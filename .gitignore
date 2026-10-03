@@ -1,0 +1,8 @@
+# build outputs
+build/
+# Ghidra project (large, regenerable from Game Files/axxl.exe + ghidra_scripts)
+ghidra/
+# exported pseudo-C corpus (large, regenerable with ghidra_scripts/ExportDecomp.java)
+decomp/
+# test run artefacts
+testruns/

@@ -1,0 +1,690 @@
+# Asterix & Obelix XXL (2004, PC) — reverse-engineering notes for the co-op mod
+
+Target binary: `Game Files/axxl.exe`
+MD5 `6953FB1930610B2D0420550479C0A40D`, SHA1 `EE7D6A20B9C07ABB591CF5E36DF50EF200B32033`
+Image base `0x400000`, no ASLR. Engine: **Kal** (Etranges Libellules) on top of RenderWare 3
+(sections `_rwcseg` / `_rwdseg` are present).
+
+Everything below is either (a) taken from AdrienTD's `xxl-inspector` / `XXL-Editor` sources that
+are checked out next to this folder, or (b) recovered with Ghidra from `axxl.exe`. Each entry says
+which. **Nothing here has been confirmed against a running game yet** — the runtime diagnostics in
+the mod (`coop_diag`) exist to do exactly that.
+
+---
+
+## 1. Object model
+
+Every engine object derives from `KClass`, whose first ten vtable slots are fixed:
+
+| slot | offset | method |
+|---|---|---|
+| 0 | 0x00 | destructor |
+| 1 | 0x04 | `isSubclass(int clgrp \| clid<<6)` |
+| 2 | 0x08 | `reset` |
+| 3 | 0x0C | `getClassGroup` |
+| 4 | 0x10 | `getClassID` |
+| 5 | 0x14 | **`sendEvent(int event, void* param)`** |
+| 6 | 0x18 | unknown |
+| 7 | 0x1C | unknown |
+| 8 | 0x20 | `serialize` |
+| 9 | 0x24 | `deserialize` |
+
+*(source: xxl-inspector `global.h`)*
+
+Classes are identified by a **(class group, class id)** pair. Groups 0..14 are
+`Managers, Services, Hooks, Hook Lives, Groups, Group Lives, Components, Cameras, Cinematic blocs,
+Dictionaries, Geometry, Nodes, Game things, Graphics things, Errors`.
+
+Classes register themselves at startup through
+
+```
+FUN_0047A240(clgrp, clid, ?, allocOne, ?, allocArray, ?, "CKClassName")
+```
+
+`0x47A274` (inside that function) is where xxl-inspector hooks to harvest class names. Because the
+name string is an argument, **every class name is a plain string in the .rdata section**, and the
+xref from the name gives you the registration site, from which `allocOne` gives the constructor and
+the constructor gives the vtable. That is how all the vtables below were found.
+
+### Finding instances at runtime
+
+```
+kcls  = *(void**)(yellowPages->loadingManager + 4)
+grp   = *(void**)(kcls + 12*clgrp)
+cont  = (ClassContainer*)grp + clid
+```
+
+`ClassContainer` is packed: `objects@0, flags@4, u1@8, u2@0xC(u16), count@0xE(u16), clSize@0x10(u16),
+pl@0x12(u8)`. Instances are inline (`pl != 0`), a single object (`flags>>17 == 1`), or an array of
+pointers. *(source: xxl-inspector `gui.cpp: GetLvlObject`)*
+
+`count == 0` is the normal state for a class with no instances — this is how you detect that
+**Obelix does not exist yet** in the opening section of level 1.
+
+---
+
+## 2. Globals
+
+| address | meaning | source |
+|---|---|---|
+| `0x6621F4` | `CKYellowPages**` — the service locator | inspector |
+| `0x665310` | `SGameStartInfo*` (`hwnd`, width, height, fullscreen) | inspector |
+| `0x479C10` | the game's own `WndProc` | inspector |
+| `0x479E8E` | immediate operand holding the WndProc pointer in `RegisterClassA` | inspector |
+
+`CKYellowPages` fields used here: `kclInfos@0x1C`, `gameLoop@0x30`, `loadingManager@0x44`,
+`srvCollision@0x50`, `+0x68` (used by the trio switch), `srvBeacon@0x78`, **`gameManager@0x8C`**.
+
+`CKGameManager`: `currentLevel@0x04` (`-1` while in menus), `nextLevel@0x08`, `levelObject@0x20`,
+and **`+0x40` → the hero command block (§5)**.
+
+---
+
+## 3. Classes that matter
+
+| class | (grp,id) | instance size | vtable | notes |
+|---|---|---|---|---|
+| `CKInput` | (0,4) | — | — | one per mapped action; registered at `0x435D20` |
+| `CKSrvCamera` | (1,3) | — | — | `pos@0x88`, `dir@0xAC`, target nodes@`0xE8` |
+| `CKHkAsterix` | (2,28) | `0xC78` | `0x625A8C` | ctor `0x4A22A0` |
+| `CKHkObelix` | (2,29) | `0xBF8` | — | ctor `0x4A60E0` |
+| `CKHkIdefix` | (2,30) | — | — | |
+| `CKHkInGameInterface` | (2,132) | — | — | the HUD; `goVanish` = `0x515CB0` |
+| `CKHkAsterixLife` | (3,27) | `0x20` | `0x625C90` | |
+| `CKHkObelixLife` | (3,57) | `0x20` | `0x625D18` | |
+| `CKGrpTrio` | (4,12) | `0x720` | `0x6256A0` | the hero manager |
+| `CKGrpBonus` | (4,48) | — | — | |
+
+---
+
+## 4. `CKGrpTrio` — the hero manager
+
+This is the class the whole co-op mode hangs off. Layout recovered from its `sendEvent` handler
+`FUN_00482BB0`:
+
+| offset | meaning |
+|---|---|
+| `+0x2C` | byte — **leader** index (the hero the camera and HUD follow) |
+| `+0x2D` | byte — **companion** index (the AI-driven hero) |
+| `+0x30` | `CKHkAsterix*` |
+| `+0x34` | `CKHkObelix*` |
+| `+0x38` | `CKHkIdefix*` |
+| `+0x38C` | float — switch proximity radius (squared against hero distance) |
+| `+0x48` | object that receives `0x4A00`-family notifications; assigned by event `0x4901` |
+| `+0x3F4` | flags: `0x4` in-switch-zone, `0x8`, `0x100`, `0x200`, `0x400`, `0x800` |
+
+`sendEvent` dispatches on `(event >> 8) & 0xFF`; `0x48` lands in `FUN_00482BB0`, which switches on
+the low byte. The interesting sub-events:
+
+| event | effect |
+|---|---|
+| `0x4800` | leader ← **Asterix** (`+0x2C = 0`, `+0x2D = 1`); Obelix gets order 0 |
+| `0x4801` | leader ← **Obelix** (`+0x2C = 1`, `+0x2D = 0`); Asterix gets order 0 |
+| `0x4802` | companion → order 3 (*Attendre* / wait) |
+| `0x4803` | companion → order 0 (*Suivre Leader* / follow) |
+| `0x4806` | all three heroes: control bits ← `bit0` |
+| `0x4807` | all three heroes: control bits ← `bit0 + 2` |
+| `0x480B`..`0x480F` | cinematic in/out; control bits ← `bit0 + 6` |
+| `0x4877/0x4878` | Idefix wait / follow |
+| `0x487F`..`0x4881` | set `hero+0x1A = 1` for Asterix / Obelix / Idefix |
+| `0x4882`..`0x4884` | clear `hero+0x1A` for Asterix / Obelix / Idefix |
+| `0x48B7 / 0x48B8` | same as `0x4800 / 0x4801` but with the "instant" flag |
+
+`0x4800`/`0x4801` are exactly what the blue circles on the ground fire, and what xxl-inspector's
+"Switch (F2)" button sends:
+
+```cpp
+trio->sendEvent(0x4800 | (*((char*)trio + 0x2D) ? 1 : 0), nullptr);
+```
+
+`FUN_00481880(newLeader, instant)` is the follow-up: if the two heroes are further apart than
+`trio+0x38C`, it teleports/fades (`FUN_00459050(node, 0.0f, 1)`), otherwise it just fades in.
+
+---
+
+## 5. Hero layout (`CKHkHero` common part)
+
+| offset | meaning |
+|---|---|
+| `+0x18` | byte. `bit0` = **this hero is the AI companion**. `bits1..4` = **control state** |
+| `+0x1A` | byte. non-zero = **ignore the player command block** (i.e. this hero is on AI) |
+| `+0x6C` | `Vector3` position |
+| `+0xB4` | `Vector3` facing direction |
+| `+0x390` | flags; `0x200` set at the end of every tick, `0x4` = busy/locked |
+| `+0x3EC`, `+0x3F0` | more flag words |
+| `+0x561` | byte — current action/animation state |
+| `+0x564` | byte — **AI order** (table below) |
+| `+0x568` | `Vector3` — AI target position |
+| `+0x574` | `Vector3` — AI target direction |
+| `+0x884` | flag word: `0x4`, `0x100`, `0x200`, `0x400`, `0x800` |
+| `+0xB64`, `+0xB68` | child nodes touched every tick by the Life object |
+
+### AI orders (`hero+0x564`)
+
+Read straight out of the debug name table at `0x64CBD8` (the developers left the French names in):
+
+| # | name | meaning |
+|---|---|---|
+| 0 | Suivre Leader | follow the leader |
+| 1 | Aller à position | go to position |
+| 2 | Sauter à position | jump to position |
+| 3 | Attendre | wait |
+| 4 | Frapper un ennemi | hit an enemy |
+| 5 | Envoyer un ennemi | throw an enemy |
+| 6 | Mordre un ennemi | bite an enemy |
+| 7 | Aller à baliste | go to the ballista |
+| 8 | Se suspendre à une poutre | hang from a beam |
+| 9 | Utiliser téléphérique | use the cable car |
+| 10 | Recevoir un coup | take a hit |
+| 11 | Nettoyer chemin | clear the path |
+| 12 | Sous controle extérieur | **under external control** |
+| 13 | Aller à homme indice | go to the hint man |
+| 14 | Aller à magasin | go to the shop |
+| 15 | Aller à position sans PF | go to position, no pathfinding |
+
+Order 0 is what makes Obelix trail Asterix and pick fights on his own; orders 4/5/6 are the combat
+behaviours the companion AI selects for itself in `FUN_0049EE80`. The big companion AI state
+machines live at `FUN_004F05C0` and `FUN_004F1260`.
+
+---
+
+### Why bit 0 is the companion flag
+
+`CKHkAsterix::update` resets the AI order to 0 whenever bit 0 is set, `CKGrpTrio`'s switch handler
+refuses to switch *to* a hero unless bit 0 is set (you can only take over someone you are not
+already driving), and live values agree: while the player drives Asterix, Asterix reads `f18=00`
+and Obelix reads `f18=03`.
+
+---
+
+## 6. The per-frame update path — where co-op has to hook
+
+**This section replaces an earlier, wrong answer.** Static analysis pointed at the hero *Life*
+objects, because slot 13 (`+0x34`) of `CKHkAsterixLife`'s vtable is `0x4AA850`, and that is the only
+caller of `CKHkAsterix::update` (`0x4A3230`). Runtime profiling showed that slot firing exactly
+**once per level** while the game played on at 63 fps. Two things were wrong:
+
+* `0x4A3230` is an **enter/init** routine (it lazily builds the state-machine jump tables and applies
+  the initial control state), not the per-frame update; and
+* the engine **swaps a hero's Life class depending on what the hero is doing**, so
+  `CKHkAsterixLife` is only one of many and is not the one driving ordinary play.
+
+The real per-frame path, found by instrumenting every vtable slot with a counting thunk that also
+records its caller:
+
+```
+FUN_0048D4F0(hero)          <- hero state-machine tick, ~63/s per hero
+  |
+  +- FUN_0048F720(prevState)          picks the state selector from hero+0x18 bits 1..4:
+  |     ctrl 0/1 -> vtable +0x40      (CKHkAsterix: 0x4A3BA0)
+  |     ctrl 2/3 -> vtable +0x44      (0x4A3DE0)
+  |     ctrl 4/5 -> vtable +0x48      (0x4A3DF0)
+  |     ctrl 6/7 -> vtable +0x4C      (0x4A3E00)
+  |     ctrl 8/9 -> vtable +0x50      (0x4A3E70)
+  |     else     -> keep current state
+  |
+  +- handlers[oldState](2, ...)       exit  the old state
+  +- handlers[newState](1, ...)       enter the new state
+  +- handlers[curState](0, ...)       run   the current state   <-- the actual per-frame work
+```
+
+Hero state-machine fields: `+0xDC` owner, `+0xE0` handler table, `+0xE5` current state index.
+`FUN_0048D4F0` is called directly from **nineteen** different hook-life ticks, all in `0x4AA000`–
+`0x4AD000`, which is why no single Life vtable covers it.
+
+So the co-op hook is an inline detour on `FUN_0048D4F0`, whose `this` is the hero. Its first five
+bytes are `51 53 56 8B F1` (`push ecx / push ebx / push esi / mov esi,ecx`) — exactly five, so a
+`jmp rel32` does not split an instruction. Heroes are told apart by comparing `this` against the
+trio's three pointers; every other hook passing through is forwarded untouched.
+
+Verified live: `asterix=126 obelix=126` ticks per 2 s at 63 fps.
+
+`CKHkAsterix::update` (`0x4A3230`) does, in order:
+
+1. lazily builds three state-machine jump tables into `hero+0xDC/0x3E0/0x558`;
+2. reads the **hero command block** at `gameManager+0x40`:
+   * `+0x5C` (char) — if not `-1`, copied into `hero+0x1A`;
+   * gated on `hero+0x1A == 0`:
+     * `+0x20..+0x28` — `Vector3`, the desired movement direction, copied to `hero+0x6C`-relative
+       state when non-zero;
+     * `+0x8C` — float heading; `sin`/`cos` of it fill `hero+0xB4` (facing);
+     * `+0x1C` — low nibble → `hero+0x18` bits 1..4, bits 4..5 → `hero+0x18` bit 0.
+
+**This is the key finding.** There is exactly one command block, and a hero consumes it only when
+its own `+0x1A` is zero. So splitting control between two players does not require finding and
+duplicating the whole input system — it requires:
+
+1. clearing `+0x1A` on *both* heroes, and
+2. wrapping each Life tick so that the command block holds *that player's* pad state while *that*
+   hero updates.
+
+Which is precisely what `coop_input.cpp` is built to do.
+
+> Not yet identified: the code that *fills* `gameManager+0x40` from the DirectInput device each
+> frame. `coop_diag` dumps the block live so the remaining fields can be labelled from a real run.
+
+### Confirmed on a live run
+
+A diagnostic dump taken just after level 1 finished loading (mod build 2026-07-26):
+
+```
+trio @ 03BED4C0  leader=0(Asterix) companion=1(Obelix) flags=00000000 switchRadius=15.00
+  Asterix @ 03B397E8 avail=0 ctrl=0 ignoreCmd=0 order=0(follow leader) pos=(0.0 0.0 0.0)
+  Obelix  @ 03B38194 avail=1 ctrl=1 ignoreCmd=1 order=3(wait) pos=(55.9 2.1 106.0)
+  Idefix  @ 03B3F514 avail=1 ctrl=1 ignoreCmd=1 order=3(wait) pos=(41.6 3.2 59.6)
+command block @ 03BA4144  ctrl=0002AAAA move=(0 0 0) ignore=-1 heading=-1.000
+```
+
+Two things this settles:
+
+* every offset in §4/§5 resolves to sane live values, and the AI-order table reads correctly;
+* the `0xA` nibbles in `controlBits` and the `-1` in `forceIgnore`/`heading` are the engine's
+  "leave this alone" sentinels — which is exactly what the `!= 10`, `!= 2` and `!= -1` guards in
+  `CKHkAsterix::update` are testing. Synthesised commands for player 2 must use those sentinels
+  for every field they do not intend to drive.
+
+---
+
+## 6b. `CKInput` — the mapped-action layer
+
+Class `(0, 4)`, instance size `0x6C`, vtable `0x623F38`, registered at `0x435D20`. It is a
+**manager** (a singleton in class group 0), not one object per binding, so `GetLvlObject(0,4,0)`
+returns it directly.
+
+| offset | meaning |
+|---|---|
+| `+0x04` | device array (stride 204 bytes) |
+| `+0x10` | device count |
+| `+0x18` | array of binding descriptors, **0x20 bytes each**; byte `+4` = binding is active |
+| `+0x1C` | **pointer to the action value array — one byte per action** |
+| `+0x3A` | number of actions |
+| `+0x68` | "already updated this frame" latch |
+
+Its per-frame update is vtable slot 20, `0x436360`. It first checks something on
+`yellowPages+0x7C` (`FUN_0040A7F0`, looks like a window-focus test), runs each device, then:
+
+```asm
+0043643b  MOV EAX, [ESP+0x14]        ; i
+0043643f  MOV EDX, [ESI+0x18]        ; bindings
+00436449  SHL ECX, 0x5               ; i * 0x20
+0043644e  CMP byte ptr [ECX+0x4], 1  ; binding active?
+00436454  MOV EDX, [ESI+0x1c]        ; values
+00436458  ADD EDX, EAX               ; &values[i]
+0043645b  CALL 0x00435a50            ; CKInput binding update
+```
+
+`FUN_00435A50(char* outValue, timeInfo*)` applies the binding: reads the raw byte from the device
+(`binding+0x0C` → device, `device+0x14` → raw state pointer), optionally passes it through a mapper
+object (`binding+0x08`, vtable slot 2), then does edge detection using `binding+0x05` (latch),
+`binding+0x06` (current), `binding+0x07` (previous), with `binding+0x10` selecting continuous vs.
+edge-only and `binding+0x1C` meaning "swallow until released". It also timestamps into
+`binding+0x14`/`+0x18`.
+
+**Why this matters:** the movement command block in §6 carries direction and heading, but *not* the
+buttons — `+0x1C` there is a packed bitfield of small "no change = max value" enum fields (hence the
+`0xAAAA` pattern), built nibble by nibble via `FUN_00483CF0`, with no `0xAAAA` immediate anywhere in
+the binary. The buttons come from this action array instead, which the hero state machines read.
+
+So per-player input needs **both** swapped around each hero's Life tick: the command block for
+movement, and the `CKInput` value array for buttons.
+
+Live values from level 2: manager at `03B2771C`, `numActions = 59`, `numDevices = 1`, all 59
+bindings active.
+
+### Measured action indices
+
+From a 10,000-frame probe session, aggregating the action-array diffs on every isolated pad edge
+(controller preset, level 2):
+
+| pad input | actions set | cleared on release |
+|---|---|---|
+| A | 4, 43, 44 | 43 |
+| X | 5, 38, 45 | 38 |
+| B | 6 | — |
+| Y | 7 | — |
+| LB | 8 | — |
+| RB | 10 | — |
+| Back | 12 | — |
+| Start | 15 | — |
+
+Only the "held" index of each pair clears on release (43 for A, 38 for X); the others are
+edge flags that the binding logic clears by itself the next frame.
+
+**Not all bindings are active in every level.** In level 2, indices 16–35 and 54–58 report
+`binding+4 != 1`. An earlier version of this table listed D-pad mappings drawn from single
+observations on those indices; they were noise and have been removed. Any co-op input synthesis
+should skip inactive bindings the same way the engine's own update loop does.
+
+**Actions 0..3 are analog movement half-axes**, carrying `0x00`..`0xFF` rather than a boolean —
+they read as "always-on / analog" in the correlation report because they are non-zero whenever the
+stick is off centre. Live samples show each one mirrored at more than one index:
+
+```
+[0]=87 [39]=87        [1]=68 [40]=68
+[2]=E9 [36]=E9 [41]=E9    [3]=FB [37]=FB [42]=FB
+```
+
+so index `n` is duplicated at `n+39`, and 2/3 additionally at `n+34`. The engine keeps several
+parallel banks of the same logical inputs (raw / edge / held variants), which is also why a single
+button lights three indices.
+
+Stick directions, from pairing 21 live samples against the action values:
+
+| stick | actions |
+|---|---|
+| up | 0, 39 |
+| down | 1, 40 |
+| left | 2, 36, 41 |
+| right | 3, 37, 42 |
+
+### The heroes do not read this array — measured
+
+Player 2's synthesised array was swapped in for **every one of Obelix's state ticks** (125 swaps per
+2 s, verified, with correct values such as `[0]=79 [2]=E0 [36]=E0 [39]=79 [41]=E0`) and he did not
+move at all.
+
+A page-guard sampler (`guardwatch.cpp`, `watch_target = actions`) then recorded every code site
+touching the array over ~30 s of play. All nine were in `0x435xxx` — **CKInput's own binding code**:
+
+```
+0043558A read   00435623 read   004354A0 read   00435542 read   004358C8 read
+00435A61 read   00435A9E write  00435B11 write  00435ABC write
+```
+
+Not one access from hero code (`0x48xxxx` / `0x4Axxxx`). So this array is CKInput's internal state,
+not the channel heroes consume, and swapping it can never affect a hero. **The approach in
+`p2input.cpp` is architecturally wrong**; it is left in place because the measured mapping is still
+correct and reusable once the real channel is found.
+
+The sampler kept pointing back into `0x435xxx` because everything goes through one accessor rather
+than touching the array directly:
+
+```
+FUN_004358B0   __thiscall uint8_t GetAction(InputView* self, uint8_t actionId)
+    MOV EDX,[ECX+0x08]     ; self+0x08 -> per-owner action-id remap table
+    MOV BL,[EDX+EAX]       ; remapped index
+    MOV EAX,[ECX+0x0C]     ; self+0x0C -> the CKInput manager
+    MOV ECX,[EAX+0x1C]     ; manager->values
+    MOV AL,[EBX+ECX]       ; values[remapped]
+```
+
+### `FUN_0048ABF0` — the hero's input reader
+
+Following that accessor's callers leads to `FUN_0048ABF0`, in the hero base-class region:
+
+```asm
+MOV ESI,ECX               ; ESI = the hero
+MOV EAX,[ESI+0x14]
+MOV EDI,[EAX+0x28]        ; the input view
+GetAction(3), GetAction(2)  ->  hero+0x3D4 = (float)(action2 - action3)   ; left - right
+GetAction(1), GetAction(0)  ->  hero+0x3DC = (float)(action0 - action1)   ; up   - down
+                                hero+0x3D8 = 0
+GetAction(4)                ->  folded into the flags at hero+0x3EC
+```
+
+This independently confirms the measured axis mapping (0 up, 1 down, 2 left, 3 right, 4 = A) and
+gives the fields the state machine actually consumes: **`hero+0x3D4` and `hero+0x3DC`**.
+
+It ends in a plain `RET` with no stack arguments, so it is safe to call as
+`__fastcall(hero, nullptr)`.
+
+**And it has exactly two callers, both hook-life ticks** — the ones that drive the *player's* hero.
+The AI companion's life never calls it. That is the whole reason player 2's input had no effect: no
+matter how faithfully the action array was populated, nothing was ever converting it into Obelix's
+movement fields.
+
+The fix is therefore to call `FUN_0048ABF0` on player 2's hero, inside the bracket where their
+action values are installed.
+
+### That was necessary but not sufficient
+
+With the reader called on Obelix, his movement fields do get populated and they survive his tick:
+
+```
+inputview asterix=03CB73A8 obelix=03CB73A8      <- both heroes share one input view
+axes      asterix=(0.0 0.0) obelix=(17.0 -254.0)
+p2 axes   before=(17.0 -254.0) afterRead=(17.0 -254.0) afterTick=(17.0 -254.0)
+```
+
+Nothing overwrites them — a page guard over Obelix's `+0x380..+0x3F7` recorded no writes to `+0x3D4`
+or `+0x3DC` at all. He still did not move, because his **AI action** was steering him. Comparing the
+two heroes while the player drove Asterix:
+
+```
+asterix e5=16 a561=FF f18=00     <- player:    no AI action running
+obelix  e5=13 a561=00 f18=03     <- companion: AI action 0, order 0 "follow leader"
+```
+
+`hero+0x561 = 0xFF` is the engine's "no state" marker — the same sentinel `FUN_0048D4F0` uses for
+`hero+0xE5`. The player's hero runs with it; the companion does not. Forcing it on player 2's hero
+each frame is what stops the AI competing for control.
+
+### There are two state machines per hero
+
+Forcing `hero+0x561 = 0xFF` did not work either: Obelix kept following normally. The reason is that
+`CKHkAsterix::update` builds **three** dispatch tables, and two of them are ticked every frame by
+separate drivers:
+
+| driver | table | current state | state chooser |
+|---|---|---|---|
+| `FUN_0048D4F0` | `hero+0xE0` | `hero+0xE5` | vtable `+0x40`.. via `FUN_0048F720` |
+| `FUN_0049DE10` | `hero+0x55C` | `hero+0x561` | `FUN_0049EE80` |
+
+Both share the `2=exit / 1=enter / 0=run` handler protocol and the `0xFF` no-state marker, and both
+take the same inline detour (identical `51 53 56 8B F1` prologue).
+
+**Which is which — corrected.** `FUN_0048D4F0` drives the **animation** machine: its walk handler
+`FUN_0048E5A0` does nothing but pick animations (`FUN_0048D650((flags & 7) + 0x0D, ...)`), which is
+why `hero+0xE5` tracks walk/run/idle poses.
+
+`FUN_0049DE10` is the hero's **main action machine** — locomotion, gravity, jumping, attacking — and
+`FUN_0049EE80` chooses between *player* handlers and *AI* handlers for it. The player's whole input
+sequence (the `FUN_0048ABF0` / `FUN_0048ACA0` calls and the `hero+0x384` bitfield rolls around
+`0x4AB291`) lives **inside one of its handlers**: those functions end in `RET 8` and take
+`(mode, prevState)`, so they are state handlers, not life ticks.
+
+Suppressing `FUN_0049DE10` for player 2's hero was therefore exactly backwards. Observed result:
+
+* the hero froze in whatever animation was playing when player 2 joined;
+* he kept drifting on whatever velocity he had, forever;
+* **gravity stopped** — pushing him up a slope left him hovering at that height;
+* buttons did nothing, because attack and jump are states of that machine.
+
+Hand-rolling the player sequence (`FUN_0049A3B0`, `FUN_0048ABF0`, `FUN_0048ACA0`, `FUN_0049A1A0`,
+`FUN_004A1BF0`, plus the movement bitfields) reproduced the *animation* — the direction vector at
+`hero+0x574..0x57C` tracked the stick correctly, unit length — but never the locomotion, because the
+real work is in the handlers.
+
+The correct intervention is to let the machine run and make it believe the hero is the player's,
+which is what clearing bit 0 of `hero+0x18` does. Both machines now get the same bracket: install
+player 2's action values, clear the companion bit, run the original, restore.
+
+Incidental finding from forcing the movement field: `hero+0x384` bits 0..2 index an animation
+directly, so `1` is walk and `2` is the next one along — the "falling" pose player 2's hero struck
+when that value was guessed rather than copied from a moving Asterix (`f384` low byte `0x09`).
+
+### Reading input and applying it are two calls
+
+The player's hook-life tick (e.g. at `0x4AB2C2`) runs:
+
+```asm
+MOV ECX,ESI / CALL 0x0049A3B0
+MOV ECX,ESI / CALL 0x0048ABF0    ; read input   -> hero+0x3D4, +0x3DC
+MOV ECX,ESI / CALL 0x0048ACA0    ; transform it -> movement
+MOV ECX,ESI / CALL 0x0049A1A0
+```
+
+`FUN_0048ABF0` only *stores* the raw axes. `FUN_0048ACA0` (`__thiscall`, hero in ECX, uses SEH,
+plain `RET`) normalises them and produces the actual motion, writing `hero+0x578`/`+0x57C` at the
+end. Calling the reader without the transform leaves correct-looking values in the hero's fields
+that nothing acts on — which is exactly what the axis logging showed.
+
+Both are called for player 2's hero now. `0x49A3B0` and `0x49A1A0` are not, and are the next things
+to try if movement is still wrong.
+
+Two other pieces worth recording:
+
+* `FUN_004815C0` (a `CKGrpTrio` method) builds the camera-relative movement basis into
+  `trio+0x39C..0x3A4`, and it consults **only the leader**: `trio + 0x30 + trio[0x2C]*4`. The basis
+  itself is camera-relative and hero-independent, so it does not need duplicating — but anything
+  that gates on "am I the leader" is worth suspecting.
+* Both heroes share a single input view object, so swapping the manager's value array does reach
+  both. The array was never the problem.
+
+---
+
+## 7. Rendering / camera
+
+`0x414B70` — `__thiscall CalcProjCamera(CRendThing* self, float fovDegrees, char force)`, `ret 8`:
+
+```c
+if (!force && fabs(self->cachedFov /*+0x28*/ - fov) < 0.001f) return;
+if (self->viewport /*+0x04*/ && self->+0x08) {
+    self->cachedFov = fov;
+    ss[0] = tan(fov * pi/180 * 0.5f);
+    self->cachedRatio /*+0x2C*/ = viewport->height /*+0x10*/ / viewport->width /*+0x0C*/;
+    ss[1] = self->cachedRatio * ss[0];
+    RwCameraSetViewWindow(self->camera /*+0x10*/, ss);   // FUN_0058FFB0
+}
+```
+
+The QoL patch and xxl-inspector both replace this function wholesale to get widescreen FOV, so it
+is a known-good, safe hook point — and it is also where a per-viewport aspect ratio has to be
+applied for split-screen.
+
+Renderer object (built by `FUN_004144A0`):
+
+| offset | meaning |
+|---|---|
+| `+0x04` | viewport/screen descriptor: `width@0x0C`, `height@0x10`, `+0x14` |
+| `+0x08` | non-zero when the camera is usable |
+| `+0x0C` | "BackBufferCopy" raster |
+| `+0x10` | **main 3D `RwCamera`** |
+| `+0x14` | second `RwCamera` — ortho, view window 0.5/0.5, near 0.1, far 1.9 → the 2D/HUD camera |
+| `+0x18` | device descriptor passed to init |
+| `+0x1C` | frame buffer object |
+| `+0x28`, `+0x2C` | cached FOV / aspect |
+
+RenderWare 3 entry points identified from that init function:
+
+| address | RW function |
+|---|---|
+| `0x590060` | `RwCameraCreate` |
+| `0x58E7B0` | `RwCameraSetRaster`-like (camera, raster) |
+| `0x58DD80` | returns the frame-buffer/raster pair |
+| `0x58FFB0` | `RwCameraSetViewWindow(camera, float[2])` |
+| `0x58FD40` | `RwCameraSetViewOffset(camera, float[2])` |
+| `0x58FD70` | `RwCameraSetNearClipPlane` |
+| `0x58FE40` | `RwCameraSetFarClipPlane` |
+| `0x58FF40` | `RwCameraSetProjection` (2 = perspective) |
+| `0x58DFF0` | frustum resync, called by `SetViewWindow` |
+
+Other callers of `CalcProjCamera`: `0x4145D7`, `0x414AD4`, `0x456E0C`, `0x4591D5`, `0x453804`,
+`0x4540FF`.
+
+### The cameras are stock RenderWare 3
+
+The renderer init stores its objects in globals:
+
+| address | object |
+|---|---|
+| `0x662EB4` | frame-buffer object |
+| `0x662EB8` | **the main 3D `RwCamera`** |
+| `0x662EBC` | the 2D/HUD `RwCamera` (orthographic) |
+
+and the camera is the unmodified RW3 `RwCamera`:
+
+| offset | field |
+|---|---|
+| `+0x04` | parent `RwFrame` (the transform) |
+| `+0x14` | `projectionType` — **1 = perspective, 2 = parallel** |
+| `+0x18` / `+0x1C` | `beginUpdate` / `endUpdate` function pointers |
+| `+0x60` / `+0x64` | `frameBuffer` / `zBuffer` rasters |
+| `+0x68` / `+0x70` | `viewWindow` / `recipViewWindow` |
+| `+0x78` | `viewOffset` |
+| `+0x80` / `+0x84` | near / far plane |
+
+Confirmed live: `viewWindow=(0.9336 0.5252)` (16:9 — the QoL patch's widescreen FOV), `near=0.12`,
+`far=60`, `projectionType=1`. The HUD camera is the one the init sets to projection 2.
+
+### `FUN_00413FF0` — render one view
+
+Found by pointing the slot profiler at the camera's `beginUpdate`/`endUpdate` pointers and recording
+the callers (`0x414041` and `0x414063`):
+
+```asm
+00413FF0  PUSH ESI / MOV ESI,ECX / TEST byte ptr [ESI+0x68],0x20   ; 7-byte prologue
+...
+00414035  MOV ECX,[ESI+0x8] / MOV EAX,[ECX+0x10]   ; renderer -> main RwCamera
+0041403C  CALL 0x0058FD30                          ; RwCameraBeginUpdate(camera)
+0041404A  CALL 0x00414110                          ; *** draw the scene ***
+0041405E  CALL 0x0058FD20                          ; RwCameraEndUpdate(camera)
+00414067  RET 4
+```
+
+So `0x58FD30` / `0x58FD20` are `RwCameraBeginUpdate` / `RwCameraEndUpdate` (`__cdecl`, one
+argument), `0x414110` is the scene draw, and `FUN_00413FF0` is "render one view" — `__thiscall`
+with one stack argument. Its first instruction boundary at or past five bytes is seven, so it takes
+a clean inline detour.
+
+**Verified: calling it twice per frame is safe and costs nothing** — the picture is identical (the
+second pass overdraws the first) and the game still holds 62 fps. Re-entrancy was the main risk in
+the whole split-screen idea, and it is not a problem.
+
+> Still needed: `RwRasterSubRaster` (to give each pass a half-screen sub-raster of the frame and Z
+> buffers) and per-pass camera placement via the camera's parent `RwFrame` at `+0x04`.
+
+---
+
+## 8. Useful functions
+
+| address | signature |
+|---|---|
+| `0x40D2C0` | `__thiscall kfRefToPnt(void* self, uint* ref)` |
+| `0x515CB0` | `__thiscall CKHook::goVanish(KHook*)` — used to hide the HUD |
+| `0x54BE20` | `__thiscall CKGrpBonus::spawnBonus(KGroup*, int type, Vector3*)` |
+| `0x54E2C0` | `__thiscall CKHkBasicBonus::followHero(KHook*, Vector3*, KHook*)` |
+| `0x54DF10` | `__thiscall CKHkBasicBonus::fall(KHook*, Vector3*)` |
+| `0x5354B0` | `CKProjectileTypeAsterixBomb::spawn(...)` |
+| `0x459050` | `(node, float, int)` — fade / visibility, used by the hero switch |
+| `0x483CF0` | `__thiscall bitfieldSet(byte* self, char value, byte shift, byte width)` |
+
+---
+
+## 8b. Diagnostics gotcha: bounded log lines
+
+The diagnostic dumps assemble variable-length lists — one entry per action, per vtable slot, per
+changed byte — and the counts are engine-controlled. Building those with `sprintf` into a fixed
+`char[256]` crashed the game with `0xC0000409` (`STATUS_STACK_BUFFER_OVERRUN`) the moment a level
+left 25 of the 59 input bindings inactive and each one appended `(off)`, pushing the line to ~315
+characters. It had run fine for 10,000 frames in a level where every binding was active.
+
+All of these now go through `LineBuf` in `log.h`, which bounds every append and marks the line
+truncated instead of running off the end. Anything new that builds a list into a log line should
+use it too.
+
+---
+
+## 9. Host environment
+
+* `dinput8.dll` in the game folder is **ThirteenAG's Ultimate ASI Loader**, so `.asi` plugins in the
+  game directory are loaded automatically. The co-op mod is built as `xxl_coop.asi` for this reason.
+* `d3d9.dll` is **AdrienTD's XXL QoL Patch** (windowed mode, widescreen FOV, right-stick remap,
+  mouse input, configurable heap). Its source is not public. It already replaces `CalcProjCamera`
+  at `0x414B70`, so the co-op mod must not blindly overwrite that function — see
+  `coop_render.cpp`.
+* Its `xxl_qol_settings.ini` has an undocumented `initial_level` key (the string is in the DLL but
+  not in the shipped ini). **It access-violates on startup** on this build, with or without the
+  co-op mod loaded.
+
+### `force_level` works fine
+
+Writing `CKGameManager::nextLevel` (what XXL-Editor's `GameLauncher` does, and what the mod's
+`force_level` does) gives real, playable gameplay. An earlier note here claimed otherwise; that was
+wrong. The symptom that prompted it — hero ticks frozen at zero while the game clearly played — was
+caused by hooking the wrong function, see §6.
+
+Two readings that misled the diagnosis, both corrected below: `hero+0x18` bit 0 means "AI
+companion", not "hero exists" (§5), so the player's own hero reads as `avail=0`; and
+`CKHkAsterixLife::tick` is not the per-frame tick (§6).
+* `dsound.dll` is IndirectSound; unrelated.
