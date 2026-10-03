@@ -14,16 +14,17 @@ set ROOT=%~dp0
 set OUT=%ROOT%build
 if not exist "%OUT%" mkdir "%OUT%"
 pushd "%OUT%" || exit /b 1
+del /q *.obj 2>nul
 
 cl /nologo /c /O2 /MT /EHsc /W3 /std:c++17 /D_CRT_SECURE_NO_WARNINGS ^
-   "%ROOT%src\main.cpp" "%ROOT%src\kal.cpp" "%ROOT%src\coop.cpp" ^
-   "%ROOT%src\hooks.cpp" "%ROOT%src\trio.cpp" "%ROOT%src\pads.cpp" ^
-   "%ROOT%src\probe.cpp" "%ROOT%src\inputmgr.cpp" "%ROOT%src\watchdog.cpp" ^
-   "%ROOT%src\vtprofile.cpp" "%ROOT%src\detour.cpp" "%ROOT%src\p2input.cpp" "%ROOT%src\p2order.cpp" "%ROOT%src\render.cpp" "%ROOT%src\guardwatch.cpp" ^
-   "%ROOT%src\config.cpp" "%ROOT%src\log.cpp"
+   "%ROOT%src\main.cpp" "%ROOT%src\kal.cpp" "%ROOT%src\coop.cpp" "%ROOT%src\hooks.cpp" ^
+   "%ROOT%src\life.cpp" "%ROOT%src\trio.cpp" "%ROOT%src\pads.cpp" "%ROOT%src\inputmgr.cpp" ^
+   "%ROOT%src\watchdog.cpp" "%ROOT%src\vtprofile.cpp" "%ROOT%src\detour.cpp" "%ROOT%src\p2input.cpp" ^
+   "%ROOT%src\render.cpp" "%ROOT%src\autotest.cpp" "%ROOT%src\shot.cpp" "%ROOT%src\config.cpp" ^
+   "%ROOT%src\log.cpp"
 if errorlevel 1 goto :fail
 
-link /nologo /DLL /OUT:xxl_coop.asi *.obj kernel32.lib user32.lib psapi.lib
+link /nologo /DLL /OUT:xxl_coop.asi *.obj kernel32.lib user32.lib gdi32.lib gdiplus.lib psapi.lib
 if errorlevel 1 goto :fail
 
 popd

@@ -48,7 +48,11 @@ void SetAxis(uint8_t* out, int n, const AxisMap& axis, float magnitude) {
 bool BuildP2Actions(int padIndex, uint8_t* out, int numActions) {
 	const PadState& p = PadGet(padIndex);
 	if (!p.connected) return false;
+	BuildActionsFromPad(p, out, numActions);
+	return true;
+}
 
+void BuildActionsFromPad(const PadState& p, uint8_t* out, int numActions) {
 	memset(out, 0, numActions);
 
 	// Stick: split into four one-sided axes the way the engine stores them.
@@ -66,5 +70,4 @@ bool BuildP2Actions(int padIndex, uint8_t* out, int numActions) {
 			for (int i = 0; i < 2 && b.edge[i] >= 0; i++)
 				if (b.edge[i] < numActions) out[b.edge[i]] = 0xFF;
 	}
-	return true;
 }

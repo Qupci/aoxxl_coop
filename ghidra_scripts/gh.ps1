@@ -7,7 +7,7 @@
 param([Parameter(Mandatory = $true, Position = 0)][string]$Script)
 
 $ghidra  = "F:\ghidra_12.1.2_PUBLIC\support\analyzeHeadless.bat"
-$proj    = "C:\Temp\claude\F--XXL-COOP-MOD\e2f20663-3682-40d7-b9f8-e22531450576\scratchpad\ghidra"
+$proj    = Join-Path (Split-Path -Parent $PSScriptRoot) "ghidra"
 $scripts = "F:\XXL COOP MOD\coop\ghidra_scripts"
 $outFile = Join-Path $env:TEMP ("ghdump_" + [guid]::NewGuid().ToString("N") + ".txt")
 

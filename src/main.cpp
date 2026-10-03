@@ -10,6 +10,7 @@
 #include "log.h"
 #include "vtprofile.h"
 #include "render.h"
+#include "autotest.h"
 
 namespace {
 
@@ -49,20 +50,36 @@ bool VerifyGameBuild() {
 // wait for the yellow pages and game manager to exist, then write the level
 // number into CKGameManager::nextLevel.
 void ForceLevel(int level) {
-	Log("forceLevel: waiting for the game manager...");
-	for (int i = 0; i < 240; i++) {   // up to ~60 s
-		CKYellowPages* yp = YellowPages();
-		if (yp && yp->gameManager) {
-			int* nextLevel = (int*)((char*)yp->gameManager + ax::kGM_nextLevel);
-			int  current   = *(int*)((char*)yp->gameManager + ax::kGM_currentLevel);
-			Log("forceLevel: gameManager=%p currentLevel=%d, requesting level %d",
-				yp->gameManager, current, level);
-			*nextLevel = level;
-			return;
+	// The request only sticks once the menu level (0) has finished loading:
+	// written any earlier, the boot sequence overwrites nextLevel with 0 itself.
+	// Left alone on the menu, the game eventually starts its attract-mode demo.
+	Log("forceLevel: waiting for the menu...");
+	for (int attempt = 0; attempt < 3; attempt++) {
+		bool requested = false;
+		for (int i = 0; i < 480 && !requested; i++) {   // up to ~120 s
+			CKYellowPages* yp = YellowPages();
+			void* gm = yp ? yp->gameManager : nullptr;
+			if (gm && *(int*)((char*)gm + ax::kGM_currentLevel) == 0) {
+				Log("forceLevel: menu is up (gameManager=%p), requesting level %d", gm, level);
+				*(int*)((char*)gm + ax::kGM_nextLevel) = level;
+				requested = true;
+			} else {
+				Sleep(250);
+			}
 		}
-		Sleep(250);
+		if (!requested) break;
+		for (int i = 0; i < 120; i++) {                 // ~30 s to get there
+			Sleep(250);
+			CKYellowPages* yp = YellowPages();
+			void* gm = yp ? yp->gameManager : nullptr;
+			if (gm && *(int*)((char*)gm + ax::kGM_currentLevel) == level) {
+				Log("forceLevel: level %d is loading", level);
+				return;
+			}
+		}
+		Log("forceLevel: level %d did not start, retrying", level);
 	}
-	Log("forceLevel: game manager never appeared");
+	Log("forceLevel: gave up");
 }
 
 DWORD WINAPI StartupThread(LPVOID) {
@@ -102,6 +119,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID) {
 		DisableThreadLibraryCalls(hinst);
 		LogOpen();
 		g_config.Load("xxl_coop.ini");
+		AutotestInit();
 		if (!g_config.enabled) {
 			Log("startup: disabled in xxl_coop.ini");
 			return TRUE;

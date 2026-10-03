@@ -24,6 +24,8 @@ typedef uint32_t(WINAPI* PFN_XInputGetState)(uint32_t, XI_STATE*);
 static HMODULE            g_xinput = nullptr;
 static PFN_XInputGetState g_getState = nullptr;
 static PadState           g_pads[kMaxPads];
+static PadState           g_virtual[kMaxPads];
+static bool               g_virtualActive[kMaxPads];
 
 bool PadsInit() {
 	static const char* const kCandidates[] = {
@@ -65,10 +67,28 @@ static void ApplyDeadzone(int16_t rawX, int16_t rawY, float dz, float* outX, flo
 	*outY = y / mag * scaled;
 }
 
+void PadsSetVirtual(int i, const PadState* st) {
+	if (i < 0 || i >= kMaxPads) return;
+	g_virtualActive[i] = st != nullptr;
+	if (st) g_virtual[i] = *st;
+}
+
 void PadsPoll() {
-	if (!g_getState) return;
 	for (int i = 0; i < kMaxPads; i++) {
 		PadState& p = g_pads[i];
+		if (g_virtualActive[i]) {
+			const PadState& v = g_virtual[i];
+			uint16_t prevButtons = p.buttons;
+			if (!p.connected) Log("pads: pad %d connected (virtual)", i);
+			p.connected = true;
+			p.buttons   = v.buttons;
+			p.pressed   = (uint16_t)(p.buttons & ~prevButtons);
+			p.released  = (uint16_t)(prevButtons & ~p.buttons);
+			p.lx = v.lx; p.ly = v.ly; p.rx = v.rx; p.ry = v.ry;
+			p.lt = v.lt; p.rt = v.rt;
+			continue;
+		}
+		if (!g_getState) continue;
 		XI_STATE st = {};
 		uint32_t res = g_getState((uint32_t)i, &st);
 		uint16_t prev = p.buttons;

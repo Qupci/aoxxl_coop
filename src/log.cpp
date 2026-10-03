@@ -7,11 +7,16 @@
 #include <cstdarg>
 #include <cstring>
 
-static FILE* g_log = nullptr;
+static FILE*            g_log = nullptr;
+static CRITICAL_SECTION g_logLock;
+static bool             g_lockReady = false;
+static DWORD            g_logStart = 0;
 
 void LogOpen() {
 	if (g_log) return;
+	if (!g_lockReady) { InitializeCriticalSection(&g_logLock); g_lockReady = true; }
 	g_log = fopen("xxl_coop.log", "w");
+	g_logStart = GetTickCount();
 	if (g_log) {
 		SYSTEMTIME st;
 		GetLocalTime(&st);
@@ -22,17 +27,37 @@ void LogOpen() {
 }
 
 void LogClose() {
+	if (!g_lockReady) return;
+	EnterCriticalSection(&g_logLock);
 	if (g_log) { fclose(g_log); g_log = nullptr; }
+	LeaveCriticalSection(&g_logLock);
 }
 
+// Every line is stamped with seconds since startup, and written under a lock:
+// the watchdog thread and the game thread both log, and a line split across
+// the two is worse than useless when reconstructing what happened in a frame.
 static void vlog(const char* fmt, va_list ap) {
-	if (!g_log) return;
-	vfprintf(g_log, fmt, ap);
-	fputc('\n', g_log);
-	fflush(g_log);  // the game can hard-crash; never buffer
+	if (!g_log || !g_lockReady) return;
+	char line[1024];
+	DWORD ms = GetTickCount() - g_logStart;
+	int n = _snprintf_s(line, sizeof(line), _TRUNCATE, "[%4lu.%03lu] ", ms / 1000, ms % 1000);
+	if (n < 0) n = 0;
+	_vsnprintf_s(line + n, sizeof(line) - n, _TRUNCATE, fmt, ap);
+	EnterCriticalSection(&g_logLock);
+	if (g_log) {
+		fputs(line, g_log);
+		fputc('\n', g_log);
+		fflush(g_log);  // the game can hard-crash; never buffer
+	}
+	LeaveCriticalSection(&g_logLock);
 }
 
 void Log(const char* fmt, ...) {
+	va_list ap; va_start(ap, fmt); vlog(fmt, ap); va_end(ap);
+}
+
+void LogV(const char* fmt, ...) {
+	if (!g_config.verbose) return;
 	va_list ap; va_start(ap, fmt); vlog(fmt, ap); va_end(ap);
 }
 
@@ -55,9 +80,4 @@ void LineBuf::Add(const char* fmt, ...) {
 		return;
 	}
 	len += (size_t)written;
-}
-
-void LogV(const char* fmt, ...) {
-	if (!g_config.verbose) return;
-	va_list ap; va_start(ap, fmt); vlog(fmt, ap); va_end(ap);
 }

@@ -42,3 +42,9 @@ const PadState& PadGet(int i); // i in [0, kMaxPads)
 // Index of the lowest-numbered connected pad that just pressed `button`,
 // skipping `excludeIndex` (pass -1 to skip nothing). Returns -1 if none.
 int PadFindPressed(uint16_t button, int excludeIndex);
+
+// Test hook for autotest: replaces XInput slot `i` with a scripted pad. Only
+// `buttons` and the stick/trigger values of `st` are used; edges and the
+// connected flag are derived by PadsPoll() exactly as for a real pad. Pass
+// nullptr to hand the slot back to the real device.
+void PadsSetVirtual(int i, const PadState* st);
