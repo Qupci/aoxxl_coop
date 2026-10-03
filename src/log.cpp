@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <cstring>
+#include <share.h>
 
 static FILE*            g_log = nullptr;
 static CRITICAL_SECTION g_logLock;
@@ -15,7 +16,11 @@ static DWORD            g_logStart = 0;
 void LogOpen() {
 	if (g_log) return;
 	if (!g_lockReady) { InitializeCriticalSection(&g_logLock); g_lockReady = true; }
-	g_log = fopen("xxl_coop.log", "w");
+	// Deny other writers: a second copy of the game (the exe exits on its own
+	// once it finds the first window, but the ASI loads before that) must not
+	// truncate the log of the one that is actually running.
+	g_log = _fsopen("xxl_coop.log", "w", _SH_DENYWR);
+	if (!g_log) g_log = _fsopen("xxl_coop_2.log", "w", _SH_DENYWR);
 	g_logStart = GetTickCount();
 	if (g_log) {
 		SYSTEMTIME st;

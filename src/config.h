@@ -15,7 +15,7 @@ struct CoopConfig {
 	bool  splitTest     = false;  // render the scene twice, to prove re-entrancy
 	int   splitMode     = SPLIT_HORIZONTAL;
 	bool  splitScreen   = true;   // off = shared camera on the leader
-	int   p1Pad         = 0;      // XInput slot player 1 uses (-1 = keyboard); P2 joins on any other
+	int   p1Pad         = -1;     // XInput slot the game reads (player 1); -1 = detect automatically
 	int   dropHoldMs    = 1500;
 	float deadzone      = 0.24f;
 

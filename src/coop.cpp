@@ -20,6 +20,7 @@
 #include "life.h"
 #include "log.h"
 #include "p2input.h"
+#include "padident.h"
 #include "pads.h"
 
 #include <cstring>
@@ -48,7 +49,17 @@ struct CoopState {
 	int     lastLevel = -2;
 	DWORD   lastFpsTick = 0;
 	uint32_t frames = 0;
+	uint32_t frameNo = 0;
+
+	// A Start press is only accepted as a join a few frames later, once it is
+	// clear the game's own input did not react to the very same press -- which
+	// would mean the pad is player 1's.
+	int      pendingPad = -1;
+	uint32_t pendingFrame = 0;
+	bool     pendingEcho = false;
 } g;
+
+const int kJoinSettleFrames = 5;
 
 const char* ModeName(uint8_t mode) {
 	switch (mode) {
@@ -120,22 +131,45 @@ void Release(const char* why) {
 }
 
 void TryJoin(Trio t) {
-	int pad = PadFindPressed(PAD_START, g_config.p1Pad);
-	if (pad < 0) return;
-	const char* why = "";
-	if (!CoopAllowedNow(t, &why)) {
-		Log("coop: pad %d pressed Start but co-op cannot start now (%s)", pad, why);
+	if (g.pendingPad >= 0) {
+		if (PadIdentGameEventRecently(0)) g.pendingEcho = true;
+		if (g.frameNo - g.pendingFrame < (uint32_t)kJoinSettleFrames) return;
+		int pad = g.pendingPad;
+		g.pendingPad = -1;
+		if (g.pendingEcho || PadIdentRole(pad) == PAD_ROLE_GAME) {
+			Log("coop: Start on pad %d also reached the game -- that is player 1's controller, "
+				"player 2 has to press Start on the other one", pad);
+			return;
+		}
+		const char* why = "";
+		if (!CoopAllowedNow(t, &why)) {
+			Log("coop: pad %d pressed Start but co-op cannot start now (%s)", pad, why);
+			return;
+		}
+		g.p2Joined = true;
+		g.p2Pad    = pad;
+		g.p1Hero   = t.Leader();
+		g.p2Hero   = OtherHero(g.p1Hero);
+		g.p2BackHeldAt = 0;
+		g.suspended = false;
+		Log("coop: player 2 joined on pad %d as %s (player 1 keeps %s)", pad,
+			HeroName(g.p2Hero), HeroName(g.p1Hero));
+		CoopLogState("join");
 		return;
 	}
-	g.p2Joined = true;
-	g.p2Pad    = pad;
-	g.p1Hero   = t.Leader();
-	g.p2Hero   = OtherHero(g.p1Hero);
-	g.p2BackHeldAt = 0;
-	g.suspended = false;
-	Log("coop: player 2 joined on pad %d as %s (player 1 keeps %s)", pad,
-		HeroName(g.p2Hero), HeroName(g.p1Hero));
-	CoopLogState("join");
+
+	for (int pad = 0; pad < kMaxPads; pad++) {
+		const PadState& p = PadGet(pad);
+		if (!p.connected || !(p.pressed & PAD_START)) continue;
+		if (PadIdentRole(pad) == PAD_ROLE_GAME) {
+			Log("coop: Start on pad %d ignored -- the game reads that pad, it is player 1's", pad);
+			continue;
+		}
+		g.pendingPad   = pad;
+		g.pendingFrame = g.frameNo;
+		g.pendingEcho  = PadIdentGameEventRecently(2);
+		return;
+	}
 }
 
 } // namespace
@@ -183,6 +217,7 @@ void CoopLogState(const char* tag) {
 void CoopFrame() {
 	DWORD now = GetTickCount();
 	g.frames++;
+	g.frameNo++;
 	if (g.lastFpsTick == 0) {
 		Log("coop: first frame");
 		g.lastFpsTick = now;
@@ -193,6 +228,12 @@ void CoopFrame() {
 	}
 
 	PadsPoll();
+	{
+		InputManager im = GetInputManager();
+		int n = im.NumActions();
+		if (n > (int)kMaxActions) n = (int)kMaxActions;
+		PadIdentFrame(im.Values(), n);
+	}
 
 	CKYellowPages* yp = YellowPages();
 	int level = (yp && yp->gameManager)
@@ -215,6 +256,11 @@ void CoopFrame() {
 
 	const PadState& p = PadGet(g.p2Pad);
 	if (!p.connected) { Release("pad disconnected"); return; }
+	if (PadIdentRole(g.p2Pad) == PAD_ROLE_GAME) {
+		Release("that pad also drives player 1 -- player 2 has to use the other controller");
+		return;
+	}
+	if (p.pressed & PAD_START) { Release("pressed Start"); return; }
 	if (p.buttons & PAD_BACK) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
 		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs) { Release("held Back"); return; }
@@ -332,8 +378,9 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 // ---------------------------------------------------------------------------
 
 void CoopInit() {
-	Log("coop: init (player 1 pad = %d)", g_config.p1Pad);
 	PadsInit();
+	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
+	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");
 }
 
 void CoopShutdown() {

@@ -71,13 +71,123 @@ const Step kP2Basic[] = {
 	P1(12000, 0, 0, 0, "p1 neutral"), VPAD(12000, 1, 0, 0, 0, "p2 neutral"),
 	VPAD(12500, 1, PAD_BACK, 0, 0, "p2 hold back"),
 	VPAD(14500, 1, 0, 0, 0, "p2 release"),
-	SHOT(16000, "p2_04_end"),
-	END(16500),
+	// Rejoin, then leave again with a second Start press.
+	VPAD(15500, 1, PAD_START, 0, 0, "p2 start (rejoin)"), VPAD(15700, 1, 0, 0, 0, "p2 release"),
+	VPAD(16500, 1, 0, 0, 1, "p2 up"), VPAD(17500, 1, 0, 0, 0, "p2 neutral"),
+	VPAD(18000, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(18200, 1, 0, 0, 0, "p2 release"),
+	SHOT(19500, "p2_04_end"),
+	END(20000),
+};
+
+// p2mirror: what happened on the user's PC -- player 2 "joins" on the pad the
+// game itself reads. Pad 1 mirrors player 1's input exactly, so the mod must work
+// out it is player 1's pad and drop player 2. Then a Start press on pad 2 at the
+// same moment player 1 jumps must be refused as a join (it looks like a pad whose
+// Start the game also sees).
+const Step kP2Mirror[] = {
+	MARK(0, "baseline"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	P1(1500, 0, 1, 0, "mirror right"), VPAD(1500, 1, 0, 1, 0, "mirror right"),
+	P1(1750, 0, 0, 1, "mirror up"), VPAD(1750, 1, 0, 0, 1, "mirror up"),
+	P1(2000, 0, -1, 0, "mirror left"), VPAD(2000, 1, 0, -1, 0, "mirror left"),
+	P1(2250, 0, 0, -1, "mirror down"), VPAD(2250, 1, 0, 0, -1, "mirror down"),
+	P1(2500, 0, 1, 0, "mirror right"), VPAD(2500, 1, 0, 1, 0, "mirror right"),
+	P1(2750, 0, 0, 1, "mirror up"), VPAD(2750, 1, 0, 0, 1, "mirror up"),
+	P1(3000, 0, -1, 0, "mirror left"), VPAD(3000, 1, 0, -1, 0, "mirror left"),
+	P1(3250, 0, 0, -1, "mirror down"), VPAD(3250, 1, 0, 0, -1, "mirror down"),
+	P1(3500, 0, 1, 0, "mirror right"), VPAD(3500, 1, 0, 1, 0, "mirror right"),
+	P1(3750, 0, 0, 1, "mirror up"), VPAD(3750, 1, 0, 0, 1, "mirror up"),
+	P1(4000, 0, -1, 0, "mirror left"), VPAD(4000, 1, 0, -1, 0, "mirror left"),
+	P1(4250, 0, 0, -1, "mirror down"), VPAD(4250, 1, 0, 0, -1, "mirror down"),
+	P1(4500, 0, 1, 0, "mirror right"), VPAD(4500, 1, 0, 1, 0, "mirror right"),
+	P1(4750, 0, 0, 1, "mirror up"), VPAD(4750, 1, 0, 0, 1, "mirror up"),
+	P1(5000, 0, -1, 0, "mirror left"), VPAD(5000, 1, 0, -1, 0, "mirror left"),
+	P1(5250, 0, 0, -1, "mirror down"), VPAD(5250, 1, 0, 0, -1, "mirror down"),
+	P1(5500, 0, 0, 0, "mirror stop"),  VPAD(5500, 1, 0, 0, 0, "mirror stop"),
+	VPAD(6000, 1, PAD_START, 0, 0, "pad1 start again"), VPAD(6200, 1, 0, 0, 0, "pad1 release"),
+	P1(7000, PAD_A, 0, 0, "p1 A"), VPAD(7000, 2, PAD_START, 0, 0, "pad2 start with p1 A"),
+	P1(7200, 0, 0, 0, "p1 release"), VPAD(7200, 2, 0, 0, 0, "pad2 release"),
+	END(8000),
 };
 
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
 const Step kIdle[] = {
 	MARK(0, "baseline"), SHOT(100, "idle_00"), SHOT(3000, "idle_01"), END(3500),
+};
+
+// p2busy: player 1 changes direction every 200 ms and taps A while player 2
+// moves and attacks on its own rhythm. Player 2 must stay joined: a busy
+// player 1 must not make player 2's pad look like the game's.
+const Step kP2Busy[] = {
+	MARK(0, "baseline"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	P1(1500, PAD_A, 1, 0, "p1 right"),
+	VPAD(1570, 1, PAD_X, -1, 0, "p2 left"),
+	P1(1700, 0, 0, 1, "p1 up"),
+	P1(1900, PAD_A, -1, 0, "p1 left"),
+	VPAD(1900, 1, 0, 0, -1, "p2 down"),
+	P1(2100, 0, 0, -1, "p1 down"),
+	VPAD(2230, 1, 0, 1, 0, "p2 right"),
+	P1(2300, PAD_A, 1, 0, "p1 right"),
+	P1(2500, 0, 0, 1, "p1 up"),
+	VPAD(2560, 1, PAD_X, 0, 1, "p2 up"),
+	P1(2700, PAD_A, -1, 0, "p1 left"),
+	VPAD(2890, 1, 0, -1, 0, "p2 left"),
+	P1(2900, 0, 0, -1, "p1 down"),
+	P1(3100, PAD_A, 1, 0, "p1 right"),
+	VPAD(3220, 1, 0, 0, -1, "p2 down"),
+	P1(3300, 0, 0, 1, "p1 up"),
+	P1(3500, PAD_A, -1, 0, "p1 left"),
+	VPAD(3550, 1, PAD_X, 1, 0, "p2 right"),
+	P1(3700, 0, 0, -1, "p1 down"),
+	VPAD(3880, 1, 0, 0, 1, "p2 up"),
+	P1(3900, PAD_A, 1, 0, "p1 right"),
+	P1(4100, 0, 0, 1, "p1 up"),
+	VPAD(4210, 1, 0, -1, 0, "p2 left"),
+	P1(4300, PAD_A, -1, 0, "p1 left"),
+	P1(4500, 0, 0, -1, "p1 down"),
+	VPAD(4540, 1, PAD_X, 0, -1, "p2 down"),
+	P1(4700, PAD_A, 1, 0, "p1 right"),
+	VPAD(4870, 1, 0, 1, 0, "p2 right"),
+	P1(4900, 0, 0, 1, "p1 up"),
+	P1(5100, PAD_A, -1, 0, "p1 left"),
+	VPAD(5200, 1, 0, 0, 1, "p2 up"),
+	P1(5300, 0, 0, -1, "p1 down"),
+	P1(5500, PAD_A, 1, 0, "p1 right"),
+	VPAD(5530, 1, PAD_X, -1, 0, "p2 left"),
+	P1(5700, 0, 0, 1, "p1 up"),
+	VPAD(5860, 1, 0, 0, -1, "p2 down"),
+	P1(5900, PAD_A, -1, 0, "p1 left"),
+	P1(6100, 0, 0, -1, "p1 down"),
+	VPAD(6190, 1, 0, 1, 0, "p2 right"),
+	P1(6300, PAD_A, 1, 0, "p1 right"),
+	P1(6500, 0, 0, 1, "p1 up"),
+	VPAD(6520, 1, PAD_X, 0, 1, "p2 up"),
+	P1(6700, PAD_A, -1, 0, "p1 left"),
+	VPAD(6850, 1, 0, -1, 0, "p2 left"),
+	P1(6900, 0, 0, -1, "p1 down"),
+	P1(7100, PAD_A, 1, 0, "p1 right"),
+	VPAD(7180, 1, 0, 0, -1, "p2 down"),
+	P1(7300, 0, 0, 1, "p1 up"),
+	P1(7500, PAD_A, -1, 0, "p1 left"),
+	VPAD(7510, 1, PAD_X, 1, 0, "p2 right"),
+	P1(7700, 0, 0, -1, "p1 down"),
+	VPAD(7840, 1, 0, 0, 1, "p2 up"),
+	P1(7900, PAD_A, 1, 0, "p1 right"),
+	P1(8100, 0, 0, 1, "p1 up"),
+	VPAD(8170, 1, 0, -1, 0, "p2 left"),
+	P1(8300, PAD_A, -1, 0, "p1 left"),
+	P1(8500, 0, 0, -1, "p1 down"),
+	VPAD(8500, 1, PAD_X, 0, -1, "p2 down"),
+	P1(8700, PAD_A, 1, 0, "p1 right"),
+	VPAD(8830, 1, 0, 1, 0, "p2 right"),
+	P1(8900, 0, 0, 1, "p1 up"),
+	P1(9100, PAD_A, -1, 0, "p1 left"),
+	VPAD(9160, 1, 0, 0, 1, "p2 up"),
+	P1(9300, 0, 0, -1, "p1 down"),
+	P1(9700, 0, 0, 0, "p1 stop"), VPAD(9750, 1, 0, 0, 0, "p2 stop"),
+	SHOT(10000, "busy_end"),
+	END(10500),
 };
 
 struct Scenario { const char* name; const Step* steps; int count; };
@@ -86,6 +196,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
+	SCENARIO("p2mirror", kP2Mirror),
+	SCENARIO("p2busy", kP2Busy),
 };
 
 struct AutotestState {
