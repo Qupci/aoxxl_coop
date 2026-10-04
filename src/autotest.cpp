@@ -7,13 +7,14 @@
 #include "p2input.h"
 #include "pads.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
 namespace {
 
-enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_END };
+enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -31,6 +32,8 @@ struct Step {
 #define P1(t, btn, x, y, n)         { t, S_P1,    0, 0, btn, x, y, n }
 #define VPAD(t, slot, btn, x, y, n) { t, S_VPAD,  slot, 0, btn, x, y, n }
 #define END(t)                      { t, S_END,   0, 0, 0, 0, 0, "end" }
+// Puts hero `hero` on the nearest visible bonus (CKHkBasicBonus) and watches it.
+#define TO_BONUS(t, hero)           { t, S_BONUS, hero, 0, 0, 0, 0, "to bonus" }
 // Right stick of virtual pad `slot` (camera look).
 #define VPADR(t, slot, x, y, n)     { t, S_VPADR, slot, 0, 0, x, y, n }
 // Puts hero `hero` next to lifter `lifter` (offset dx/dz, 1.5 units up).
@@ -315,6 +318,18 @@ const Step kSoak[] = {
 	END(61000),
 };
 
+// helmet: player 2 (not the leader) is put on a bonus. Before the proximity
+// layer only the leader could collect bonuses.
+const Step kHelmet[] = {
+	MARK(0, "baseline"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	SHOT(1400, "helmet_00_before"),
+	TO_BONUS(1500, HERO_OBELIX),
+	SHOT(2500, "helmet_01_on"),
+	SHOT(4000, "helmet_02_after"),
+	END(4500),
+};
+
 // survey: log which group-action objects the level has, then leave.
 const Step kSurvey[] = {
 	MARK(0, "survey"), SHOT(100, "survey"), END(300),
@@ -409,6 +424,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("split1", kSplit1),
 	SCENARIO("split2", kSplit2),
 	SCENARIO("soak", kSoak),
+	SCENARIO("helmet", kHelmet),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("p2mirror", kP2Mirror),
@@ -430,6 +446,7 @@ struct AutotestState {
 
 	HWND    hwnd = nullptr;
 	WNDPROC prevProc = nullptr;
+	char*   watchBonus = nullptr;   // CKHkBasicBonus hook being watched
 } at;
 
 LRESULT CALLBACK AutotestWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -491,6 +508,15 @@ void LogTick(float t) {
 			*(uint8_t*)(h.raw() + 0x561), h.Pos().x, h.Pos().y, h.Pos().z);
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
+	if (at.watchBonus) {
+		char* node = *(char**)(at.watchBonus + 0x10);
+		char* life = *(char**)(at.watchBonus + 0x0C);
+		typedef char(__fastcall* BoolFn)(void* self, void* edx);
+		char following = ((BoolFn)(*(void***)at.watchBonus)[19])(at.watchBonus, nullptr);
+		line.Add(" | bonus hidden=%d following=%d target=%p", node ? (*(uint8_t*)(node + 0x10) & 2) != 0 : -1,
+			following, *(void**)(at.watchBonus + 0x20));
+		(void)life;
+	}
 	Log("%s", line.c_str());
 }
 
@@ -597,6 +623,46 @@ void RunStep(const Step& s) {
 		}
 		Log("autotest: teleported %s to lifter %d (%.2f %.2f %.2f)", HeroName(s.a), s.b,
 			to.x, to.y, to.z);
+		break;
+	}
+	case S_BONUS: {
+		// Nearest bonus that a pool currently has active (the real collectibles).
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		char* best = nullptr;
+		float bestD = 1e30f;
+		Vector3 bestP;
+		int pools = 0, active = 0;
+		const int kPoolIds[2] = { 61, 63 };
+		for (int k = 0; k < 2; k++) {
+			unsigned n = GetNumLvlClassInstances(4, kPoolIds[k]);
+			for (unsigned i = 0; i < n; i++) {
+				char* pool = (char*)GetLvlObject(4, kPoolIds[k], i);
+				if (!pool) continue;
+				pools++;
+				for (char* b = *(char**)(pool + 0x30); b; b = *(char**)(b + 0x14)) {
+					char* node = *(char**)(b + 0x10);
+					char* frame = node ? *(char**)(node + 4) : nullptr;
+					if (!frame) continue;
+					active++;
+					Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1],
+					          ((float*)(frame + 0x80))[2]);
+					float d = (p - h.Pos()).len2();
+					if (d < bestD) { bestD = d; best = b; bestP = p; }
+				}
+			}
+		}
+		Log("autotest: %d pools, %d active bonuses; nearest to %s at (%.2f %.2f %.2f), %.1f away",
+			pools, active, HeroName(s.a), bestP.x, bestP.y, bestP.z, best ? sqrtf(bestD) : -1.0f);
+		if (!best) break;
+		at.watchBonus = best;
+		Vector3 to = bestP + Vector3(0, 0.2f, 0);
+		h.Pos() = to;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
 		break;
 	}
 	case S_END:

@@ -6,6 +6,7 @@
 #include "config.h"
 #include "crash.h"
 #include "splitscreen.h"
+#include "proximity.h"
 #include "inputmgr.h"
 #include "life.h"
 #include "log.h"
@@ -47,15 +48,18 @@ DWORD WINAPI WatchdogThread(LPVOID) {
 			long ca = g_hookCounters.asterixTicks;
 			long co = g_hookCounters.obelixTicks;
 			long cr = g_hookCounters.p2Routed;
-			static long lastSplit = 0;
+			static long lastSplit = 0, lastProx = 0;
 			long cs = SplitFrames();
+			long cp = ProximitySlices();
 			Log("watch: level=%d next=%d | per 2s: frames=%ld lifeTicks A=%ld O=%ld p2Routed=%ld "
-				"split=%ld | enforced=%ld trioEvents=%ld | p2=%s%s",
+				"split=%ld nearestHero=%ld p2Bonuses=%ld | enforced=%ld trioEvents=%ld | p2=%s%s",
 				curLevel, nextLevel, ci - lastInput, ca - lastAst, co - lastObe, cr - lastRouted,
-				cs - lastSplit, g_hookCounters.enforced, g_hookCounters.trioEvents,
+				cs - lastSplit, cp - lastProx, ProximityP2Bonuses(), g_hookCounters.enforced,
+				g_hookCounters.trioEvents,
 				CoopP2Joined() ? HeroName(CoopP2Hero()) : "-",
 				CoopSuspended() ? " (suspended)" : "");
 			lastSplit = cs;
+			lastProx = cp;
 			lastInput = ci; lastAst = ca; lastObe = co; lastRouted = cr;
 
 			RenderProbeTick();

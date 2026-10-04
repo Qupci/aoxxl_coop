@@ -14,6 +14,7 @@
 #include "autotest.h"
 #include "crash.h"
 #include "splitscreen.h"
+#include "proximity.h"
 
 namespace {
 
@@ -108,6 +109,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 
 	RenderInstallHooks();
 	SplitInstallHooks();
+	ProximityInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

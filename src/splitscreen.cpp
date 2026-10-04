@@ -193,9 +193,40 @@ void RenderSplitFrame(char* view, void* dt) {
 	CollectFn collect = (CollectFn)(*(void***)root)[14];
 	uint32_t viewFlags = *(uint32_t*)(view + 0x68);
 
-	// 2. Player 1's view.
+	// Clones (crates, enemies...) are drawn as merged batches that the clone
+	// manager rebuilds from the instances stamped visible this frame, and the
+	// scene walk culls those batches by their bounds. One clone sync per player
+	// leaves each batch covering only the *last* player's instances, so the
+	// other player's walk culls it: player 1's camera turning made crates pop in
+	// player 2's half. Instead, stamp what player 2 sees first (a walk into
+	// lists that ignore everything), then player 1's real walk, then one sync
+	// over both views.
+	void* stampLists[kNumLists];
+	for (int i = 0; i < kNumLists; i++) stampLists[i] = &g_dummy;
+	float m2[16];
+	bool own2 = P2CamMatrix(m2);
+	auto placeP2 = [&] {
+		if (own2) {
+			memcpy(FrameModelling(cam), m2, sizeof(m2));
+			memcpy(FrameLtm(cam), m2, sizeof(m2));
+		} else {
+			Translate(cam, p1cam, d2);
+		}
+	};
+	auto placeP1 = [&] {
+		memcpy(FrameModelling(cam), p1cam.modelling, sizeof(p1cam.modelling));
+		memcpy(FrameLtm(cam), p1cam.ltm, sizeof(p1cam.ltm));
+		Translate(cam, p1cam, d1);
+	};
+
+	// 2. Stamp-only walk for player 2.
 	RwCameraSetViewWindow(cam, half);
-	Translate(cam, p1cam, d1);
+	placeP2();
+	SyncCameras(view, nullptr);
+	collect(root, nullptr, stampLists, dt);
+
+	// 3. Player 1's view.
+	placeP1();
 	SyncCameras(view, nullptr);
 	collect(root, nullptr, (void**)(view + 0x1C), dt);
 	SyncClones(*(void**)(view + 0x58), nullptr, dt);
@@ -206,32 +237,22 @@ void RenderSplitFrame(char* view, void* dt) {
 	DrawEffects(view, nullptr, dt);
 	g_vpActive = false;
 
-	// 3. Player 2's view: same steps with player 2's camera and fresh world lists
-	//    (player 1's pass drew and emptied them).
+	// 4. Player 2's view: fresh world lists (player 1's pass drew and emptied
+	//    them); the clone batches already cover both views.
 	*(uint32_t*)(view + 0x68) = viewFlags;
-	float m2[16];
-	if (P2CamMatrix(m2)) {
-		// Player 2's own follow camera (p2cam.cpp).
-		memcpy(FrameModelling(cam), m2, sizeof(m2));
-		memcpy(FrameLtm(cam), m2, sizeof(m2));
-	} else {
-		Translate(cam, p1cam, d2);
-	}
+	placeP2();
 	SyncCameras(view, nullptr);
 	void* lists[kNumLists];
 	for (int i = 0; i < kNumLists; i++)
 		lists[i] = i >= kFirstHud ? (void*)&g_dummy : *(void**)(view + 0x1C + 4 * i);
 	collect(root, nullptr, lists, dt);
-	// Instances only player 2 can see were disabled by player 1's clone sync;
-	// enable them for this pass (and keep player 1's, still stamped this frame).
-	SyncClones(*(void**)(view + 0x58), nullptr, dt);
 	ResetDirty(view, nullptr);
 	g_vp = vp2; g_vpActive = true;
 	DrawWorld(view, nullptr, dt);
 	DrawEffects(view, nullptr, dt);
 	g_vpActive = false;
 
-	// 4. Back to the game's own camera, so everything after the render (sound,
+	// 5. Back to the game's own camera, so everything after the render (sound,
 	//    game logic, next frame's camera service) sees what it expects.
 	RwCameraSetViewWindow(cam, p1cam.window);
 	memcpy(FrameModelling(cam), p1cam.modelling, sizeof(p1cam.modelling));

@@ -17,7 +17,10 @@ const float kPitchMin    = -0.10f;  // just below the horizon
 const float kPitchMax    = 1.25f;   // almost straight down
 const float kFollowXZ    = 14.0f;   // focus follow rates (1/s)
 const float kFollowY     = 5.0f;    // slower vertically: jumps don't bob the view
-const int   kSteps       = 8;       // wall test samples between focus and camera
+const int   kSteps       = 16;      // wall test samples between focus and camera
+const float kAutoFollow  = 1.8f;    // rad/s swing behind a moving hero (stick idle)
+const float kIdleBefore  = 0.4f;    // s of untouched right stick before auto-follow
+const float kEaseOut     = 2.5f;    // 1/s: back out to full distance after a wall
 
 struct Cam {
 	bool    init = false;
@@ -26,6 +29,10 @@ struct Cam {
 	float   m[16] = {};
 	bool    haveMatrix = false;
 	DWORD   lastTick = 0;
+	float   reach = 1.0f;       // smoothed fraction of the full distance
+	float   idle = 0.0f;        // time since the right stick was last used
+	Vector3 prevHero;
+	bool    havePrev = false;
 	float   handed = 1.0f;    // sign of right . (up x at) in the game's camera matrix
 	uint32_t matFlags = 0;
 } cam;
@@ -98,7 +105,7 @@ void Seed(Hero leader) {
 
 } // namespace
 
-void P2CamReset() { cam.init = false; cam.haveMatrix = false; }
+void P2CamReset() { cam.init = false; cam.haveMatrix = false; cam.havePrev = false; cam.reach = 1.0f; }
 
 void P2CamFrame() {
 	if (!CoopP2Joined() || !g_config.splitScreen) { P2CamReset(); return; }
@@ -123,6 +130,28 @@ void P2CamFrame() {
 	const PadState& p = PadGet(CoopP2Pad());
 	cam.yaw   += p.rx * kYawSpeed * dt;
 	cam.pitch -= p.ry * kPitchSpeed * dt;
+
+	// Lazy follow, like the game's own camera: with the right stick left alone,
+	// swing round behind a moving hero. The turn rate goes with sin(angle off
+	// behind), so walking sideways turns the view most, walking away needs no
+	// turn, and walking towards the camera does not spin it round.
+	Vector3 hp = hero.Pos();
+	bool stick = fabsf(p.rx) > 0.1f || fabsf(p.ry) > 0.1f;
+	cam.idle = stick ? 0.0f : cam.idle + dt;
+	if (cam.havePrev && dt > 0.0f) {
+		float vx = (hp.x - cam.prevHero.x) / dt, vz = (hp.z - cam.prevHero.z) / dt;
+		float speed = sqrtf(vx * vx + vz * vz);
+		if (!stick && cam.idle > kIdleBefore && speed > 1.0f && speed < 40.0f) {
+			float behind = atan2f(-vz, -vx);
+			float diff = behind - cam.yaw;
+			while (diff >  3.14159265f) diff -= 6.2831853f;
+			while (diff < -3.14159265f) diff += 6.2831853f;
+			float rate = kAutoFollow * (speed > 6.0f ? 1.0f : speed / 6.0f);
+			cam.yaw += sinf(diff) * rate * dt;
+		}
+	}
+	cam.prevHero = hp;
+	cam.havePrev = true;
 	if (cam.pitch < kPitchMin) cam.pitch = kPitchMin;
 	if (cam.pitch > kPitchMax) cam.pitch = kPitchMax;
 
@@ -137,11 +166,15 @@ void P2CamFrame() {
 	// Walk from the hero out to where the camera wants to be and stop short of the
 	// first wall: no clipping into geometry, no wall between player 2 and Obelix.
 	float reach = 1.0f;
-	for (int i = 2; i <= kSteps; i++) {
+	for (int i = 3; i <= kSteps; i++) {
 		float f = (float)i / kSteps;
 		if (CollideAt(cam.focus + dir * (cam.dist * f)) >= 2) { reach = (float)(i - 1) / kSteps; break; }
 	}
-	cam.pos = cam.focus + dir * (cam.dist * reach);
+	// Pull in at once when a wall comes between (never look through it), ease
+	// back out when it clears -- no jumping between distances.
+	if (reach < cam.reach) cam.reach = reach;
+	else cam.reach += (reach - cam.reach) * (1.0f - expf(-kEaseOut * dt));
+	cam.pos = cam.focus + dir * (cam.dist * cam.reach);
 	(void)want;
 	// Never below the hero's feet: water is not solid to the collision test, and
 	// a camera under the surface looking up at a swimming Obelix is useless.

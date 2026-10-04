@@ -101,6 +101,22 @@ bool EnforcePlayer(Trio t, int idx) {
 
 uint8_t Situation(Hero h) { return h ? *(uint8_t*)(h.raw() + 0x3E9) : 0xFF; }
 
+// A cutscene is playing: CKSrvCinematic (yellowPages+0x80) keeps its scenes at
+// +0x10 (count +0x14), and bit 0 of a scene's +0x20 flags means it is running
+// (CKSrvCinematic::vf17 only updates those). Player 1 cannot move then, so
+// player 2's hero goes back to the game until it ends.
+bool CinematicPlaying() {
+	CKYellowPages* yp = YellowPages();
+	char* srv = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+	if (!srv || *(uintptr_t*)srv != 0x624F90) return false;
+	char** scenes = *(char***)(srv + 0x10);
+	unsigned n = *(unsigned*)(srv + 0x14);
+	if (!scenes || n > 4096) return false;
+	for (unsigned i = 0; i < n; i++)
+		if (scenes[i] && (*(uint8_t*)(scenes[i] + 0x20) & 1)) return true;
+	return false;
+}
+
 // A hero a player drives has no AI state: when the game moves a hero from its AI
 // Life state to a player one, it runs the current AI state's exit handler and
 // sets hero+0x561 to 0xFF (CKHkObelixLife::State1_Ai, mode 2). Group actions break
@@ -317,13 +333,21 @@ void CoopFrame() {
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
 	// companion" to a marker and waits for it, which only an AI companion does.
 	bool groupAction = Situation(h1) == kSituationGroupAction;
+	bool cinematic = CinematicPlaying();
 	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
-	                h1.Busy() || h2.Busy() || groupAction;
+	                h1.Busy() || h2.Busy() || groupAction || cinematic;
 	if (scripted != g.suspended) {
 		g.suspended = scripted;
-		Log("coop: %s (%s %s / %s %s)", scripted ? "suspended for a scripted mode" : "resumed",
+		Log("coop: %s (%s %s / %s %s%s%s)", scripted ? "suspended for a scripted mode" : "resumed",
 			HeroName(g.p1Hero), ModeName(HeroMode(h1.Flags18())),
-			HeroName(g.p2Hero), ModeName(HeroMode(h2.Flags18())));
+			HeroName(g.p2Hero), ModeName(HeroMode(h2.Flags18())),
+			cinematic ? ", cutscene" : "", groupAction ? ", group action" : "");
+		if (scripted) {
+			// Hand player 2's hero to the game for the duration.
+			uint8_t f = *F18(h2);
+			if (HeroModePlayable(f) && HeroIsPlayerVariant(f) && t.Leader() != g.p2Hero)
+				*F18(h2) = HeroAiVariant(f);
+		}
 		CoopLogState(scripted ? "suspend" : "resume");
 	}
 
