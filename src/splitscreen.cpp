@@ -4,6 +4,7 @@
 #include "log.h"
 #include "render.h"
 #include "trio.h"
+#include "p2cam.h"
 
 #include <cstring>
 
@@ -17,8 +18,11 @@ typedef void(__fastcall* CollectFn)(void* self, void* edx, void** lists, void* d
 typedef void(__fastcall* GraphicTickFn)(void* self, void* edx, void* dt);
 
 const ThisFn     SyncCameras    = (ThisFn)0x413DC0;       // FUN_00413DC0(view)
-const ThisArgFn  UpdateFx       = (ThisArgFn)0x422D10;    // FUN_00422D10(view+0x58, dt)
-const ThisFn     ResetRwLists   = (ThisFn)0x413E70;       // FUN_00413E70(view)
+// Clone visibility: CClone / CAnimatedClone nodes (crates, enemies...) do not go
+// into the draw lists during the scene walk; they stamp their instance with the
+// frame id, and this then enables every stamped instance and disables the rest.
+const ThisArgFn  SyncClones     = (ThisArgFn)0x422D10;    // FUN_00422D10(view+0x58, dt)
+const ThisFn     ResetDirty     = (ThisFn)0x413E70;       // FUN_00413E70(view): RW dirty frames
 const ThisByteFn ClearCamera    = (ThisByteFn)0x414700;   // FUN_00414700(renderer, zOnly)
 const ThisArgFn  DrawWorld      = (ThisArgFn)0x413F40;    // FUN_00413F40(view, dt)
 const ThisArgFn  DrawEffects    = (ThisArgFn)0x413FF0;    // Render_View(view, dt)
@@ -194,8 +198,8 @@ void RenderSplitFrame(char* view, void* dt) {
 	Translate(cam, p1cam, d1);
 	SyncCameras(view, nullptr);
 	collect(root, nullptr, (void**)(view + 0x1C), dt);
-	UpdateFx(*(void**)(view + 0x58), nullptr, dt);
-	ResetRwLists(view, nullptr);
+	SyncClones(*(void**)(view + 0x58), nullptr, dt);
+	ResetDirty(view, nullptr);
 	if (!(viewFlags & 0x10)) ClearCamera(renderer, nullptr, 0);
 	g_vp = vp1; g_vpActive = true;
 	DrawWorld(view, nullptr, dt);
@@ -205,12 +209,23 @@ void RenderSplitFrame(char* view, void* dt) {
 	// 3. Player 2's view: same steps with player 2's camera and fresh world lists
 	//    (player 1's pass drew and emptied them).
 	*(uint32_t*)(view + 0x68) = viewFlags;
-	Translate(cam, p1cam, d2);
+	float m2[16];
+	if (P2CamMatrix(m2)) {
+		// Player 2's own follow camera (p2cam.cpp).
+		memcpy(FrameModelling(cam), m2, sizeof(m2));
+		memcpy(FrameLtm(cam), m2, sizeof(m2));
+	} else {
+		Translate(cam, p1cam, d2);
+	}
 	SyncCameras(view, nullptr);
 	void* lists[kNumLists];
 	for (int i = 0; i < kNumLists; i++)
 		lists[i] = i >= kFirstHud ? (void*)&g_dummy : *(void**)(view + 0x1C + 4 * i);
 	collect(root, nullptr, lists, dt);
+	// Instances only player 2 can see were disabled by player 1's clone sync;
+	// enable them for this pass (and keep player 1's, still stamped this frame).
+	SyncClones(*(void**)(view + 0x58), nullptr, dt);
+	ResetDirty(view, nullptr);
 	g_vp = vp2; g_vpActive = true;
 	DrawWorld(view, nullptr, dt);
 	DrawEffects(view, nullptr, dt);

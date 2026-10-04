@@ -13,7 +13,7 @@
 
 namespace {
 
-enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_TELEPORT, S_END };
+enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -31,6 +31,8 @@ struct Step {
 #define P1(t, btn, x, y, n)         { t, S_P1,    0, 0, btn, x, y, n }
 #define VPAD(t, slot, btn, x, y, n) { t, S_VPAD,  slot, 0, btn, x, y, n }
 #define END(t)                      { t, S_END,   0, 0, 0, 0, 0, "end" }
+// Right stick of virtual pad `slot` (camera look).
+#define VPADR(t, slot, x, y, n)     { t, S_VPADR, slot, 0, 0, x, y, n }
 // Puts hero `hero` next to lifter `lifter` (offset dx/dz, 1.5 units up).
 #define TELEPORT(t, hero, lifter, dx, dz) { t, S_TELEPORT, hero, lifter, 0, dx, dz, "teleport" }
 
@@ -150,6 +152,169 @@ const Step kSplit1[] = {
 	END(8500),
 };
 
+// split2: player 2's own camera. Player 2 turns it with the right stick, walks
+// "forward" (must go away from player 2's camera, not player 1's), player 1
+// jumps (player 2's view must not move), player 2 walks along the rail.
+const Step kSplit2[] = {
+	MARK(0, "baseline"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	SHOT(1500, "cam_00_joined"),
+	VPADR(2000, 1, 1, 0, "p2 look right"), VPADR(3000, 1, 0, 0, "p2 look stop"),
+	SHOT(3300, "cam_01_turned"),
+	VPAD(3500, 1, 0, 0, 1, "p2 forward"), SHOT(4700, "cam_02_forward"), VPAD(5000, 1, 0, 0, 0, "p2 stop"),
+	P1(5500, PAD_A, 0, 0, "p1 jump"), SHOT(5800, "cam_03_p1jump"), P1(5800, 0, 0, 0, "p1 release"),
+	VPAD(6500, 1, 0, 1, 0, "p2 right"), SHOT(8000, "cam_04_right"), VPAD(8500, 1, 0, 0, 0, "p2 stop"),
+	VPADR(8600, 1, 0, -1, "p2 look down"), VPADR(9200, 1, 0, 0, "p2 look stop"),
+	SHOT(9500, "cam_05_lookdown"),
+	END(10000),
+};
+
+// soak: one minute of both players wandering (p2 also turning the camera), to
+// shake out rare crashes in the split renderer and player 2's camera.
+const Step kSoak[] = {
+	MARK(0, "baseline"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"),
+	VPAD(700, 1, 0, 0, 0, "p2 release"),
+	VPAD(1500, 1, 0, -0.7f, 0.7f, "p2 wander"),
+	VPADR(1501, 1, 0.0f, -0.5f, "p2 look"),
+	P1(1503, PAD_A, 0.0f, 1.0f, "p1 wander"),
+	SHOT(1505, "soak_00"),
+	VPAD(2296, 1, PAD_X, -0.7f, 0.7f, "p2 wander"),
+	VPADR(2297, 1, -1.0f, 0.0f, "p2 look"),
+	VPAD(3034, 1, PAD_A, 0.0f, 1.0f, "p2 wander"),
+	VPADR(3035, 1, 0.0f, -0.5f, "p2 look"),
+	P1(3037, 0, 0.0f, -1.0f, "p1 wander"),
+	VPAD(4298, 1, 0, 0.7f, -0.7f, "p2 wander"),
+	VPADR(4299, 1, 0.5f, -0.5f, "p2 look"),
+	VPAD(5226, 1, PAD_X, 1.0f, 0.0f, "p2 wander"),
+	VPADR(5227, 1, 0.5f, 0.5f, "p2 look"),
+	P1(5229, 0, 1.0f, 0.0f, "p1 wander"),
+	VPAD(5973, 1, 0, -1.0f, 0.0f, "p2 wander"),
+	VPADR(5974, 1, 0.0f, 0.0f, "p2 look"),
+	VPAD(7226, 1, PAD_X, 0.0f, 1.0f, "p2 wander"),
+	VPADR(7227, 1, 0.0f, 0.0f, "p2 look"),
+	P1(7229, PAD_A, 0.0f, 1.0f, "p1 wander"),
+	VPAD(8510, 1, 0, 0.0f, -1.0f, "p2 wander"),
+	VPADR(8511, 1, -1.0f, -0.5f, "p2 look"),
+	VPAD(9787, 1, PAD_X, 1.0f, 0.0f, "p2 wander"),
+	VPADR(9788, 1, -0.5f, 0.5f, "p2 look"),
+	P1(9790, 0, 0.7f, -0.7f, "p1 wander"),
+	SHOT(9792, "soak_08"),
+	VPAD(10963, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(10964, 1, 0.0f, 0.0f, "p2 look"),
+	VPAD(12476, 1, 0, -1.0f, 0.0f, "p2 wander"),
+	VPADR(12477, 1, -1.0f, 0.0f, "p2 look"),
+	P1(12479, 0, -0.7f, -0.7f, "p1 wander"),
+	VPAD(13922, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(13923, 1, 0.5f, -0.5f, "p2 look"),
+	VPAD(14742, 1, 0, 0.7f, -0.7f, "p2 wander"),
+	VPADR(14743, 1, 0.0f, 0.0f, "p2 look"),
+	P1(14745, 0, -0.7f, -0.7f, "p1 wander"),
+	VPAD(15482, 1, PAD_X, 0.0f, 1.0f, "p2 wander"),
+	VPADR(15483, 1, 0.5f, 0.0f, "p2 look"),
+	VPAD(16530, 1, PAD_X, -0.7f, 0.7f, "p2 wander"),
+	VPADR(16531, 1, 0.0f, 0.5f, "p2 look"),
+	P1(16533, 0, 0.0f, 1.0f, "p1 wander"),
+	VPAD(17506, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(17507, 1, -1.0f, 0.0f, "p2 look"),
+	VPAD(18868, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(18869, 1, 1.0f, 0.5f, "p2 look"),
+	P1(18871, 0, -0.7f, 0.7f, "p1 wander"),
+	SHOT(18873, "soak_16"),
+	VPAD(20040, 1, 0, -0.7f, 0.7f, "p2 wander"),
+	VPADR(20041, 1, 0.5f, -0.5f, "p2 look"),
+	VPAD(21245, 1, 0, 1.0f, 0.0f, "p2 wander"),
+	VPADR(21246, 1, 0.0f, 0.0f, "p2 look"),
+	P1(21248, 0, 0.0f, -1.0f, "p1 wander"),
+	VPAD(22345, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(22346, 1, -0.5f, 0.5f, "p2 look"),
+	VPAD(23456, 1, 0, 0.7f, 0.7f, "p2 wander"),
+	VPADR(23457, 1, 0.0f, 0.0f, "p2 look"),
+	P1(23459, 0, 0.7f, -0.7f, "p1 wander"),
+	VPAD(24855, 1, 0, 0.7f, -0.7f, "p2 wander"),
+	VPADR(24856, 1, -0.5f, -0.5f, "p2 look"),
+	VPAD(25735, 1, 0, -1.0f, 0.0f, "p2 wander"),
+	VPADR(25736, 1, 1.0f, 0.0f, "p2 look"),
+	P1(25738, 0, 1.0f, 0.0f, "p1 wander"),
+	VPAD(27286, 1, 0, -1.0f, 0.0f, "p2 wander"),
+	VPADR(27287, 1, 0.0f, -0.5f, "p2 look"),
+	VPAD(28135, 1, PAD_X, 0.7f, -0.7f, "p2 wander"),
+	VPADR(28136, 1, 0.0f, 0.0f, "p2 look"),
+	P1(28138, PAD_A, -1.0f, 0.0f, "p1 wander"),
+	SHOT(28140, "soak_24"),
+	VPAD(29714, 1, PAD_A, 1.0f, 0.0f, "p2 wander"),
+	VPADR(29715, 1, 1.0f, 0.5f, "p2 look"),
+	VPAD(30821, 1, PAD_A, 0.7f, -0.7f, "p2 wander"),
+	VPADR(30822, 1, -1.0f, 0.5f, "p2 look"),
+	P1(30824, 0, 0.7f, -0.7f, "p1 wander"),
+	VPAD(31716, 1, 0, 0.0f, 1.0f, "p2 wander"),
+	VPADR(31717, 1, 0.0f, 0.0f, "p2 look"),
+	VPAD(32528, 1, PAD_X, -0.7f, 0.7f, "p2 wander"),
+	VPADR(32529, 1, -1.0f, -0.5f, "p2 look"),
+	P1(32531, PAD_A, 1.0f, 0.0f, "p1 wander"),
+	VPAD(33382, 1, 0, 0.0f, 1.0f, "p2 wander"),
+	VPADR(33383, 1, 0.5f, -0.5f, "p2 look"),
+	VPAD(34154, 1, PAD_X, 0.0f, -1.0f, "p2 wander"),
+	VPADR(34155, 1, 0.0f, 0.0f, "p2 look"),
+	P1(34157, 0, 0.7f, 0.7f, "p1 wander"),
+	VPAD(35470, 1, PAD_A, -0.7f, 0.7f, "p2 wander"),
+	VPADR(35471, 1, -1.0f, -0.5f, "p2 look"),
+	VPAD(37039, 1, PAD_A, -0.7f, -0.7f, "p2 wander"),
+	VPADR(37040, 1, 0.0f, 0.5f, "p2 look"),
+	P1(37042, 0, 0.7f, 0.7f, "p1 wander"),
+	SHOT(37044, "soak_32"),
+	VPAD(37886, 1, 0, 0.0f, 1.0f, "p2 wander"),
+	VPADR(37887, 1, 1.0f, 0.0f, "p2 look"),
+	VPAD(39076, 1, PAD_X, -1.0f, 0.0f, "p2 wander"),
+	VPADR(39077, 1, -1.0f, 0.0f, "p2 look"),
+	P1(39079, 0, -0.7f, 0.7f, "p1 wander"),
+	VPAD(40482, 1, PAD_X, 1.0f, 0.0f, "p2 wander"),
+	VPADR(40483, 1, 0.0f, -0.5f, "p2 look"),
+	VPAD(41894, 1, PAD_X, 0.7f, 0.7f, "p2 wander"),
+	VPADR(41895, 1, 0.0f, 0.0f, "p2 look"),
+	P1(41897, 0, -0.7f, 0.7f, "p1 wander"),
+	VPAD(43139, 1, 0, -0.7f, 0.7f, "p2 wander"),
+	VPADR(43140, 1, 0.5f, 0.0f, "p2 look"),
+	VPAD(44664, 1, PAD_A, 0.0f, -1.0f, "p2 wander"),
+	VPADR(44665, 1, 1.0f, 0.0f, "p2 look"),
+	P1(44667, PAD_A, 0.0f, -1.0f, "p1 wander"),
+	VPAD(45868, 1, 0, -0.7f, 0.7f, "p2 wander"),
+	VPADR(45869, 1, -1.0f, 0.0f, "p2 look"),
+	VPAD(47051, 1, 0, 0.7f, 0.7f, "p2 wander"),
+	VPADR(47052, 1, 1.0f, 0.0f, "p2 look"),
+	P1(47054, PAD_A, -0.7f, -0.7f, "p1 wander"),
+	SHOT(47056, "soak_40"),
+	VPAD(48108, 1, 0, -0.7f, 0.7f, "p2 wander"),
+	VPADR(48109, 1, -0.5f, -0.5f, "p2 look"),
+	VPAD(49040, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(49041, 1, 0.0f, 0.0f, "p2 look"),
+	P1(49043, PAD_A, -0.7f, -0.7f, "p1 wander"),
+	VPAD(50364, 1, PAD_A, 1.0f, 0.0f, "p2 wander"),
+	VPADR(50365, 1, 1.0f, 0.0f, "p2 look"),
+	VPAD(51882, 1, 0, 0.0f, 1.0f, "p2 wander"),
+	VPADR(51883, 1, 0.0f, 0.0f, "p2 look"),
+	P1(51885, 0, -0.7f, -0.7f, "p1 wander"),
+	VPAD(53026, 1, 0, -0.7f, 0.7f, "p2 wander"),
+	VPADR(53027, 1, 1.0f, 0.5f, "p2 look"),
+	VPAD(54200, 1, 0, 0.7f, -0.7f, "p2 wander"),
+	VPADR(54201, 1, 1.0f, 0.0f, "p2 look"),
+	P1(54203, 0, -1.0f, 0.0f, "p1 wander"),
+	VPAD(54928, 1, PAD_X, -1.0f, 0.0f, "p2 wander"),
+	VPADR(54929, 1, 0.0f, 0.0f, "p2 look"),
+	VPAD(56254, 1, 0, -0.7f, -0.7f, "p2 wander"),
+	VPADR(56255, 1, -0.5f, 0.0f, "p2 look"),
+	P1(56257, 0, 1.0f, 0.0f, "p1 wander"),
+	SHOT(56259, "soak_48"),
+	VPAD(57772, 1, PAD_X, 0.0f, 1.0f, "p2 wander"),
+	VPADR(57773, 1, 1.0f, 0.0f, "p2 look"),
+	VPAD(58916, 1, 0, 0.0f, -1.0f, "p2 wander"),
+	VPADR(58917, 1, -1.0f, 0.0f, "p2 look"),
+	P1(58919, 0, 0.0f, -1.0f, "p1 wander"),
+	P1(60500, 0, 0, 0, "p1 stop"),
+	VPAD(60500, 1, 0, 0, 0, "p2 stop"),
+	END(61000),
+};
+
 // survey: log which group-action objects the level has, then leave.
 const Step kSurvey[] = {
 	MARK(0, "survey"), SHOT(100, "survey"), END(300),
@@ -242,6 +407,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("survey", kSurvey),
 	SCENARIO("lifter", kLifter),
 	SCENARIO("split1", kSplit1),
+	SCENARIO("split2", kSplit2),
+	SCENARIO("soak", kSoak),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("p2mirror", kP2Mirror),
@@ -398,6 +565,12 @@ void RunStep(const Step& s) {
 		at.p1.lx = s.x;
 		at.p1.ly = s.y;
 		CoopLogState(s.name);
+		break;
+	case S_VPADR:
+		Log("autotest: %s", s.name);
+		at.vpad[s.a].rx = s.x;
+		at.vpad[s.a].ry = s.y;
+		PadsSetVirtual(s.a, &at.vpad[s.a]);
 		break;
 	case S_VPAD:
 		Log("autotest: %s", s.name);

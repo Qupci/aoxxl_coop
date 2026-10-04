@@ -21,6 +21,7 @@
 #include "log.h"
 #include "p2input.h"
 #include "padident.h"
+#include "p2cam.h"
 #include "pads.h"
 
 #include <cstring>
@@ -135,6 +136,7 @@ bool CoopAllowedNow(Trio t, const char** why) {
 }
 
 void ForgetP2() {
+	P2CamReset();
 	g.p2Joined = false;
 	g.p2Pad = -1;
 	g.p1Hero = g.p2Hero = -1;
@@ -337,6 +339,7 @@ void CoopFrame() {
 		EnforcePlayer(t, g.p2Hero);
 		EnforcePlayer(t, g.p1Hero);
 	}
+	P2CamFrame();
 }
 
 // ---------------------------------------------------------------------------
@@ -378,10 +381,14 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	trio[0x2C] = (uint8_t)g.p2Hero;
 	trio[0x2D] = (uint8_t)g.p1Hero;
 	g.sliced = true;
+
+	// With split-screen, player 2 steers relative to player 2's own camera.
+	P2CamBeginHeroTick();
 }
 
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
+	P2CamEndHeroTick();
 	if (g.sliced) {
 		g.sliced = false;
 		Trio t = GetTrio();
