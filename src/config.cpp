@@ -35,7 +35,7 @@ void CoopConfig::Load(const char* iniPath) {
 	splitTest   = ReadBool("debug", "split_test", splitTest, full);
 
 	char buf[64] = {};
-	GetPrivateProfileStringA("coop", "split_mode", "horizontal", buf, sizeof(buf), full);
+	GetPrivateProfileStringA("coop", "split_mode", "vertical", buf, sizeof(buf), full);
 	splitMode = (buf[0] == 'v' || buf[0] == 'V') ? SPLIT_VERTICAL : SPLIT_HORIZONTAL;
 
 	GetPrivateProfileStringA("coop", "deadzone", "0.24", buf, sizeof(buf), full);

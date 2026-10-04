@@ -513,6 +513,22 @@ const Step kSwingSp[] = {
 	END(10000),
 };
 
+// lead2 (level 2): the trio switches to player 2's Obelix while player 1's
+// Asterix stays free: player 1's half gets a follow camera of its own.
+const Step kLead2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "switch to Obelix" },
+	P1(2000, 0, 0, 1, "p1 up (held)"), VPAD(2000, 1, 0, 1, 0, "p2 right (held)"),
+	SHOT(3500, "lead2_00"),
+	P1(3600, 0, 0, 0, "p1 neutral"), VPAD(3600, 1, 0, 0, 0, "p2 neutral"),
+	VPAD(4000, 1, PAD_A, 0, 0, "p2 jump"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	SHOT(4400, "lead2_01"),
+	{ 5500, S_TRIOEV, 0x4800, 0, 0, 0, 0, "switch to Asterix" },
+	SHOT(6500, "lead2_02"),
+	END(7000),
+};
+
 // borrow (level 2): the trio tells the companion (player 2's Obelix) to wait
 // (0x4802), then to follow again (0x4803): he should go to the AI and back.
 const Step kBorrow[] = {
@@ -629,6 +645,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("borrow", kBorrow),
 	SCENARIO("grab3", kGrab3),
 	SCENARIO("swing", kSwing),
+	SCENARIO("lead2", kLead2),
 	SCENARIO("swingsp", kSwingSp),
 	SCENARIO("cutscene", kCutscene),
 	SCENARIO("exp1", kExp1),

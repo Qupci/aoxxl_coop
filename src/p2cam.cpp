@@ -3,6 +3,7 @@
 #include "config.h"
 #include "log.h"
 #include "pads.h"
+#include "padident.h"
 #include "render.h"
 #include "trio.h"
 
@@ -35,9 +36,12 @@ struct Cam {
 	bool    havePrev = false;
 	float   handed = 1.0f;    // sign of right . (up x at) in the game's camera matrix
 	uint32_t matFlags = 0;
-} cam;
+};
+Cam g_cams[2];      // [0]: player 1's (only while player 2's hero leads), [1]: player 2's
+Cam* g_cur = &g_cams[1];
+#define cam (*g_cur)
 
-// The trio's movement basis around player 2's hero tick.
+// The trio's movement basis around a player's hero tick.
 struct SavedBasis { bool active = false; float a37C, a384, b[3]; } basis;
 
 char* CameraService() {
@@ -105,13 +109,37 @@ void Seed(Hero leader) {
 
 } // namespace
 
-void P2CamReset() { cam.init = false; cam.haveMatrix = false; cam.havePrev = false; cam.reach = 1.0f; }
+void ResetCam(Cam& c) { c.init = false; c.haveMatrix = false; c.havePrev = false; c.reach = 1.0f; }
+void P2CamReset() { ResetCam(g_cams[0]); ResetCam(g_cams[1]); }
+
+namespace {
+// Player 1's pad: the one the game reads (pad identification), if known.
+int Player1Pad() {
+	for (int i = 0; i < kMaxPads; i++)
+		if (i != CoopP2Pad() && PadGet(i).connected && PadIdentRole(i) == PAD_ROLE_GAME) return i;
+	return -1;
+}
+void UpdateCam(Hero hero, Hero leader, int pad);
+}
 
 void P2CamFrame() {
 	if (!CoopP2Joined() || !g_config.splitScreen) { P2CamReset(); return; }
 	Trio t = GetTrio();
-	Hero hero = t ? t.GetHero(CoopP2Hero()) : Hero();
-	Hero leader = t ? t.GetHero(t.Leader()) : Hero();
+	if (!t) return;
+	Hero leader = t.GetHero(t.Leader());
+	g_cur = &g_cams[1];
+	UpdateCam(t.GetHero(CoopP2Hero()), leader, CoopP2Pad());
+	// Player 1 needs a camera of its own only while the game's camera follows
+	// player 2's hero and player 1's hero is free to move.
+	int p1 = CoopP1Hero();
+	g_cur = &g_cams[0];
+	if (t.Leader() == CoopP2Hero() && !CoopHeroHeld(p1)) UpdateCam(t.GetHero(p1), leader, Player1Pad());
+	else ResetCam(g_cams[0]);
+	g_cur = &g_cams[1];
+}
+
+namespace {
+void UpdateCam(Hero hero, Hero leader, int pad) {
 	if (!hero) return;
 
 	DWORD now = GetTickCount();
@@ -127,7 +155,8 @@ void P2CamFrame() {
 		cam.focus = target;
 	}
 
-	const PadState& p = PadGet(CoopP2Pad());
+	PadState none = {};
+	const PadState& p = pad >= 0 ? PadGet(pad) : none;
 	cam.yaw   += p.rx * kYawSpeed * dt;
 	cam.pitch -= p.ry * kPitchSpeed * dt;
 
@@ -195,20 +224,35 @@ void P2CamFrame() {
 	cam.haveMatrix = true;
 }
 
+} // namespace
+
+bool P1CamMatrix(float out[16]) {
+	if (!g_cams[0].haveMatrix) return false;
+	memcpy(out, g_cams[0].m, sizeof(g_cams[0].m));
+	return true;
+}
+
 bool P2CamMatrix(float out[16]) {
 	if (!cam.haveMatrix) return false;
 	memcpy(out, cam.m, sizeof(cam.m));
 	return true;
 }
 
-void P2CamBeginHeroTick() {
+void BeginTickWith(Cam& c);
+void P2CamBeginHeroTick() { BeginTickWith(g_cams[1]); }
+void P1CamBeginHeroTick() { BeginTickWith(g_cams[0]); }
+void P1CamEndHeroTick() { P2CamEndHeroTick(); }
+
+void BeginTickWith(Cam& c) {
+	Cam* saved = g_cur;
+	g_cur = &c;
 	basis.active = false;
-	if (!cam.haveMatrix) return;
+	if (!cam.haveMatrix) { g_cur = saved; return; }
 	Trio t = GetTrio();
-	if (!t) return;
+	if (!t) { g_cur = saved; return; }
 	char* trio = t.raw();
 	Vector3 fwd(cam.m[8], 0, cam.m[10]);
-	if (fwd.len2() < 1e-6f) return;
+	if (fwd.len2() < 1e-6f) { g_cur = saved; return; }
 	fwd = Normalize(fwd);
 	basis.a37C = *(float*)(trio + 0x37C);
 	basis.a384 = *(float*)(trio + 0x384);
@@ -221,6 +265,7 @@ void P2CamBeginHeroTick() {
 	*(float*)(trio + 0x3A0) = 0.0f;
 	*(float*)(trio + 0x3A4) = fwd.z;
 	basis.active = true;
+	g_cur = saved;
 }
 
 void P2CamEndHeroTick() {

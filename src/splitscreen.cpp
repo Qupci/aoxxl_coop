@@ -311,10 +311,21 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 			Translate(cam, p1cam, d2);
 		}
 	};
+	// Player 1's half: the game camera follows the leader. When that is player
+	// 2's hero, player 1 gets a follow camera of its own -- or, while the game
+	// has borrowed player 1's hero for a scripted sequence (Asterix riding the
+	// cable car), the game's camera as it is: it frames that sequence.
+	float m1[16];
+	bool own1 = P1CamMatrix(m1);
 	auto placeP1 = [&] {
+		if (own1) {
+			memcpy(FrameModelling(cam), m1, sizeof(m1));
+			memcpy(FrameLtm(cam), m1, sizeof(m1));
+			return;
+		}
 		memcpy(FrameModelling(cam), p1cam.modelling, sizeof(p1cam.modelling));
 		memcpy(FrameLtm(cam), p1cam.ltm, sizeof(p1cam.ltm));
-		Translate(cam, p1cam, d1);
+		(void)d1;   // no shifting the game camera: it bobbed with the leader's jumps
 	};
 
 	// 2. Stamp-only walk for player 2. Being the frame's first walk, it is also

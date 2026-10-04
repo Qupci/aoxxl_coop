@@ -568,6 +568,9 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
 		ClearStaleAiState(heroIndex, hero);
 
+	// Player 1 steers relative to its own camera while player 2's hero leads.
+	if (heroIndex == g.p1Hero && t.Leader() == g.p2Hero) P1CamBeginHeroTick();
+
 	if (heroIndex != g.p2Hero || !g.p2ValuesReady) return;
 	InputManager im = GetInputManager();
 	if (!im) return;
