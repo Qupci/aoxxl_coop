@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include "coop.h"
 #include "klusters.h"
+#include "sound.h"
 #include "config.h"
 #include "log.h"
 #include "vtprofile.h"
@@ -113,6 +114,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	ProximityInstallHooks();
 	TraceInstallHooks();
 	KlusterInstallHooks();
+	SoundInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

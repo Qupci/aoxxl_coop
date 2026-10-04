@@ -17,6 +17,32 @@ static bool ReadBool(const char* section, const char* key, bool def, const char*
 	       !strcmp(buf, "yes") || !strcmp(buf, "true");
 }
 
+// "W", "SPACE", "ENTER", "UP", "F5", "NUM4", "0x26"... -> virtual-key code (0 = none).
+static int ParseKey(const char* t) {
+	char k[32] = {};
+	size_t n = 0;
+	for (; t[n] && n < sizeof(k) - 1; n++) k[n] = (char)toupper((unsigned char)t[n]);
+	while (n && (k[n - 1] == ' ' || k[n - 1] == '	')) k[--n] = 0;
+	const char* s = k;
+	while (*s == ' ') s++;
+	if (!*s) return 0;
+	if (s[0] == '0' && s[1] == 'X') return (int)strtol(s, nullptr, 16);
+	if (!s[1] && ((s[0] >= 'A' && s[0] <= 'Z') || (s[0] >= '0' && s[0] <= '9'))) return s[0];
+	static const struct { const char* name; int vk; } kNames[] = {
+		{ "SPACE", 0x20 }, { "ENTER", 0x0D }, { "RETURN", 0x0D }, { "BACKSPACE", 0x08 }, { "TAB", 0x09 },
+		{ "ESC", 0x1B }, { "SHIFT", 0x10 }, { "LSHIFT", 0xA0 }, { "RSHIFT", 0xA1 }, { "CTRL", 0x11 },
+		{ "LCTRL", 0xA2 }, { "RCTRL", 0xA3 }, { "ALT", 0x12 }, { "UP", 0x26 }, { "DOWN", 0x28 },
+		{ "LEFT", 0x25 }, { "RIGHT", 0x27 }, { "INSERT", 0x2D }, { "DELETE", 0x2E }, { "HOME", 0x24 },
+		{ "END", 0x23 }, { "PAGEUP", 0x21 }, { "PAGEDOWN", 0x22 }, { "COMMA", 0xBC }, { "PERIOD", 0xBE },
+		{ "SEMICOLON", 0xBA }, { "SLASH", 0xBF }, { "NUMDIV", 0x6F }, { "NUMMUL", 0x6A },
+		{ "NUMMINUS", 0x6D }, { "NUMPLUS", 0x6B }, { "NUMDOT", 0x6E }, { "NONE", 0 },
+	};
+	for (const auto& e : kNames) if (!strcmp(s, e.name)) return e.vk;
+	if (s[0] == 'F' && s[1] >= '1' && s[1] <= '9') { int f = atoi(s + 1); if (f >= 1 && f <= 12) return 0x70 + f - 1; }
+	if (!strncmp(s, "NUM", 3) && s[3] >= '0' && s[3] <= '9' && !s[4]) return 0x60 + (s[3] - '0');
+	return 0;
+}
+
 void CoopConfig::Load(const char* iniPath) {
 	// GetPrivateProfileString wants a full path or it searches the Windows dir.
 	char full[MAX_PATH];
@@ -24,7 +50,12 @@ void CoopConfig::Load(const char* iniPath) {
 
 	enabled     = ReadBool("coop", "enabled", enabled, full);
 	splitScreen = ReadBool("coop", "split_screen", splitScreen, full);
-	p1Pad       = GetPrivateProfileIntA("coop", "p1_pad", p1Pad, full);
+	{
+		char pb[32] = {};
+		GetPrivateProfileStringA("coop", "p1_pad", "", pb, sizeof(pb), full);
+		if (pb[0] == 'k' || pb[0] == 'K') p1Pad = 4;   // the keyboard (pads.h kKeyboardPad)
+		else if (pb[0]) p1Pad = atoi(pb);
+	}
 	dropHoldMs  = GetPrivateProfileIntA("coop", "drop_hold_ms", dropHoldMs, full);
 
 	verbose     = ReadBool("debug", "verbose", verbose, full);
@@ -38,12 +69,22 @@ void CoopConfig::Load(const char* iniPath) {
 	GetPrivateProfileStringA("coop", "split_mode", "vertical", buf, sizeof(buf), full);
 	splitMode = (buf[0] == 'v' || buf[0] == 'V') ? SPLIT_VERTICAL : SPLIT_HORIZONTAL;
 
+	keyboard = ReadBool("keyboard", "enabled", keyboard, full);
+	static const char* const kKeyNames[KEY_COUNT] = {
+		"move_up", "move_down", "move_left", "move_right", "look_up", "look_down", "look_left",
+		"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back" };
+	for (int i = 0; i < KEY_COUNT; i++) {
+		char kb[32] = {};
+		GetPrivateProfileStringA("keyboard", kKeyNames[i], "", kb, sizeof(kb), full);
+		if (kb[0]) keys[i] = ParseKey(kb);
+	}
+
 	GetPrivateProfileStringA("coop", "deadzone", "0.24", buf, sizeof(buf), full);
 	deadzone = (float)atof(buf);
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d",
+		"splitTest=%d verbose=%d keyboard=%d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
-		deadzone, forceLevel, watchdog, splitTest, verbose);
+		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard);
 }

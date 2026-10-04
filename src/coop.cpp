@@ -15,6 +15,7 @@
 
 #include "coop.h"
 #include "klusters.h"
+#include "sound.h"
 #include "autotest.h"
 #include "config.h"
 #include "inputmgr.h"
@@ -26,6 +27,7 @@
 #include "pads.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -248,13 +250,13 @@ void TryJoin(Trio t) {
 		int pad = g.pendingPad;
 		g.pendingPad = -1;
 		if (g.pendingEcho || PadIdentRole(pad) == PAD_ROLE_GAME) {
-			Log("coop: Start on pad %d also reached the game -- that is player 1's controller, "
-				"player 2 has to press Start on the other one", pad);
+			Log("coop: Start on %s also reached the game -- that is player 1's controller, "
+				"player 2 has to use another one", PadName(pad));
 			return;
 		}
 		const char* why = "";
 		if (!CoopAllowedNow(t, &why)) {
-			Log("coop: pad %d pressed Start but co-op cannot start now (%s)", pad, why);
+			Log("coop: %s pressed Start but co-op cannot start now (%s)", PadName(pad), why);
 			return;
 		}
 		g.p2Joined = true;
@@ -279,7 +281,7 @@ void TryJoin(Trio t) {
 		}
 		g.p2BackHeldAt = 0;
 		g.suspended = false;
-		Log("coop: player 2 joined on pad %d as %s (player 1 keeps %s)", pad,
+		Log("coop: player 2 joined on %s as %s (player 1 keeps %s)", PadName(pad),
 			HeroName(g.p2Hero), HeroName(g.p1Hero));
 		CoopLogState("join");
 		return;
@@ -289,7 +291,7 @@ void TryJoin(Trio t) {
 		const PadState& p = PadGet(pad);
 		if (!p.connected || !(p.pressed & PAD_START)) continue;
 		if (PadIdentRole(pad) == PAD_ROLE_GAME) {
-			Log("coop: Start on pad %d ignored -- the game reads that pad, it is player 1's", pad);
+			Log("coop: Start on %s ignored -- the game reads it, it is player 1's", PadName(pad));
 			continue;
 		}
 		g.pendingPad   = pad;
@@ -423,6 +425,8 @@ void CoopFrame() {
 	}
 
 	PadsPoll();
+	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
+	SoundSetP2Listener();
 	CheckMarker(now);
 	{
 		InputManager im = GetInputManager();
@@ -445,6 +449,10 @@ void CoopFrame() {
 	}
 
 	Trio t = GetTrio();
+	{
+		static bool dumped = false;
+		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
+	}
 	if (!g.p2Joined) {
 		TryJoin(t);
 		return;
@@ -553,6 +561,60 @@ void CoopFrame() {
 // Per-hero Life tick
 // ---------------------------------------------------------------------------
 
+// Events the non-leading player hero sets off in its own update. Hero code
+// flags some level events only for a player-controlled hero (+0x18 bit 0
+// clear) -- in single player that is the leader alone, the AI companion never
+// runs those paths. In co-op both heroes are player-driven, and player 2's
+// Obelix walking onto the spinning platform's blue circle ran "switch to
+// Obelix, Asterix waits here" with Asterix elsewhere. Around that hero's update
+// the event service's flag table (yellow pages +0x6C: 3 bytes per event group
+// at +0xC, flags in byte 2; group counts at +0x1C/+0x1E/+0x20) is snapshot,
+// and whatever it newly flagged is taken back.
+namespace {
+uint8_t g_eventSnap[8192];
+unsigned g_eventSnapN = 0;
+bool g_eventSnapActive = false;
+int g_eventSnapHero = -1;
+
+char* EventService(unsigned* groups) {
+	CKYellowPages* yp = YellowPages();
+	char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!ev || !*(uint8_t**)(ev + 0xC)) return nullptr;
+	*groups = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
+	return ev;
+}
+
+void SnapEvents(int hero) {
+	unsigned n = 0;
+	char* ev = EventService(&n);
+	g_eventSnapActive = false;
+	if (!ev || n == 0 || n > sizeof(g_eventSnap)) return;
+	uint8_t* tab = *(uint8_t**)(ev + 0xC);
+	for (unsigned i = 0; i < n; i++) g_eventSnap[i] = tab[i * 3 + 2];
+	g_eventSnapN = n;
+	g_eventSnapHero = hero;
+	g_eventSnapActive = true;
+}
+
+void UndoNewEvents() {
+	if (!g_eventSnapActive) return;
+	g_eventSnapActive = false;
+	unsigned n = 0;
+	char* ev = EventService(&n);
+	if (!ev || n != g_eventSnapN) return;
+	uint8_t* tab = *(uint8_t**)(ev + 0xC);
+	for (unsigned i = 0; i < n; i++) {
+		uint8_t added = tab[i * 3 + 2] & ~g_eventSnap[i];
+		if (!added) continue;
+		tab[i * 3 + 2] &= ~added;
+		for (int b = 0; b < 8; b++)
+			if (added & (1 << b))
+				Log("coop: event %04X set off by %s (not leading) -- dropped", (i << 3) | b,
+					HeroName(g_eventSnapHero));
+	}
+}
+}
+
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	(void)hero;
 	if (!g.p2Joined || g.suspended) return;
@@ -563,6 +625,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	Trio t = GetTrio();
 	if (!t) return;
 	if (g.held[heroIndex]) return;   // the game's AI drives it for now
+	if (heroIndex != t.Leader()) SnapEvents(heroIndex);
 	EnforcePlayer(t, heroIndex);
 	if (Situation(t.GetHero(g.p1Hero)) != kSituationGroupAction &&
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
@@ -625,6 +688,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
+	UndoNewEvents();
 	P2CamEndHeroTick();
 	if (g.sliced) {
 		g.sliced = false;

@@ -32,7 +32,17 @@ struct PadState {
 	float    lt = 0, rt = 0;  // triggers, 0..1
 };
 
-const int kMaxPads = 4;
+// Slots 0..3 are XInput pads; slot 4 is the keyboard, read as one more pad
+// (keys from the ini's [keyboard] section, only while the game window has the
+// focus), so it can be player 2's controller like any pad.
+const int kMaxPads = 5;
+const int kXInputPads = 4;
+const int kKeyboardPad = 4;
+const char* PadName(int i);   // "pad 2", "the keyboard"
+
+// While true, key-downs of player 2's keyboard keys are kept from the game (set
+// each frame: player 2 joined on the keyboard).
+void PadsSetKeyboardOwnedByP2(bool owned);
 
 bool PadsInit();               // false if no XInput DLL could be loaded
 void PadsShutdown();

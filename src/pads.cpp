@@ -1,6 +1,7 @@
 #include "pads.h"
 #include "config.h"
 #include "log.h"
+#include "kal.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -73,6 +74,107 @@ void PadsSetVirtual(int i, const PadState* st) {
 	if (st) g_virtual[i] = *st;
 }
 
+static bool GameHasFocus() {
+	HWND fg = GetForegroundWindow();
+	DWORD pid = 0;
+	if (fg) GetWindowThreadProcessId(fg, &pid);
+	return pid == GetCurrentProcessId();
+}
+
+// While player 2 plays on the keyboard, their keys must not also reach the game,
+// which reads the keyboard from WM_KEYDOWN/WM_KEYUP in its window procedure
+// (0x479C10 -> FUN_00438990): with player 1 on the keyboard too, one key would
+// drive both heroes. Key-downs of player 2's keys are swallowed; key-ups always
+// pass, so a key held at the moment of joining (Start) is released in the game.
+static WNDPROC g_prevProc = nullptr;
+static HWND    g_hwnd = nullptr;
+static bool    g_keysOwnedByP2 = false;
+
+static bool IsP2Key(WPARAM vk, LPARAM lp) {
+	const int* k = g_config.keys;
+	bool ext = (lp & (1 << 24)) != 0;
+	for (int i = 0; i < CoopConfig::KEY_COUNT; i++) {
+		int key = k[i];
+		if (key <= 0) continue;
+		if ((WPARAM)key == vk) return true;
+		// The window procedure gets the generic shift/control/alt codes.
+		if (vk == VK_SHIFT && (key == VK_LSHIFT || key == VK_RSHIFT)) {
+			UINT sc = (UINT)((lp >> 16) & 0xFF);
+			UINT lsc = MapVirtualKeyA(VK_LSHIFT, 0 /* MAPVK_VK_TO_VSC */);
+			if ((key == VK_LSHIFT) == (sc == lsc)) return true;
+		}
+		if (vk == VK_CONTROL && (key == (ext ? VK_RCONTROL : VK_LCONTROL))) return true;
+		if (vk == VK_MENU && (key == (ext ? VK_RMENU : VK_LMENU))) return true;
+	}
+	return false;
+}
+
+static LRESULT CALLBACK KeyFilterProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+	if (g_keysOwnedByP2 && (m == WM_KEYDOWN || m == WM_SYSKEYDOWN) && IsP2Key(w, l)) return 0;
+	return CallWindowProcA(g_prevProc, h, m, w, l);
+}
+
+static void InstallKeyFilter() {
+	if (g_prevProc || !g_config.keyboard) return;
+	HWND hwnd = GameStartInfo()->hwnd;
+	if (!hwnd || !IsWindow(hwnd)) return;
+	g_hwnd = hwnd;
+	g_prevProc = (WNDPROC)SetWindowLongPtrA(hwnd, GWLP_WNDPROC, (LONG_PTR)KeyFilterProc);
+	Log("pads: keyboard filter installed on window %p", hwnd);
+}
+
+void PadsSetKeyboardOwnedByP2(bool owned) {
+	if (owned != g_keysOwnedByP2)
+		Log("pads: player 2's keys %s", owned ? "now drive only player 2 (kept from the game)"
+		                                       : "go to the game again");
+	g_keysOwnedByP2 = owned;
+}
+
+static bool KeyDown(int vk) { return vk > 0 && (GetAsyncKeyState(vk) & 0x8000) != 0; }
+
+static void PollKeyboard(PadState& p) {
+	uint16_t prev = p.buttons;
+	if (!g_config.keyboard) {
+		p = PadState();
+		p.released = prev;
+		return;
+	}
+	if (!p.connected) Log("pads: keyboard available as a controller (slot %d)", kKeyboardPad);
+	p.connected = true;
+	const int* k = g_config.keys;
+	bool focus = GameHasFocus();
+	auto down = [&](int idx) { return focus && KeyDown(k[idx]); };
+	uint16_t b = 0;
+	if (down(CoopConfig::KEY_JUMP))   b |= PAD_A;
+	if (down(CoopConfig::KEY_ATTACK)) b |= PAD_X;
+	if (down(CoopConfig::KEY_GRAB))   b |= PAD_B;
+	if (down(CoopConfig::KEY_DASH))   b |= PAD_Y;
+	if (down(CoopConfig::KEY_LB))     b |= PAD_LB;
+	if (down(CoopConfig::KEY_RB))     b |= PAD_RB;
+	if (down(CoopConfig::KEY_START))  b |= PAD_START;
+	if (down(CoopConfig::KEY_BACK))   b |= PAD_BACK;
+	p.buttons  = b;
+	p.pressed  = (uint16_t)(b & ~prev);
+	p.released = (uint16_t)(prev & ~b);
+	float x = (down(CoopConfig::KEY_RIGHT) ? 1.0f : 0.0f) - (down(CoopConfig::KEY_LEFT) ? 1.0f : 0.0f);
+	float y = (down(CoopConfig::KEY_UP) ? 1.0f : 0.0f) - (down(CoopConfig::KEY_DOWN) ? 1.0f : 0.0f);
+	float m = sqrtf(x * x + y * y);
+	p.lx = m > 0 ? x / m : 0.0f;
+	p.ly = m > 0 ? y / m : 0.0f;
+	p.rx = (down(CoopConfig::KEY_LOOK_RIGHT) ? 1.0f : 0.0f) - (down(CoopConfig::KEY_LOOK_LEFT) ? 1.0f : 0.0f);
+	p.ry = (down(CoopConfig::KEY_LOOK_UP) ? 1.0f : 0.0f) - (down(CoopConfig::KEY_LOOK_DOWN) ? 1.0f : 0.0f);
+	p.lt = p.rt = 0.0f;
+}
+
+const char* PadName(int i) {
+	static char buf[4][16];
+	static int slot = 0;
+	if (i == kKeyboardPad) return "the keyboard";
+	char* out = buf[slot++ & 3];
+	wsprintfA(out, "pad %d", i);
+	return out;
+}
+
 void PadsPoll() {
 	for (int i = 0; i < kMaxPads; i++) {
 		PadState& p = g_pads[i];
@@ -88,6 +190,7 @@ void PadsPoll() {
 			p.lt = v.lt; p.rt = v.rt;
 			continue;
 		}
+		if (i == kKeyboardPad) { InstallKeyFilter(); PollKeyboard(p); continue; }
 		if (!g_getState) continue;
 		XI_STATE st = {};
 		uint32_t res = g_getState((uint32_t)i, &st);

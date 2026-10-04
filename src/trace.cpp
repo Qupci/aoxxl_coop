@@ -8,6 +8,10 @@
 #include "log.h"
 #include "kal.h"
 #include "trio.h"
+#include "inputmgr.h"
+
+#include <cstdio>
+#include <cstring>
 
 #include <intrin.h>
 
@@ -125,4 +129,39 @@ bool TraceInstallHooks() {
 			ok = false;
 	}
 	return ok;
+}
+
+// Input bindings: for each mapped action, which device byte feeds it in every
+// preset (binding +0x0C -> source; source +0x04.. = one raw-byte pointer per
+// preset, +0x14 = the preset in use). Devices: CKInput +0x04 (count +0x10,
+// 0xCC each), +0x08 (count +0x11, 0x68 each), +0x0C (count +0x12, 0x3FC each).
+void TraceDumpBindings() {
+	InputManager im = GetInputManager();
+	if (!im) return;
+	char* in = im.raw();
+	struct Dev { const char* name; char* base; int count, stride; } devs[3] = {
+		{ "A", *(char**)(in + 0x04), *(uint8_t*)(in + 0x10), 0xCC },
+		{ "B", *(char**)(in + 0x08), *(uint8_t*)(in + 0x11), 0x68 },
+		{ "C", *(char**)(in + 0x0C), *(uint8_t*)(in + 0x12), 0x3FC },
+	};
+	for (auto& d : devs) Log("bind: device %s at %p x%d", d.name, d.base, d.count);
+	auto where = [&](char* p, char* out) {
+		if (!p) { strcpy(out, "-"); return; }
+		for (auto& d : devs)
+			if (d.base && p >= d.base && p < d.base + d.count * d.stride) {
+				int off = (int)(p - d.base);
+				sprintf(out, "%s%d+%03X", d.name, off / d.stride, off % d.stride);
+				return;
+			}
+		sprintf(out, "%p", p);
+	};
+	int n = im.NumActions();
+	for (int i = 0; i < n; i++) {
+		char* b = im.Binding(i);
+		char* src = *(char**)(b + 0xC);
+		char w[5][24];
+		for (int k = 0; k < 5; k++) where(src ? *(char**)(src + 4 + 4 * k) : nullptr, w[k]);
+		Log("bind: %2d active=%d cont=%d src=%p presets %s %s %s %s cur %s mapper=%p",
+		    i, b[4], b[0x10], src, w[0], w[1], w[2], w[3], w[4], *(void**)(b + 8));
+	}
 }

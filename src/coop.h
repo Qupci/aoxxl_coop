@@ -57,6 +57,7 @@ bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 bool TraceInstallHooks();   // trace.cpp: event logging for interaction debugging
 void TraceDumpCollisionTests(void* receiver);   // trace.cpp: collision tests involving `receiver`
+void TraceDumpBindings();       // trace.cpp: which device byte feeds each mapped action
 
 // Shared vtable patcher (hooks.cpp).
 bool PatchVtableSlot(uintptr_t vtbl, size_t slot, uintptr_t expected,

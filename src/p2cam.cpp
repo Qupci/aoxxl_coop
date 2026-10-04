@@ -133,7 +133,13 @@ void P2CamFrame() {
 	// player 2's hero and player 1's hero is free to move.
 	int p1 = CoopP1Hero();
 	g_cur = &g_cams[0];
-	if (t.Leader() == CoopP2Hero()) UpdateCam(t.GetHero(p1), leader, Player1Pad());
+	// ...except while player 1's hero is the game's for a scripted shot of its
+	// own (the cable car ride: the game camera leaves its classic follow track
+	// for a path track that frames the rider) -- then the game camera is right.
+	char* srv = CameraService();
+	char* track = srv ? *(char**)(srv + 0x38) : nullptr;
+	bool scriptedShot = CoopHeroHeld(p1) && track && *(uintptr_t*)track != 0x624418;   // CKCameraClassicTrack
+	if (t.Leader() == CoopP2Hero() && !scriptedShot) UpdateCam(t.GetHero(p1), leader, Player1Pad());
 	else ResetCam(g_cams[0]);
 	g_cur = &g_cams[1];
 }

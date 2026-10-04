@@ -15,9 +15,18 @@ struct CoopConfig {
 	bool  splitTest     = false;  // render the scene twice, to prove re-entrancy
 	int   splitMode     = SPLIT_VERTICAL;
 	bool  splitScreen   = true;   // off = shared camera on the leader
-	int   p1Pad         = -1;     // XInput slot the game reads (player 1); -1 = detect automatically
+	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect
 	int   dropHoldMs    = 1500;
 	float deadzone      = 0.24f;
+
+	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
+	// codes, [keyboard] section of the ini.
+	bool  keyboard      = true;
+	enum { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_LOOK_UP, KEY_LOOK_DOWN, KEY_LOOK_LEFT,
+	       KEY_LOOK_RIGHT, KEY_JUMP, KEY_ATTACK, KEY_GRAB, KEY_DASH, KEY_LB, KEY_RB, KEY_START,
+	       KEY_BACK, KEY_COUNT };
+	int   keys[KEY_COUNT] = { 'W', 'S', 'A', 'D', 0x26, 0x28, 0x25, 0x27, 0x20, 'J', 'K', 'L', 'U', 'O',
+	                          0x0D, 0x08 };
 
 	void Load(const char* iniPath);
 };

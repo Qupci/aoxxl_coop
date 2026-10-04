@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -33,6 +33,12 @@ struct Step {
 #define P1(t, btn, x, y, n)         { t, S_P1,    0, 0, btn, x, y, n }
 #define VPAD(t, slot, btn, x, y, n) { t, S_VPAD,  slot, 0, btn, x, y, n }
 #define END(t)                      { t, S_END,   0, 0, 0, 0, 0, "end" }
+// A real key press (down=1) or release (down=0) through keybd_event, seen by the
+// game's window procedure and by the mod's keyboard "pad" alike.
+#define KEY(t, vk, down, n)         { t, S_KEY,   vk, down, 0, 0, 0, n }
+// Player 2's keyboard layout: 1 = the ini's numpad layout, 2 = the same with
+// jump on SPACE (one of the game's own keys).
+#define KEYMAP(t, layout)           { t, S_KEYMAP, layout, 0, 0, 0, 0, "keymap" }
 // Puts hero `hero` on the nearest visible bonus (CKHkBasicBonus) and watches it.
 #define TO_BONUS(t, hero)           { t, S_BONUS, hero, 0, 0, 0, 0, "to bonus" }
 // Same for a placed bonus (a beacon helmet: what the pool spawned last frame at
@@ -106,6 +112,28 @@ const Step kP2Basic[] = {
 	VPAD(18000, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(18200, 1, 0, 0, 0, "p2 release"),
 	SHOT(19500, "p2_04_end"),
 	END(20000),
+};
+
+// kbd: player 2 on the keyboard (numpad layout) while the game itself reads the
+// keyboard for player 1 (no gamepad attached -> the game's keyboard controls).
+// Join with HOME, move, jump, both players moving at once (player 1 through the
+// real arrow keys), then a player 2 key that is also the game's jump key (SPACE)
+// must jump only Obelix; hold END to leave.
+const Step kKbd[] = {
+	MARK(0, "baseline"), KEYMAP(0, 1),
+	KEY(500, 0x24, 1, "p2 HOME (join)"), KEY(700, 0x24, 0, "p2 release"),
+	KEY(1500, 0x66, 1, "p2 NUM6 (right)"), KEY(3000, 0x66, 0, "p2 release"),
+	KEY(3000, 0x68, 1, "p2 NUM8 (up)"), KEY(4500, 0x68, 0, "p2 release"),
+	KEY(5000, 0x60, 1, "p2 NUM0 (jump)"), KEY(5300, 0x60, 0, "p2 release"),
+	SHOT(5400, "kbd_01_jump"),
+	KEY(6500, 0x27, 1, "p1 RIGHT"), KEY(6500, 0x64, 1, "p2 NUM4 (left)"),
+	SHOT(7500, "kbd_02_apart"),
+	KEY(8000, 0x27, 0, "p1 release"), KEY(8000, 0x64, 0, "p2 release"),
+	KEYMAP(8500, 2),
+	KEY(9000, 0x20, 1, "p2 SPACE (jump, also the game's)"), KEY(9300, 0x20, 0, "p2 release"),
+	KEY(10500, 0x23, 1, "p2 hold END (leave)"), KEY(12500, 0x23, 0, "p2 release"),
+	KEY(13000, 0x20, 1, "SPACE after leaving (player 1 jumps)"), KEY(13300, 0x20, 0, "release"),
+	END(14500),
 };
 
 // p2mirror: what happened on the user's PC -- player 2 "joins" on the pad the
@@ -667,6 +695,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("cutscene", kCutscene),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
+	SCENARIO("kbd", kKbd),
 	SCENARIO("p2mirror", kP2Mirror),
 	SCENARIO("p2busy", kP2Busy),
 };
@@ -881,6 +910,22 @@ void RunStep(const Step& s) {
 		at.p1.ly = s.y;
 		CoopLogState(s.name);
 		break;
+	case S_KEY: {
+		Log("autotest: %s", s.name);
+		UINT sc = MapVirtualKeyA((UINT)s.a, 0 /* MAPVK_VK_TO_VSC */);
+		bool ext = (s.a >= 0x21 && s.a <= 0x2E) || s.a == 0x6F;   // nav cluster, numpad /
+		keybd_event((BYTE)s.a, (BYTE)sc, (ext ? KEYEVENTF_EXTENDEDKEY : 0) | (s.b ? 0 : KEYEVENTF_KEYUP), 0);
+		CoopLogState(s.name);
+		break;
+	}
+	case S_KEYMAP: {
+		static const int kNumpad[CoopConfig::KEY_COUNT] = {
+			0x68, 0x65, 0x64, 0x66, 0x6F, 0x62, 0x67, 0x69, 0x60, 0x61, 0x63, 0x6E, 0x2D, 0x2E, 0x24, 0x23 };
+		memcpy(g_config.keys, kNumpad, sizeof(kNumpad));
+		if (s.a == 2) g_config.keys[CoopConfig::KEY_JUMP] = 0x20;
+		Log("autotest: player 2 keyboard layout %d", s.a);
+		break;
+	}
 	case S_VPADR:
 		Log("autotest: %s", s.name);
 		at.vpad[s.a].rx = s.x;
@@ -1277,6 +1322,18 @@ void AutotestFrame() {
 		if (g_config.forceLevel >= 0 && level != g_config.forceLevel) live = false;
 		if (!live) {
 			at.liveSince = 0;
+			// Without a game controller the menu opens on "No controller detected
+			// ... continue with default keyboard control", which holds the forced
+			// level back until somebody presses Enter.
+			static DWORD lastEnter = 0;
+			if (level <= 0 && (int)(now - at.bootTick) > 6000 && (int)(now - lastEnter) > 5000 &&
+			    GetForegroundWindow() == at.hwnd) {
+				lastEnter = now;
+				Log("autotest: pressing Enter (no-controller notice?)");
+				keybd_event(VK_RETURN, 0x1C, 0, 0);
+				Sleep(60);
+				keybd_event(VK_RETURN, 0x1C, KEYEVENTF_KEYUP, 0);
+			}
 			if ((int)(now - at.bootTick) > 120000) Finish("gameplay never became live");
 			return;
 		}
