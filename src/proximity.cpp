@@ -1,9 +1,14 @@
 #include "proximity.h"
 #include "coop.h"
+#include "detour.h"
 #include "log.h"
 #include "trio.h"
 
 #include <cmath>
+#include <cstring>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 namespace {
 
@@ -148,6 +153,81 @@ void AttractToPlayer2(char* pool) {
 	}
 }
 
+// Placed bonuses (the helmets hanging in the air) are beacons, not pool
+// members: every frame CKGrpBonusPool::vf27 walks the beacons of the live
+// sectors, gives each uncollected one a bonus from the free list (vf21 places it,
+// vf15 updates it) and, when the leader is within the pool's radius, calls
+// bonus->vf18(leader, &beacon), which sends it flying and marks the beacon
+// collected. Bonuses nobody claimed go back to the free list next frame. That
+// distance check (0x54C6C6..0x54C719) is replaced: same test for the leader,
+// then the same for player 2's hero.
+const uintptr_t kBeaconCheck     = 0x54C6C6;   // mov al,[esp+13h]; test al,al; jz ...
+const uintptr_t kBeaconCheckDone = 0x54C71A;
+const uint8_t   kBeaconCheckBytes[10] = { 0x8A, 0x44, 0x24, 0x13, 0x84, 0xC0, 0x74, 0x4C, 0xD9, 0x44 };
+volatile long g_p2Beacons = 0;
+
+// `frame` is vf27's ESP inside the beacon loop: +0x13 the leader may collect,
+// +0x1C the beacon descriptor, +0x20 the leader's hook, +0x3C leader position,
+// +0x48 beacon position.
+void __cdecl BeaconCheck(char* pool, char* bonus, char* frame) {
+	typedef void(__fastcall* AttractFn)(void* self, void* edx, void* hero, void* beacon);
+	typedef char(__fastcall* CanFn)(void* pool, void* edx, void* hero);
+	AttractFn attract = (AttractFn)(*(void***)bonus)[18];
+	float r2 = *(float*)(*(char**)(pool + 0x3C) + 4);
+	const float* b = (const float*)(frame + 0x48);
+	void* beacon = frame + 0x1C;
+	if (*(uint8_t*)(frame + 0x13)) {
+		const float* l = (const float*)(frame + 0x3C);
+		float dx = b[0] - l[0], dy = b[1] - l[1], dz = b[2] - l[2];
+		if (dx * dx + dy * dy + dz * dz <= r2) {
+			attract(bonus, nullptr, *(void**)(frame + 0x20), beacon);
+			return;
+		}
+	}
+	if (!CoopP2Joined() || CoopSuspended()) return;
+	Trio t = GetTrio();
+	Hero h2 = t ? t.GetHero(CoopP2Hero()) : Hero();
+	if (!h2 || !((CanFn)(*(void***)pool)[39])(pool, nullptr, h2.hook)) return;
+	Vector3 p = h2.Pos();
+	float dx = b[0] - p.x, dy = b[1] - p.y, dz = b[2] - p.z;
+	if (dx * dx + dy * dy + dz * dz <= r2) {
+		attract(bonus, nullptr, h2.hook, beacon);
+		InterlockedIncrement(&g_p2Beacons);
+	}
+}
+
+__declspec(naked) void BeaconCheckThunk() {
+	__asm {
+		pushad
+		lea  eax, [esp + 36]   // vf27's ESP: 8 saved registers + our return address
+		push eax
+		push edi               // the bonus just placed on the beacon
+		push esi               // the pool
+		call BeaconCheck
+		add  esp, 12
+		popad
+		ret
+	}
+}
+
+bool PatchBeaconCheck() {
+	uint8_t* code = (uint8_t*)kBeaconCheck;
+	if (memcmp(code, kBeaconCheckBytes, sizeof(kBeaconCheckBytes)) != 0) {
+		Log("proximity: beacon check at %08X does not match -- not patching", (unsigned)kBeaconCheck);
+		return false;
+	}
+	DWORD old = 0;
+	if (!VirtualProtect(code, sizeof(kBeaconCheckBytes), PAGE_EXECUTE_READWRITE, &old)) return false;
+	code[0] = 0xE8;   // call BeaconCheckThunk
+	*(uint32_t*)(code + 1) = (uint32_t)((uintptr_t)BeaconCheckThunk - (kBeaconCheck + 5));
+	code[5] = 0xE9;   // jmp past the original check
+	*(uint32_t*)(code + 6) = (uint32_t)(kBeaconCheckDone - (kBeaconCheck + 10));
+	VirtualProtect(code, sizeof(kBeaconCheckBytes), old, &old);
+	FlushInstructionCache(GetCurrentProcess(), code, sizeof(kBeaconCheckBytes));
+	Log("proximity: beacon bonus check %08X -> %p", (unsigned)kBeaconCheck, (void*)BeaconCheckThunk);
+	return true;
+}
+
 void __fastcall PoolUpdateHook(void* self, void* edx, void* dt) {
 	g_origPoolUpdate(self, edx, dt);
 	AttractToPlayer2((char*)self);
@@ -158,8 +238,121 @@ void __fastcall AsterixPoolUpdateHook(void* self, void* edx, void* dt) {
 	AttractToPlayer2((char*)self);
 }
 
+// Collision contacts. CKSrvCollision's tick hands out what its tests found:
+//  * FUN_00447E30, shape-pair tests: receiver->sendEvent(0x300, list), list
+//    entries {next, test}; a test starts with its two shapes.
+//  * FUN_00447FF0, projectiles (punches, thrown things) against targets:
+//    sendEvent(0x301, list) to each target's owner and to each projectile's
+//    owner; entries {next, u8 record, u8 projectile, u16 target, u8 sub}, the
+//    projectile's shape being at service+0x24 + 8*projectile.
+// A shape's owner hook is at +0x20. Interactive objects only accept what comes
+// from the trio's leader: CKHkBumper launches the leader if the touching shape
+// is the leader's; an iron crate (filter 0x4B0DF0) breaks only if the punch is
+// the leader's and the leader is not Asterix. Those calls are redirected here,
+// and when the contact comes from player 2's hero alone (or the receiver is that
+// hero), the leader is player 2's hero for the length of the call.
+typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+const uintptr_t kPairCallSite = 0x447FD1;          // mov edx,[ecx]; call [edx+14h]
+const uint8_t   kPairCallBytes[5] = { 0x8B, 0x11, 0xFF, 0x52, 0x14 };
+const uintptr_t kTargetCallSite = 0x4483C5;        // mov edx,[ecx]; call [edx+14h]
+const uint8_t   kTargetCallBytes[5] = { 0x8B, 0x11, 0xFF, 0x52, 0x14 };
+const uintptr_t kProjectileCallSite = 0x448405;    // mov edx,[ecx]; push eax; push 301h; call [edx+14h]
+const uint8_t   kProjectileCallBytes[11] = { 0x8B, 0x11, 0x50, 0x68, 0x01, 0x03, 0x00, 0x00,
+                                             0xFF, 0x52, 0x14 };
+volatile long g_p2Contacts = 0;
+
+// Which player hero does this contact list come from? -1: none or both.
+template <class OwnerAt>
+int ContactActor(char* receiver, Hero h1, Hero h2, int p1, int p2, OwnerAt ownersOf) {
+	if (receiver == h1.raw()) return p1;
+	if (receiver == h2.raw()) return p2;
+	bool by1 = false, by2 = false;
+	ownersOf([&](char* owner) {
+		if (owner == h1.raw()) by1 = true;
+		else if (owner == h2.raw()) by2 = true;
+	});
+	if (by2 && !by1) return p2;
+	if (by1 && !by2) return p1;
+	return -1;
+}
+
+template <class OwnerAt>
+int DispatchAs(char* receiver, int event, void* list, OwnerAt ownersOf) {
+	SendEventFn send = (SendEventFn)(*(void***)receiver)[5];
+	Trio t = GetTrio();
+	if (!t || !CoopP2Joined() || CoopSuspended()) return send(receiver, nullptr, event, list);
+	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
+	Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
+	if (!h1 || !h2) return send(receiver, nullptr, event, list);
+	int actor = ContactActor(receiver, h1, h2, p1, p2, ownersOf);
+	uint8_t* tr = (uint8_t*)t.raw();
+	if (actor < 0 || tr[0x2C] == actor) return send(receiver, nullptr, event, list);
+
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	int other = actor == p1 ? p2 : p1;
+	tr[0x2C] = (uint8_t)actor;
+	tr[0x2D] = (uint8_t)other;
+	if (actor == p2) InterlockedIncrement(&g_p2Contacts);
+	int r = send(receiver, nullptr, event, list);
+	if (tr[0x2C] == (uint8_t)actor && tr[0x2D] == (uint8_t)other) {
+		tr[0x2C] = leader;
+		tr[0x2D] = companion;
+	}
+	return r;
+}
+
+int __fastcall PairContactDispatch(char* receiver, void*, int event, int* list) {
+	return DispatchAs(receiver, event, list, [&](auto&& note) {
+		for (int* e = list; e; e = (int*)e[0]) {
+			char** test = (char**)e[1];
+			if (!test) continue;
+			for (int k = 0; k < 2; k++)
+				if (test[k]) note(*(char**)(test[k] + 0x20));
+		}
+	});
+}
+
+int __fastcall ProjectileContactDispatch(char* receiver, void*, int event, uint8_t* list) {
+	return DispatchAs(receiver, event, list, [&](auto&& note) {
+		CKYellowPages* yp = YellowPages();
+		char* srv = yp ? *(char**)((char*)yp + 0x50) : nullptr;
+		if (!srv) return;
+		unsigned count = *(uint8_t*)(srv + 0x1B6);
+		for (uint8_t* e = list; e; e = *(uint8_t**)e) {
+			unsigned idx = e[5];
+			if (idx >= count) continue;
+			char* shape = *(char**)(srv + 0x24 + 8 * idx);
+			if (shape) note(*(char**)(shape + 0x20));
+		}
+	});
+}
+
+// The projectile-owner loop loads the vtable before its pushes, so the patch
+// there rewrites the whole sequence: push eax; push 301h; call dispatcher.
+bool PatchProjectileOwnerCall() {
+	uint8_t* code = (uint8_t*)kProjectileCallSite;
+	if (memcmp(code, kProjectileCallBytes, sizeof(kProjectileCallBytes)) != 0) {
+		Log("proximity: projectile owner call site %08X does not match -- not patching",
+			(unsigned)kProjectileCallSite);
+		return false;
+	}
+	DWORD old = 0;
+	if (!VirtualProtect(code, sizeof(kProjectileCallBytes), PAGE_EXECUTE_READWRITE, &old)) return false;
+	code[0] = 0x50;                                   // push eax (the list)
+	code[1] = 0x68; *(uint32_t*)(code + 2) = 0x301;   // push 301h
+	code[6] = 0xE8;                                   // call ProjectileContactDispatch
+	*(uint32_t*)(code + 7) = (uint32_t)((uintptr_t)ProjectileContactDispatch - (kProjectileCallSite + 11));
+	VirtualProtect(code, sizeof(kProjectileCallBytes), old, &old);
+	FlushInstructionCache(GetCurrentProcess(), code, sizeof(kProjectileCallBytes));
+	Log("proximity: projectile hits, owners (0x301) call site %08X -> %p", (unsigned)kProjectileCallSite,
+		(void*)ProjectileContactDispatch);
+	return true;
+}
+
 } // namespace
 
+long ProximityP2Contacts() { return g_p2Contacts; }
+long ProximityP2Beacons() { return g_p2Beacons; }
 long ProximitySlices() { return g_slices; }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
 
@@ -171,5 +364,11 @@ bool ProximityInstallHooks() {
 	ok &= PatchVtableSlot(kAsterixBonusPoolVtbl, kPoolUpdateSlot, kAsterixBonusPoolUpdate,
 	                      (void*)AsterixPoolUpdateHook, (void**)&g_origAsterixPoolUpdate,
 	                      "CKGrpAsterixBonusPool::update");
+	ok &= PatchCallSite(kPairCallSite, kPairCallBytes, sizeof(kPairCallBytes),
+	                    (void*)PairContactDispatch, "collision contacts (0x300)");
+	ok &= PatchCallSite(kTargetCallSite, kTargetCallBytes, sizeof(kTargetCallBytes),
+	                    (void*)ProjectileContactDispatch, "projectile hits, targets (0x301)");
+	ok &= PatchProjectileOwnerCall();
+	ok &= PatchBeaconCheck();
 	return ok;
 }

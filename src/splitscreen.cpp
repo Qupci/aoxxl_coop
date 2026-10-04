@@ -40,6 +40,28 @@ const uintptr_t kD3DDevicePtr    = 0x668978;    // IDirect3DDevice9* (RenderWare
 
 GraphicTickFn g_origGraphicTick = nullptr;
 
+// --- swept collision spheres ---------------------------------------------------
+// CKDynamicBoundingSphere (and CKDynBSphereProjectile) record their motion in the
+// scene walk: vf14 moves the previous position to +0x30, the motion since then to
+// +0x24 and the current one to +0x3C. The collision service sweeps the sphere
+// along that motion (OBB test FUN_00440F10), which is how a dash or a punch
+// registers with springs, crates, enemies... A second walk in the same frame
+// leaves a motion of zero, and every sweep falls back to a static overlap test:
+// player 2's Obelix dashing into a spring never touched it. Only the first walk
+// of a split frame updates them; the later walks just stamp them visible.
+const uintptr_t kDynSphereVtbl     = 0x622DE8;   // CKDynamicBoundingSphere (11,15)
+const uintptr_t kDynProjectileVtbl = 0x622E30;   // CKDynBSphereProjectile (11,6)
+const size_t    kWalkSlot          = 14;
+const uintptr_t kDynSphereWalk     = 0x416440;
+const CollectFn LeafWalk           = (CollectFn)0x41EFE0;   // CSGLeaf: stamp only
+CollectFn g_origDynSphereWalk = nullptr;
+bool      g_repeatWalk = false;
+
+void __fastcall DynSphereWalkHook(void* self, void* edx, void** lists, void* dt) {
+	if (g_repeatWalk) LeafWalk(self, edx, lists, dt);
+	else              g_origDynSphereWalk(self, edx, lists, dt);
+}
+
 // --- viewport override ---------------------------------------------------------
 // RenderWare's D3D9 camera begin-update sets the viewport from the camera's
 // raster; the main camera's own beginUpdate pointer is wrapped so a half-screen
@@ -127,6 +149,18 @@ void Translate(RwCamera* cam, const SavedCamera& base, const Vector3& d) {
 }
 
 volatile long g_splitFrames = 0;
+
+// One-off diagnostic: does our sync really move the camera's view matrix and
+// frustum planes (what the scene walk culls with), or only BeginUpdate does?
+int g_frustumLogs = 0;
+void LogFrustum(const char* tag, RwCamera* cam) {
+	if (g_frustumLogs >= 12) return;
+	g_frustumLogs++;
+	const float* vm = (const float*)((char*)cam + 0x20);
+	const float* fp = (const float*)((char*)cam + 0x94);
+	Log("split: %-12s view.pos=(%.2f %.2f %.2f) view.at=(%.2f %.2f %.2f) plane0=(%.3f %.3f %.3f %.2f)",
+		tag, vm[12], vm[13], vm[14], vm[8], vm[9], vm[10], fp[0], fp[1], fp[2], fp[3]);
+}
 bool          g_splitActive = false;
 bool          g_loggedLayout = false;
 
@@ -219,15 +253,20 @@ void RenderSplitFrame(char* view, void* dt) {
 		Translate(cam, p1cam, d1);
 	};
 
-	// 2. Stamp-only walk for player 2.
+	// 2. Stamp-only walk for player 2. Being the frame's first walk, it is also
+	//    the one that updates the swept collision spheres.
+	g_repeatWalk = false;
 	RwCameraSetViewWindow(cam, half);
 	placeP2();
 	SyncCameras(view, nullptr);
+	LogFrustum("p2 stamp", cam);
 	collect(root, nullptr, stampLists, dt);
+	g_repeatWalk = true;
 
 	// 3. Player 1's view.
 	placeP1();
 	SyncCameras(view, nullptr);
+	LogFrustum("p1 walk", cam);
 	collect(root, nullptr, (void**)(view + 0x1C), dt);
 	SyncClones(*(void**)(view + 0x58), nullptr, dt);
 	ResetDirty(view, nullptr);
@@ -242,10 +281,12 @@ void RenderSplitFrame(char* view, void* dt) {
 	*(uint32_t*)(view + 0x68) = viewFlags;
 	placeP2();
 	SyncCameras(view, nullptr);
+	LogFrustum("p2 walk", cam);
 	void* lists[kNumLists];
 	for (int i = 0; i < kNumLists; i++)
 		lists[i] = i >= kFirstHud ? (void*)&g_dummy : *(void**)(view + 0x1C + 4 * i);
 	collect(root, nullptr, lists, dt);
+	g_repeatWalk = false;
 	ResetDirty(view, nullptr);
 	g_vp = vp2; g_vpActive = true;
 	DrawWorld(view, nullptr, dt);
@@ -294,6 +335,12 @@ bool SplitActive() { return g_splitActive; }
 long SplitFrames() { return g_splitFrames; }
 
 bool SplitInstallHooks() {
-	return PatchVtableSlot(kGraphicVtbl, kGraphicTickSlot, kGraphicTick,
-	                       (void*)GraphicTickHook, (void**)&g_origGraphicTick, "CKGraphic::render");
+	bool ok = PatchVtableSlot(kGraphicVtbl, kGraphicTickSlot, kGraphicTick,
+	                          (void*)GraphicTickHook, (void**)&g_origGraphicTick, "CKGraphic::render");
+	ok &= PatchVtableSlot(kDynSphereVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
+	                      (void**)&g_origDynSphereWalk, "CKDynamicBoundingSphere::walk");
+	CollectFn same = nullptr;
+	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
+	                      (void**)&same, "CKDynBSphereProjectile::walk");
+	return ok;
 }

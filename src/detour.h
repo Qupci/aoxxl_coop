@@ -17,3 +17,10 @@
 // `prologueLen` must be >= 5 and must not split an instruction.
 bool InstallDetour(uintptr_t target, void* hook, void** outTrampoline,
                    const uint8_t* expected, size_t prologueLen, const char* name);
+
+// Replaces the `len` bytes at `at` (>= 5, whole instructions, checked against
+// `expected`) with `call target`, padded with NOPs. For redirecting one call
+// site, e.g. an indirect `mov edx,[ecx]; call [edx+N]` pair, to a function that
+// does the same call with something around it.
+bool PatchCallSite(uintptr_t at, const uint8_t* expected, size_t len, void* target,
+                   const char* name);

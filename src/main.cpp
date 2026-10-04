@@ -110,6 +110,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	RenderInstallHooks();
 	SplitInstallHooks();
 	ProximityInstallHooks();
+	TraceInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

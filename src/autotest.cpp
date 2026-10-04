@@ -14,7 +14,8 @@
 
 namespace {
 
-enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_END };
+enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
+                S_CRATE, S_ENEMY, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -34,6 +35,21 @@ struct Step {
 #define END(t)                      { t, S_END,   0, 0, 0, 0, 0, "end" }
 // Puts hero `hero` on the nearest visible bonus (CKHkBasicBonus) and watches it.
 #define TO_BONUS(t, hero)           { t, S_BONUS, hero, 0, 0, 0, 0, "to bonus" }
+// Same for a placed bonus (a beacon helmet: what the pool spawned last frame at
+// the beacons of the live sectors), at least 15 units from the other hero.
+#define TO_BEACON(t, hero)          { t, S_BONUS, hero, 1, 0, 0, 0, "to beacon" }
+// Puts hero `hero` 2.5 units behind the nearest spring (CKHkBumper), facing it.
+#define NEAR_BUMPER(t, hero)        { t, S_BUMPER, hero, 0, 0, 0, 0, "near bumper" }
+// Puts hero `hero` in front of the nearest intact crate, facing it: iron (iron=1,
+// the kind only Obelix breaks) or wooden (iron=0). CRATE_REPORT logs how many
+// pieces the chosen crate has left.
+#define NEAR_CRATE(t, hero, iron)   { t, S_CRATE, hero, iron, 0, 0, 0, "near crate" }
+#define CRATE_REPORT(t)             { t, S_CRATE, 0, -1, 0, 0, 0, "crate report" }
+// Puts hero `hero` 1.3 units from the nearest visible Roman (CKHkBasicEnemy),
+// facing it.
+#define NEAR_ENEMY(t, hero)         { t, S_ENEMY, hero, 0, 0, 0, 0, "near enemy" }
+// Turn the cutscene probe (extra state every log tick) on or off.
+#define PROBE(t, on)                { t, S_PROBE, on, 0, 0, 0, 0, "probe" }
 // Right stick of virtual pad `slot` (camera look).
 #define VPADR(t, slot, x, y, n)     { t, S_VPADR, slot, 0, 0, x, y, n }
 // Puts hero `hero` next to lifter `lifter` (offset dx/dz, 1.5 units up).
@@ -330,6 +346,84 @@ const Step kHelmet[] = {
 	END(4500),
 };
 
+// beacon (level 2): player 2's Obelix goes to a helmet placed in the level, away
+// from Asterix; it should fly to him (watch: p2Beacons, the bonus's target).
+const Step kBeacon[] = {
+	MARK(0, "baseline"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	TO_BEACON(1500, HERO_OBELIX),
+	SHOT(2500, "beacon_00_on"),
+	TO_BEACON(4500, HERO_OBELIX),
+	SHOT(5500, "beacon_01_on"),
+	END(7500),
+};
+
+// cine (run with -Level 4): the level's intro cutscene. Player 1 pushes the stick
+// the whole time, so the moment Asterix starts moving is the moment the game
+// gives control back; the probe logs every candidate signal around it.
+const Step kCine[] = {
+	PROBE(0, 1), MARK(0, "cine"), P1(0, 0, 0, 1, "p1 up (held)"),
+	SHOT(500, "cine_00"), SHOT(4000, "cine_01"), SHOT(8000, "cine_02"), SHOT(12000, "cine_03"),
+	SHOT(16000, "cine_04"), SHOT(20000, "cine_05"), SHOT(24000, "cine_06"),
+	END(26000),
+};
+
+// bumper (level 2): player 1 dashes into the nearest spring (control), then
+// player 2 does the same with Obelix. trace.cpp logs the spring's events.
+const Step kBumper[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	NEAR_BUMPER(1500, HERO_ASTERIX),
+	P1(1800, PAD_Y, 0, 0, "p1 dash"), P1(2000, 0, 0, 0, "p1 release"),
+	SHOT(2300, "bumper_00_p1"), SHOT(3000, "bumper_01_p1"),
+	NEAR_BUMPER(5000, HERO_OBELIX),
+	VPAD(5300, 1, PAD_Y, 0, 0, "p2 dash"), VPAD(5500, 1, 0, 0, 0, "p2 release"),
+	SHOT(5800, "bumper_02_p2"), SHOT(6500, "bumper_03_p2"),
+	END(8500),
+};
+
+// crate (level 2): player 2's Obelix punches the nearest iron crate, then the
+// nearest wooden one. CKHkCrate pieces (+8 & 7) drop by one per break.
+const Step kCrate[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	NEAR_CRATE(1500, HERO_OBELIX, 1),
+	VPAD(1900, 1, PAD_X, 0, 0, "p2 punch"), VPAD(2050, 1, 0, 0, 0, "p2 release"),
+	VPAD(2500, 1, PAD_X, 0, 0, "p2 punch"), VPAD(2650, 1, 0, 0, 0, "p2 release"),
+	VPAD(3100, 1, PAD_X, 0, 0, "p2 punch"), VPAD(3250, 1, 0, 0, 0, "p2 release"),
+	SHOT(3600, "crate_00_iron"), CRATE_REPORT(4000),
+	NEAR_CRATE(4500, HERO_OBELIX, 0),
+	VPAD(4900, 1, PAD_X, 0, 0, "p2 punch"), VPAD(5050, 1, 0, 0, 0, "p2 release"),
+	VPAD(5500, 1, PAD_X, 0, 0, "p2 punch"), VPAD(5650, 1, 0, 0, 0, "p2 release"),
+	SHOT(6000, "crate_01_wood"), CRATE_REPORT(6500),
+	END(7000),
+};
+
+// grab (level 2): each player walks up to a Roman and grabs it (B), then turns
+// the stick around to spin it. Player 1 first as the control.
+const Step kGrab[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	NEAR_ENEMY(1500, HERO_ASTERIX),
+	P1(1600, PAD_X, 0, 0, "p1 punch"), P1(1700, 0, 0, 0, "p1 release"),
+	P1(2000, PAD_X, 0, 0, "p1 punch"), P1(2100, 0, 0, 0, "p1 release"),
+	P1(2400, PAD_X, 0, 0, "p1 punch"), P1(2500, 0, 0, 0, "p1 release"),
+	P1(2900, PAD_B, 0, 0, "p1 grab"), P1(3100, 0, 0, 0, "p1 release"),
+	P1(3500, 0, 1, 0, "p1 spin r"), P1(3700, 0, 0, -1, "p1 spin d"), P1(3900, 0, -1, 0, "p1 spin l"),
+	P1(4100, 0, 0, 1, "p1 spin u"), P1(4300, 0, 1, 0, "p1 spin r"), P1(4500, 0, 0, 0, "p1 neutral"),
+	SHOT(4600, "grab_00_p1"),
+	NEAR_ENEMY(6500, HERO_OBELIX),
+	VPAD(6600, 1, PAD_X, 0, 0, "p2 punch"), VPAD(6700, 1, 0, 0, 0, "p2 release"),
+	VPAD(7000, 1, PAD_X, 0, 0, "p2 punch"), VPAD(7100, 1, 0, 0, 0, "p2 release"),
+	VPAD(7400, 1, PAD_X, 0, 0, "p2 punch"), VPAD(7500, 1, 0, 0, 0, "p2 release"),
+	VPAD(7900, 1, PAD_B, 0, 0, "p2 grab"), VPAD(8100, 1, 0, 0, 0, "p2 release"),
+	VPAD(8500, 1, 0, 1, 0, "p2 spin r"), VPAD(8700, 1, 0, 0, -1, "p2 spin d"),
+	VPAD(8900, 1, 0, -1, 0, "p2 spin l"), VPAD(9100, 1, 0, 0, 1, "p2 spin u"),
+	VPAD(9300, 1, 0, 1, 0, "p2 spin r"), VPAD(9500, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(9600, "grab_01_p2"),
+	END(11500),
+};
+
 // survey: log which group-action objects the level has, then leave.
 const Step kSurvey[] = {
 	MARK(0, "survey"), SHOT(100, "survey"), END(300),
@@ -425,6 +519,11 @@ const Scenario kScenarios[] = {
 	SCENARIO("split2", kSplit2),
 	SCENARIO("soak", kSoak),
 	SCENARIO("helmet", kHelmet),
+	SCENARIO("beacon", kBeacon),
+	SCENARIO("cine", kCine),
+	SCENARIO("bumper", kBumper),
+	SCENARIO("crate", kCrate),
+	SCENARIO("grab", kGrab),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("p2mirror", kP2Mirror),
@@ -447,6 +546,9 @@ struct AutotestState {
 	HWND    hwnd = nullptr;
 	WNDPROC prevProc = nullptr;
 	char*   watchBonus = nullptr;   // CKHkBasicBonus hook being watched
+	char*   watchCrate = nullptr;   // CKHkCrate chosen by NEAR_CRATE
+	char*   watchEnemy = nullptr;   // CKHkBasicEnemy chosen by NEAR_ENEMY
+	bool    probe = false;          // log cutscene-related engine state each tick
 } at;
 
 LRESULT CALLBACK AutotestWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -508,6 +610,43 @@ void LogTick(float t) {
 			*(uint8_t*)(h.raw() + 0x561), h.Pos().x, h.Pos().y, h.Pos().z);
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
+	if (at.probe) {
+		// Everything that might say "a cutscene has the player": cinematic scenes,
+		// the camera service's track and flags, game manager / trio flags, the
+		// hero command block, and the input bindings and values.
+		__try {
+			CKYellowPages* yp = YellowPages();
+			char* cin = *(char**)((char*)yp + 0x80);
+			char* cam = *(char**)((char*)yp + 0x68);
+			char* gm = (char*)yp->gameManager;
+			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+			char* inp = *(char**)((char*)yp + 0x14);
+			line.Add(" | cin:");
+			char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+			unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
+			int shown = 0;
+			for (unsigned i = 0; scenes && i < n && i < 64 && shown < 6; i++) {
+				unsigned f20 = *(unsigned short*)(scenes[i] + 0x20), f30 = *(uint8_t*)(scenes[i] + 0x30);
+				if ((f20 & 0x8001) || f30) { line.Add(" %u:%04X/%02X", i, f20, f30); shown++; }
+			}
+			char* track = cam ? *(char**)(cam + 0x38) : nullptr;
+			line.Add(" | cam trk=%08X fl=%08X | gm5C=%08X trio3F4=%08X", track ? *(unsigned*)track : 0,
+				cam ? *(unsigned*)(cam + 0xC) : 0, gm ? *(unsigned*)(gm + 0x5C) : 0,
+				tr ? *(unsigned*)(tr.raw() + 0x3F4) : 0);
+			if (cb) line.Add(" | cb1C=%05X cb5C=%d cb8C=%.2f", *(unsigned*)(cb + 0x1C) & 0xFFFFF,
+				(int)*(signed char*)(cb + 0x5C), *(float*)(cb + 0x8C));
+			if (inp) {
+				unsigned mask = 0;
+				char* binds = *(char**)(inp + 0x18);
+				for (int i = 0; i < 16 && binds; i++) if (binds[i * 0x20 + 4] == 1) mask |= 1u << i;
+				uint8_t* v = *(uint8_t**)(inp + 0x1C);
+				line.Add(" | bind=%04X v=%02X%02X%02X%02X in68=%d", mask, v ? v[0] : 0, v ? v[1] : 0,
+					v ? v[2] : 0, v ? v[3] : 0, *(uint8_t*)(inp + 0x68));
+			}
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			line.Add(" | probe fault");
+		}
+	}
 	if (at.watchBonus) {
 		char* node = *(char**)(at.watchBonus + 0x10);
 		char* life = *(char**)(at.watchBonus + 0x0C);
@@ -516,6 +655,13 @@ void LogTick(float t) {
 		line.Add(" | bonus hidden=%d following=%d target=%p", node ? (*(uint8_t*)(node + 0x10) & 2) != 0 : -1,
 			following, *(void**)(at.watchBonus + 0x20));
 		(void)life;
+	}
+	if (at.watchEnemy) {
+		char* node = *(char**)(at.watchEnemy + 0x10);
+		char* frame = node ? *(char**)(node + 4) : nullptr;
+		if (frame)
+			line.Add(" | roman (%.2f %.2f %.2f)", ((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1],
+				((float*)(frame + 0x80))[2]);
 	}
 	Log("%s", line.c_str());
 }
@@ -626,10 +772,14 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_BONUS: {
-		// Nearest bonus that a pool currently has active (the real collectibles).
+		// Nearest bonus that a pool currently has active (dropped collectibles),
+		// or (s.b == 1) one the pool placed on a beacon last frame, away from the
+		// other hero.
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		Hero other = t.GetHero(s.a == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX);
+		const size_t listOff = s.b == 1 ? 0x34 : 0x30;
 		char* best = nullptr;
 		float bestD = 1e30f;
 		Vector3 bestP;
@@ -641,20 +791,22 @@ void RunStep(const Step& s) {
 				char* pool = (char*)GetLvlObject(4, kPoolIds[k], i);
 				if (!pool) continue;
 				pools++;
-				for (char* b = *(char**)(pool + 0x30); b; b = *(char**)(b + 0x14)) {
+				for (char* b = *(char**)(pool + listOff); b; b = *(char**)(b + 0x14)) {
 					char* node = *(char**)(b + 0x10);
 					char* frame = node ? *(char**)(node + 4) : nullptr;
 					if (!frame) continue;
 					active++;
 					Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1],
 					          ((float*)(frame + 0x80))[2]);
+					if (s.b == 1 && other && (p - other.Pos()).len2() < 15.0f * 15.0f) continue;
 					float d = (p - h.Pos()).len2();
 					if (d < bestD) { bestD = d; best = b; bestP = p; }
 				}
 			}
 		}
-		Log("autotest: %d pools, %d active bonuses; nearest to %s at (%.2f %.2f %.2f), %.1f away",
-			pools, active, HeroName(s.a), bestP.x, bestP.y, bestP.z, best ? sqrtf(bestD) : -1.0f);
+		Log("autotest: %d pools, %d %s bonuses; nearest to %s at (%.2f %.2f %.2f), %.1f away",
+			pools, active, s.b == 1 ? "beacon" : "active", HeroName(s.a), bestP.x, bestP.y, bestP.z,
+			best ? sqrtf(bestD) : -1.0f);
 		if (!best) break;
 		at.watchBonus = best;
 		Vector3 to = bestP + Vector3(0, 0.2f, 0);
@@ -665,6 +817,148 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_BUMPER: {
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		unsigned n = GetNumLvlClassInstances(2, 160);
+		char* best = nullptr;
+		float bestD = 1e30f;
+		Vector3 bestP;
+		for (unsigned i = 0; i < n; i++) {
+			char* bmp = (char*)GetLvlObject(2, 160, i);
+			char* node = bmp ? *(char**)(bmp + 0x10) : nullptr;
+			char* frame = node ? *(char**)(node + 4) : nullptr;
+			if (!frame) continue;
+			Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2]);
+			if (p.len2() == 0.0f) continue;
+			float d = (p - h.Pos()).len2();
+			if (d < bestD) { bestD = d; best = bmp; bestP = p; }
+		}
+		if (!best) { Log("autotest: no bumper"); break; }
+		// CKHkBumper launches the leader when it hits at speed >= +0x18 with its
+		// facing along the bumper's (LTM at) axis: flag 0x40 of +0x3E accepts
+		// dot > 0.1, flag 0x80 dot < -0.1. Line the hero up accordingly.
+		char* bframe = *(char**)(*(char**)(best + 0x10) + 4);
+		Vector3 axis(((float*)(bframe + 0x70))[0], 0, ((float*)(bframe + 0x70))[2]);
+		float al = sqrtf(axis.len2());
+		axis = al > 0.01f ? axis * (1.0f / al) : Vector3(0, 0, 1);
+		uint8_t bflags = *(uint8_t*)(best + 0x3E);
+		Vector3 face = (bflags & 0x40) ? axis : axis * -1.0f;
+		Log("autotest: %u bumpers; nearest to %s at (%.2f %.2f %.2f), %.1f away; flags %02X speeds "
+			"%.2f/%.2f axis (%.2f %.2f) -> facing (%.2f %.2f)",
+			n, HeroName(s.a), bestP.x, bestP.y, bestP.z, sqrtf(bestD), bflags, *(float*)(best + 0x14),
+			*(float*)(best + 0x18), axis.x, axis.z, face.x, face.z);
+		TraceDumpCollisionTests(best);
+		// Facing: direction +0xB4 plus the yaw pair +0xCC/+0xD4 the hero turns
+		// with (FUN_0048C970 sets all three the same way, yaw = atan2(z, x)).
+		h.Dir() = face;
+		float yaw = atan2f(face.z, face.x);
+		if (yaw < 0) yaw += 6.2831855f;
+		*(float*)(h.raw() + 0xCC) = yaw;
+		*(float*)(h.raw() + 0xD4) = yaw;
+		Vector3 to = bestP - face * 3.0f + Vector3(0, 0.3f, 0);
+		h.Pos() = to;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
+		break;
+	}
+	case S_CRATE: {
+		if (s.b < 0) {
+			if (at.watchCrate)
+				Log("autotest: crate %p has %u pieces left", at.watchCrate, *(uint32_t*)(at.watchCrate + 8) & 7);
+			break;
+		}
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		const uintptr_t kIronFilter = 0x4B0DF0;   // CKGrpMecaCpntAsterix: Obelix-only crates
+		unsigned n = GetNumLvlClassInstances(2, 112), iron = 0, wood = 0;
+		char* best = nullptr;
+		float bestD = 1e30f;
+		Vector3 bestP;
+		for (unsigned i = 0; i < n; i++) {
+			char* c = (char*)GetLvlObject(2, 112, i);
+			if (!c || *(int*)(c + 0x58) == -1 || (*(uint32_t*)(c + 8) & 7) == 0) continue;
+			char* cfg = *(char**)(c + 0x14);
+			bool isIron = cfg && *(uintptr_t*)(cfg + 0x2E0) == kIronFilter;
+			(isIron ? iron : wood)++;
+			if (isIron != (s.b == 1)) continue;
+			char* node = *(char**)(c + 0x10);
+			char* frame = node ? *(char**)(node + 4) : nullptr;
+			if (!frame) continue;
+			Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2]);
+			float d = (p - h.Pos()).len2();
+			if (d < bestD) { bestD = d; best = c; bestP = p; }
+		}
+		Log("autotest: %u crates (%u iron, %u wooden intact); nearest %s one to %s at (%.2f %.2f %.2f), "
+			"%.1f away, %u pieces", n, iron, wood, s.b == 1 ? "iron" : "wooden", HeroName(s.a), bestP.x,
+			bestP.y, bestP.z, best ? sqrtf(bestD) : -1.0f, best ? *(uint32_t*)(best + 8) & 7 : 0);
+		at.watchCrate = best;
+		if (!best) break;
+		Vector3 face = bestP - h.Pos();
+		face.y = 0;
+		float fl = sqrtf(face.len2());
+		face = fl > 0.01f ? face * (1.0f / fl) : Vector3(0, 0, 1);
+		h.Dir() = face;
+		float yaw = atan2f(face.z, face.x);
+		if (yaw < 0) yaw += 6.2831855f;
+		*(float*)(h.raw() + 0xCC) = yaw;
+		*(float*)(h.raw() + 0xD4) = yaw;
+		Vector3 to = bestP - face * 1.8f;
+		to.y = h.Pos().y > bestP.y ? h.Pos().y : bestP.y;
+		to.y += 0.3f;
+		h.Pos() = to;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
+		break;
+	}
+	case S_ENEMY: {
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		unsigned n = GetNumLvlClassInstances(2, 93);
+		char* best = nullptr;
+		float bestD = 1e30f;
+		Vector3 bestP;
+		for (unsigned i = 0; i < n; i++) {
+			char* e = (char*)GetLvlObject(2, 93, i);
+			char* node = e ? *(char**)(e + 0x10) : nullptr;
+			char* frame = node ? *(char**)(node + 4) : nullptr;
+			if (!frame || (*(uint8_t*)(node + 0x10) & 2)) continue;   // hidden: not in play
+			Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2]);
+			if (p.len2() == 0.0f) continue;
+			float d = (p - h.Pos()).len2();
+			if (d < bestD) { bestD = d; best = e; bestP = p; }
+		}
+		Log("autotest: %u Romans; nearest visible to %s at (%.2f %.2f %.2f), %.1f away", n, HeroName(s.a),
+			bestP.x, bestP.y, bestP.z, best ? sqrtf(bestD) : -1.0f);
+		if (!best) break;
+		at.watchEnemy = best;
+		Vector3 face = bestP - h.Pos();
+		face.y = 0;
+		float fl = sqrtf(face.len2());
+		face = fl > 0.01f ? face * (1.0f / fl) : Vector3(0, 0, 1);
+		h.Dir() = face;
+		float yaw = atan2f(face.z, face.x);
+		if (yaw < 0) yaw += 6.2831855f;
+		*(float*)(h.raw() + 0xCC) = yaw;
+		*(float*)(h.raw() + 0xD4) = yaw;
+		Vector3 to = bestP - face * 1.3f + Vector3(0, 0.3f, 0);
+		h.Pos() = to;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
+		break;
+	}
+	case S_PROBE:
+		at.probe = s.a != 0;
+		break;
 	case S_END:
 		Finish("timeline complete");
 		break;
@@ -728,7 +1022,7 @@ void AutotestFrame() {
 			at.liveSince = now;
 			Log("autotest: gameplay live, settling");
 		}
-		if ((int)(now - at.liveSince) < 4000) return;
+		if ((int)(now - at.liveSince) < (at.sc->steps == kCine ? 0 : 4000)) return;
 		at.phase = AutotestState::RUN;
 		at.runStart = now;
 		at.next = 0;

@@ -55,3 +55,24 @@ bool InstallDetour(uintptr_t target, void* hook, void** outTrampoline,
 	Log("detour: %s %08X -> %p (trampoline %p)", name, (unsigned)target, hook, tramp);
 	return true;
 }
+
+bool PatchCallSite(uintptr_t at, const uint8_t* expected, size_t len, void* target,
+                   const char* name) {
+	uint8_t* code = (uint8_t*)at;
+	if (len < 5 || len > 32 || memcmp(code, expected, len) != 0) {
+		Log("detour: %s call site %08X does not match -- not patching", name, (unsigned)at);
+		return false;
+	}
+	DWORD oldProtect = 0;
+	if (!VirtualProtect(code, len, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+		Log("detour: %s cannot unprotect %08X (%lu)", name, (unsigned)at, GetLastError());
+		return false;
+	}
+	code[0] = 0xE8;
+	*(uint32_t*)(code + 1) = (uint32_t)((uintptr_t)target - (at + 5));
+	for (size_t i = 5; i < len; i++) code[i] = 0x90;
+	VirtualProtect(code, len, oldProtect, &oldProtect);
+	FlushInstructionCache(GetCurrentProcess(), code, len);
+	Log("detour: %s call site %08X -> %p", name, (unsigned)at, target);
+	return true;
+}

@@ -54,6 +54,8 @@ int  CoopBeforeTrioEvent(int event);
 void CoopAfterTrioEvent(int event, int cookie);
 
 bool CoopInstallHooks();
+bool TraceInstallHooks();   // trace.cpp: event logging for interaction debugging
+void TraceDumpCollisionTests(void* receiver);   // trace.cpp: collision tests involving `receiver`
 
 // Shared vtable patcher (hooks.cpp).
 bool PatchVtableSlot(uintptr_t vtbl, size_t slot, uintptr_t expected,

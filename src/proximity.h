@@ -20,3 +20,5 @@ bool ProximityInstallHooks();
 // Diagnostics.
 long ProximitySlices();
 long ProximityP2Bonuses();   // bonuses sent flying to player 2's hero
+long ProximityP2Contacts();  // collision contacts delivered with player 2's hero as leader
+long ProximityP2Beacons();   // placed bonuses (beacons) sent flying to player 2's hero

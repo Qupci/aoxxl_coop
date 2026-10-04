@@ -267,6 +267,71 @@ void CoopLogState(const char* tag) {
 // Frame
 // ---------------------------------------------------------------------------
 
+// Marker for capturing what the game does in situations that cannot be staged by
+// the autotest (cutscenes...): LB+RB together on any pad logs a burst of engine
+// state for four seconds.
+DWORD g_probeUntil = 0;
+int   g_markNo = 0;
+
+void ProbeLine() {
+	char buf[1024];
+	LineBuf line(buf);
+	__try {
+		CKYellowPages* yp = YellowPages();
+		Trio t = GetTrio();
+		for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++) {
+			Hero h = t ? t.GetHero(i) : Hero();
+			if (!h) continue;
+			line.Add("%c f18=%02X L=%02X sit=%02X body=%02X 1A=%02X 390=%08X pos=(%.1f %.1f %.1f) ",
+				i == HERO_ASTERIX ? 'A' : 'O', h.Flags18(), LifeLastState(i), Situation(h),
+				*(uint8_t*)(h.raw() + 0xE5), *(uint8_t*)(h.raw() + 0x1A), h.Flags390(),
+				h.Pos().x, h.Pos().y, h.Pos().z);
+		}
+		char* cin = *(char**)((char*)yp + 0x80);
+		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+		unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
+		line.Add("| cin:");
+		for (unsigned i = 0, shown = 0; scenes && i < n && i < 64 && shown < 8; i++) {
+			unsigned f20 = *(unsigned short*)(scenes[i] + 0x20), f30 = *(uint8_t*)(scenes[i] + 0x30);
+			if ((f20 & 0x8001) || f30) { line.Add(" %u:%04X/%02X", i, f20, f30); shown++; }
+		}
+		char* cam = *(char**)((char*)yp + 0x68);
+		char* track = cam ? *(char**)(cam + 0x38) : nullptr;
+		char* gm = (char*)yp->gameManager;
+		char* inp = *(char**)((char*)yp + 0x14);
+		line.Add(" | cam trk=%08X fl=%08X | gm5C=%08X", track ? *(unsigned*)track : 0,
+			cam ? *(unsigned*)(cam + 0xC) : 0, gm ? *(unsigned*)(gm + 0x5C) : 0);
+		if (inp) {
+			unsigned mask = 0;
+			char* binds = *(char**)(inp + 0x18);
+			for (int i = 0; i < 16 && binds; i++) if (binds[i * 0x20 + 4] == 1) mask |= 1u << i;
+			uint8_t* v = *(uint8_t**)(inp + 0x1C);
+			line.Add(" | bind=%04X v0-7=%02X%02X%02X%02X%02X%02X%02X%02X", mask,
+				v ? v[0] : 0, v ? v[1] : 0, v ? v[2] : 0, v ? v[3] : 0, v ? v[4] : 0, v ? v[5] : 0,
+				v ? v[6] : 0, v ? v[7] : 0);
+		}
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		line.Add(" (probe fault)");
+	}
+	Log("probe: %s", line.c_str());
+}
+
+void CheckMarker(DWORD now) {
+	for (int i = 0; i < kMaxPads; i++) {
+		const PadState& p = PadGet(i);
+		if (p.connected && (p.pressed & (PAD_LB | PAD_RB)) && (p.buttons & PAD_LB) && (p.buttons & PAD_RB)) {
+			Log("probe: ===== MARK %d (LB+RB on pad %d) =====", ++g_markNo, i);
+			g_probeUntil = now + 4000;
+			break;
+		}
+	}
+	static DWORD lastProbe = 0;
+	if ((int)(g_probeUntil - now) > 0 && (int)(now - lastProbe) >= 250) {
+		lastProbe = now;
+		ProbeLine();
+	}
+}
+
 void CoopFrame() {
 	DWORD now = GetTickCount();
 	g.frames++;
@@ -281,6 +346,7 @@ void CoopFrame() {
 	}
 
 	PadsPoll();
+	CheckMarker(now);
 	{
 		InputManager im = GetInputManager();
 		int n = im.NumActions();
@@ -333,7 +399,10 @@ void CoopFrame() {
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
 	// companion" to a marker and waits for it, which only an AI companion does.
 	bool groupAction = Situation(h1) == kSituationGroupAction;
-	bool cinematic = CinematicPlaying();
+	// (Cutscenes: CKSrvCinematic scene bit 0 turned out to stay set during normal
+	// play -- e.g. level 4 scene 0 once the player first moves -- so it is not
+	// used. The real cutscene signal is still to be identified with the marker.)
+	bool cinematic = false;
 	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
 	                h1.Busy() || h2.Busy() || groupAction || cinematic;
 	if (scripted != g.suspended) {
