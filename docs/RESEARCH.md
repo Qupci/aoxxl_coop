@@ -110,6 +110,35 @@ the mod (`coop_diag`) exist to do exactly that.
   game manager `+0x5C` bit 20 set (HUD hides on it), camera service camera = plain `CKCamera`
   (vt `0x6245BC`), and **no hero Life ticks**. Scene event `0x500+i` starts scene i,
   `0x500+count+i` stops it. Ambient scenes (no bars) play all the time.
+* **Trigger zones**: `CKSrvDetection` (`yellowPages+0x54`, vt `0x62504C`, tick = slot 17 `0x46BE90`)
+  tracks two objects (`+0x18` nodes, `+0x20` count: Obelix's node 0, Asterix's node 1) and their
+  last positions (`+0x1C`, 12 bytes each, written at the end of the tick). Tests are 8 bytes
+  (`+0` shape, `+2` object, `+4` bit 0 enabled, `+5` bit 0 "inside" wanted, `+6` event) in five
+  lists: `+0x2C` box-enter, `+0x34` sphere-enter, `+0x3C` plane-cross (→ `FUN_00460C20`, ECX =
+  event service `yp+0x6C`), `+0x44` box-level and `+0x4C` sphere-level (flag set inline every frame
+  while inside/outside). Shapes: boxes `+0xC` (0x18: max xyz, min xyz), spheres `+0x10` (0x14:
+  centre, r, r²). All stateless (current vs last position). Level 2: 29/3/145 enter/cross tests,
+  about half bound to each hero (lifter Romans: sphere-enter event `0x408`, bound to Asterix). The
+  mod runs the tick a second time with the two heroes' nodes and last positions swapped (minus
+  "while outside" tests), so every hero zone answers to both players (`proximity.cpp`).
+* **Sound**: one listener (`CKSoundManager+4` → wrapper → object: pos `+0x28`, velocity `+0x34`,
+  up `+0x40`, at `+0x4C`, right `+0x58`), copied from the camera frame's LTM by
+  `CKSoundManager::vf17` (`0x43ADD0`). Range cut via `FUN_005917C0` (sqrt) at `0x43B0D5`,
+  `0x43B512` (vf17) and `0x43B9B9`, `0x43BCBF` (start, `FUN_0043B730`); software 3D mix
+  `FUN_005DE840(&listener, n, in, out, ...)` (volume/pan per voice, positions in world space;
+  voices store x negated at `+0xA0`). The mod answers the range checks with the nearer camera and
+  mixes voices nearer P2's camera against a listener copy moved there (`sound.cpp`).
+* **Keyboard**: the game reads it from window messages (`0x479C10` → `FUN_00438990` → keyboard
+  device vf5 `0x433900`, VK → key index table, state at device `+0x95`); CKInput devices: `+0x04`
+  pads (0xCC), `+0x08` mice (0x68), `+0x0C` keyboards (0x3FC). A binding's source (`binding+0xC`)
+  holds one raw-byte pointer per preset (`+4..`), `+0x14` = the preset in use. Default keyboard
+  preset: arrows move, Space jump, F attack, G grab, D dash, R/C shoulders, P back, I start, Shift/
+  Ctrl camera. Without a pad the game opens on "No controller detected" (Enter dismisses it).
+* **Sectors**: sector manager `yellowPages+0x90` (0x14C bytes): sectors `+4` (count `+0x20`),
+  current `+0x24`. Sector `+4` index, `+6` flags (bit 0 loaded), `+0x18` box max xyz, `+0x24` min
+  xyz. Collision (`FUN_004493C0`), klusters and rendering walk only the current sector and
+  sector 0 — one streamed sector at a time. Level 2: 11 sectors, 0 and 1 loaded at the start.
+  Teleports skip the zone events that stream sectors; autotest `GLIDE` moves heroes frame by frame.
 
 ### 0.6 Other facts
 * `CKSrvCamera` = `yellowPages+0x68`; dir `+0xAC`; targets `+0xE8`.

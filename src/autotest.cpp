@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -38,6 +38,13 @@ struct Step {
 #define KEY(t, vk, down, n)         { t, S_KEY,   vk, down, 0, 0, 0, n }
 // Player 2's keyboard layout: 1 = the ini's numpad layout, 2 = the same with
 // jump on SPACE (one of the game's own keys).
+// Logs the sector manager (yellow pages +0x90): sectors, flags, boxes, the
+// current one, and which sector each hero is in.
+#define SECTORS(t)                  { t, S_SECTORS, 0, 0, 0, 0, 0, "sectors" }
+// Moves hero `hero` in a straight line to spot `spot` over `ms` milliseconds,
+// frame by frame (walls ignored), so trigger zones and sector streaming see a
+// continuous path, unlike a teleport.
+#define GLIDE(t, hero, spot, ms)    { t, S_GLIDE, hero, spot, 0, ms, 0, "glide" }
 #define KEYMAP(t, layout)           { t, S_KEYMAP, layout, 0, 0, 0, 0, "keymap" }
 // Puts hero `hero` on the nearest visible bonus (CKHkBasicBonus) and watches it.
 #define TO_BONUS(t, hero)           { t, S_BONUS, hero, 0, 0, 0, 0, "to bonus" }
@@ -187,6 +194,35 @@ const Step kLifter[] = {
 	VPAD(27000, 1, 0, 1, 0, "p2 right"), VPAD(28500, 1, 0, 0, 0, "p2 neutral"),
 	SHOT(29000, "lifter_04_end"),
 	END(29500),
+};
+
+// warp: player 2 walks off, then Back + A brings Obelix back to Asterix; Back
+// alone held long enough must still leave afterwards.
+const Step kWarp[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(1000, 1, 0, 0, 1, "p2 up"), VPAD(4000, 1, 0, 0, 0, "p2 neutral"),
+	VPAD(4500, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(4700, 1, PAD_BACK | PAD_A, 0, 0, "p2 back+A"),
+	VPAD(4900, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(6800, 1, 0, 0, 0, "p2 release (still in)"),
+	SHOT(7000, "warp_01"),
+	VPAD(7500, 1, PAD_BACK, 0, 0, "p2 hold back (leave)"), VPAD(9500, 1, 0, 0, 0, "p2 release"),
+	END(10000),
+};
+
+// lifter2: player 2's Obelix goes to the lifter alone (player 1 stays at the
+// start); zone events bound to the other hero should fire for him.
+const Step kLifter2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	SECTORS(1000), { 1000, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	{ 1500, S_PLACE, HERO_OBELIX, 5, 0, 0, 0, "obelix into the lifter zone" },
+	SECTORS(2000),
+	SHOT(2500, "lifter2_00"),
+	VPAD(3000, 1, 0, -1, 0, "p2 left"), VPAD(4500, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(6000, "lifter2_01"),
+	VPAD(6500, 1, 0, 1, 0, "p2 right"), VPAD(8000, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(12000, "lifter2_02"),
+	END(13000),
 };
 
 // split1: split-screen smoke test. Player 2 joins (split on), the players walk
@@ -562,15 +598,18 @@ const Step kLead2[] = {
 const Step kCircle[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
-	{ 1500, S_PLACE, HERO_ASTERIX, 3, 0, 0, 0, "asterix near platform" },
-	{ 1500, S_PLACE, HERO_OBELIX, 3, 0, 0, 0, "obelix near platform" },
-	{ 3000, S_PLACE, HERO_OBELIX, 4, 0, 0, 0, "obelix on circle spot" },
-	SHOT(3500, "circle_00"),
-	VPAD(4000, 1, 0, -0.5f, 0, "p2 left"), VPAD(4600, 1, 0, 0, 0.5f, "p2 up"),
-	VPAD(5200, 1, 0, 0.5f, 0, "p2 right"), VPAD(5800, 1, 0, 0, -0.5f, "p2 down"),
-	VPAD(6400, 1, 0, 0, 0, "p2 neutral"),
-	SHOT(6500, "circle_01"),
-	END(8000),
+	GLIDE(1000, HERO_ASTERIX, 3, 6000), GLIDE(1000, HERO_OBELIX, 3, 6000), GLIDE(1000, HERO_IDEFIX, 3, 6000),
+	SECTORS(7500),
+	SHOT(8000, "circle_00"),
+	GLIDE(8500, HERO_OBELIX, 4, 1500),
+	SHOT(10500, "circle_01"),
+	VPAD(11000, 1, 0, -0.5f, 0, "p2 left"), VPAD(11600, 1, 0, 0, 0.5f, "p2 up"),
+	VPAD(12200, 1, 0, 0.5f, 0, "p2 right"), VPAD(12800, 1, 0, 0, -0.5f, "p2 down"),
+	VPAD(13400, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(14000, "circle_02"),
+	P1(14500, 0, 1, 0, "p1 right"), P1(16000, 0, 0, 0, "p1 neutral"),
+	SHOT(16500, "circle_03"),
+	END(17000),
 };
 
 // borrow (level 2): the trio tells the companion (player 2's Obelix) to wait
@@ -696,9 +735,23 @@ const Scenario kScenarios[] = {
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("kbd", kKbd),
+	SCENARIO("lifter2", kLifter2),
+	SCENARIO("warp", kWarp),
 	SCENARIO("p2mirror", kP2Mirror),
 	SCENARIO("p2busy", kP2Busy),
 };
+
+// Fixed spots (level 2), from players' logs.
+const float kSpots[][3] = {
+	{ -793.89f, 512.30f, -1060.49f },   // 0: the cable car (swing) seat
+	{ -794.40f, 508.40f, -1060.40f },   // 1: next to the cable car's rope
+	{ -790.45f, 510.60f, -1059.94f },   // 2: just before the cable car
+	{ -771.90f, 515.60f, -976.80f },    // 3: Asterix near the spinning platform
+	{ -777.20f, 515.90f, -977.00f },    // 4: where player 2's Obelix set off the circle
+	{ -744.00f, 509.00f, -1006.00f },   // 5: the lifter's zone (sphere bound to Asterix, event 0408)
+};
+
+const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
 
 struct AutotestState {
 	const Scenario* sc = nullptr;
@@ -720,7 +773,30 @@ struct AutotestState {
 	char*   watchEnemy = nullptr;   // CKHkBasicEnemy chosen by NEAR_ENEMY
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
+	struct Glide { bool on; Vector3 from, to; DWORD start, ms; } glide[HERO_COUNT] = {};
 } at;
+
+void SetHeroPos(Hero h, const Vector3& to) {
+	h.Pos() = to;
+	if (h.hook->node && h.hook->node->matrix) {
+		float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+		hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+	}
+}
+
+void RunGlides(DWORD now) {
+	Trio t = GetTrio();
+	for (int i = 0; i < HERO_COUNT; i++) {
+		auto& g = at.glide[i];
+		Hero h = t ? t.GetHero(i) : Hero();
+		if (!g.on || !h) continue;
+		float f = (float)(now - g.start) / (float)(g.ms ? g.ms : 1);
+		if (f >= 1.0f) { f = 1.0f; g.on = false; Log("autotest: %s glide done", HeroName(i)); }
+		Vector3 p(g.from.x + (g.to.x - g.from.x) * f, g.from.y + (g.to.y - g.from.y) * f,
+		          g.from.z + (g.to.z - g.from.z) * f);
+		SetHeroPos(h, p);
+	}
+}
 
 LRESULT CALLBACK AutotestWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 	// The game pauses when it loses focus; a test run must not stall because
@@ -916,6 +992,47 @@ void RunStep(const Step& s) {
 		bool ext = (s.a >= 0x21 && s.a <= 0x2E) || s.a == 0x6F;   // nav cluster, numpad /
 		keybd_event((BYTE)s.a, (BYTE)sc, (ext ? KEYEVENTF_EXTENDEDKEY : 0) | (s.b ? 0 : KEYEVENTF_KEYUP), 0);
 		CoopLogState(s.name);
+		break;
+	}
+	case S_SECTORS: {
+		CKYellowPages* yp = YellowPages();
+		char* mgr = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+		if (!mgr) { Log("autotest: no sector manager"); break; }
+		char** secs = *(char***)(mgr + 4);
+		Log("autotest: sector manager %p: +0x1C %08X +0x20 %08X current(+0x24) %d +0x28 %08X +0x2C %08X +0x30 %08X",
+		    mgr, *(uint32_t*)(mgr + 0x1C), *(uint32_t*)(mgr + 0x20), *(int*)(mgr + 0x24), *(uint32_t*)(mgr + 0x28),
+		    *(uint32_t*)(mgr + 0x2C), *(uint32_t*)(mgr + 0x30));
+		Trio t = GetTrio();
+		for (int i = 0; secs && i < 64; i++) {
+			char* sec = secs[i];
+			if (!sec || IsBadReadPtr(sec, 0x40)) break;
+			const float* b = (const float*)(sec + 0x18);
+			char who[32] = "";
+			for (int h = 0; h < HERO_COUNT && t; h++) {
+				Hero hero = t.GetHero(h);
+				if (!hero) continue;
+				Vector3 p = hero.Pos();
+				if (p.x <= b[0] && p.x > b[3] && p.y <= b[1] && p.y > b[4] && p.z <= b[2] && p.z > b[5]) {
+					strcat(who, " ");
+					strcat(who, HeroName(h));
+				}
+			}
+			Log("autotest:   sector %d %p idx=%d flags=%04X vt=%p box max(%.0f %.0f %.0f) min(%.0f %.0f %.0f)%s", i, sec,
+			    *(int16_t*)(sec + 4), *(uint16_t*)(sec + 6), *(void**)sec, b[0], b[1], b[2], b[3], b[4], b[5], who);
+		}
+		break;
+	}
+	case S_GLIDE: {
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h || s.a < 0 || s.a >= HERO_COUNT || s.b < 0 || s.b >= kNumSpots) break;
+		auto& g = at.glide[s.a];
+		g.on = true;
+		g.from = h.Pos();
+		g.to = Vector3(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
+		g.start = GetTickCount();
+		g.ms = (DWORD)s.x;
+		Log("autotest: %s gliding to spot %d over %d ms", HeroName(s.a), s.b, (int)s.x);
 		break;
 	}
 	case S_KEYMAP: {
@@ -1180,17 +1297,9 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_PLACE: {
-		// Fixed spots (level 2), from players' logs.
-		static const float kSpots[][3] = {
-			{ -793.89f, 512.30f, -1060.49f },   // 0: the cable car (swing) seat
-			{ -794.40f, 508.40f, -1060.40f },   // 1: next to the cable car's rope
-			{ -790.45f, 510.60f, -1059.94f },   // 2: just before the cable car
-			{ -771.90f, 515.60f, -976.80f },    // 3: Asterix near the spinning platform
-			{ -777.20f, 515.90f, -977.00f },    // 4: where player 2's Obelix set off the circle
-		};
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
-		if (!h || s.b < 0 || s.b >= 5) break;
+		if (!h || s.b < 0 || s.b >= kNumSpots) break;
 		Vector3 to(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
 		h.Pos() = to;
 		if (h.hook->node && h.hook->node->matrix) {
@@ -1229,6 +1338,27 @@ void RunStep(const Step& s) {
 				if (h && (char*)h.hook->node == nodes[i]) who = HeroName(hI);
 			}
 			Log("autotest:   detected %u: node %p vt %p %s", i, nodes[i], nodes[i] ? *(void**)nodes[i] : nullptr, who);
+		}
+		// Every test: list, shape centre, bound object, flags, event.
+		struct L { const char* name; int base, count, shapes, stride; } ls[5] = {
+			{ "box-enter", 0x2C, 0x30, 0x0C, 0x18 }, { "sphere-enter", 0x34, 0x38, 0x10, 0x14 },
+			{ "plane-cross", 0x3C, 0x40, 0, 0 }, { "box-level", 0x44, 0x48, 0x0C, 0x18 },
+			{ "sphere-level", 0x4C, 0x50, 0x10, 0x14 } };
+		for (const L& l : ls) {
+			char* e = *(char**)(det + l.base);
+			unsigned cnt = *(uint16_t*)(det + l.count);
+			for (unsigned i = 0; e && i < cnt && i < 200; i++, e += 8) {
+				float c[3] = { 0, 0, 0 };
+				if (l.shapes) {
+					const float* sh = (const float*)(*(char**)(det + l.shapes) + *(uint16_t*)e * l.stride);
+					if (l.stride == 0x18) { c[0] = (sh[0] + sh[3]) / 2; c[1] = (sh[1] + sh[4]) / 2; c[2] = (sh[2] + sh[5]) / 2; }
+					else { c[0] = sh[0]; c[1] = sh[1]; c[2] = sh[2]; }
+				}
+				float r = 0;
+				if (l.stride == 0x14) r = ((const float*)(*(char**)(det + l.shapes) + *(uint16_t*)e * l.stride))[3];
+				Log("autotest:   %s %u: obj %u flags %02X/%02X event %04X at (%.0f %.0f %.0f) r %.1f", l.name, i,
+				    *(uint16_t*)(e + 2), (uint8_t)e[4], (uint8_t)e[5], *(uint16_t*)(e + 6), c[0], c[1], c[2], r);
+			}
 		}
 		break;
 	}
@@ -1353,6 +1483,7 @@ void AutotestFrame() {
 		RunStep(at.sc->steps[at.next++]);
 	if (at.phase != AutotestState::RUN) return;
 
+	RunGlides(now);
 	InjectP1();
 	if ((int)(now - at.lastLog) >= 100) {
 		at.lastLog = now;

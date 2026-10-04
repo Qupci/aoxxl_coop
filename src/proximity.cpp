@@ -7,6 +7,7 @@
 #include <cmath>
 #include <intrin.h>
 #include <cstring>
+#include <utility>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -400,66 +401,109 @@ bool PatchProjectileOwnerCall() {
 	return true;
 }
 
-// Trigger zones. CKSrvDetection (yellow pages +0x54) tests zones against the
-// nodes of specific heroes (detected objects at +0x18: Obelix's node and
-// Asterix's) and flags an event with FUN_00460C20 when one is entered. In single
-// player the non-leader is an AI that stays at the leader's side, so a zone
-// tied to it effectively fires where the leader goes. With player 2 driving
-// Obelix on his own he set off the spinning platform's blue circle -- "switch
-// to Obelix, Asterix waits here" -- with Asterix elsewhere. Events from zones
-// that only the non-leading, player-driven hero satisfies are dropped; zones
-// for a hero the game has borrowed (lifter markers...) fire as usual.
+// Trigger zones. CKSrvDetection (yellow pages +0x54, vtable 0x62504C) tests
+// zones against the nodes of specific heroes: detected objects at +0x18 (count
+// +0x20, Obelix's node and Asterix's), their positions last frame at +0x1C (12
+// bytes each). Each test (8 bytes: +0 shape, +2 object, +4 bit 0 enabled, +5
+// bit 0 "inside" wanted, +6 event) is bound to one object:
+//   +0x2C/+0x30 boxes, +0x34/+0x38 spheres, +0x3C/+0x40 planes: the event
+//     fires (FUN_00460C20) when the object enters / crosses this frame;
+//   +0x44/+0x48 boxes, +0x4C/+0x50 spheres: the event flag is set every frame
+//     the object is inside (or outside, +5 bit 0 clear).
+// In single player the AI companion stays at the leader's side, so which hero
+// a zone is bound to does not matter -- it fires where the pair goes. In co-op
+// the two heroes go their own ways: a zone bound to Asterix never saw player
+// 2's Obelix (Romans near the lifter did not appear until player 1 came).
+// After the engine's own pass, the tests bound to either hero run again with
+// the two heroes' nodes and last positions swapped, so every hero zone answers
+// to both players. "While outside" tests are left out of that second pass:
+// they mean the pair is away, which needs both heroes outside, not either.
+typedef void(__fastcall* DetectTickFn)(char* self, void* edx, int arg);
+const uintptr_t kDetectVtbl = 0x62504C;
+const size_t    kDetectTickSlot = 17;
+const uintptr_t kDetectTick = 0x46BE90;
+DetectTickFn g_origDetectTick = nullptr;
+volatile long g_swappedZones = 0;
+bool g_inSwappedPass = false;
+
+int NodeIndex(char* det, Hero h) {
+	char** nodes = *(char***)(det + 0x18);
+	unsigned n = *(uint16_t*)(det + 0x20);
+	for (unsigned i = 0; nodes && h && i < n; i++)
+		if (nodes[i] == (char*)h.hook->node) return (int)i;
+	return -1;
+}
+
+void __fastcall DetectTickHook(char* det, void* edx, int arg) {
+	Trio t = GetTrio();
+	bool coop = t && CoopP2Joined() && !CoopSuspended() && *(uint8_t*)(det + 0x2A) &&
+	            !CoopHeroHeld(HERO_ASTERIX) && !CoopHeroHeld(HERO_OBELIX);
+	int ia = coop ? NodeIndex(det, t.GetHero(HERO_ASTERIX)) : -1;
+	int io = coop ? NodeIndex(det, t.GetHero(HERO_OBELIX)) : -1;
+	if (ia < 0 || io < 0) { g_origDetectTick(det, edx, arg); return; }
+
+	float* prev = *(float**)(det + 0x1C);
+	float prevA[3], prevO[3];
+	memcpy(prevA, prev + 3 * ia, 12);
+	memcpy(prevO, prev + 3 * io, 12);
+	g_origDetectTick(det, edx, arg);
+
+	// Second pass: only enabled tests bound to a hero, minus "while outside".
+	struct List { int base, count; bool level; } lists[5] = {
+		{ 0x2C, 0x30, false }, { 0x34, 0x38, false }, { 0x3C, 0x40, false },
+		{ 0x44, 0x48, true }, { 0x4C, 0x50, true } };
+	static uint8_t saved[4096];
+	size_t k = 0;
+	bool any = false;
+	for (const List& l : lists) {
+		char* e = *(char**)(det + l.base);
+		unsigned n = *(uint16_t*)(det + l.count);
+		for (unsigned i = 0; e && i < n; i++, e += 8) {
+			if (k < sizeof(saved)) saved[k] = (uint8_t)e[4];
+			k++;
+			unsigned obj = *(uint16_t*)(e + 2);
+			bool keep = (obj == (unsigned)ia || obj == (unsigned)io) && !(l.level && !(e[5] & 1));
+			if (keep && (e[4] & 1)) any = true;
+			else e[4] &= ~1;
+		}
+	}
+	if (any && k <= sizeof(saved)) {
+		char** nodes = *(char***)(det + 0x18);
+		float curA[3], curO[3];
+		memcpy(curA, prev + 3 * ia, 12);
+		memcpy(curO, prev + 3 * io, 12);
+		std::swap(nodes[ia], nodes[io]);
+		memcpy(prev + 3 * ia, prevO, 12);
+		memcpy(prev + 3 * io, prevA, 12);
+		g_inSwappedPass = true;
+		g_origDetectTick(det, edx, arg);
+		g_inSwappedPass = false;
+		std::swap(nodes[ia], nodes[io]);
+		memcpy(prev + 3 * ia, curA, 12);
+		memcpy(prev + 3 * io, curO, 12);
+	}
+	k = 0;
+	for (const List& l : lists) {
+		char* e = *(char**)(det + l.base);
+		unsigned n = *(uint16_t*)(det + l.count);
+		for (unsigned i = 0; e && i < n; i++, e += 8, k++)
+			if (k < sizeof(saved)) e[4] = (char)saved[k];
+	}
+}
+
+// Zone events: logged while player 2 is in (the second pass marked as such).
 typedef void(__fastcall* FlagEventFn)(void* self, void* edx, unsigned eventId);
 const uintptr_t kFlagEvent = 0x460C20;
 const uint8_t   kFlagEventPrologue[7] = { 0x8B, 0xD1, 0x66, 0x8B, 0x4C, 0x24, 0x04 };
 const uintptr_t kDetectTickBegin = 0x46BE90, kDetectTickEnd = 0x46C0CE;   // CKSrvDetection::vf17
 FlagEventFn g_origFlagEvent = nullptr;
-volatile long g_droppedZones = 0;
-
-// Which hero nodes (bit 0 Asterix, bit 1 Obelix...) have a zone test firing `ev`.
-unsigned ZoneHeroes(char* det, unsigned ev, Trio t) {
-	char** nodes = *(char***)(det + 0x18);
-	unsigned nNodes = *(uint16_t*)(det + 0x28), mask = 0;
-	auto heroOfNode = [&](unsigned idx) -> int {
-		if (!nodes || idx >= nNodes) return -1;
-		for (int h = 0; h < HERO_COUNT; h++) {
-			Hero hero = t.GetHero(h);
-			if (hero && (char*)hero.hook->node == nodes[idx]) return h;
-		}
-		return -1;
-	};
-	struct List { int base, count, objOff, evOff; } lists[3] = {
-		{ 0x2C, 0x30, 2, 6 }, { 0x34, 0x38, 2, 6 }, { 0x3C, 0x40, 2, 6 } };
-	for (const List& l : lists) {
-		char* e = *(char**)(det + l.base);
-		unsigned n = *(uint16_t*)(det + l.count);
-		for (unsigned i = 0; e && i < n; i++, e += 8) {
-			if (*(uint16_t*)(e + l.evOff) != (uint16_t)ev) continue;
-			int h = heroOfNode(*(uint16_t*)(e + l.objOff));
-			mask |= h >= 0 ? (1u << h) : 0x80000000u;   // not a hero: never drop
-		}
-	}
-	return mask;
-}
 
 void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 	uintptr_t from = (uintptr_t)_ReturnAddress();
-	Trio t = GetTrio();
-	if (t && CoopP2Joined() && from >= kDetectTickBegin && from < kDetectTickEnd) {
-		CKYellowPages* yp = YellowPages();
-		char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
-		int lead = t.Leader();
-		int other = lead == CoopP1Hero() ? CoopP2Hero() : CoopP1Hero();
-		if (det && *(uintptr_t*)det == 0x62504C && other >= 0 && !CoopHeroHeld(other)) {
-			unsigned mask = ZoneHeroes(det, eventId & 0xFFFF, t);
-			if (mask == (1u << other)) {
-				InterlockedIncrement(&g_droppedZones);
-				Log("proximity: zone event %04X set off by %s (not leading) -- dropped", eventId & 0xFFFF,
-					HeroName(other));
-				return;
-			}
-			Log("proximity: zone event %04X (heroes %08X)", eventId & 0xFFFF, mask);
-		}
+	if (CoopP2Joined() && from >= kDetectTickBegin && from < kDetectTickEnd) {
+		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
+		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
+		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
 	}
 	g_origFlagEvent(self, edx, eventId);
 }
@@ -467,6 +511,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 } // namespace
 
 long ProximityP2Contacts() { return g_p2Contacts; }
+long ProximitySwappedZones() { return g_swappedZones; }
 long ProximityP2Beacons() { return g_p2Beacons; }
 long ProximitySlices() { return g_slices; }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
@@ -485,6 +530,8 @@ bool ProximityInstallHooks() {
 	                    (void*)ProjectileContactDispatch, "projectile hits, targets (0x301)");
 	ok &= PatchProjectileOwnerCall();
 	ok &= PatchBeaconCheck();
+	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,
+	                      (void**)&g_origDetectTick, "CKSrvDetection::tick");
 	ok &= InstallDetour(kFlagEvent, (void*)FlagEventHook, (void**)&g_origFlagEvent, kFlagEventPrologue,
 	                    sizeof(kFlagEventPrologue), "event flag (zones)");
 	return ok;

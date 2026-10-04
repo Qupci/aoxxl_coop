@@ -24,6 +24,11 @@ of the way of the QoL patch (`d3d9.dll`) and the XXL Inspector, both of which wa
 | P2: springs, iron crates, grabbing/spinning Romans, helmets placed in the air | fixed, verified by automated tests; awaiting a real two-pad session |
 | Crates / placed helmets around P2 when P1's camera looks away | fixed (both cameras' frustums), awaiting a real two-pad session |
 | Swing (push/pull) for P2's Obelix | untested |
+| Keyboard as a controller (P1 pad + P2 keyboard, P1 keyboard + P2 pad, both on one keyboard) | **new**, automated test (`kbd`) |
+| Sound around P2 (footsteps, crates) audible: range checks and 3D mix use the nearer camera | **new**, automated check only |
+| Trigger zones bound to one hero fire for either player (Romans near the lifter for P2 alone) | **new**, automated test (`lifter2`) |
+| Back + A: P2 warps to P1 | **new**, automated test (`warp`) |
+| Blue circle stepped on by P2 alone; P1 camera in the cable car | changed, awaiting a real session |
 | Crash at axxl.exe+0x9C228 (lifters) | fixed; crashes and stalls are now logged with their location |
 
 How it works is in `docs/RESEARCH.md` §0. Automated tests: `tools/run_test.ps1 <scenario>`
@@ -55,8 +60,14 @@ Both are already installed in `Game Files\`. The mod writes `xxl_coop.log` there
 
 | | |
 |---|---|
-| Start on a second pad | join / take over the other hero |
-| Hold Back for 1.5 s | leave co-op |
+| Start on a second pad (or Enter on the keyboard) | join / take over the other hero |
+| Hold Back for 1.5 s (Backspace) | leave co-op |
+| Hold Back, press A (Backspace + Space) | player 2's hero jumps to player 1's side |
+
+Player 2's keyboard keys are in the `[keyboard]` section of `xxl_coop.ini` (default: WASD move,
+arrows camera, Space jump, J/K/L attack/grab/dash, U/O shoulder buttons). While player 2 plays on
+the keyboard their keys are kept from the game, so one keyboard can serve both players when the
+keys don't overlap (the ini has a numpad layout for that).
 
 Player 1 keeps using whatever the game is already configured to use (keyboard or pad) — the mod does
 not touch player 1's input path, so the QoL patch's right-stick and mouse options keep working.

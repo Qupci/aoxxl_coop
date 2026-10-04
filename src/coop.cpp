@@ -43,6 +43,7 @@ struct CoopState {
 	int     p1Hero   = -1;
 	int     p2Hero   = -1;
 	DWORD   p2BackHeldAt = 0;
+	bool    p2BackCombo = false;   // Back is held for Back+A (warp), not to leave
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
@@ -411,6 +412,21 @@ void CheckMarker(DWORD now) {
 	}
 }
 
+// Puts `who` just above `to`'s position (it lands next to it; overlapping heroes
+// push apart). Hero position +kHero_pos and the node's matrix (+0x40) both
+// carry the position.
+static void WarpToPartner(Hero who, Hero to) {
+	Vector3 dst = to.Pos();
+	dst.y += 1.0f;
+	who.Pos() = dst;
+	if (who.hook->node && who.hook->node->matrix) {
+		float* hp = (float*)((char*)who.hook->node->matrix + 0x40);
+		hp[0] = dst.x; hp[1] = dst.y; hp[2] = dst.z;
+	}
+	Log("coop: player 2's %s warped to %s (Back + A) at (%.1f %.1f %.1f)", HeroName(g.p2Hero),
+	    HeroName(g.p1Hero), dst.x, dst.y, dst.z);
+}
+
 void CoopFrame() {
 	DWORD now = GetTickCount();
 	g.frames++;
@@ -467,7 +483,9 @@ void CoopFrame() {
 	// Start and Back are left alone during a cutscene: Start may be what skips it.
 	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars();
 	if (!inCutscene && (p.pressed & PAD_START)) { Release("pressed Start"); return; }
-	if (!inCutscene && (p.buttons & PAD_BACK)) {
+	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & PAD_A)) g.p2BackCombo = true;
+	if (!(p.buttons & PAD_BACK)) g.p2BackCombo = false;
+	if (!inCutscene && (p.buttons & PAD_BACK) && !g.p2BackCombo) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
 		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs) { Release("held Back"); return; }
 	} else {
@@ -481,6 +499,11 @@ void CoopFrame() {
 		Log("coop: heroes disappeared, player 2 dropped");
 		return;
 	}
+
+	// Back + A: player 2's hero joins player 1's (lost, stuck, or fell behind).
+	if (g.p2BackCombo && (p.pressed & PAD_A) && !inCutscene && !g.suspended && !g.held[g.p1Hero] &&
+	    !g.held[g.p2Hero])
+		WarpToPartner(h2, h1);
 
 	// Scripted modes belong to the game. So does a group action player 1 starts
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
