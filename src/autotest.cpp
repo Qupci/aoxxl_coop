@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -460,6 +460,58 @@ const Step kGrab2[] = {
 	END(6000),
 };
 
+// grab3 (level 2): like grab2 but Asterix stays at the start, ~65 units away.
+const Step kGrab3[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	NEAR_ENEMY(1500, HERO_OBELIX),
+	VPAD(1700, 1, PAD_X, 0, 0, "p2 punch"), VPAD(1800, 1, 0, 0, 0, "p2 release"),
+	VPAD(2400, 1, PAD_B, 0, 0, "p2 grab"), VPAD(2600, 1, 0, 0, 0, "p2 release"),
+	VPAD(3000, 1, 0, 1, 0, "p2 spin r"), VPAD(3200, 1, 0, 0, -1, "p2 spin d"),
+	VPAD(3400, 1, 0, -1, 0, "p2 spin l"), VPAD(3600, 1, 0, 0, 1, "p2 spin u"),
+	VPAD(3800, 1, 0, 0, 0, "p2 neutral"),
+	END(6000),
+};
+
+// swing (level 2): Asterix walks onto the cable car, player 2's Obelix pulls.
+const Step kSwing[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PROBE(1000, 1),
+	{ 1500, S_PLACE, HERO_OBELIX, 1, 0, 0, 0, "obelix to rope" },
+	{ 1600, S_PLACE, HERO_ASTERIX, 2, 0, 0, 0, "asterix before car" },
+	P1(1800, 0, -1, 0, "p1 left (held)"), P1(2300, 0, 0, 0, "p1 neutral"),
+	{ 2400, S_PLACE, HERO_ASTERIX, 0, 0, 0, 0, "asterix on car" },
+	{ 3000, S_SCATTER, HERO_OBELIX, 0, 0, 0, 0, "scatter" },
+	{ 3600, S_SCATTER, HERO_OBELIX, 0, 0, 0, 0, "scatter" },
+	SHOT(3800, "swing_00"),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	VPAD(4600, 1, PAD_X, 0, 0, "p2 X"), VPAD(4750, 1, 0, 0, 0, "p2 release"),
+	SHOT(5000, "swing_01"),
+	VPAD(5200, 1, PAD_X, 0, 0, "p2 X"), VPAD(5350, 1, 0, 0, 0, "p2 release"),
+	VPAD(5800, 1, PAD_X, 0, 0, "p2 X"), VPAD(5950, 1, 0, 0, 0, "p2 release"),
+	VPAD(6400, 1, PAD_X, 0, 0, "p2 X"), VPAD(6550, 1, 0, 0, 0, "p2 release"),
+	SHOT(7000, "swing_02"),
+	END(9000),
+};
+
+// swingsp (level 2): the same without player 2 -- player 1 drives whoever the
+// game makes leader (Obelix, once Asterix sits in the cable car).
+const Step kSwingSp[] = {
+	MARK(0, "baseline"), PROBE(1000, 1),
+	{ 1600, S_PLACE, HERO_ASTERIX, 2, 0, 0, 0, "asterix before car" },
+	{ 2400, S_PLACE, HERO_ASTERIX, 0, 0, 0, 0, "asterix on car" },
+	{ 4500, S_PLACE, HERO_OBELIX, 1, 0, 0, 0, "obelix to rope (now leader)" },
+	SHOT(5000, "swingsp_00"),
+	P1(5500, PAD_X, 0, 0, "p1 X"), P1(5650, 0, 0, 0, "p1 release"),
+	P1(6100, PAD_X, 0, 0, "p1 X"), P1(6250, 0, 0, 0, "p1 release"),
+	SHOT(6600, "swingsp_01"),
+	P1(7000, PAD_X, 0, 0, "p1 X"), P1(7150, 0, 0, 0, "p1 release"),
+	P1(7600, PAD_X, 0, 0, "p1 X"), P1(7750, 0, 0, 0, "p1 release"),
+	SHOT(8500, "swingsp_02"),
+	END(10000),
+};
+
 // borrow (level 2): the trio tells the companion (player 2's Obelix) to wait
 // (0x4802), then to follow again (0x4803): he should go to the AI and back.
 const Step kBorrow[] = {
@@ -574,6 +626,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("grab", kGrab),
 	SCENARIO("grab2", kGrab2),
 	SCENARIO("borrow", kBorrow),
+	SCENARIO("grab3", kGrab3),
+	SCENARIO("swing", kSwing),
+	SCENARIO("swingsp", kSwingSp),
 	SCENARIO("cutscene", kCutscene),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
@@ -1015,6 +1070,52 @@ void RunStep(const Step& s) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
 			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
 		}
+		break;
+	}
+	case S_SCATTER: {
+		// Move every Roman within 40 units of hero `a` 300 units away (x, z), so
+		// "enemies nearby" stops turning the action button into an attack.
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		const int kIds[] = { 93, 148, 75, 95, 164, 167 };
+		int moved = 0;
+		for (int id : kIds) {
+			unsigned n = GetNumLvlClassInstances(2, id);
+			for (unsigned i = 0; i < n; i++) {
+				char* e = (char*)GetLvlObject(2, id, i);
+				char* node = e ? *(char**)(e + 0x10) : nullptr;
+				char* frame = node ? *(char**)(node + 4) : nullptr;
+				if (!frame) continue;
+				float* ltm = (float*)(frame + 0x80);
+				float dx = ltm[0] - h.Pos().x, dz = ltm[2] - h.Pos().z;
+				if (dx * dx + dz * dz > 40.0f * 40.0f) continue;
+				float* mp = (float*)(frame + 0x40);
+				mp[0] += 300.0f; mp[2] += 300.0f; ltm[0] += 300.0f; ltm[2] += 300.0f;
+				*(uint32_t*)(frame + 0x1C) &= ~0x20000u;   // let RW resync the frame
+				moved++;
+			}
+		}
+		Log("autotest: moved %d Romans away from %s", moved, HeroName(s.a));
+		break;
+	}
+	case S_PLACE: {
+		// Fixed spots (level 2), from players' logs.
+		static const float kSpots[][3] = {
+			{ -793.89f, 512.30f, -1060.49f },   // 0: the cable car (swing) seat
+			{ -794.40f, 508.40f, -1060.40f },   // 1: next to the cable car's rope
+			{ -790.45f, 510.60f, -1059.94f },   // 2: just before the cable car
+		};
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h || s.b < 0 || s.b >= 3) break;
+		Vector3 to(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
+		h.Pos() = to;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
+		Log("autotest: %s placed at spot %d", HeroName(s.a), s.b);
 		break;
 	}
 	case S_TRIOEV: {

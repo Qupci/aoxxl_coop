@@ -116,7 +116,9 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 	Trio t = GetTrio();
 	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
 	Hero h1 = t ? t.GetHero(p1) : Hero(), h2 = t ? t.GetHero(p2) : Hero();
-	if (!CoopP2Joined() || CoopSuspended() || !h1 || !h2) {
+	// A hero the game has borrowed for a scripted order (Asterix riding the cable
+	// car Obelix pulls) is not a player's: objects see the real leader.
+	if (!CoopP2Joined() || CoopSuspended() || !h1 || !h2 || CoopHeroHeld(p1) || CoopHeroHeld(p2)) {
 		g_origBundleTick(bundle, edx, dt);
 		return;
 	}
@@ -131,14 +133,29 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 	}
 }
 
+// CKGrpBonusPool vf39 "may this hero collect" ignores its argument and asks the
+// trio's leader instead (the potion pool, type 3: leader must be Asterix), so it
+// is asked with player 2's hero leading.
+bool P2MayCollect(char* pool, Trio t, Hero h2) {
+	typedef char(__fastcall* CanFn)(void* pool, void* edx, void* hero);
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	int p2 = CoopP2Hero();
+	tr[0x2C] = (uint8_t)p2;
+	tr[0x2D] = (uint8_t)CoopP1Hero();
+	bool ok = ((CanFn)(*(void***)pool)[39])(pool, nullptr, h2.hook) != 0;
+	tr[0x2C] = leader;
+	tr[0x2D] = companion;
+	return ok;
+}
+
 void AttractToPlayer2(char* pool) {
 	Trio t = GetTrio();
 	Hero h2 = t ? t.GetHero(CoopP2Hero()) : Hero();
-	if (!h2 || !CoopP2Joined() || CoopSuspended()) return;
-	typedef char(__fastcall* CanFn)(void* pool, void* edx, void* hero);
+	if (!h2 || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(CoopP2Hero())) return;
 	typedef char(__fastcall* BoolFn)(void* self, void* edx);
 	typedef void(__fastcall* AttractFn)(void* self, void* edx, void* hero, int zero);
-	if (!((CanFn)(*(void***)pool)[39])(pool, nullptr, h2.hook)) return;
+	if (!P2MayCollect(pool, t, h2)) return;
 	char* radiusObj = *(char**)(pool + 0x3C);
 	if (!radiusObj) return;
 	float r2 = *(float*)(radiusObj + 4);
@@ -188,7 +205,7 @@ void __cdecl BeaconCheck(char* pool, char* bonus, char* frame) {
 	if (!CoopP2Joined() || CoopSuspended()) return;
 	Trio t = GetTrio();
 	Hero h2 = t ? t.GetHero(CoopP2Hero()) : Hero();
-	if (!h2 || !((CanFn)(*(void***)pool)[39])(pool, nullptr, h2.hook)) return;
+	if (!h2 || CoopHeroHeld(CoopP2Hero()) || !P2MayCollect(pool, t, h2)) return;
 	Vector3 p = h2.Pos();
 	float dx = b[0] - p.x, dy = b[1] - p.y, dz = b[2] - p.z;
 	if (dx * dx + dy * dy + dz * dz <= r2) {
@@ -291,7 +308,7 @@ int DispatchAs(char* receiver, int event, void* list, MaskOf maskOf) {
 	if (!t || !CoopP2Joined() || CoopSuspended()) return send(receiver, nullptr, event, list);
 	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
 	Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
-	if (!h1 || !h2) return send(receiver, nullptr, event, list);
+	if (!h1 || !h2 || CoopHeroHeld(p1) || CoopHeroHeld(p2)) return send(receiver, nullptr, event, list);
 	if (receiver == h1.raw()) return SendAs(receiver, event, list, t, p1, p2, p2);
 	if (receiver == h2.raw()) return SendAs(receiver, event, list, t, p2, p1, p2);
 

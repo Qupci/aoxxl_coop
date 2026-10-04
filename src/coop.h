@@ -54,6 +54,7 @@ int  CoopBeforeTrioEvent(int event);
 void CoopAfterTrioEvent(int event, int cookie);
 
 bool CoopInstallHooks();
+bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 bool TraceInstallHooks();   // trace.cpp: event logging for interaction debugging
 void TraceDumpCollisionTests(void* receiver);   // trace.cpp: collision tests involving `receiver`
 

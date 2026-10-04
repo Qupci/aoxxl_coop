@@ -215,8 +215,14 @@ void ForgetP2() {
 void Release(const char* why) {
 	Trio t = GetTrio();
 	int p1 = g.p1Hero, p2 = g.p2Hero;
+	// In the middle of a scripted sequence (a hero borrowed for a cable car ride,
+	// a wait on a platform) the game's own arrangement stands: no switch back, no
+	// "follow me" -- player 1 simply drives whoever leads, as in single player.
+	bool scripted = (p1 >= 0 && g.held[p1]) || (p2 >= 0 && g.held[p2]);
 	ForgetP2();   // first, so our trio-event wrapper stays out of the way
-	if (t && p1 >= 0 && p2 >= 0) {
+	if (t && p1 >= 0 && p2 >= 0 && scripted) {
+		Log("coop: player 2 left (%s) during a scripted sequence; leader stays %s", why, HeroName(t.Leader()));
+	} else if (t && p1 >= 0 && p2 >= 0) {
 		Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
 		if (t.Leader() == p2 && h1 && h2) {
 			// The switch handler only accepts a target that looks like a companion.
@@ -283,6 +289,7 @@ int  CoopP2Hero()    { return g.p2Hero; }
 int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
+bool CoopHeroHeld(int idx) { return g.p2Joined && idx >= 0 && idx < HERO_COUNT && g.held[idx]; }
 
 void CoopRequestLeave(const char* why) {
 	if (g.p2Joined) Release(why);
@@ -331,10 +338,12 @@ void ProbeLine() {
 		for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++) {
 			Hero h = t ? t.GetHero(i) : Hero();
 			if (!h) continue;
-			line.Add("%c f18=%02X L=%02X sit=%02X body=%02X 1A=%02X 390=%08X pos=(%.1f %.1f %.1f) ",
+			line.Add("%c f18=%02X L=%02X sit=%02X body=%02X 1A=%02X 390=%08X 3EC=%08X 3F0=%08X 38C=%08X "
+				"464=%p 884=%08X ord=%d pos=(%.1f %.1f %.1f) ",
 				i == HERO_ASTERIX ? 'A' : 'O', h.Flags18(), LifeLastState(i), Situation(h),
 				*(uint8_t*)(h.raw() + 0xE5), *(uint8_t*)(h.raw() + 0x1A), h.Flags390(),
-				h.Pos().x, h.Pos().y, h.Pos().z);
+				*(uint32_t*)(h.raw() + 0x3EC), *(uint32_t*)(h.raw() + 0x3F0), *(uint32_t*)(h.raw() + 0x38C),
+				*(void**)(h.raw() + 0x464), h.Flags884(), (int)h.Order(), h.Pos().x, h.Pos().y, h.Pos().z);
 		}
 		char* cin = *(char**)((char*)yp + 0x80);
 		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
@@ -555,6 +564,10 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	// Offers meant for the real leader stay with it: the magic potion (CKHkTorch
 	// checks the leader is Asterix, then latches itself at trio+0x4C for one
 	// frame) must not be taken by player 2's Obelix while he poses as leader.
+	// The trio caches its nearby-enemy lists and distances once per frame, from
+	// the leader (FUN_0047CB40, valid while +0x3F4 bit 0 is set): lock-on and
+	// grabbing pick from them. Rebuild them for player 2's hero, and again after.
+	*(uint32_t*)(trio + 0x3F4) &= ~1u;
 	g.savedOffer = 0;
 	if (g.savedLeader != (uint8_t)g.p2Hero) {
 		g.savedOffer = *(uint32_t*)(trio + 0x4C);
@@ -573,6 +586,7 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 		Trio t = GetTrio();
 		if (t) {
 			uint8_t* trio = (uint8_t*)t.raw();
+			*(uint32_t*)(trio + 0x3F4) &= ~1u;
 			if (g.savedOffer && *(uint32_t*)(trio + 0x4C) == 0) *(uint32_t*)(trio + 0x4C) = g.savedOffer;
 			g.savedOffer = 0;
 			if (trio[0x2C] == (uint8_t)g.p2Hero && trio[0x2D] == (uint8_t)g.p1Hero) {
