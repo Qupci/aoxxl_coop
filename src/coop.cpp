@@ -46,7 +46,9 @@ struct CoopState {
 	bool    p2ValuesReady = false;
 
 	uint8_t* savedValues = nullptr;   // CKInput's own array while player 2's is in
-	char*    savedBindings = nullptr; // CKInput+0x18 likewise (analog values at +0x18 each)
+	char*    savedBindings = nullptr; // CKInput+0x18 likewise (hold time in seconds at +0x18 each)
+	float    p2HoldStart[256];
+	float    p2HoldTime[256] = {};
 	bool     swapped = false;
 
 	// The trio's leader/companion bytes while player 2's hero is ticking (see
@@ -259,6 +261,22 @@ void TryJoin(Trio t) {
 		g.p2Pad    = pad;
 		g.p1Hero   = t.Leader();
 		g.p2Hero   = OtherHero(g.p1Hero);
+		// Joining in the middle of a scripted sequence (Asterix already seated in
+		// the cable car, Obelix leading to pull it): player 1 keeps the hero the
+		// game borrowed, and gets it back when the sequence is over.
+		{
+			Hero other = t.GetHero(g.p2Hero);
+			int order = other ? (int)other.Order() : 0;
+			if (other && !other.IsPlayerControlled() && IsScriptedOrder(order)) {
+				g.p2Hero = g.p1Hero;
+				g.p1Hero = OtherHero(g.p2Hero);
+				g.held[g.p1Hero] = true;
+				g.heldSince[g.p1Hero] = GetTickCount();
+				g.lastOrder[g.p1Hero] = (uint8_t)order;
+				Log("coop: joining mid-sequence: %s is the game's (AI order %d), player 1 gets it back after",
+					HeroName(g.p1Hero), order);
+			}
+		}
 		g.p2BackHeldAt = 0;
 		g.suspended = false;
 		Log("coop: player 2 joined on pad %d as %s (player 1 keeps %s)", pad,
@@ -489,6 +507,15 @@ void CoopFrame() {
 	if (n > 0 && BuildP2Actions(g.p2Pad, g.p2Values, n)) {
 		memset(g.p2Values + n, 0, kP2ValuesSize - n);
 		g.p2ValuesReady = true;
+		// Hold timers, as CKInput_UpdateBinding keeps them at binding +0x18.
+		uint8_t held[kP2ValuesSize] = {};
+		BuildP2Held(g.p2Pad, held, n);
+		float t = GetTickCount() / 1000.0f;
+		for (int i = 0; i < n; i++) {
+			if (!held[i]) { g.p2HoldStart[i] = -1.0f; g.p2HoldTime[i] = 0.0f; continue; }
+			if (g.p2HoldStart[i] <= 0) g.p2HoldStart[i] = t;
+			g.p2HoldTime[i] = t - g.p2HoldStart[i] + 0.001f;   // non-zero from the first frame
+		}
 	}
 
 	// Heroes the game has borrowed: a scripted AI order given to a player's hero
@@ -547,9 +574,9 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	uint8_t** values = (uint8_t**)(im.raw() + 0x1C);
 	g.savedValues = *values;
 	*values = g.p2Values;
-	// Some states read the analog value of a binding instead (FUN_00435900:
-	// CKInput+0x18, 0x20 bytes per binding, float at +0x18) -- Obelix holding
-	// the cable car's rope (situation 3) does. Player 2 gets a copy of the
+	// Some states read how long a binding has been held instead (FUN_00435900:
+	// CKInput+0x18, 0x20 bytes per binding, seconds at +0x18) -- Obelix holding
+	// the cable car's rope (situation 3) keeps hold while X is. Player 2 gets a copy of the
 	// bindings carrying his own values there.
 	static char p2Bindings[256 * 0x20];
 	char** bindings = (char**)(im.raw() + 0x18);
@@ -557,7 +584,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	g.savedBindings = nullptr;
 	if (*bindings && nb > 0 && nb <= 256) {
 		memcpy(p2Bindings, *bindings, nb * 0x20);
-		for (unsigned i = 0; i < nb; i++) *(float*)(p2Bindings + i * 0x20 + 0x18) = g.p2Values[i] / 255.0f;
+		for (unsigned i = 0; i < nb; i++) *(float*)(p2Bindings + i * 0x20 + 0x18) = g.p2HoldTime[i];
 		g.savedBindings = *bindings;
 		*bindings = p2Bindings;
 	}

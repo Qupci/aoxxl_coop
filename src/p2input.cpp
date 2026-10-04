@@ -71,3 +71,18 @@ void BuildActionsFromPad(const PadState& p, uint8_t* out, int numActions) {
 				if (b.edge[i] < numActions) out[b.edge[i]] = 0xFF;
 	}
 }
+
+// Which actions are physically held right now (level, for edge-triggered
+// bindings too) -- what the engine's per-binding hold timers follow.
+bool BuildP2Held(int padIndex, uint8_t* out, int numActions) {
+	const PadState& p = PadGet(padIndex);
+	if (!p.connected) return false;
+	BuildActionsFromPad(p, out, numActions);   // stick axes
+	for (const ButtonMap& b : kButtons) {
+		if (!(p.buttons & b.padBit)) continue;
+		if (b.held >= 0 && b.held < numActions) out[b.held] = 0xFF;
+		for (int i = 0; i < 2; i++)
+			if (b.edge[i] >= 0 && b.edge[i] < numActions) out[b.edge[i]] = 0xFF;
+	}
+	return true;
+}

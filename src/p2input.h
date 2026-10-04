@@ -18,6 +18,8 @@
 // Fill `out[0..numActions)` with the action bytes pad `padIndex` should produce.
 // Returns false if the pad is not connected, in which case `out` is untouched.
 bool BuildP2Actions(int padIndex, uint8_t* out, int numActions);
+// Same, but every action whose button is down reads as held (no edges).
+bool BuildP2Held(int padIndex, uint8_t* out, int numActions);
 
 // Same mapping from an explicit pad state (used by autotest to synthesise
 // player 1's input). Clears `out` first.
