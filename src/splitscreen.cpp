@@ -6,6 +6,7 @@
 #include "trio.h"
 #include "p2cam.h"
 
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -60,6 +61,48 @@ bool      g_repeatWalk = false;
 void __fastcall DynSphereWalkHook(void* self, void* edx, void** lists, void* dt) {
 	if (g_repeatWalk) LeafWalk(self, edx, lists, dt);
 	else              g_origDynSphereWalk(self, edx, lists, dt);
+}
+
+// --- particles ---------------------------------------------------------------
+// CParticlesNodeFx::vf14 (0x41A510) only does its work -- step the particles by
+// the frame time, build them for the camera, add them to the draw lists -- while
+// its particle system's +4 bit 1 is set, and clears that bit when done: once per
+// frame. The split frame's first walk is player 2's stamp walk into lists that
+// draw nothing, so helmet sparkles and torch flames vanished from both halves.
+// The later walks get the bit back and a zero time step (no double simulation).
+const uintptr_t kParticlesVtbl = 0x622FCC;   // CParticlesNodeFx (11,19)
+const uintptr_t kParticlesWalk = 0x41A510;
+CollectFn g_origParticlesWalk = nullptr;
+bool      g_inSplitFrame = false;
+bool      g_stampWalk = false;
+int       g_particlePass = 0;     // 1: player 1's walk (first real one), 2: player 2's
+char*     g_particleRedo[512];
+int       g_numParticleRedo = 0;
+
+void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt) {
+	char* ps = *(char**)(self + 0x48);
+	if (!g_inSplitFrame || !ps) { g_origParticlesWalk(self, edx, lists, dt); return; }
+	uint32_t* flags = (uint32_t*)(ps + 4);
+	if (g_stampWalk) return;   // lists that draw nothing: leave the frame's work for the real walks
+	if (!g_repeatWalk || g_particlePass == 1) {
+		if ((*flags & 2) && g_numParticleRedo < 512) g_particleRedo[g_numParticleRedo++] = self;
+		g_origParticlesWalk(self, edx, lists, dt);
+		return;
+	}
+	for (int i = 0; i < g_numParticleRedo; i++) {
+		if (g_particleRedo[i] != self) continue;
+		char still[0x40];
+		memcpy(still, dt, sizeof(still));
+		*(float*)(still + 0xC) = 1e-5f;   // non-zero: a zero step skips the build entirely
+		*flags |= 2;
+		// Nodes with +0x10 bit 9 add themselves to the lists only if their visit
+		// stamp is not this frame's yet; player 1's walk has just set it.
+		uint16_t frame = *(uint16_t*)kFrameId;
+		*(uint16_t*)(self + 0x14) = frame > 1 ? (uint16_t)(frame - 1) : (uint16_t)0xFFFE;
+		g_origParticlesWalk(self, edx, lists, still);
+		return;
+	}
+	g_origParticlesWalk(self, edx, lists, dt);
 }
 
 // --- viewport override ---------------------------------------------------------
@@ -165,7 +208,28 @@ bool          g_splitActive = false;
 bool          g_loggedLayout = false;
 
 // The render of one frame with two 3D passes. Mirrors FUN_00413EC0 step for step.
+int SplitDebug() {
+	static int v = -1;
+	if (v < 0) {
+		char buf[16] = {};
+		v = GetEnvironmentVariableA("XXL_SPLITDBG", buf, sizeof(buf)) ? atoi(buf) : 0;
+		if (v) Log("split: debug mode %d", v);
+	}
+	return v;
+}
+
+void RenderSplitFrameImpl(char* view, void* dt);
+
 void RenderSplitFrame(char* view, void* dt) {
+	g_inSplitFrame = true;
+	g_numParticleRedo = 0;
+	RenderSplitFrameImpl(view, dt);
+	g_inSplitFrame = false;
+	g_repeatWalk = false;
+	g_particlePass = 0;
+}
+
+void RenderSplitFrameImpl(char* view, void* dt) {
 	char* renderer = *(char**)(view + 0x08);
 	if (!*(void**)(renderer + 0x04) || !*(void**)(renderer + 0x08)) return;
 	RwCamera* cam = *(RwCamera**)(renderer + 0x10);
@@ -260,14 +324,18 @@ void RenderSplitFrame(char* view, void* dt) {
 	placeP2();
 	SyncCameras(view, nullptr);
 	LogFrustum("p2 stamp", cam);
-	collect(root, nullptr, stampLists, dt);
-	g_repeatWalk = true;
+	g_stampWalk = true;
+	if (!(SplitDebug() & 1)) collect(root, nullptr, stampLists, dt);
+	g_stampWalk = false;
+	g_repeatWalk = !(SplitDebug() & 1);
 
 	// 3. Player 1's view.
 	placeP1();
 	SyncCameras(view, nullptr);
 	LogFrustum("p1 walk", cam);
+	g_particlePass = 1;
 	collect(root, nullptr, (void**)(view + 0x1C), dt);
+	g_particlePass = 2;
 	SyncClones(*(void**)(view + 0x58), nullptr, dt);
 	ResetDirty(view, nullptr);
 	if (!(viewFlags & 0x10)) ClearCamera(renderer, nullptr, 0);
@@ -339,6 +407,8 @@ bool SplitInstallHooks() {
 	                          (void*)GraphicTickHook, (void**)&g_origGraphicTick, "CKGraphic::render");
 	ok &= PatchVtableSlot(kDynSphereVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&g_origDynSphereWalk, "CKDynamicBoundingSphere::walk");
+	ok &= PatchVtableSlot(kParticlesVtbl, kWalkSlot, kParticlesWalk, (void*)ParticlesWalkHook,
+	                      (void**)&g_origParticlesWalk, "CParticlesNodeFx::walk");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");

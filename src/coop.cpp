@@ -25,6 +25,7 @@
 #include "p2cam.h"
 #include "pads.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -51,8 +52,12 @@ struct CoopState {
 	// CoopBeforeLifeTick): saved values, and the values we put there.
 	bool     sliced = false;
 	uint8_t  savedLeader = 0, savedCompanion = 0;
+	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
 
 	bool    suspended = false;
+	bool    held[HERO_COUNT] = {};       // a player's hero the game has borrowed (scripted AI order)
+	uint8_t lastOrder[HERO_COUNT] = {};
+	DWORD   heldSince[HERO_COUNT] = {};
 	int     cutsceneHold = 0;    // frames left before a cutscene counts as over
 	int     lastLevel = -2;
 	DWORD   lastFpsTick = 0;
@@ -93,13 +98,28 @@ uint8_t* F18(Hero h) { return (uint8_t*)(h.raw() + 0x18); }
 // playable one (normal or swimming). Scripted modes are left to the game.
 bool EnforcePlayer(Trio t, int idx) {
 	Hero h = t.GetHero(idx);
-	if (!h) return false;
+	if (!h || (idx >= 0 && idx < HERO_COUNT && g.held[idx])) return false;
 	uint8_t f = *F18(h);
 	if (!HeroModePlayable(f) || HeroIsPlayerVariant(f)) return false;
 	*F18(h) = HeroPlayerVariant(f);
 	InterlockedIncrement(&g_hookCounters.enforced);
 	LogV("coop: %s -> player (f18 %02X -> %02X)", HeroName(idx), f, *F18(h));
 	return true;
+}
+
+bool IsScriptedOrder(int o) {
+	return o != AI_FOLLOW_LEADER && o != AI_HIT_ENEMY && o != AI_THROW_ENEMY && o != AI_BITE_ENEMY &&
+	       o != AI_TAKE_HIT;
+}
+
+void Hold(Trio t, int idx, const char* why) {
+	Hero h = t.GetHero(idx);
+	if (!h || g.held[idx]) return;
+	g.held[idx] = true;
+	g.heldSince[idx] = GetTickCount();
+	uint8_t f = *F18(h);
+	if (HeroModePlayable(f)) *F18(h) = HeroAiVariant(f);
+	Log("coop: %s handed to the game (%s, AI order %d)", HeroName(idx), why, (int)h.Order());
 }
 
 uint8_t Situation(Hero h) { return h ? *(uint8_t*)(h.raw() + 0x3E9) : 0xFF; }
@@ -118,7 +138,12 @@ uint8_t Situation(Hero h) { return h ? *(uint8_t*)(h.raw() + 0x3E9) : 0xFF; }
 bool CutsceneBars() {
 	CKYellowPages* yp = YellowPages();
 	char* srv = yp ? *(char**)((char*)yp + 0x80) : nullptr;
-	return srv && *(uintptr_t*)srv == 0x624F90 && (*(uint8_t*)(srv + 0xC) & 1) != 0;
+	if (srv && *(uintptr_t*)srv == 0x624F90 && (*(uint8_t*)(srv + 0xC) & 1) != 0) return true;
+	// Dialogues (the Roman agent: trio events 0x5120..0x5121) show no bars but
+	// take the camera, and set game manager +0x5C bit 20 for exactly that long
+	// (the HUD hides on it; the pause menu sets it too, harmlessly).
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	return gm && (*(uint32_t*)(gm + 0x5C) & 0x100000) != 0;
 }
 
 void LogCutsceneSignals() {
@@ -182,6 +207,7 @@ void ForgetP2() {
 	g.p2BackHeldAt = 0;
 	g.p2ValuesReady = false;
 	g.suspended = false;
+	for (int i = 0; i < HERO_COUNT; i++) g.held[i] = false;
 }
 
 // Hand player 2's hero back to the game: make player 1's hero the trio leader
@@ -455,6 +481,29 @@ void CoopFrame() {
 		g.p2ValuesReady = true;
 	}
 
+	// Heroes the game has borrowed: a scripted AI order given to a player's hero
+	// while it is not the leader (Asterix riding the cable car Obelix pulls,
+	// waiting on the spinning platform...) is the AI's to carry out. Back to its
+	// player when the order is over or the hero leads again.
+	const int players[2] = { g.p1Hero, g.p2Hero };
+	for (int idx : players) {
+		Hero h = t.GetHero(idx);
+		if (!h) continue;
+		int order = (int)h.Order();
+		bool leads = t.Leader() == idx;
+		if (!g.held[idx] && !leads && order != g.lastOrder[idx] && IsScriptedOrder(order)) {
+			Hold(t, idx, "new order");
+		} else if (g.held[idx] && (leads || order == AI_FOLLOW_LEADER)) {
+			g.held[idx] = false;
+			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : "order done");
+		} else if (g.held[idx] && order == g.lastOrder[idx] && GetTickCount() - g.heldSince[idx] > 120000) {
+			// Safety valve: an order that never ends must not take a player's hero for good.
+			g.held[idx] = false;
+			Log("coop: %s back to its player (order %d still running after 2 min)", HeroName(idx), order);
+		}
+		g.lastOrder[idx] = (uint8_t)order;
+	}
+
 	if (!g.suspended) {
 		EnforcePlayer(t, g.p2Hero);
 		EnforcePlayer(t, g.p1Hero);
@@ -476,6 +525,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	// moment they have to be right.
 	Trio t = GetTrio();
 	if (!t) return;
+	if (g.held[heroIndex]) return;   // the game's AI drives it for now
 	EnforcePlayer(t, heroIndex);
 	if (Situation(t.GetHero(g.p1Hero)) != kSituationGroupAction &&
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
@@ -502,6 +552,14 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	trio[0x2C] = (uint8_t)g.p2Hero;
 	trio[0x2D] = (uint8_t)g.p1Hero;
 	g.sliced = true;
+	// Offers meant for the real leader stay with it: the magic potion (CKHkTorch
+	// checks the leader is Asterix, then latches itself at trio+0x4C for one
+	// frame) must not be taken by player 2's Obelix while he poses as leader.
+	g.savedOffer = 0;
+	if (g.savedLeader != (uint8_t)g.p2Hero) {
+		g.savedOffer = *(uint32_t*)(trio + 0x4C);
+		*(uint32_t*)(trio + 0x4C) = 0;
+	}
 
 	// With split-screen, player 2 steers relative to player 2's own camera.
 	P2CamBeginHeroTick();
@@ -515,6 +573,8 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 		Trio t = GetTrio();
 		if (t) {
 			uint8_t* trio = (uint8_t*)t.raw();
+			if (g.savedOffer && *(uint32_t*)(trio + 0x4C) == 0) *(uint32_t*)(trio + 0x4C) = g.savedOffer;
+			g.savedOffer = 0;
 			if (trio[0x2C] == (uint8_t)g.p2Hero && trio[0x2D] == (uint8_t)g.p1Hero) {
 				trio[0x2C] = g.savedLeader;
 				trio[0x2D] = g.savedCompanion;
@@ -545,31 +605,78 @@ bool IsModeOrSwitchEvent(int ev) {
 }
 }
 
+// Events that give "the companion" something to do: the 0x48xx trio orders,
+// the 0x51xx requests and 0x0Cxx interactions. Several only act on a companion
+// whose AI is idle (+0x561 == 0, e.g. 0x48EF sends it somewhere) or that is not
+// player-driven (the switch handler refuses a target whose companion bit is
+// clear), so around them the non-leader hero is shown as an idle AI follower.
+bool IsCompanionEvent(int ev) {
+	int cls = (ev >> 8) & 0xFF;
+	return cls == 0x48 || cls == 0x51 || cls == 0x0C;
+}
+
+struct EventFrame {
+	bool    used[HERO_COUNT];
+	uint8_t order[HERO_COUNT];
+	bool    idled[HERO_COUNT];   // +0x561 was 0xFF and we set 0
+};
+EventFrame g_eventStack[8];
+int g_eventDepth = 0;
+
 int CoopBeforeTrioEvent(int ev) {
 	InterlockedIncrement(&g_hookCounters.trioEvents);
 	if (!g.p2Joined) return 0;
-	Log("coop: trio event %04X", ev);
-	if (!IsModeOrSwitchEvent(ev)) return 0;
+	ev &= 0xFFFF;
+	static int lastEv = -1;
+	static DWORD lastEvAt = 0;
+	DWORD now = GetTickCount();
+	if (ev != lastEv || now - lastEvAt > 1000) Log("coop: trio event %04X", ev);
+	lastEv = ev;
+	lastEvAt = now;
+	if (!IsModeOrSwitchEvent(ev) && !IsCompanionEvent(ev)) return 0;
+	if (g_eventDepth >= 8) return 0;
 
-	// Show the trio the arrangement it was written for: only its leader drives.
-	// The switch handler, for one, refuses to switch to a hero whose companion
-	// bit is clear, and the mode events derive each hero's new state from it.
 	Trio t = GetTrio();
 	if (!t) return 0;
-	for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++) {
+	EventFrame& fr = g_eventStack[g_eventDepth++];
+	for (int i = 0; i < HERO_COUNT; i++) {
+		fr.used[i] = fr.idled[i] = false;
+		if (i == HERO_IDEFIX || (i != g.p1Hero && i != g.p2Hero)) continue;
 		Hero h = t.GetHero(i);
-		if (!h || i == t.Leader()) continue;
+		if (!h || i == t.Leader() || g.held[i]) continue;
 		uint8_t f = *F18(h);
-		if (HeroModePlayable(f) && HeroIsPlayerVariant(f)) *F18(h) = HeroAiVariant(f);
+		if (!HeroModePlayable(f) || !HeroIsPlayerVariant(f)) continue;
+		fr.used[i] = true;
+		fr.order[i] = (uint8_t)h.Order();
+		*F18(h) = HeroAiVariant(f);
+		uint8_t* ai = (uint8_t*)(h.raw() + 0x561);
+		if (*ai == 0xFF) { *ai = 0; fr.idled[i] = true; }
 	}
-	return 1;
+	return g_eventDepth;
 }
 
 void CoopAfterTrioEvent(int ev, int cookie) {
-	if (!cookie || !g.p2Joined) return;
+	if (!cookie) return;
+	if (cookie != g_eventDepth) { g_eventDepth = cookie - 1 < 0 ? 0 : cookie - 1; return; }
+	EventFrame& fr = g_eventStack[--g_eventDepth];
+	if (!g.p2Joined) return;
 	Trio t = GetTrio();
 	if (!t) return;
-	Log("coop: after trio event %04X leader=%s", ev, HeroName(t.Leader()));
+	ev &= 0xFFFF;
+	if (IsModeOrSwitchEvent(ev)) Log("coop: after trio event %04X leader=%s", ev, HeroName(t.Leader()));
+	for (int i = 0; i < HERO_COUNT; i++) {
+		if (!fr.used[i]) continue;
+		Hero h = t.GetHero(i);
+		if (!h) continue;
+		uint8_t* ai = (uint8_t*)(h.raw() + 0x561);
+		if (fr.idled[i] && *ai == 0) *ai = 0xFF;   // the AI driver enters its state from scratch
+		int order = (int)h.Order();
+		if (i != t.Leader() && order != fr.order[i] && IsScriptedOrder(order)) {
+			char why[32];
+			sprintf(why, "event %04X", ev);
+			Hold(t, i, why);
+		}
+	}
 	EnforcePlayer(t, g.p1Hero);
 	EnforcePlayer(t, g.p2Hero);
 }

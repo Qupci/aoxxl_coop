@@ -23,6 +23,7 @@ const uintptr_t kObelixLifeVtbl  = 0x625D18;
 const uintptr_t kIdefixLifeVtbl  = 0x625DA0;
 const uintptr_t kHudHookVtbl     = 0x6285F0;   // CKHkInterfaceInGame (2,132)
 const uintptr_t kBonusGroupLife  = 0x6296FC;   // CKGrpBonusLife: handled per bonus below
+const uintptr_t kTrioGroupLife   = 0x625984;   // CKGrpTrioLife: the trio itself, always the real leader
 
 // Bonus pools (helmets and the like). CKGrpBonusPool::vf27 updates every active
 // bonus, then attracts those within the pool's radius of the leader's position
@@ -83,7 +84,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	uintptr_t vt = *(uintptr_t*)life;
 	Vector3 at;
 	if (vt == kAsterixLifeVtbl || vt == kObelixLifeVtbl || vt == kIdefixLifeVtbl ||
-	    vt == kBonusGroupLife || !LifePos(life, isGroup, &at)) {
+	    vt == kBonusGroupLife || vt == kTrioGroupLife || !LifePos(life, isGroup, &at)) {
 		tick(life, nullptr, dt);
 		return;
 	}
@@ -261,35 +262,12 @@ const uint8_t   kProjectileCallBytes[11] = { 0x8B, 0x11, 0x50, 0x68, 0x01, 0x03,
                                              0xFF, 0x52, 0x14 };
 volatile long g_p2Contacts = 0;
 
-// Which player hero does this contact list come from? -1: none or both.
-template <class OwnerAt>
-int ContactActor(char* receiver, Hero h1, Hero h2, int p1, int p2, OwnerAt ownersOf) {
-	if (receiver == h1.raw()) return p1;
-	if (receiver == h2.raw()) return p2;
-	bool by1 = false, by2 = false;
-	ownersOf([&](char* owner) {
-		if (owner == h1.raw()) by1 = true;
-		else if (owner == h2.raw()) by2 = true;
-	});
-	if (by2 && !by1) return p2;
-	if (by1 && !by2) return p1;
-	return -1;
-}
-
-template <class OwnerAt>
-int DispatchAs(char* receiver, int event, void* list, OwnerAt ownersOf) {
+// Calls receiver->sendEvent(event, list) with `actor` as the trio's leader.
+int SendAs(char* receiver, int event, void* list, Trio t, int actor, int other, int p2) {
 	SendEventFn send = (SendEventFn)(*(void***)receiver)[5];
-	Trio t = GetTrio();
-	if (!t || !CoopP2Joined() || CoopSuspended()) return send(receiver, nullptr, event, list);
-	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
-	Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
-	if (!h1 || !h2) return send(receiver, nullptr, event, list);
-	int actor = ContactActor(receiver, h1, h2, p1, p2, ownersOf);
 	uint8_t* tr = (uint8_t*)t.raw();
 	if (actor < 0 || tr[0x2C] == actor) return send(receiver, nullptr, event, list);
-
 	uint8_t leader = tr[0x2C], companion = tr[0x2D];
-	int other = actor == p1 ? p2 : p1;
 	tr[0x2C] = (uint8_t)actor;
 	tr[0x2D] = (uint8_t)other;
 	if (actor == p2) InterlockedIncrement(&g_p2Contacts);
@@ -301,29 +279,75 @@ int DispatchAs(char* receiver, int event, void* list, OwnerAt ownersOf) {
 	return r;
 }
 
+// `maskOf(entry, h1, h2)`: bit 0 if player 1's hero is in that contact, bit 1
+// for player 2's. Entries are chained through their first word. A contact list
+// with both heroes in it (both fighting the same Roman) is delivered in two
+// calls: everything but player 2's contacts as player 1, then player 2's as
+// player 2.
+template <class MaskOf>
+int DispatchAs(char* receiver, int event, void* list, MaskOf maskOf) {
+	SendEventFn send = (SendEventFn)(*(void***)receiver)[5];
+	Trio t = GetTrio();
+	if (!t || !CoopP2Joined() || CoopSuspended()) return send(receiver, nullptr, event, list);
+	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
+	Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
+	if (!h1 || !h2) return send(receiver, nullptr, event, list);
+	if (receiver == h1.raw()) return SendAs(receiver, event, list, t, p1, p2, p2);
+	if (receiver == h2.raw()) return SendAs(receiver, event, list, t, p2, p1, p2);
+
+	void* entries[64];
+	int masks[64], n = 0, all = 0;
+	for (void* e = list; e; e = *(void**)e) {
+		if (n == 64) return send(receiver, nullptr, event, list);
+		entries[n] = e;
+		masks[n] = maskOf(e, h1, h2);
+		all |= masks[n++];
+	}
+	if (all == 0) return send(receiver, nullptr, event, list);
+	if (all == 1) return SendAs(receiver, event, list, t, p1, p2, p2);
+	bool mixed = false;
+	for (int i = 0; i < n; i++) if (!(masks[i] & 2)) mixed = true;
+	if (!mixed) return SendAs(receiver, event, list, t, p2, p1, p2);
+
+	// Split, deliver, then put the chain back the way the service built it.
+	void* headA = nullptr; void** tailA = &headA;
+	void* headB = nullptr; void** tailB = &headB;
+	for (int i = 0; i < n; i++) {
+		void*** tail = (masks[i] & 2) ? &tailB : &tailA;
+		**tail = entries[i];
+		*tail = (void**)entries[i];
+	}
+	*tailA = nullptr;
+	*tailB = nullptr;
+	int r = SendAs(receiver, event, headA, t, p1, p2, p2);
+	SendAs(receiver, event, headB, t, p2, p1, p2);
+	for (int i = 0; i < n; i++) *(void**)entries[i] = i + 1 < n ? entries[i + 1] : nullptr;
+	return r;
+}
+
 int __fastcall PairContactDispatch(char* receiver, void*, int event, int* list) {
-	return DispatchAs(receiver, event, list, [&](auto&& note) {
-		for (int* e = list; e; e = (int*)e[0]) {
-			char** test = (char**)e[1];
-			if (!test) continue;
-			for (int k = 0; k < 2; k++)
-				if (test[k]) note(*(char**)(test[k] + 0x20));
+	return DispatchAs(receiver, event, list, [](void* e, Hero h1, Hero h2) {
+		char** test = (char**)((int*)e)[1];
+		int m = 0;
+		for (int k = 0; test && k < 2; k++) {
+			char* owner = test[k] ? *(char**)(test[k] + 0x20) : nullptr;
+			if (owner == h1.raw()) m |= 1;
+			else if (owner == h2.raw()) m |= 2;
 		}
+		return m;
 	});
 }
 
 int __fastcall ProjectileContactDispatch(char* receiver, void*, int event, uint8_t* list) {
-	return DispatchAs(receiver, event, list, [&](auto&& note) {
-		CKYellowPages* yp = YellowPages();
-		char* srv = yp ? *(char**)((char*)yp + 0x50) : nullptr;
-		if (!srv) return;
-		unsigned count = *(uint8_t*)(srv + 0x1B6);
-		for (uint8_t* e = list; e; e = *(uint8_t**)e) {
-			unsigned idx = e[5];
-			if (idx >= count) continue;
-			char* shape = *(char**)(srv + 0x24 + 8 * idx);
-			if (shape) note(*(char**)(shape + 0x20));
-		}
+	CKYellowPages* yp = YellowPages();
+	char* srv = yp ? *(char**)((char*)yp + 0x50) : nullptr;
+	unsigned count = srv ? *(uint8_t*)(srv + 0x1B6) : 0;
+	return DispatchAs(receiver, event, list, [srv, count](void* e, Hero h1, Hero h2) {
+		unsigned idx = ((uint8_t*)e)[5];
+		if (!srv || idx >= count) return 0;
+		char* shape = *(char**)(srv + 0x24 + 8 * idx);
+		char* owner = shape ? *(char**)(shape + 0x20) : nullptr;
+		return owner == h1.raw() ? 1 : owner == h2.raw() ? 2 : 0;
 	});
 }
 

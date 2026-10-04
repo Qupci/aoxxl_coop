@@ -25,6 +25,7 @@ Traced g_traced[] = {
 	{ 0x626110, 0x4B4630, "PushPull" },
 	{ 0x62928C, 0x544060, "HkCrate" },
 	{ 0x6291E0, 0x5424D0, "CrateCpnt" },
+	{ 0x627738, 0x004E3F00, "Roman" },
 };
 volatile long g_traceLines = 0;
 
@@ -34,7 +35,7 @@ int __fastcall TracedSendEvent(void* self, void* edx, int event, void* param) {
 	for (const Traced& c : g_traced) if (c.vtbl == vt) { t = &c; break; }
 	if (!t) return 0;   // cannot happen: only these vtables point here
 	// 0x906 is the crates' per-frame "where are you" query: noise.
-	if (CoopP2Joined() && event != 0x906 && InterlockedIncrement(&g_traceLines) < 4000) {
+	if (CoopP2Joined() && event != 0x906 && event != 0x4C01 && InterlockedIncrement(&g_traceLines) < 4000) {
 		Trio tr = GetTrio();
 		Log("trace: %s %p event %04X param %p leader=%s from %p", t->name, self, event, param,
 			tr ? HeroName(tr.Leader()) : "?", _ReturnAddress());

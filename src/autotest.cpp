@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -445,9 +445,36 @@ const Step kCutscene[] = {
 	END(12000),
 };
 
+// grab2 (level 2): both heroes next to the same Roman; player 2 hits it once
+// (it is stunned for a few seconds) and grabs it, then spins.
+const Step kGrab2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	NEAR_ENEMY(1500, HERO_OBELIX), { 1520, S_ENEMY, HERO_ASTERIX, 1, 0, 0, 0, "near enemy (far side)" },
+	VPAD(1700, 1, PAD_X, 0, 0, "p2 punch"), VPAD(1800, 1, 0, 0, 0, "p2 release"),
+	VPAD(2400, 1, PAD_B, 0, 0, "p2 grab"), VPAD(2600, 1, 0, 0, 0, "p2 release"),
+	VPAD(3000, 1, 0, 1, 0, "p2 spin r"), VPAD(3200, 1, 0, 0, -1, "p2 spin d"),
+	VPAD(3400, 1, 0, -1, 0, "p2 spin l"), VPAD(3600, 1, 0, 0, 1, "p2 spin u"),
+	VPAD(3800, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(3900, "grab2_00"),
+	END(6000),
+};
+
+// borrow (level 2): the trio tells the companion (player 2's Obelix) to wait
+// (0x4802), then to follow again (0x4803): he should go to the AI and back.
+const Step kBorrow[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion wait" },
+	VPAD(1600, 1, 0, 1, 0, "p2 right (held)"),
+	{ 3500, S_TRIOEV, 0x4803, 0, 0, 0, 0, "companion follow" },
+	VPAD(5500, 1, 0, 0, 0, "p2 neutral"),
+	END(6500),
+};
+
 // survey: log which group-action objects the level has, then leave.
 const Step kSurvey[] = {
-	MARK(0, "survey"), SHOT(100, "survey"), END(300),
+	MARK(0, "survey"), { 0, S_DETECT, 0, 0, 0, 0, 0, "detect" }, SHOT(100, "survey"), END(300),
 };
 
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
@@ -545,6 +572,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("bumper", kBumper),
 	SCENARIO("crate", kCrate),
 	SCENARIO("grab", kGrab),
+	SCENARIO("grab2", kGrab2),
+	SCENARIO("borrow", kBorrow),
 	SCENARIO("cutscene", kCutscene),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
@@ -972,11 +1001,51 @@ void RunStep(const Step& s) {
 		if (yaw < 0) yaw += 6.2831855f;
 		*(float*)(h.raw() + 0xCC) = yaw;
 		*(float*)(h.raw() + 0xD4) = yaw;
+		if (s.b == 1) {   // the opposite side of the same Roman, facing it
+			face = face * -1.0f;
+			yaw = atan2f(face.z, face.x);
+			if (yaw < 0) yaw += 6.2831855f;
+			h.Dir() = face;
+			*(float*)(h.raw() + 0xCC) = yaw;
+			*(float*)(h.raw() + 0xD4) = yaw;
+		}
 		Vector3 to = bestP - face * 1.3f + Vector3(0, 0.3f, 0);
 		h.Pos() = to;
 		if (h.hook->node && h.hook->node->matrix) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
 			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
+		break;
+	}
+	case S_TRIOEV: {
+		Trio t = GetTrio();
+		if (!t) break;
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		Log("autotest: trio event %04X -> %d", s.a,
+			((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, s.a, nullptr));
+		break;
+	}
+	case S_DETECT: {
+		// CKSrvDetection (found by vtable among the yellow pages' services).
+		CKYellowPages* yp = YellowPages();
+		char* det = nullptr;
+		for (int off = 0x10; off < 0xC0 && !det; off += 4) {
+			char* o = *(char**)((char*)yp + off);
+			if (o && !IsBadReadPtr(o, 4) && *(uintptr_t*)o == 0x62504C) { det = o; Log("autotest: detection service at yp+0x%X", off); }
+		}
+		if (!det) { Log("autotest: no detection service"); break; }
+		unsigned n = *(uint16_t*)(det + 0x28);
+		char** nodes = *(char***)(det + 0x18);
+		Trio t = GetTrio();
+		Log("autotest: %u detected objects; tests %u/%u/%u", n, *(uint16_t*)(det + 0x30), *(uint16_t*)(det + 0x38),
+			*(uint16_t*)(det + 0x40));
+		for (unsigned i = 0; i < n && i < 64; i++) {
+			const char* who = "";
+			for (int hI = 0; hI < HERO_COUNT; hI++) {
+				Hero h = t ? t.GetHero(hI) : Hero();
+				if (h && (char*)h.hook->node == nodes[i]) who = HeroName(hI);
+			}
+			Log("autotest:   detected %u: node %p vt %p %s", i, nodes[i], nodes[i] ? *(void**)nodes[i] : nullptr, who);
 		}
 		break;
 	}
