@@ -12,30 +12,18 @@ of the way of the QoL patch (`d3d9.dll`) and the XXL Inspector, both of which wa
 
 ## Status — read this first
 
-This is a **partial implementation**. The engine has been mapped and the plumbing is in place and
-verified against the running game, but the two headline features are not finished.
-
 | | state |
 |---|---|
-| ASI loads, hooks install, engine reachable | **done, verified live** |
-| Address/offset map for heroes, trio, AI orders | **done, verified live** |
-| Per-frame hero hook (inline detour on the state-machine tick) | **done, verified live at 63 fps for both heroes** |
-| `CKInput` action array located and mapped to pad inputs | **done, measured over ~13k frames** |
-| Second-controller detection, join / drop | **done**, not yet exercised with a real pad |
-| Hero switching from pad 2 (same thing the blue circles do) | **done** |
-| Guards for "Obelix not in the level yet", cutscenes, belly/boat rides | **done** |
-| Player 2 driving the second hero | **written, completely untested** |
-| Split-screen rendering | **not started** — needs the scene-render call located |
+| Player 2 drives the other hero (move, jump, attack, grab, dash, swim) | **working**, verified with two real pads |
+| Join / leave: Start on the controller the game is not using; Start again or hold Back | **working**; player 1's pad is detected automatically |
+| Players keep their heroes through blue circles / scripted switches | implemented |
+| Scripted sections (rides, belly slide, cinematics, lifters started by P1) | co-op pauses, game handles them, resumes after |
+| Split-screen (stacked or side by side), shared HUD | **working in automated tests**, awaiting a real two-pad session |
+| Crash at axxl.exe+0x9C228 (lifters) | fixed; crashes and stalls are now logged with their location |
 
-Everything marked "verified live" was checked by booting into level 2 with `force_level` and reading
-`xxl_coop.log`. The input mapping came from probe sessions played by the project's owner.
-
-**Player 2 control has never actually been run.** The code path is complete and the mapping under it
-is measured rather than guessed, but nobody has yet pressed Start on a second pad with this build.
-Expect to iterate.
-
-There is still only one camera, so player 2 can walk off the edge of the screen. Split-screen is the
-next piece.
+How it works is in `docs/RESEARCH.md` §0. Automated tests: `tools/run_test.ps1 <scenario>`
+(scenarios in `src/autotest.cpp`). Decompiled game code for reference: run
+`ghidra_scripts/rebuild_decomp.ps1 -Import` once, then grep `decomp/`.
 
 ---
 

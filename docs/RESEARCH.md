@@ -10,6 +10,76 @@ are checked out next to this folder, or (b) recovered with Ghidra from `axxl.exe
 which. **Nothing here has been confirmed against a running game yet** — the runtime diagnostics in
 the mod (`coop_diag`) exist to do exactly that.
 
+
+> **Session 2 (Oct 2026) — read §0 first.** The hero-control model in §5–6 below is from session 1
+> and is **wrong**: it hooked the body/AI machines, a layer below where player-vs-AI is decided.
+> §0 is the verified model (autotest + real two-pad tests). Function names refer to the Ghidra
+> corpus in `coop/decomp/` (regenerate with `ghidra_scripts/rebuild_decomp.ps1`).
+
+## 0. Session 2 — verified model
+
+### 0.1 Hero control: the Life layer
+* Every hero hook has a Life (`hero+0x0C`; `life+0x10` = hero). Its per-frame tick is **Life vtable
+  slot 17** (`CKHkAsterixLife` vt `0x625C90` → `0x4AA9C0`, `CKHkObelixLife` vt `0x625D18` →
+  `0x4AB7E0`), verified at one tick per hero per frame.
+* Life state (`life+0x1D`) = `(hero+0x18 >> 1) & 0xF`, handlers = Life vtable slots 24–33
+  (state 0–9). **Even = player variant, odd = AI variant**, of 5 modes: 0 normal, 1/2 rides &
+  ballista, 3 belly slide/cinematic (`0x480B–F`), 4 **swimming** (hero-driven). Bit 0 of `+0x18`
+  (companion flag) always equals the state's low bit: `(f18 & 3) == 0` ⇔ player-driven.
+* Modes 0 and 4 have player and AI handlers for every hero; modes 1–3 have a real handler for one
+  hero only (single-player sections).
+* Player handlers (e.g. `CKHkAsterixLife::State0_Player` `0x4AAAE0`) call `Hero_ProcessPlayerInput`
+  `0x499660` (`GetAction` 0–3 stick, 4 A/jump, 5 X/attack, 6 B/grab, 7 Y/dash, 0x10/0x11/0x13/0x14).
+  AI handlers call `Hero_TickAiMachine` `0x49DE10` (AI state `+0x561`, order `+0x564`).
+* Input: `GetAction(view, id)` = `CKInput.values[view.remap[id]]`; both heroes share the view at
+  `trio+0x28`; `CKInput` = `yellowPages+0x14`, values pointer at `CKInput+0x1C`.
+* **Co-op mechanism:** hold P2's hero in the player variant (playable modes only) and swap
+  `CKInput+0x1C` to P2's array for the length of that hero's Life tick.
+
+### 0.2 Trio rules (`CKGrpTrio::sendEvent` `0x47AC10`, `0x48xx` → `CKGrpTrio_OnEvent48xx`)
+* `0x4800/0x4801` (and `0x48B7/0x48B8` instant): refused unless the target hero has its companion
+  bit set and the leader isn't busy (`+0x390 & 4`); sets target `ctrl-1`/bit0=0, other `ctrl+1`/
+  bit0=1, other's order 0, `trio+0x2C/+0x2D`.
+* `0x4806`: all heroes back to mode 0 (`ctrl = bit0`). `0x4807`: mode 1. `0x4809/0x480A`: mode 2.
+  `0x480B–F`: switch + mode 3. `0x4802/0x4803`: companion wait/follow.
+* ~25 trio virtuals answer "the leader …" (vf25–37, 42, 52–57) and 5 "the companion …" (vf38,
+  43–45, 47); hero code also reads `trio+0x2D` directly. **Player-side code assumes it runs on the
+  leader.** Co-op therefore time-slices `trio+0x2C/+0x2D` during P2's Life tick.
+* Per-frame `CKGrpTrioLife::vf17` `0x484400`: leader position sync, move basis
+  (`CKGrpTrio_BuildMoveBasis` `0x4815C0`, from camera heading + leader stick), music triggers. It
+  does not rewrite control bits.
+
+### 0.3 Group actions (situation 13) and the lifter crash
+* A trio event (family handler `0x482610`, case `0x30`) gives the **leader** `+0x544` = lifter and
+  `+0x3F0 |= 0x4000` → `Hero_ChooseSituationState` `0x49C900` picks situation `0xD` →
+  `FUN_0049C030`: sends companion/Idefix to markers (`hero+0x548[3]`), waits for AI state 3, and
+  after 17 s forces the companion's AI state to 3.
+* Crash `axxl.exe+0x9C228`: forced state 3 on a *player-driven* companion never clears; the next
+  lifter empties that hero's marker slot and dereferences it. Fixes: trio time-slice, clear
+  leftover AI states the way the game does (`table[st](2, 0xFF)`, `+0x561 = 0xFF`), and suspend
+  co-op while player 1's hero runs a group action.
+
+### 0.4 Rendering and split-screen
+* Per-frame render: **`CKGraphic` (0,2) vtable `0x623D54` slot 17** `0x431A40` (bumps frame id
+  `0x6464C4`) → `FUN_00413EC0(view = CKGraphic+4)`: `FUN_00413DC0` camera sync →
+  `CSGRootNode` slot 14 scene walk into 15 lists at `view+0x1C` (culls with
+  `RwCameraFrustumTestSphere(g_mainRwCamera)` `0x58FE70`) → `FUN_00422D10` → clear
+  (`FUN_00414700(renderer,0)`) → `FUN_00413F40` 11 world lists → `Render_View` effects list
+  (`view+0x48`) → `FUN_00414070` HUD (2D camera, lists `view+0x4C..`) → `FUN_00414780` present.
+* Lists are intrusive (`item+0x24`); slot 1 add, slot 3 draw-and-empty.
+* RW: `RwCameraBeginUpdate/EndUpdate` jump through `camera+0x18/+0x1C`; `RwCameraSetViewWindow`
+  `0x58FFB0` (cdecl) only marks the frame dirty. D3D9 device `*(void**)0x668978`; RW sets the
+  viewport from the camera raster (`width +0xC`, `height +0x10`, `nOffsetX/Y +0x1C/+0x1E`).
+* Camera frame is a root RwFrame (modelling `+0x10`, LTM `+0x50`, pos at matrix `+0x30`).
+* Split-screen = `splitscreen.cpp` (see its header comment).
+
+### 0.5 Other facts
+* `CKSrvCamera` = `yellowPages+0x68`; dir `+0xAC`; targets `+0xE8`.
+* Level survey (levels 2–6): lifters in 2, 3, 4, 5; levels 7–8 have no co-op-ready start.
+* The game window pauses on `WM_ACTIVATEAPP` focus loss (`Game_WndProc` `0x479C10`).
+* `CKGrpTrioLife::vf12` runs a CRC16 over a code range (anti-tamper, `0x645A10..18`): avoid
+  byte-patching code inside it; all co-op hooks are vtable/function-pointer swaps.
+
 ---
 
 ## 1. Object model
