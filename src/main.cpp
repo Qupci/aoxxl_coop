@@ -13,6 +13,7 @@
 #include "render.h"
 #include "autotest.h"
 #include "crash.h"
+#include "splitscreen.h"
 
 namespace {
 
@@ -106,6 +107,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	}
 
 	RenderInstallHooks();
+	SplitInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

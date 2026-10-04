@@ -32,7 +32,9 @@ void __fastcall RenderViewHook(void* self, void* edx, void* arg) {
 } // namespace
 
 bool RenderInstallHooks() {
-	if (!g_config.splitScreen && !g_config.splitTest) return true;
+	// The old "render the effects layer twice" re-entrancy test; split-screen
+	// proper lives in splitscreen.cpp.
+	if (!g_config.splitTest) return true;
 	return InstallDetour(axr::kRenderView, (void*)RenderViewHook,
 	                     (void**)&g_origRenderView, kRenderViewPrologue,
 	                     sizeof(kRenderViewPrologue), "renderView");

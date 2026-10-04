@@ -134,6 +134,22 @@ const Step kLifter[] = {
 	END(29500),
 };
 
+// split1: split-screen smoke test. Player 2 joins (split on), the players walk
+// apart, screenshots along the way, then player 2 leaves (back to one screen).
+const Step kSplit1[] = {
+	MARK(0, "baseline"), SHOT(100, "split_00_single"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	SHOT(1500, "split_01_joined"),
+	P1(2000, 0, 1, 0, "p1 right"), VPAD(2000, 1, 0, -1, 0, "p2 left"),
+	SHOT(3500, "split_02_apart"),
+	P1(4000, 0, 0, 0, "p1 neutral"), VPAD(4000, 1, 0, 0, 1, "p2 up"),
+	SHOT(5500, "split_03_p2up"),
+	VPAD(6000, 1, 0, 0, 0, "p2 neutral"),
+	VPAD(7000, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(7200, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "split_04_left"),
+	END(8500),
+};
+
 // survey: log which group-action objects the level has, then leave.
 const Step kSurvey[] = {
 	MARK(0, "survey"), SHOT(100, "survey"), END(300),
@@ -225,6 +241,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("survey", kSurvey),
 	SCENARIO("lifter", kLifter),
+	SCENARIO("split1", kSplit1),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("p2mirror", kP2Mirror),
@@ -324,6 +341,31 @@ void RunStep(const Step& s) {
 		line.Add("autotest: level objects:");
 		for (auto& k : kinds) line.Add(" %s=%u", k.name, GetNumLvlClassInstances(k.grp, k.id));
 		Log("%s", line.c_str());
+		// Render objects: CKGraphic = yellowPages+0x08, view = CKGraphic+4,
+		// renderer = view+8. Vtables are matched to classes offline (vtables.tsv).
+		__try {
+			char* yp = (char*)YellowPages();
+			char* gfx = yp ? *(char**)(yp + 0x08) : nullptr;
+			char* view = gfx ? *(char**)(gfx + 0x04) : nullptr;
+			if (view) {
+				char rb[512];
+				LineBuf r(rb);
+				r.Add("autotest: render gfx=%p vt=%08X view=%p renderer=%p builder(view+0C)=%p vt=%08X",
+					gfx, *(unsigned*)gfx, view, *(void**)(view + 8), *(void**)(view + 0xC),
+					*(void**)(view + 0xC) ? **(unsigned**)(view + 0xC) : 0);
+				Log("%s", r.c_str());
+				char lb[512];
+				LineBuf l(lb);
+				l.Add("autotest: render lists vt:");
+				for (int i = 0; i < 15; i++) {
+					void* o = *(void**)(view + 0x1C + 4 * i);
+					l.Add(" %s%08X", i == 11 ? "fx:" : i == 12 ? "hud:" : "", o ? *(unsigned*)o : 0);
+				}
+				Log("%s", l.c_str());
+			}
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			Log("autotest: render probe faulted");
+		}
 		for (unsigned i = 0; i < GetNumLvlClassInstances(2, 47) && i < 8; i++) {
 			KHook* lifter = (KHook*)GetLvlObject(2, 47, i);
 			if (!lifter || !lifter->node || !lifter->node->matrix) continue;

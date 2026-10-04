@@ -48,9 +48,12 @@ public class NameClasses extends GhidraScript {
 		return v >= textStart && v < textEnd;
 	}
 
-	// imm32 if the bytes at va are `B8 imm32 C3`, else -1.
+	// imm32 if the bytes at va are `B8 imm32 C3`, 0 for `33 C0 C3` (the compiler's
+	// `return 0` -- every group-0 manager class), else -1.
 	private long stubValue(long va) {
 		try {
+			if ((mem.getByte(toAddr(va)) & 0xFF) == 0x33 && (mem.getByte(toAddr(va + 1)) & 0xFF) == 0xC0
+					&& (mem.getByte(toAddr(va + 2)) & 0xFF) == 0xC3) return 0;
 			if ((mem.getByte(toAddr(va)) & 0xFF) != 0xB8) return -1;
 			if ((mem.getByte(toAddr(va + 5)) & 0xFF) != 0xC3) return -1;
 			return mem.getInt(toAddr(va + 1)) & 0xFFFFFFFFL;
