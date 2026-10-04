@@ -1,3 +1,4 @@
+#include <intrin.h>
 // Installs the co-op hooks. All of them are single vtable-slot swaps: reversible,
 // checked against the value this build of the game is expected to hold, and
 // unable to collide with byte patches other mods put inside the functions.
@@ -45,7 +46,7 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 }
 
 int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) {
-	int cookie = CoopBeforeTrioEvent(event);
+	int cookie = CoopBeforeTrioEvent(event, _ReturnAddress());
 	int r = g_origTrioSendEvent(self, edx, event, param);
 	CoopAfterTrioEvent(event, cookie);
 	return r;

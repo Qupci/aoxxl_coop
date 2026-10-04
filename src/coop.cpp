@@ -684,14 +684,14 @@ struct EventFrame {
 EventFrame g_eventStack[8];
 int g_eventDepth = 0;
 
-int CoopBeforeTrioEvent(int ev) {
+int CoopBeforeTrioEvent(int ev, void* caller) {
 	InterlockedIncrement(&g_hookCounters.trioEvents);
 	if (!g.p2Joined) return 0;
 	ev &= 0xFFFF;
 	static int lastEv = -1;
 	static DWORD lastEvAt = 0;
 	DWORD now = GetTickCount();
-	if (ev != lastEv || now - lastEvAt > 1000) Log("coop: trio event %04X", ev);
+	if (ev != lastEv || now - lastEvAt > 1000) Log("coop: trio event %04X from %p", ev, caller);
 	lastEv = ev;
 	lastEvAt = now;
 	if (!IsModeOrSwitchEvent(ev) && !IsCompanionEvent(ev)) return 0;

@@ -50,7 +50,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero);
 void CoopAfterLifeTick(int heroIndex, Hero hero);
 
 // Called around CKGrpTrio::sendEvent. `before` returns a cookie for `after`.
-int  CoopBeforeTrioEvent(int event);
+int  CoopBeforeTrioEvent(int event, void* caller);
 void CoopAfterTrioEvent(int event, int cookie);
 
 bool CoopInstallHooks();

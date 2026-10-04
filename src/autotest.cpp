@@ -529,6 +529,22 @@ const Step kLead2[] = {
 	END(7000),
 };
 
+// circle (level 2): player 2's Obelix where he set off the spinning platform's
+// blue circle in a player's session, Asterix nearby.
+const Step kCircle[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 3, 0, 0, 0, "asterix near platform" },
+	{ 1500, S_PLACE, HERO_OBELIX, 3, 0, 0, 0, "obelix near platform" },
+	{ 3000, S_PLACE, HERO_OBELIX, 4, 0, 0, 0, "obelix on circle spot" },
+	SHOT(3500, "circle_00"),
+	VPAD(4000, 1, 0, -0.5f, 0, "p2 left"), VPAD(4600, 1, 0, 0, 0.5f, "p2 up"),
+	VPAD(5200, 1, 0, 0.5f, 0, "p2 right"), VPAD(5800, 1, 0, 0, -0.5f, "p2 down"),
+	VPAD(6400, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(6500, "circle_01"),
+	END(8000),
+};
+
 // borrow (level 2): the trio tells the companion (player 2's Obelix) to wait
 // (0x4802), then to follow again (0x4803): he should go to the AI and back.
 const Step kBorrow[] = {
@@ -646,6 +662,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("grab3", kGrab3),
 	SCENARIO("swing", kSwing),
 	SCENARIO("lead2", kLead2),
+	SCENARIO("circle", kCircle),
 	SCENARIO("swingsp", kSwingSp),
 	SCENARIO("cutscene", kCutscene),
 	SCENARIO("exp1", kExp1),
@@ -1123,10 +1140,12 @@ void RunStep(const Step& s) {
 			{ -793.89f, 512.30f, -1060.49f },   // 0: the cable car (swing) seat
 			{ -794.40f, 508.40f, -1060.40f },   // 1: next to the cable car's rope
 			{ -790.45f, 510.60f, -1059.94f },   // 2: just before the cable car
+			{ -771.90f, 515.60f, -976.80f },    // 3: Asterix near the spinning platform
+			{ -777.20f, 515.90f, -977.00f },    // 4: where player 2's Obelix set off the circle
 		};
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
-		if (!h || s.b < 0 || s.b >= 3) break;
+		if (!h || s.b < 0 || s.b >= 5) break;
 		Vector3 to(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
 		h.Pos() = to;
 		if (h.hook->node && h.hook->node->matrix) {
