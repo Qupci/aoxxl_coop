@@ -485,6 +485,7 @@ const Step kSwing[] = {
 	{ 3000, S_SCATTER, HERO_OBELIX, 0, 0, 0, 0, "scatter" },
 	{ 3600, S_SCATTER, HERO_OBELIX, 0, 0, 0, 0, "scatter" },
 	SHOT(3800, "swing_00"),
+	VPAD(3850, 1, PAD_X, 0, 0, "p2 X (held)"), SHOT(4400, "swing_00b"), VPAD(5850, 1, 0, 0, 0, "p2 release"),
 	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
 	VPAD(4600, 1, PAD_X, 0, 0, "p2 X"), VPAD(4750, 1, 0, 0, 0, "p2 release"),
 	SHOT(5000, "swing_01"),

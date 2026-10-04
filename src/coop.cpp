@@ -46,6 +46,7 @@ struct CoopState {
 	bool    p2ValuesReady = false;
 
 	uint8_t* savedValues = nullptr;   // CKInput's own array while player 2's is in
+	char*    savedBindings = nullptr; // CKInput+0x18 likewise (analog values at +0x18 each)
 	bool     swapped = false;
 
 	// The trio's leader/companion bytes while player 2's hero is ticking (see
@@ -546,6 +547,20 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	uint8_t** values = (uint8_t**)(im.raw() + 0x1C);
 	g.savedValues = *values;
 	*values = g.p2Values;
+	// Some states read the analog value of a binding instead (FUN_00435900:
+	// CKInput+0x18, 0x20 bytes per binding, float at +0x18) -- Obelix holding
+	// the cable car's rope (situation 3) does. Player 2 gets a copy of the
+	// bindings carrying his own values there.
+	static char p2Bindings[256 * 0x20];
+	char** bindings = (char**)(im.raw() + 0x18);
+	unsigned nb = *(uint8_t*)(im.raw() + 0x3A);
+	g.savedBindings = nullptr;
+	if (*bindings && nb > 0 && nb <= 256) {
+		memcpy(p2Bindings, *bindings, nb * 0x20);
+		for (unsigned i = 0; i < nb; i++) *(float*)(p2Bindings + i * 0x20 + 0x18) = g.p2Values[i] / 255.0f;
+		g.savedBindings = *bindings;
+		*bindings = p2Bindings;
+	}
 	g.swapped = true;
 	InterlockedIncrement(&g_hookCounters.p2Routed);
 
@@ -603,6 +618,8 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	if (!g.swapped) return;
 	InputManager im = GetInputManager();
 	if (im) *(uint8_t**)(im.raw() + 0x1C) = g.savedValues;
+	if (im && g.savedBindings) *(char**)(im.raw() + 0x18) = g.savedBindings;
+	g.savedBindings = nullptr;
 	g.swapped = false;
 }
 
