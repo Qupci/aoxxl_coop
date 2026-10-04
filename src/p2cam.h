@@ -22,7 +22,7 @@ void P2CamBeginHeroTick();
 void P2CamEndHeroTick();
 
 // Player 1's follow camera: only while player 2's hero is the trio's leader (the
-// game camera follows it) and player 1's hero is not borrowed by a script.
+// game camera follows it).
 bool P1CamMatrix(float out[16]);
 void P1CamBeginHeroTick();
 void P1CamEndHeroTick();

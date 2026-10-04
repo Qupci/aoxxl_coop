@@ -133,7 +133,7 @@ void P2CamFrame() {
 	// player 2's hero and player 1's hero is free to move.
 	int p1 = CoopP1Hero();
 	g_cur = &g_cams[0];
-	if (t.Leader() == CoopP2Hero() && !CoopHeroHeld(p1)) UpdateCam(t.GetHero(p1), leader, Player1Pad());
+	if (t.Leader() == CoopP2Hero()) UpdateCam(t.GetHero(p1), leader, Player1Pad());
 	else ResetCam(g_cams[0]);
 	g_cur = &g_cams[1];
 }

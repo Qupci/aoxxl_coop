@@ -312,9 +312,8 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 		}
 	};
 	// Player 1's half: the game camera follows the leader. When that is player
-	// 2's hero, player 1 gets a follow camera of its own -- or, while the game
-	// has borrowed player 1's hero for a scripted sequence (Asterix riding the
-	// cable car), the game's camera as it is: it frames that sequence.
+	// 2's hero, player 1 gets a follow camera of its own on its hero (also
+	// while the game has borrowed it, e.g. Asterix riding the cable car).
 	float m1[16];
 	bool own1 = P1CamMatrix(m1);
 	auto placeP1 = [&] {

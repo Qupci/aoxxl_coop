@@ -5,6 +5,7 @@
 #include "trio.h"
 
 #include <cmath>
+#include <intrin.h>
 #include <cstring>
 
 #define WIN32_LEAN_AND_MEAN
@@ -399,6 +400,70 @@ bool PatchProjectileOwnerCall() {
 	return true;
 }
 
+// Trigger zones. CKSrvDetection (yellow pages +0x54) tests zones against the
+// nodes of specific heroes (detected objects at +0x18: Obelix's node and
+// Asterix's) and flags an event with FUN_00460C20 when one is entered. In single
+// player the non-leader is an AI that stays at the leader's side, so a zone
+// tied to it effectively fires where the leader goes. With player 2 driving
+// Obelix on his own he set off the spinning platform's blue circle -- "switch
+// to Obelix, Asterix waits here" -- with Asterix elsewhere. Events from zones
+// that only the non-leading, player-driven hero satisfies are dropped; zones
+// for a hero the game has borrowed (lifter markers...) fire as usual.
+typedef void(__fastcall* FlagEventFn)(void* self, void* edx, unsigned eventId);
+const uintptr_t kFlagEvent = 0x460C20;
+const uint8_t   kFlagEventPrologue[7] = { 0x8B, 0xD1, 0x66, 0x8B, 0x4C, 0x24, 0x04 };
+const uintptr_t kDetectTickBegin = 0x46BE90, kDetectTickEnd = 0x46C0CE;   // CKSrvDetection::vf17
+FlagEventFn g_origFlagEvent = nullptr;
+volatile long g_droppedZones = 0;
+
+// Which hero nodes (bit 0 Asterix, bit 1 Obelix...) have a zone test firing `ev`.
+unsigned ZoneHeroes(char* det, unsigned ev, Trio t) {
+	char** nodes = *(char***)(det + 0x18);
+	unsigned nNodes = *(uint16_t*)(det + 0x28), mask = 0;
+	auto heroOfNode = [&](unsigned idx) -> int {
+		if (!nodes || idx >= nNodes) return -1;
+		for (int h = 0; h < HERO_COUNT; h++) {
+			Hero hero = t.GetHero(h);
+			if (hero && (char*)hero.hook->node == nodes[idx]) return h;
+		}
+		return -1;
+	};
+	struct List { int base, count, objOff, evOff; } lists[3] = {
+		{ 0x2C, 0x30, 2, 6 }, { 0x34, 0x38, 2, 6 }, { 0x3C, 0x40, 2, 6 } };
+	for (const List& l : lists) {
+		char* e = *(char**)(det + l.base);
+		unsigned n = *(uint16_t*)(det + l.count);
+		for (unsigned i = 0; e && i < n; i++, e += 8) {
+			if (*(uint16_t*)(e + l.evOff) != (uint16_t)ev) continue;
+			int h = heroOfNode(*(uint16_t*)(e + l.objOff));
+			mask |= h >= 0 ? (1u << h) : 0x80000000u;   // not a hero: never drop
+		}
+	}
+	return mask;
+}
+
+void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
+	uintptr_t from = (uintptr_t)_ReturnAddress();
+	Trio t = GetTrio();
+	if (t && CoopP2Joined() && from >= kDetectTickBegin && from < kDetectTickEnd) {
+		CKYellowPages* yp = YellowPages();
+		char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+		int lead = t.Leader();
+		int other = lead == CoopP1Hero() ? CoopP2Hero() : CoopP1Hero();
+		if (det && *(uintptr_t*)det == 0x62504C && other >= 0 && !CoopHeroHeld(other)) {
+			unsigned mask = ZoneHeroes(det, eventId & 0xFFFF, t);
+			if (mask == (1u << other)) {
+				InterlockedIncrement(&g_droppedZones);
+				Log("proximity: zone event %04X set off by %s (not leading) -- dropped", eventId & 0xFFFF,
+					HeroName(other));
+				return;
+			}
+			Log("proximity: zone event %04X (heroes %08X)", eventId & 0xFFFF, mask);
+		}
+	}
+	g_origFlagEvent(self, edx, eventId);
+}
+
 } // namespace
 
 long ProximityP2Contacts() { return g_p2Contacts; }
@@ -420,5 +485,7 @@ bool ProximityInstallHooks() {
 	                    (void*)ProjectileContactDispatch, "projectile hits, targets (0x301)");
 	ok &= PatchProjectileOwnerCall();
 	ok &= PatchBeaconCheck();
+	ok &= InstallDetour(kFlagEvent, (void*)FlagEventHook, (void**)&g_origFlagEvent, kFlagEventPrologue,
+	                    sizeof(kFlagEventPrologue), "event flag (zones)");
 	return ok;
 }
