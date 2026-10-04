@@ -14,6 +14,7 @@
 //    (only its leader in a player state), then player control is re-applied.
 
 #include "coop.h"
+#include "klusters.h"
 #include "autotest.h"
 #include "config.h"
 #include "inputmgr.h"
@@ -52,6 +53,7 @@ struct CoopState {
 	uint8_t  savedLeader = 0, savedCompanion = 0;
 
 	bool    suspended = false;
+	int     cutsceneHold = 0;    // frames left before a cutscene counts as over
 	int     lastLevel = -2;
 	DWORD   lastFpsTick = 0;
 	uint32_t frames = 0;
@@ -66,6 +68,7 @@ struct CoopState {
 } g;
 
 const int kJoinSettleFrames = 5;
+const int kCutsceneHoldFrames = 15;   // ~0.25 s
 
 // Hero situation-machine state (hero+0x3E9) of group actions: FUN_0049C030, which
 // sends the companion and Idefix to markers and waits for them (lifters).
@@ -105,16 +108,35 @@ uint8_t Situation(Hero h) { return h ? *(uint8_t*)(h.raw() + 0x3E9) : 0xFF; }
 // +0x10 (count +0x14), and bit 0 of a scene's +0x20 flags means it is running
 // (CKSrvCinematic::vf17 only updates those). Player 1 cannot move then, so
 // player 2's hero goes back to the game until it ends.
-bool CinematicPlaying() {
+// Cutscenes. CKSrvCinematic (yellow pages +0x80) recomputes its letterbox bars
+// every tick: hidden first (FUN_0046AE20), shown again (FUN_0046ADE0, +0xC bit 0)
+// if a playing scene wants them (scene +0x30 bit 0). The per-scene "playing" bit
+// is no use on its own: ambient scenes play all along (level 4 scene 0). Seen on
+// level 2's scene 1: bars on, game manager +0x5C bit 20 on (the HUD hides itself
+// on it), the camera service's camera a plain CKCamera, and no hero Life ticks at
+// all until it ends. Only the bars decide; the rest is logged when it changes.
+bool CutsceneBars() {
 	CKYellowPages* yp = YellowPages();
 	char* srv = yp ? *(char**)((char*)yp + 0x80) : nullptr;
-	if (!srv || *(uintptr_t*)srv != 0x624F90) return false;
-	char** scenes = *(char***)(srv + 0x10);
-	unsigned n = *(unsigned*)(srv + 0x14);
-	if (!scenes || n > 4096) return false;
-	for (unsigned i = 0; i < n; i++)
-		if (scenes[i] && (*(uint8_t*)(scenes[i] + 0x20) & 1)) return true;
-	return false;
+	return srv && *(uintptr_t*)srv == 0x624F90 && (*(uint8_t*)(srv + 0xC) & 1) != 0;
+}
+
+void LogCutsceneSignals() {
+	CKYellowPages* yp = YellowPages();
+	if (!yp) return;
+	char* gm = (char*)yp->gameManager;
+	char* cam = *(char**)((char*)yp + 0x68);
+	char* track = cam ? *(char**)(cam + 0x38) : nullptr;
+	uint32_t hud = gm ? (*(uint32_t*)(gm + 0x5C) & 0x100000) : 0;
+	uintptr_t camVt = track ? *(uintptr_t*)track : 0;
+	static uint32_t lastHud = 0;
+	static uintptr_t lastCamVt = 0;
+	if (hud != lastHud || camVt != lastCamVt) {
+		Log("coop: cutscene signals: bars=%d gm5C.20=%d camera vt %08X", CutsceneBars(), hud != 0,
+			(unsigned)camVt);
+		lastHud = hud;
+		lastCamVt = camVt;
+	}
 }
 
 // A hero a player drives has no AI state: when the game moves a hero from its AI
@@ -148,6 +170,7 @@ bool CoopAllowedNow(Trio t, const char** why) {
 	if (!a || !o) { *why = "hero missing"; return false; }
 	if (!HeroModePlayable(a.Flags18()) || !HeroModePlayable(o.Flags18())) { *why = "scripted mode"; return false; }
 	if (a.Busy() || o.Busy()) { *why = "hero busy"; return false; }
+	if (CutsceneBars() || g.cutsceneHold > 0) { *why = "cutscene"; return false; }
 	return true;
 }
 
@@ -290,7 +313,7 @@ void ProbeLine() {
 		char* cin = *(char**)((char*)yp + 0x80);
 		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
 		unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
-		line.Add("| cin:");
+		line.Add("| bars=%d cin:", cin ? (*(uint8_t*)(cin + 0xC) & 1) : -1);
 		for (unsigned i = 0, shown = 0; scenes && i < n && i < 64 && shown < 8; i++) {
 			unsigned f20 = *(unsigned short*)(scenes[i] + 0x20), f30 = *(uint8_t*)(scenes[i] + 0x30);
 			if ((f20 & 0x8001) || f30) { line.Add(" %u:%04X/%02X", i, f20, f30); shown++; }
@@ -379,8 +402,10 @@ void CoopFrame() {
 		Release("that pad also drives player 1 -- player 2 has to use the other controller");
 		return;
 	}
-	if (p.pressed & PAD_START) { Release("pressed Start"); return; }
-	if (p.buttons & PAD_BACK) {
+	// Start and Back are left alone during a cutscene: Start may be what skips it.
+	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars();
+	if (!inCutscene && (p.pressed & PAD_START)) { Release("pressed Start"); return; }
+	if (!inCutscene && (p.buttons & PAD_BACK)) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
 		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs) { Release("held Back"); return; }
 	} else {
@@ -399,10 +424,12 @@ void CoopFrame() {
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
 	// companion" to a marker and waits for it, which only an AI companion does.
 	bool groupAction = Situation(h1) == kSituationGroupAction;
-	// (Cutscenes: CKSrvCinematic scene bit 0 turned out to stay set during normal
-	// play -- e.g. level 4 scene 0 once the player first moves -- so it is not
-	// used. The real cutscene signal is still to be identified with the marker.)
-	bool cinematic = false;
+	// Cutscenes: the letterbox bars, held a few frames after they go so a scene
+	// handing over to the next one does not flicker co-op on and off.
+	LogCutsceneSignals();
+	if (CutsceneBars()) g.cutsceneHold = kCutsceneHoldFrames;
+	else if (g.cutsceneHold > 0) g.cutsceneHold--;
+	bool cinematic = g.cutsceneHold > 0;
 	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
 	                h1.Busy() || h2.Busy() || groupAction || cinematic;
 	if (scripted != g.suspended) {
@@ -433,6 +460,7 @@ void CoopFrame() {
 		EnforcePlayer(t, g.p1Hero);
 	}
 	P2CamFrame();
+	KlusterSetP2Camera();
 }
 
 // ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -48,6 +48,12 @@ struct Step {
 // Puts hero `hero` 1.3 units from the nearest visible Roman (CKHkBasicEnemy),
 // facing it.
 #define NEAR_ENEMY(t, hero)         { t, S_ENEMY, hero, 0, 0, 0, 0, "near enemy" }
+// Cutscenes (CKSrvCinematic, yellow pages +0x80): CINE_LIST logs every scene's
+// flags; CINE_START starts the first idle scene with letterbox bars (scene +0x30
+// bit 0) through the service's own event 0x500 + index.
+#define CINE_LIST(t)                { t, S_CINE, -1, 0, 0, 0, 0, "cine list" }
+#define CINE_START(t)               { t, S_CINE, -2, 0, 0, 0, 0, "cine start" }
+#define CINE_STOP(t)                { t, S_CINE, -3, 0, 0, 0, 0, "cine stop" }
 // Turn the cutscene probe (extra state every log tick) on or off.
 #define PROBE(t, on)                { t, S_PROBE, on, 0, 0, 0, 0, "probe" }
 // Right stick of virtual pad `slot` (camera look).
@@ -424,6 +430,21 @@ const Step kGrab[] = {
 	END(11500),
 };
 
+// cutscene (level 2): player 2 joins, a cutscene with bars is started, both
+// players push their sticks the whole time. Co-op should suspend for it (player
+// 2's hero back to the AI) and resume after.
+const Step kCutscene[] = {
+	MARK(0, "baseline"), CINE_LIST(0),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	P1(1000, 0, 0, 1, "p1 up (held)"), VPAD(1000, 1, 0, 0, 1, "p2 up (held)"),
+	PROBE(1400, 1), CINE_START(1500),
+	SHOT(2500, "cutscene_00"), SHOT(5000, "cutscene_01"),
+	CINE_STOP(6000), SHOT(7500, "cutscene_02"),
+	PROBE(9000, 0),
+	VPAD(9500, 1, 0, 1, 0, "p2 right (held)"), SHOT(11000, "cutscene_03"),
+	END(12000),
+};
+
 // survey: log which group-action objects the level has, then leave.
 const Step kSurvey[] = {
 	MARK(0, "survey"), SHOT(100, "survey"), END(300),
@@ -524,6 +545,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("bumper", kBumper),
 	SCENARIO("crate", kCrate),
 	SCENARIO("grab", kGrab),
+	SCENARIO("cutscene", kCutscene),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("p2mirror", kP2Mirror),
@@ -548,6 +570,7 @@ struct AutotestState {
 	char*   watchBonus = nullptr;   // CKHkBasicBonus hook being watched
 	char*   watchCrate = nullptr;   // CKHkCrate chosen by NEAR_CRATE
 	char*   watchEnemy = nullptr;   // CKHkBasicEnemy chosen by NEAR_ENEMY
+	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
 } at;
 
@@ -621,7 +644,8 @@ void LogTick(float t) {
 			char* gm = (char*)yp->gameManager;
 			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
 			char* inp = *(char**)((char*)yp + 0x14);
-			line.Add(" | cin:");
+			line.Add(" | bars=%d gm160=%08X cin:", cin ? (*(uint8_t*)(cin + 0xC) & 1) : -1,
+				gm ? *(unsigned*)(gm + 0x160) : 0);
 			char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
 			unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
 			int shown = 0;
@@ -954,6 +978,37 @@ void RunStep(const Step& s) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
 			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
 		}
+		break;
+	}
+	case S_CINE: {
+		CKYellowPages* yp = YellowPages();
+		char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+		unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
+		if (!scenes) { Log("autotest: no cinematic service"); break; }
+		if (s.a == -1) {
+			Log("autotest: %u cinematic scenes, service flags %08X", n, *(uint32_t*)(cin + 0xC));
+			for (unsigned i = 0; i < n && i < 128; i++)
+				Log("autotest:   scene %u %p: f20=%04X f30=%02X", i, scenes[i],
+					*(uint16_t*)(scenes[i] + 0x20), *(uint8_t*)(scenes[i] + 0x30));
+			break;
+		}
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		if (s.a == -3) {
+			if (at.cineScene < 0) break;
+			Log("autotest: stopping scene %d", at.cineScene);
+			((SendEventFn)(*(void***)cin)[5])(cin, nullptr, 0x500 + (int)n + at.cineScene, nullptr);
+			at.cineScene = -1;
+			break;
+		}
+		int pick = -1;
+		for (unsigned i = 0; i < n && pick < 0; i++)
+			if ((*(uint8_t*)(scenes[i] + 0x30) & 1) && !(*(uint16_t*)(scenes[i] + 0x20) & 1)) pick = (int)i;
+		if (pick < 0) { Log("autotest: no idle scene with bars"); break; }
+		Log("autotest: starting scene %d (f20=%04X f30=%02X)", pick, *(uint16_t*)(scenes[pick] + 0x20),
+			*(uint8_t*)(scenes[pick] + 0x30));
+		((SendEventFn)(*(void***)cin)[5])(cin, nullptr, 0x500 + pick, nullptr);
+		at.cineScene = pick;
 		break;
 	}
 	case S_PROBE:

@@ -33,7 +33,8 @@ int __fastcall TracedSendEvent(void* self, void* edx, int event, void* param) {
 	const Traced* t = nullptr;
 	for (const Traced& c : g_traced) if (c.vtbl == vt) { t = &c; break; }
 	if (!t) return 0;   // cannot happen: only these vtables point here
-	if (CoopP2Joined() && InterlockedIncrement(&g_traceLines) < 4000) {
+	// 0x906 is the crates' per-frame "where are you" query: noise.
+	if (CoopP2Joined() && event != 0x906 && InterlockedIncrement(&g_traceLines) < 4000) {
 		Trio tr = GetTrio();
 		Log("trace: %s %p event %04X param %p leader=%s from %p", t->name, self, event, param,
 			tr ? HeroName(tr.Leader()) : "?", _ReturnAddress());

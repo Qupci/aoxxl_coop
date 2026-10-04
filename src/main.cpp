@@ -7,6 +7,7 @@
 #include "kal.h"
 #include <cstdlib>
 #include "coop.h"
+#include "klusters.h"
 #include "config.h"
 #include "log.h"
 #include "vtprofile.h"
@@ -111,6 +112,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	SplitInstallHooks();
 	ProximityInstallHooks();
 	TraceInstallHooks();
+	KlusterInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");
