@@ -9,6 +9,7 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)][string]$Scenario,
     [int]$TimeoutSec = 150,
+    [int]$Level = -1,
     [switch]$NoDeploy
 )
 $ErrorActionPreference = "Stop"
@@ -21,10 +22,12 @@ if (-not $NoDeploy) { Copy-Item (Join-Path $coop "build\xxl_coop.asi") $game -Fo
 if (Test-Path $shots) { Remove-Item (Join-Path $shots "*") -Force -ErrorAction SilentlyContinue }
 
 $env:XXL_AUTOTEST = $Scenario
+if ($Level -ge 0) { $env:XXL_LEVEL = "$Level" }
 try {
     $p = Start-Process -FilePath (Join-Path $game "axxl.exe") -WorkingDirectory $game -PassThru
 } finally {
     Remove-Item Env:XXL_AUTOTEST -ErrorAction SilentlyContinue
+    Remove-Item Env:XXL_LEVEL -ErrorAction SilentlyContinue
 }
 
 if ($p.WaitForExit($TimeoutSec * 1000)) {
@@ -34,7 +37,8 @@ if ($p.WaitForExit($TimeoutSec * 1000)) {
     $status = "TIMEOUT after $TimeoutSec s (killed)"
 }
 
-$dest = Join-Path $coop ("testruns\" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + $Scenario)
+$tag = if ($Level -ge 0) { "$Scenario-L$Level" } else { $Scenario }
+$dest = Join-Path $coop ("testruns\" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + $tag)
 New-Item -ItemType Directory -Force $dest | Out-Null
 Copy-Item (Join-Path $game "xxl_coop.log") $dest
 if (Test-Path $shots) { Copy-Item (Join-Path $shots "*") $dest -ErrorAction SilentlyContinue }

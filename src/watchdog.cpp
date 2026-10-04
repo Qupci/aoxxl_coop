@@ -4,6 +4,7 @@
 
 #include "coop.h"
 #include "config.h"
+#include "crash.h"
 #include "inputmgr.h"
 #include "life.h"
 #include "log.h"
@@ -30,6 +31,8 @@ DWORD WINAPI WatchdogThread(LPVOID) {
 
 	for (;;) {
 		Sleep(2000);
+
+		StallCheck(g_hookCounters.inputUpdates);
 
 		bool ok = Guarded([&] {
 			CKYellowPages* yp = YellowPages();

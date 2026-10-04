@@ -45,6 +45,11 @@ struct CoopState {
 	uint8_t* savedValues = nullptr;   // CKInput's own array while player 2's is in
 	bool     swapped = false;
 
+	// The trio's leader/companion bytes while player 2's hero is ticking (see
+	// CoopBeforeLifeTick): saved values, and the values we put there.
+	bool     sliced = false;
+	uint8_t  savedLeader = 0, savedCompanion = 0;
+
 	bool    suspended = false;
 	int     lastLevel = -2;
 	DWORD   lastFpsTick = 0;
@@ -60,6 +65,10 @@ struct CoopState {
 } g;
 
 const int kJoinSettleFrames = 5;
+
+// Hero situation-machine state (hero+0x3E9) of group actions: FUN_0049C030, which
+// sends the companion and Idefix to markers and waits for them (lifters).
+const uint8_t kSituationGroupAction = 0x0D;
 
 const char* ModeName(uint8_t mode) {
 	switch (mode) {
@@ -87,6 +96,32 @@ bool EnforcePlayer(Trio t, int idx) {
 	InterlockedIncrement(&g_hookCounters.enforced);
 	LogV("coop: %s -> player (f18 %02X -> %02X)", HeroName(idx), f, *F18(h));
 	return true;
+}
+
+uint8_t Situation(Hero h) { return h ? *(uint8_t*)(h.raw() + 0x3E9) : 0xFF; }
+
+// A hero a player drives has no AI state: when the game moves a hero from its AI
+// Life state to a player one, it runs the current AI state's exit handler and
+// sets hero+0x561 to 0xFF (CKHkObelixLife::State1_Ai, mode 2). Group actions break
+// that in co-op: at its 17 s timeout the lifter handler (FUN_0049C030) forces "the
+// companion" into AI state 3 ("wait") -- which can be a player-driven hero, whose
+// AI machine never ticks, so the 3 stays. The next lifter then sees a companion
+// "already waiting", empties its marker slot, and dereferences it (the crash at
+// axxl.exe+0x9C228). Clearing the leftover the same way the game does keeps the
+// invariant the lifter code relies on.
+void ClearStaleAiState(int idx, Hero h) {
+	uint8_t st = *(uint8_t*)(h.raw() + 0x561);
+	if (st == 0xFF) return;
+	// Only once the hero's Life already runs a player state: on the tick that
+	// switches it over, the Life's own AI-state exit does this job.
+	uint8_t life = LifeLastState(idx);
+	if (life == 0xFF || (life & 1)) return;
+	typedef char(__fastcall* StateFn)(void* self, void* edx, int mode, int other);
+	void*    owner = *(void**)(h.raw() + 0x558);
+	StateFn* table = *(StateFn**)(h.raw() + 0x55C);
+	if (owner && table) table[st](owner, nullptr, 2, 0xFF);
+	*(uint8_t*)(h.raw() + 0x561) = 0xFF;
+	Log("coop: cleared leftover AI state %u on player-driven %s", st, HeroName(idx));
 }
 
 bool CoopAllowedNow(Trio t, const char** why) {
@@ -276,9 +311,12 @@ void CoopFrame() {
 		return;
 	}
 
-	// Scripted modes belong to the game.
+	// Scripted modes belong to the game. So does a group action player 1 starts
+	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
+	// companion" to a marker and waits for it, which only an AI companion does.
+	bool groupAction = Situation(h1) == kSituationGroupAction;
 	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
-	                h1.Busy() || h2.Busy();
+	                h1.Busy() || h2.Busy() || groupAction;
 	if (scripted != g.suspended) {
 		g.suspended = scripted;
 		Log("coop: %s (%s %s / %s %s)", scripted ? "suspended for a scripted mode" : "resumed",
@@ -313,7 +351,11 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	// The Life reads the control bits first thing in its tick, so this is the
 	// moment they have to be right.
 	Trio t = GetTrio();
-	if (t) EnforcePlayer(t, heroIndex);
+	if (!t) return;
+	EnforcePlayer(t, heroIndex);
+	if (Situation(t.GetHero(g.p1Hero)) != kSituationGroupAction &&
+	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
+		ClearStaleAiState(heroIndex, hero);
 
 	if (heroIndex != g.p2Hero || !g.p2ValuesReady) return;
 	InputManager im = GetInputManager();
@@ -323,10 +365,39 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	*values = g.p2Values;
 	g.swapped = true;
 	InterlockedIncrement(&g_hookCounters.p2Routed);
+
+	// Player-side hero code assumes the hero running it is the trio's leader:
+	// it asks the trio for "the companion" (trio+0x2D, or vtable +0x98) and means
+	// the *other* hero. Run as the companion, it gets itself back -- the lifter
+	// handler FUN_0049C030 then dereferences its own empty marker slot and
+	// crashes (axxl.exe+0x9C228). So for the length of player 2's tick, the trio
+	// says what that code expects: player 2's hero leads, player 1's follows.
+	uint8_t* trio = (uint8_t*)t.raw();
+	g.savedLeader    = trio[0x2C];
+	g.savedCompanion = trio[0x2D];
+	trio[0x2C] = (uint8_t)g.p2Hero;
+	trio[0x2D] = (uint8_t)g.p1Hero;
+	g.sliced = true;
 }
 
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
+	if (g.sliced) {
+		g.sliced = false;
+		Trio t = GetTrio();
+		if (t) {
+			uint8_t* trio = (uint8_t*)t.raw();
+			if (trio[0x2C] == (uint8_t)g.p2Hero && trio[0x2D] == (uint8_t)g.p1Hero) {
+				trio[0x2C] = g.savedLeader;
+				trio[0x2D] = g.savedCompanion;
+			} else {
+				// A switch event ran during the tick and picked a new leader on
+				// purpose; that is the game's decision now.
+				Log("coop: the game changed the trio's leader during %s's tick (now %s)",
+					HeroName(g.p2Hero), HeroName(trio[0x2C]));
+			}
+		}
+	}
 	if (!g.swapped) return;
 	InputManager im = GetInputManager();
 	if (im) *(uint8_t**)(im.raw() + 0x1C) = g.savedValues;

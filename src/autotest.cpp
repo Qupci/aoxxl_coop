@@ -13,7 +13,7 @@
 
 namespace {
 
-enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_END };
+enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_TELEPORT, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -31,6 +31,8 @@ struct Step {
 #define P1(t, btn, x, y, n)         { t, S_P1,    0, 0, btn, x, y, n }
 #define VPAD(t, slot, btn, x, y, n) { t, S_VPAD,  slot, 0, btn, x, y, n }
 #define END(t)                      { t, S_END,   0, 0, 0, 0, 0, "end" }
+// Puts hero `hero` next to lifter `lifter` (offset dx/dz, 1.5 units up).
+#define TELEPORT(t, hero, lifter, dx, dz) { t, S_TELEPORT, hero, lifter, 0, dx, dz, "teleport" }
 
 // exp1: does a hero held in the player control state answer input? Player 1's
 // synthetic input goes to the shared action array, so if the theory holds both
@@ -108,6 +110,33 @@ const Step kP2Mirror[] = {
 	P1(7000, PAD_A, 0, 0, "p1 A"), VPAD(7000, 2, PAD_START, 0, 0, "pad2 start with p1 A"),
 	P1(7200, 0, 0, 0, "p1 release"), VPAD(7200, 2, 0, 0, 0, "pad2 release"),
 	END(8000),
+};
+
+// lifter (level 2): player 2 joins, Asterix is put on the level's lifter, and
+// player 1 tries the buttons that could activate it. Watches situation 13 (the
+// group action that crashed at axxl.exe+0x9C228), co-op suspension, and that
+// Obelix walks to his marker on AI and comes back to player 2 afterwards.
+const Step kLifter[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	TELEPORT(1500, HERO_ASTERIX, 0, 0, 0),
+	TELEPORT(1500, HERO_OBELIX, 0, 6, 0),
+	TELEPORT(1500, HERO_IDEFIX, 0, -6, 0),
+	SHOT(2500, "lifter_00_on"),
+	P1(3000, PAD_B, 0, 0, "p1 B"), P1(3200, 0, 0, 0, "p1 release"),
+	P1(4500, PAD_Y, 0, 0, "p1 Y"), P1(4700, 0, 0, 0, "p1 release"),
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(9000, "lifter_01"),
+	SHOT(16000, "lifter_02"),
+	SHOT(26000, "lifter_03"),
+	VPAD(27000, 1, 0, 1, 0, "p2 right"), VPAD(28500, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(29000, "lifter_04_end"),
+	END(29500),
+};
+
+// survey: log which group-action objects the level has, then leave.
+const Step kSurvey[] = {
+	MARK(0, "survey"), SHOT(100, "survey"), END(300),
 };
 
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
@@ -194,6 +223,8 @@ struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
+	SCENARIO("survey", kSurvey),
+	SCENARIO("lifter", kLifter),
 	SCENARIO("exp1", kExp1),
 	SCENARIO("p2basic", kP2Basic),
 	SCENARIO("p2mirror", kP2Mirror),
@@ -241,9 +272,11 @@ void SubclassWindow() {
 
 void Shot(const char* name) {
 	if (!at.hwnd) return;
-	CreateDirectoryA("shots", nullptr);
-	char path[MAX_PATH];
-	_snprintf_s(path, sizeof(path), _TRUNCATE, "shots\\%s.png", name);
+	char dir[MAX_PATH], file[MAX_PATH], path[MAX_PATH];
+	GameDirPath(dir, sizeof(dir), "shots");
+	CreateDirectoryA(dir, nullptr);
+	_snprintf_s(file, sizeof(file), _TRUNCATE, "shots\\%s.png", name);
+	GameDirPath(path, sizeof(path), file);
 	CaptureWindowPng(at.hwnd, path, 2);
 }
 
@@ -279,10 +312,26 @@ void LogTick(float t) {
 
 void RunStep(const Step& s) {
 	switch (s.kind) {
-	case S_MARK:
+	case S_MARK: {
 		Log("autotest: --- %s ---", s.name);
 		CoopLogState(s.name);
+		struct { int grp, id; const char* name; } kinds[] = {
+			{ 2, 47, "CKHkLifter" }, { 2, 44, "CKHkCorkscrew" }, { 2, 190, "CKHkTrioCatapult" },
+			{ 2, 39, "CKHkBoat" }, { 2, 147, "CKHkPushPullAsterix" }, { 2, 193, "checkpoint" },
+		};
+		char buf[256];
+		LineBuf line(buf);
+		line.Add("autotest: level objects:");
+		for (auto& k : kinds) line.Add(" %s=%u", k.name, GetNumLvlClassInstances(k.grp, k.id));
+		Log("%s", line.c_str());
+		for (unsigned i = 0; i < GetNumLvlClassInstances(2, 47) && i < 8; i++) {
+			KHook* lifter = (KHook*)GetLvlObject(2, 47, i);
+			if (!lifter || !lifter->node || !lifter->node->matrix) continue;
+			float* m = (float*)((char*)lifter->node->matrix + 0x40);   // RW matrix position
+			Log("autotest:   lifter %u at (%.2f %.2f %.2f)", i, m[0], m[1], m[2]);
+		}
 		break;
+	}
 	case S_SHOT:
 		Shot(s.name);
 		break;
@@ -316,6 +365,25 @@ void RunStep(const Step& s) {
 		PadsSetVirtual(s.a, &at.vpad[s.a]);
 		CoopLogState(s.name);
 		break;
+	case S_TELEPORT: {
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		KHook* lifter = (KHook*)GetLvlObject(2, 47, (unsigned)s.b);
+		if (!h || !lifter || !lifter->node || !lifter->node->matrix) {
+			Log("autotest: teleport %s: no hero or lifter %d", HeroName(s.a), s.b);
+			break;
+		}
+		float* lp = (float*)((char*)lifter->node->matrix + 0x40);
+		Vector3 to(lp[0] + s.x, lp[1] + 1.5f, lp[2] + s.y);
+		h.Pos() = to;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		}
+		Log("autotest: teleported %s to lifter %d (%.2f %.2f %.2f)", HeroName(s.a), s.b,
+			to.x, to.y, to.z);
+		break;
+	}
 	case S_END:
 		Finish("timeline complete");
 		break;

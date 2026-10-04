@@ -1,9 +1,14 @@
 #pragma once
+#include <cstddef>
 
 // Writes to xxl_coop.log next to the game executable. The game is a 2004 title
 // with no console, so a file is the only way to see what the mod is doing.
 void LogOpen();
 void LogClose();
+
+// Full path of `file` in the game's own folder (next to axxl.exe), whatever the
+// working directory the game was started with.
+void GameDirPath(char* out, size_t n, const char* file);
 void Log(const char* fmt, ...);
 
 // Same, but only emitted when [debug] verbose is on.

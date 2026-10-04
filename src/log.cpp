@@ -13,14 +13,38 @@ static CRITICAL_SECTION g_logLock;
 static bool             g_lockReady = false;
 static DWORD            g_logStart = 0;
 
+void GameDirPath(char* out, size_t n, const char* file) {
+	char dir[MAX_PATH] = {};
+	GetModuleFileNameA(nullptr, dir, MAX_PATH);
+	char* slash = strrchr(dir, '\\');
+	if (slash) slash[1] = '\0';
+	_snprintf_s(out, n, _TRUNCATE, "%s%s", dir, file);
+}
+
 void LogOpen() {
 	if (g_log) return;
 	if (!g_lockReady) { InitializeCriticalSection(&g_logLock); g_lockReady = true; }
+
+	// The log lives next to axxl.exe, not in whatever directory the game was
+	// started from, and the previous two runs are kept: a crash is only ever
+	// reported after the game has been started again.
+	char cur[MAX_PATH], prev1[MAX_PATH], prev2[MAX_PATH];
+	GameDirPath(cur, sizeof(cur), "xxl_coop.log");
+	GameDirPath(prev1, sizeof(prev1), "xxl_coop.1.log");
+	GameDirPath(prev2, sizeof(prev2), "xxl_coop.2.log");
+	DeleteFileA(prev2);
+	MoveFileA(prev1, prev2);
+	MoveFileA(cur, prev1);   // fails harmlessly if another running copy holds it
+
 	// Deny other writers: a second copy of the game (the exe exits on its own
 	// once it finds the first window, but the ASI loads before that) must not
 	// truncate the log of the one that is actually running.
-	g_log = _fsopen("xxl_coop.log", "w", _SH_DENYWR);
-	if (!g_log) g_log = _fsopen("xxl_coop_2.log", "w", _SH_DENYWR);
+	g_log = _fsopen(cur, "w", _SH_DENYWR);
+	if (!g_log) {
+		char alt[MAX_PATH];
+		GameDirPath(alt, sizeof(alt), "xxl_coop_second_instance.log");
+		g_log = _fsopen(alt, "w", _SH_DENYWR);
+	}
 	g_logStart = GetTickCount();
 	if (g_log) {
 		SYSTEMTIME st;

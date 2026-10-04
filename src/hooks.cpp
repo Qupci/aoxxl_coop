@@ -16,6 +16,7 @@
 #include "coop.h"
 #include "autotest.h"
 #include "config.h"
+#include "crash.h"
 #include "life.h"
 #include "log.h"
 
@@ -38,6 +39,7 @@ SendEventFn   g_origTrioSendEvent = nullptr;
 void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	g_origInputUpdate(self, edx, timeInfo);   // let the action array refresh first
 	InterlockedIncrement(&g_hookCounters.inputUpdates);
+	StallRegisterGameThread();
 	AutotestFrame();
 	CoopFrame();
 }

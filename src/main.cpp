@@ -5,12 +5,14 @@
 // QoL patch (d3d9.dll) and the XXL Inspector instead of fighting over a slot.
 
 #include "kal.h"
+#include <cstdlib>
 #include "coop.h"
 #include "config.h"
 #include "log.h"
 #include "vtprofile.h"
 #include "render.h"
 #include "autotest.h"
+#include "crash.h"
 
 namespace {
 
@@ -118,7 +120,16 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID) {
 	if (reason == DLL_PROCESS_ATTACH) {
 		DisableThreadLibraryCalls(hinst);
 		LogOpen();
-		g_config.Load("xxl_coop.ini");
+		char ini[MAX_PATH];
+		GameDirPath(ini, sizeof(ini), "xxl_coop.ini");
+		g_config.Load(ini);
+		CrashHandlerInstall();
+		// Test runs may pick the level: XXL_LEVEL overrides force_level.
+		char lvl[16] = {};
+		if (GetEnvironmentVariableA("XXL_LEVEL", lvl, sizeof(lvl)) && lvl[0]) {
+			g_config.forceLevel = atoi(lvl);
+			Log("config: force_level %d from XXL_LEVEL", g_config.forceLevel);
+		}
 		AutotestInit();
 		if (!g_config.enabled) {
 			Log("startup: disabled in xxl_coop.ini");
