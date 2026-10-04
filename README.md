@@ -17,8 +17,13 @@ of the way of the QoL patch (`d3d9.dll`) and the XXL Inspector, both of which wa
 | Player 2 drives the other hero (move, jump, attack, grab, dash, swim) | **working**, verified with two real pads |
 | Join / leave: Start on the controller the game is not using; Start again or hold Back | **working**; player 1's pad is detected automatically |
 | Players keep their heroes through blue circles / scripted switches | implemented |
-| Scripted sections (rides, belly slide, cinematics, lifters started by P1) | co-op pauses, game handles them, resumes after |
-| Split-screen (stacked or side by side), shared HUD | **working in automated tests**, awaiting a real two-pad session |
+| Scripted sections (rides, belly slide, lifters started by P1) | co-op pauses, game handles them, resumes after |
+| Cutscenes (letterbox bars) | co-op pauses (P2's hero to the AI, one screen), resumes after — automated test |
+| Split-screen (stacked or side by side), shared HUD, P2's own camera (right stick) | **working**, verified with two real pads |
+| P2's hero in the world: Romans attack him, dropped helmets come to him | **working**, verified with two real pads |
+| P2: springs, iron crates, grabbing/spinning Romans, helmets placed in the air | fixed, verified by automated tests; awaiting a real two-pad session |
+| Crates / placed helmets around P2 when P1's camera looks away | fixed (both cameras' frustums), awaiting a real two-pad session |
+| Swing (push/pull) for P2's Obelix | untested |
 | Crash at axxl.exe+0x9C228 (lifters) | fixed; crashes and stalls are now logged with their location |
 
 How it works is in `docs/RESEARCH.md` §0. Automated tests: `tools/run_test.ps1 <scenario>`

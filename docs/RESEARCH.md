@@ -73,7 +73,45 @@ the mod (`coop_diag`) exist to do exactly that.
 * Camera frame is a root RwFrame (modelling `+0x10`, LTM `+0x50`, pos at matrix `+0x30`).
 * Split-screen = `splitscreen.cpp` (see its header comment).
 
-### 0.5 Other facts
+### 0.5 World interactions for the non-leader hero (verified by autotest, Oct 2026)
+* **Collision service** `CKSrvCollision` = `yellowPages+0x50`, tick slot 17 → `FUN_00447E30`
+  (shape-pair tests) + `FUN_00447FF0` (projectiles). Tests: array `+0x1C8` (count u16 `+0x1DC`,
+  0x1C bytes: shape1, shape2, u16 receiver idx ×2, next-on-hit `+0xC`, next-on-miss `+0x10`, parent
+  `+0x14`, flags u16 `+0x18`, priority `+0x1B`); active list `+0x1BC`, inactive `+0x1C0`; receivers
+  `+0x1CC` (12 B: contact list, hook, next). A shape's owner hook is at `shape+0x20`; shape type =
+  vf17; handler table `+0x110C[type2 + type1*6]` (cdecl `(s1, s2, out)`).
+* Hits are delivered as `receiver->sendEvent(0x300, list)` (entries `{next, test}`, call site
+  `0x447FD1`) and projectile hits as `0x301` (entries `{next, u8 rec, u8 projectile, u16 target,
+  u8 sub}`, projectile shape at `srv+0x24+8*i`; call sites `0x4483C5` targets, `0x448405` owners).
+  Objects accept only the **trio leader's** contacts: `CKHkBumper::sendEvent` 0x4BB4C0 checks
+  `shape->owner == trio->vf25()` (leader hook) then uses `vf35` (leader speed) and sends `0xC0B`
+  (launch) to the trio; the iron-crate filter `0x4B0DF0` breaks only if the projectile owner is the
+  leader and `trio->vf40()` (leader is Asterix) is false. Fix: `proximity.cpp` slices the leader
+  around those three call sites when the contact is player 2's alone.
+* **Swept spheres**: `CKDynamicBoundingSphere` / `CKDynBSphereProjectile` (vt `0x622DE8`/`0x622E30`)
+  slot 14 = scene-walk visit `0x416440`: prev pos `+0x30`, motion `+0x24`, current `+0x3C` (from
+  the frame LTM). The OBB test `FUN_00440F10` sweeps along the motion; zero motion falls back to
+  a static overlap. Every node of the scene graph is visited on every walk, so split-screen's
+  three walks zeroed every sweep — only the first walk of a frame may update them.
+* **Hero yaw**: facing `+0xB4`, yaw pair `+0xCC/+0xD4` = atan2(z, x) in [0, 2π) (`FUN_0048C970`).
+* **Bonus beacons** (helmets placed in the level): `CKGrpBonusPool::vf27` spawns a pool bonus on
+  every uncollected beacon of the live klusters each frame, and attracts it to the leader if
+  within the pool radius with `bonus->vf18(hero, &beacon)` (marks the beacon collected). Patched
+  check at `0x54C6C6` adds player 2's hero.
+* **Beacon klusters**: `FUN_0046DED0(handler, flags, &outside, ref)` (thiscall on
+  `yellowPages+0x78`, ret 0x10) — walks the current sector and sector 0 (`yellowPages+0x90`,
+  `FUN_0046E240`), klusters at `sector+0x34` (center `+8`, radius `+0x14`, per-handler entry
+  `+0x1C/+0x20`); flag 1 = frustum test against camera service planes `+0x500..+0x54C` (far + 4
+  sides, outward normals; built by `FUN_00457170`), flag 2/8 = sort by Manhattan distance to
+  `ref` or camera `+0x5B0`. Crates (`CKCrateCpnt::vf13`, flags 7) and bonus beacons use it →
+  re-implemented with both players' frustums (`klusters.cpp`).
+* **Cutscenes**: `CKSrvCinematic` (`yellowPages+0x80`) shows letterbox bars when a playing scene
+  has `+0x30` bit 0; `+0xC` bit 0 = bars visible (recomputed every tick). During level 2's scene 1:
+  game manager `+0x5C` bit 20 set (HUD hides on it), camera service camera = plain `CKCamera`
+  (vt `0x6245BC`), and **no hero Life ticks**. Scene event `0x500+i` starts scene i,
+  `0x500+count+i` stops it. Ambient scenes (no bars) play all the time.
+
+### 0.6 Other facts
 * `CKSrvCamera` = `yellowPages+0x68`; dir `+0xAC`; targets `+0xE8`.
 * Level survey (levels 2–6): lifters in 2, 3, 4, 5; levels 7–8 have no co-op-ready start.
 * The game window pauses on `WM_ACTIVATEAPP` focus loss (`Game_WndProc` `0x479C10`).
