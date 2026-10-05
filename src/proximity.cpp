@@ -41,6 +41,12 @@ const uintptr_t kPressionStoneVtbl = 0x628EE4;   // CKHkPressionStone (2,21)
 // switched when Obelix stepped on it and left Asterix waiting off the platform
 // -- a softlock. It keeps to the real leader too.
 const uintptr_t kCorkscrewVtbl = 0x628E0C;       // CKHkCorkscrew (2,44)
+// The spies (CKHkClueMan, 2,161). Their tick (vf15, 0x4B8FB0) spawns the spy
+// (FUN_004B12F0, node at hook +0x10) when the trio leader comes within +0x68
+// of its spot (+0x12C/+0x130/+0x134 x/y/z) and removes it (FUN_004B1790) when
+// the leader goes out of that range. While no spy is spawned there is no node,
+// so its tick was never sliced: only the leader made it appear.
+const uintptr_t kClueManVtbl = 0x6261F4;
 
 // Bonus pools (helmets and the like). CKGrpBonusPool::vf27 updates every active
 // bonus, then attracts those within the pool's radius of the leader's position
@@ -88,6 +94,12 @@ bool LifePos(int* life, bool isGroup, Vector3* out) {
 	if (!owner) return false;
 	if (!isGroup) {
 		if (*(uintptr_t*)owner == kHudHookVtbl) return false;
+		if (*(uintptr_t*)owner == kClueManVtbl) {
+			const float* p = (const float*)(owner + 0x12C);
+			if (!std::isfinite(p[0]) || !std::isfinite(p[1]) || !std::isfinite(p[2])) return false;
+			*out = Vector3(p[0], p[1], p[2]);
+			return true;
+		}
 		return NodePos(*(void**)(owner + 0x10), out);
 	}
 	for (char* hook = *(char**)(owner + 0x20); hook; hook = *(char**)(hook + 4))
@@ -111,7 +123,12 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	float d1 = (at - pos1).len2(), d2 = (at - pos2).len2();
 	int nearest = d2 < d1 ? p2 : p1;
 	uint8_t* tr = (uint8_t*)t.raw();
-	if ((d1 > kMaxRange2 && d2 > kMaxRange2) || tr[0x2C] == nearest) {
+	float range2 = kMaxRange2;
+	if (hook && *(uintptr_t*)hook == kClueManVtbl) {
+		float r = *(const float*)(hook + 0x68);
+		if (std::isfinite(r) && r * r > range2) range2 = r * r;
+	}
+	if ((d1 > range2 && d2 > range2) || tr[0x2C] == nearest) {
 		tick(life, nullptr, dt);
 		return;
 	}

@@ -17,7 +17,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -340,7 +340,7 @@ const Step kMusicA[] = {
 	{ 3500, S_PLACE, HERO_IDEFIX, 6, 0, 0, 0, "idefix at entrance" },
 	SECTORS(4500),
 	{ 1000, S_WATCHGROUPS, 0, 0, 0, 0, 0, "watch groups" },
-	GLIDE(5000, HERO_ASTERIX, 7, 4000),
+	GLIDE(5000, HERO_ASTERIX, 8, 4000),
 	SHOT(9500, "musica"),
 	{ 9600, S_MUSICGROUPS, 0, 0, 0, 0, 0, "music groups" },
 	END(14000),
@@ -354,7 +354,7 @@ const Step kMusicO[] = {
 	VPAD(4000, 1, PAD_START, 0, 0, "p2 start"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
 	VPAD(4600, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(4800, 1, PAD_BACK | PAD_A, 0, 0, "p2 back+A (warp to Asterix)"),
 	VPAD(5000, 1, 0, 0, 0, "p2 release"),
-	GLIDE(6000, HERO_OBELIX, 7, 4000),
+	GLIDE(6000, HERO_OBELIX, 8, 4000),
 	SHOT(10500, "musico"),
 	SHOT(14000, "musico2"),
 	END(15000),
@@ -377,9 +377,48 @@ const Step kMusicA2[] = {
 	VPAD(4000, 1, PAD_START, 0, 0, "p2 start"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
 	VPAD(4600, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(4800, 1, PAD_BACK | PAD_A, 0, 0, "p2 back+A (warp to Asterix)"),
 	VPAD(5000, 1, 0, 0, 0, "p2 release"),
-	GLIDE(6000, HERO_ASTERIX, 7, 4000),
+	GLIDE(6000, HERO_ASTERIX, 8, 4000),
 	SHOT(10500, "musica2"),
 	END(15000),
+};
+
+const Step kSpyGroups[] = {
+	MARK(0, "baseline"),
+	{ 500, S_EVGROUP, 0x98, 0, 0, 0, 0, "group 098 (#152)" },
+	{ 500, S_EVGROUP, 0x9B, 0, 0, 0, 0, "group 09B (box 16)" },
+	{ 500, S_EVGROUP, 0xE1, 0, 0, 0, 0, "group 0E1 (0708, spy dialogue)" },
+	{ 500, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	END(1000),
+};
+
+// spyo / spya: walk (glide) to the spy first with player 2's Obelix, or with
+// Asterix; the spy's (CKHkClueMan) state is logged every tick.
+const Step kSpyO[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDE(1500, HERO_OBELIX, 7, 4000),
+	SHOT(6000, "spyo_1"),
+	SHOT(9000, "spyo_2"),
+	END(10000),
+};
+const Step kSpyA[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDE(1500, HERO_ASTERIX, 7, 4000),
+	SHOT(6000, "spya_1"),
+	END(10000),
+};
+
+// spy2o: player 2's Obelix goes on alone to the lifter area's spy (Asterix
+// stays at the start); the spy has to appear for him.
+const Step kSpy2O[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	// Teleported, not glided: crossing the first spy's zone starts its dialogue.
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	{ 1500, S_PLACE, HERO_OBELIX, 9, 0, 0, 0, "obelix near the lifter area's spy" },
+	SHOT(5000, "spy2o_1"),
+	END(8000),
 };
 
 const Step kRegions[] = {
@@ -938,6 +977,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("dash", kDash),
 	SCENARIO("joinlead2", kJoinLead2),
 	SCENARIO("regions", kRegions),
+	SCENARIO("spyo", kSpyO),
+	SCENARIO("spya", kSpyA),
+	SCENARIO("spy2o", kSpy2O),
+	SCENARIO("spygroups", kSpyGroups),
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
 	SCENARIO("musico", kMusicO),
@@ -962,7 +1005,9 @@ const float kSpots[][3] = {
 	{ -777.20f, 515.90f, -977.00f },    // 4: where player 2's Obelix set off the circle
 	{ -744.00f, 509.00f, -1006.00f },   // 5: the lifter's zone (sphere bound to Asterix, event 0408)
 	{ -8.00f, 45.50f, -146.00f },       // 6: sector 8's entrance (where the user's sector switched)
-	{ 16.00f, 51.50f, -124.50f },       // 7: where the music starts for the leader
+	{ -815.00f, 507.60f, -1061.00f },   // 7: past the spy's dialogue trigger (level 2 start area)
+	{ 16.00f, 51.50f, -124.50f },       // 8: where the music starts for the leader (checkpoint)
+	{ -759.40f, 508.50f, -1014.80f },   // 9: where the user's Obelix waited for the lifter area's spy
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
@@ -985,6 +1030,7 @@ struct AutotestState {
 	char*   watchBonus = nullptr;   // CKHkBasicBonus hook being watched
 	char*   watchCrate = nullptr;   // CKHkCrate chosen by NEAR_CRATE
 	char*   watchEnemy = nullptr;   // CKHkBasicEnemy chosen by NEAR_ENEMY
+	char*   watchClue = nullptr;    // CKHkClueMan (the spy), WATCHCLUE
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
 	struct Glide { bool on; Vector3 from, to; DWORD start, ms; } glide[HERO_COUNT] = {};
@@ -1117,6 +1163,29 @@ void LogTick(float t) {
 		line.Add(" | bonus hidden=%d following=%d target=%p", node ? (*(uint8_t*)(node + 0x10) & 2) != 0 : -1,
 			following, *(void**)(at.watchBonus + 0x20));
 		(void)life;
+	}
+	if (at.watchClue) {
+		line.Add(" | spies");
+		{   // CKHkClueMan::vf15's gates: [[gm+0x18]+0x24]+0x64 -> +0x10 bit 1, [gm+0x40]+0x50
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			char* a = gm ? *(char**)(gm + 0x18) : nullptr;
+			char* b = a ? *(char**)(a + 0x24) : nullptr;
+			char* c = b ? *(char**)(b + 0x64) : nullptr;
+			char* d = gm ? *(char**)(gm + 0x40) : nullptr;
+			line.Add(" gate=%d/%p clue=%d", c ? (*(uint8_t*)(c + 0x10) >> 1) & 1 : -1, c, d ? *(uint8_t*)(d + 0x50) : -1);
+		}
+		unsigned n = GetNumLvlClassInstances(2, 161);
+		for (unsigned i = 0; i < n && i < 6; i++) {
+			char* c = (char*)GetLvlObject(2, 161, i);
+			char* node = c ? *(char**)(c + 0x10) : nullptr;
+			char* frame = node ? *(char**)(node + 4) : nullptr;
+			const float* p = frame ? (const float*)(frame + 0x80) : nullptr;
+			if (!c) continue;
+			line.Add(" %u:%s%s f14=%02X f15=%02X", i, node ? "node" : "-", node && (*(uint8_t*)(node + 0x10) & 2) ? "(hidden)" : "",
+			         *(uint8_t*)(c + 0x14), *(uint8_t*)(c + 0x15));
+			if (p) line.Add("@(%.0f %.0f %.0f)", p[0], p[1], p[2]);
+		}
 	}
 	if (at.watchEnemy) {
 		char* node = *(char**)(at.watchEnemy + 0x10);
@@ -1281,6 +1350,28 @@ void RunStep(const Step& s) {
 			char* o = objs ? objs[first + k] : nullptr;
 			Log("autotest:   target %u: %p vt %08X message %04X", k, o, o ? (unsigned)*(uintptr_t*)o : 0,
 			    msgs ? msgs[first + k] : 0);
+		}
+		break;
+	}
+	case S_WATCHCLUE: {
+		unsigned n = GetNumLvlClassInstances(2, 161);
+		at.watchClue = n ? (char*)GetLvlObject(2, 161, 0) : nullptr;
+		Log("autotest: %u clue men; watching %p", n, at.watchClue);
+		if (s.a == 1) {   // open the spies' gate (set in play by the first spy's dialogue)
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			char* a = gm ? *(char**)(gm + 0x18) : nullptr;
+			char* b = a ? *(char**)(a + 0x24) : nullptr;
+			char* c = b ? *(char**)(b + 0x64) : nullptr;
+			if (c) *(uint8_t*)(c + 0x10) |= 2;
+			Log("autotest: spies' gate opened (%p)", c);
+		}
+		for (unsigned i = 0; i < n; i++) {
+			char* c = (char*)GetLvlObject(2, 161, i);
+			if (c)
+				Log("autotest:   spy %u: spot (%.1f %.1f %.1f) appears within %.1f, talks within %.1f", i,
+				    *(float*)(c + 0x12C), *(float*)(c + 0x130), *(float*)(c + 0x134), *(float*)(c + 0x68),
+				    *(float*)(c + 0x70));
 		}
 		break;
 	}

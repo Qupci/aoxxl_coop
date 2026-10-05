@@ -886,3 +886,17 @@ Two readings that misled the diagnosis, both corrected below: `hero+0x18` bit 0 
 companion", not "hero exists" (§5), so the player's own hero reads as `avail=0`; and
 `CKHkAsterixLife::tick` is not the per-frame tick (§6).
 * `dsound.dll` is IndirectSound; unrelated.
+
+### Roman agents (CKHkClueMan, 2,161) — spawn by leader distance (2026-10-05)
+`CKHkClueMan::vf15` (0x4B8FB0) spawns the spy (FUN_004B12F0, node at hook +0x10) when the
+trio leader (trio vf25) is within `+0x68` of the spy's spot `+0x12C/+0x130/+0x134` (x/y/z)
+and removes it (FUN_004B1790) when the leader leaves that range; `+0x70` is the talk range.
+An unspawned spy also needs `[[[gm+0x18]+0x24]+0x64]+0x10` bit 1 (opened in play by the first
+spy's dialogue; the `spy2o` autotest sets it). Level 2 spies: (-824.7,507.6,-1060.5) r50
+(start), (-762.8,507.7,-994.8) r38 (lifter area; stands at (-743,508,-1008) once spawned).
+No detector is involved: the rectangle where the user saw it appear is ~36 units away.
+Proximity slicing could not help because an unspawned spy has no node to locate it — LifePos now
+uses the spot for clue men, and the slicing range is at least the spy's radius.
+Dialogue: the zone in front of the spy (plane-cross 66 for the first one) sends trio 0x5120;
+the trio walks the *leader* to the spy (situation 09) — if player 2 set it off from afar, player 1
+has to steer Asterix there.
