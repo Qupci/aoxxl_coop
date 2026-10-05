@@ -32,6 +32,7 @@ void CoopLogState(const char* tag);
 bool CoopP2Joined();
 int  CoopP2Hero();
 int  CoopP1Hero();
+int  CoopNonLeaderPlayer();   // the player hero that is not the trio leader (-1 if none)
 int  CoopP2Pad();
 bool CoopSuspended();   // co-op paused for a scripted mode (ride, cinematic...)
 

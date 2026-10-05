@@ -251,6 +251,12 @@ bool P1CamMatrix(float out[16]) {
 	return true;
 }
 
+bool OtherViewMatrix(float out[16]) {
+	Trio t = GetTrio();
+	if (t && CoopP2Joined() && t.Leader() == CoopP2Hero() && P1CamMatrix(out)) return true;
+	return P2CamMatrix(out);
+}
+
 bool P2CamMatrix(float out[16]) {
 	if (!cam.haveMatrix) return false;
 	memcpy(out, cam.m, sizeof(cam.m));

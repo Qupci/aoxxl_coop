@@ -219,6 +219,58 @@ const Step kPotion[] = {
 	END(70000),
 };
 
+// pursuit: does a Roman come after a hero standing 6 units away? First player
+// 2's Obelix (not leading), then Asterix (the leader) at another Roman.
+const Step kPursuitO[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_ENEMY, HERO_OBELIX, 2, 0, 0, 0, "obelix 6 from a roman" },
+	SHOT(4000, "pursuit_o"),
+	END(9000),
+};
+const Step kPursuitA[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
+	SHOT(4000, "pursuit_a"),
+	END(9000),
+};
+
+// flask: Asterix picks up a magic potion flask while player 2 is in (the user
+// saw player 2's Obelix start running on his own then).
+const Step kFlask[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_BONUS, HERO_ASTERIX, 3, 0, 0, 0, "asterix to a flask (beacon)" },
+	{ 1600, S_BONUS, HERO_ASTERIX, 2, 0, 0, 0, "asterix to a flask (active)" },
+	SHOT(3000, "flask_01"),
+	SHOT(8000, "flask_02"),
+	END(15000),
+};
+
+// release: the game tells player 2's Obelix to wait (0x4802); R3 + B takes him
+// back, and he walks.
+const Step kRelease[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion wait" },
+	VPAD(2500, 1, PAD_RTHUMB, 0, 0, "p2 R3"), VPAD(2700, 1, PAD_RTHUMB | PAD_B, 0, 0, "p2 R3+B"),
+	VPAD(2900, 1, 0, 0, 0, "p2 release"),
+	VPAD(3500, 1, 0, 0, 1, "p2 up"), VPAD(5500, 1, 0, 0, 0, "p2 neutral"),
+	END(6500),
+};
+
+// pursuitlead2: Obelix leads (as after the belly slide); a Roman 6 units from
+// player 1's Asterix must come for him.
+const Step kPursuitLead2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 2000, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
+	SHOT(5000, "pursuitlead2"),
+	END(10000),
+};
+
 // warp: player 2 walks off, then Back + A brings Obelix back to Asterix; Back
 // alone held long enough must still leave afterwards.
 const Step kWarp[] = {
@@ -753,6 +805,11 @@ const Scenario kScenarios[] = {
 	SCENARIO("lifter2", kLifter2),
 	SCENARIO("warp", kWarp),
 	SCENARIO("potion", kPotion),
+	SCENARIO("pursuito", kPursuitO),
+	SCENARIO("release", kRelease),
+	SCENARIO("pursuitlead2", kPursuitLead2),
+	SCENARIO("flask", kFlask),
+	SCENARIO("pursuita", kPursuitA),
 	SCENARIO("p2mirror", kP2Mirror),
 	SCENARIO("p2busy", kP2Busy),
 };
@@ -1123,6 +1180,7 @@ void RunStep(const Step& s) {
 		if (!h) break;
 		Hero other = t.GetHero(s.a == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX);
 		const size_t listOff = s.b == 1 ? 0x34 : 0x30;
+		const bool flaskOnly = s.b >= 2;   // 2: potion pool (type 3) active, 3: potion pool beacons
 		char* best = nullptr;
 		float bestD = 1e30f;
 		Vector3 bestP;
@@ -1133,8 +1191,9 @@ void RunStep(const Step& s) {
 			for (unsigned i = 0; i < n; i++) {
 				char* pool = (char*)GetLvlObject(4, kPoolIds[k], i);
 				if (!pool) continue;
+				if (flaskOnly && (kPoolIds[k] != 63 || *(int*)(pool + 0x24) != 3)) continue;
 				pools++;
-				for (char* b = *(char**)(pool + listOff); b; b = *(char**)(b + 0x14)) {
+				for (char* b = *(char**)(pool + (s.b == 3 ? 0x34 : listOff)); b; b = *(char**)(b + 0x14)) {
 					char* node = *(char**)(b + 0x10);
 					char* frame = node ? *(char**)(node + 4) : nullptr;
 					if (!frame) continue;
@@ -1299,7 +1358,7 @@ void RunStep(const Step& s) {
 			*(float*)(h.raw() + 0xCC) = yaw;
 			*(float*)(h.raw() + 0xD4) = yaw;
 		}
-		Vector3 to = bestP - face * 1.3f + Vector3(0, 0.3f, 0);
+		Vector3 to = bestP - face * (s.b == 2 ? 6.0f : 1.3f) + Vector3(0, 0.3f, 0);
 		h.Pos() = to;
 		if (h.hook->node && h.hook->node->matrix) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);

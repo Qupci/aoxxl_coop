@@ -151,16 +151,84 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 	}
 }
 
+// Roman squads. They are not ticked one by one: the enemy group (CKGrpEnemy,
+// its Life CKGrpEnemyLife, vtable 0x628938, slot 17 -> FUN_0052AC70) asks the
+// trio for the leader's position, and for each squad (group +0x0C, chained at
+// +4, isSubclass 0x604) runs FUN_0052D340, then the squad's AI (vf31, +0x7C)
+// only if the leader is inside the squad's box (squad +0x11C..+0x124 max x/y/z,
+// +0x128..+0x130 min); otherwise a squad with +0x152 bit 1 gets vf31 and vf35
+// (+0x8C), and the rest just count idle time (+0x138). The non-leading player
+// walked through Roman camps unnoticed. Re-implemented: a squad whose box holds
+// only the non-leading player's hero runs its AI with that hero as the leader.
+typedef void(__fastcall* EnemyTickFn)(char* life, void* edx, char* dt);
+const uintptr_t kEnemyLifeVtbl = 0x628938, kEnemyLifeTick = 0x530930, kSquadPrep = 0x52D340;
+const size_t    kEnemyLifeSlot = 17;
+EnemyTickFn g_origEnemyTick = nullptr;
+volatile long g_p2Squads = 0;
+
+bool InSquadBox(const char* sq, const Vector3& p) {
+	const float* f = (const float*)sq;
+	return f[0x4A] < p.x && p.x <= f[0x47] && f[0x4C] < p.z && p.z <= f[0x49] && f[0x4B] < p.y && p.y <= f[0x48];
+}
+
+void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
+	Trio t = GetTrio();
+	int nl = CoopNonLeaderPlayer();
+	char* grp = *(char**)(life + 0x0C);
+	Hero lead = t ? t.GetHero(t.Leader()) : Hero(), other = t && nl >= 0 ? t.GetHero(nl) : Hero();
+	if (!grp || !lead || !other || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(nl)) {
+		g_origEnemyTick(life, edx, dt);
+		return;
+	}
+	typedef char(__fastcall* IsSubFn)(void* self, void* edx, int id);
+	typedef void(__fastcall* VoidFn)(void* self, void* edx);
+	typedef void(__fastcall* DtFn)(void* self, void* edx, char* dt);
+	Vector3 pl = lead.Pos(), po = other.Pos();
+	uint8_t* tr = (uint8_t*)t.raw();
+	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
+		void** vt = *(void***)sq;
+		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604)) continue;
+		((VoidFn)kSquadPrep)(sq, nullptr);
+		if (*(uint8_t*)(grp + 0x10) & 4) continue;
+		bool inL = InSquadBox(sq, pl), inO = InSquadBox(sq, po);
+		if (inL && inO) {   // big boxes hold both: the hero nearer the box's middle
+			const float* f = (const float*)sq;
+			Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
+			if ((po - c).len2() < (pl - c).len2()) inL = false;
+		}
+		if (inL) {
+			((DtFn)vt[31])(sq, nullptr, dt);
+		} else if (inO) {
+			uint8_t leader = tr[0x2C], companion = tr[0x2D];
+			tr[0x2C] = (uint8_t)nl;
+			tr[0x2D] = leader;
+			*(uint32_t*)(tr + 0x3F4) &= ~1u;   // the trio's enemy cache is per leader
+			((DtFn)vt[31])(sq, nullptr, dt);
+			if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
+			*(uint32_t*)(tr + 0x3F4) &= ~1u;
+			if (InterlockedIncrement(&g_p2Squads) % 300 == 1)
+				Log("proximity: squad %p active for %s (not leading)", sq, HeroName(nl));
+		} else if (*(uint8_t*)(sq + 0x152) & 2) {
+			((DtFn)vt[31])(sq, nullptr, dt);
+			((VoidFn)vt[35])(sq, nullptr);
+		} else {
+			*(float*)(sq + 0x138) += *(float*)(dt + 0xC);
+		}
+	}
+}
+
 // CKGrpBonusPool vf39 "may this hero collect" ignores its argument and asks the
 // trio's leader instead (the potion pool, type 3: leader must be Asterix), so it
-// is asked with player 2's hero leading.
+// is asked with the non-leading player's hero leading. "Player 2" in the names
+// below means that hero: player 2's Obelix at the start of level 2, player 1's
+// Asterix once Obelix leads (after the belly slide).
 bool P2MayCollect(char* pool, Trio t, Hero h2) {
 	typedef char(__fastcall* CanFn)(void* pool, void* edx, void* hero);
 	uint8_t* tr = (uint8_t*)t.raw();
 	uint8_t leader = tr[0x2C], companion = tr[0x2D];
-	int p2 = CoopP2Hero();
+	int p2 = CoopNonLeaderPlayer();
 	tr[0x2C] = (uint8_t)p2;
-	tr[0x2D] = (uint8_t)CoopP1Hero();
+	tr[0x2D] = (uint8_t)(p2 == CoopP1Hero() ? CoopP2Hero() : CoopP1Hero());
 	bool ok = ((CanFn)(*(void***)pool)[39])(pool, nullptr, h2.hook) != 0;
 	tr[0x2C] = leader;
 	tr[0x2D] = companion;
@@ -169,8 +237,9 @@ bool P2MayCollect(char* pool, Trio t, Hero h2) {
 
 void AttractToPlayer2(char* pool) {
 	Trio t = GetTrio();
-	Hero h2 = t ? t.GetHero(CoopP2Hero()) : Hero();
-	if (!h2 || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(CoopP2Hero())) return;
+	int nl = CoopNonLeaderPlayer();
+	Hero h2 = t && nl >= 0 ? t.GetHero(nl) : Hero();
+	if (!h2 || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(nl)) return;
 	typedef char(__fastcall* BoolFn)(void* self, void* edx);
 	typedef void(__fastcall* AttractFn)(void* self, void* edx, void* hero, int zero);
 	if (!P2MayCollect(pool, t, h2)) return;
@@ -222,8 +291,9 @@ void __cdecl BeaconCheck(char* pool, char* bonus, char* frame) {
 	}
 	if (!CoopP2Joined() || CoopSuspended()) return;
 	Trio t = GetTrio();
-	Hero h2 = t ? t.GetHero(CoopP2Hero()) : Hero();
-	if (!h2 || CoopHeroHeld(CoopP2Hero()) || !P2MayCollect(pool, t, h2)) return;
+	int nl = CoopNonLeaderPlayer();
+	Hero h2 = t && nl >= 0 ? t.GetHero(nl) : Hero();
+	if (!h2 || CoopHeroHeld(nl) || !P2MayCollect(pool, t, h2)) return;
 	Vector3 p = h2.Pos();
 	float dx = b[0] - p.x, dy = b[1] - p.y, dz = b[2] - p.z;
 	if (dx * dx + dy * dy + dz * dz <= r2) {
@@ -519,6 +589,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 
 long ProximityP2Contacts() { return g_p2Contacts; }
 long ProximitySwappedZones() { return g_swappedZones; }
+long ProximityP2Squads() { return g_p2Squads; }
 long ProximityP2Beacons() { return g_p2Beacons; }
 long ProximitySlices() { return g_slices; }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
@@ -537,6 +608,8 @@ bool ProximityInstallHooks() {
 	                    (void*)ProjectileContactDispatch, "projectile hits, targets (0x301)");
 	ok &= PatchProjectileOwnerCall();
 	ok &= PatchBeaconCheck();
+	ok &= PatchVtableSlot(kEnemyLifeVtbl, kEnemyLifeSlot, kEnemyLifeTick, (void*)EnemyTickHook,
+	                      (void**)&g_origEnemyTick, "CKGrpEnemyLife::tick");
 	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,
 	                      (void**)&g_origDetectTick, "CKSrvDetection::tick");
 	ok &= InstallDetour(kFlagEvent, (void*)FlagEventHook, (void**)&g_origFlagEvent, kFlagEventPrologue,

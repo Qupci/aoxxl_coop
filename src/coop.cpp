@@ -60,6 +60,7 @@ struct CoopState {
 	// CoopBeforeLifeTick): saved values, and the values we put there.
 	bool     sliced = false;
 	uint8_t  savedLeader = 0, savedCompanion = 0;
+	uint8_t  slicedHero = 0, slicedOther = 0;   // what the trio said during the sliced tick
 	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
 
 	bool    suspended = false;
@@ -310,6 +311,11 @@ HookCounters g_hookCounters;
 
 bool CoopP2Joined()  { return g.p2Joined; }
 int  CoopP2Hero()    { return g.p2Hero; }
+int  CoopNonLeaderPlayer() {
+	Trio t = GetTrio();
+	if (!t || !g.p2Joined) return -1;
+	return t.Leader() == g.p2Hero ? g.p1Hero : g.p2Hero;
+}
 int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
@@ -511,7 +517,8 @@ void CoopFrame() {
 	// Start and Back are left alone during a cutscene: Start may be what skips it.
 	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars();
 	if (!inCutscene && (p.pressed & PAD_START)) { Release("pressed Start"); return; }
-	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & (PAD_A | PAD_Y))) g.p2BackCombo = true;
+	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y;
+	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & kFace)) g.p2BackCombo = true;
 	if (!(p.buttons & PAD_BACK)) g.p2BackCombo = false;
 	if (!inCutscene && (p.buttons & PAD_BACK) && !g.p2BackCombo) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
@@ -528,22 +535,43 @@ void CoopFrame() {
 		return;
 	}
 
-	// Back + A: player 2's hero joins player 1's (lost, stuck, or fell behind).
-	// Player 1's pad (the one the game reads) does the same the other way round.
-	bool canWarp = !inCutscene && !g.suspended && !g.held[g.p1Hero] && !g.held[g.p2Hero];
-	if (g.p2BackCombo && (p.pressed & PAD_A) && canWarp)
-		WarpToPartner(g.p2Hero, h2, g.p1Hero, h1);
+	// The mod's combos: hold the right stick button (player 2 also Back) and
+	//   A  your hero joins your partner's (lost, stuck, fell behind)
+	//   B  take your hero back from the game ("wait here" orders that a sequence
+	//      played out of order never ends)
+	//   Y  [cheats] fill the magic potion
+	//   X  [cheats] your hero becomes the leader
+	// Player 1's controller is the one the game reads (pad identification).
 	{
 		int p1pad = Player1Pad();
 		const PadState& q = PadGet(p1pad);
-		bool p1ok = p1pad >= 0 && p1pad != g.p2Pad && q.connected && (q.buttons & PAD_BACK);
-		if (p1ok && (q.pressed & PAD_A) && canWarp)
-			WarpToPartner(g.p1Hero, h1, g.p2Hero, h2);
-		// Test helper ([debug] cheats = on): Back + Y fills the magic potion.
-		if (g_config.cheats && !inCutscene &&
-		    ((p1ok && (q.pressed & PAD_Y)) || ((p.buttons & PAD_BACK) && (p.pressed & PAD_Y)))) {
-			SetPotionGauge(300.0f);
-			Log("coop: cheat: magic potion filled");
+		bool mod1 = p1pad >= 0 && p1pad != g.p2Pad && q.connected && (q.buttons & PAD_RTHUMB);
+		bool mod2 = (p.buttons & (PAD_BACK | PAD_RTHUMB)) != 0;
+		for (int who = 0; who < 2 && !inCutscene; who++) {
+			bool held = who == 0 ? mod1 : mod2;
+			uint16_t pressed = who == 0 ? q.pressed : p.pressed;
+			if (!held || !(pressed & kFace)) continue;
+			int me = who == 0 ? g.p1Hero : g.p2Hero, mate = who == 0 ? g.p2Hero : g.p1Hero;
+			Hero hm = who == 0 ? h1 : h2, hp = who == 0 ? h2 : h1;
+			const char* player = who == 0 ? "player 1" : "player 2";
+			if ((pressed & PAD_A) && !g.suspended && !g.held[me] && !g.held[mate])
+				WarpToPartner(me, hm, mate, hp);
+			if ((pressed & PAD_B) && g.held[me]) {
+				g.held[me] = false;
+				Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me),
+				    (int)hm.Order());
+				EnforcePlayer(t, me);
+			}
+			if ((pressed & PAD_Y) && g_config.cheats) {
+				SetPotionGauge(300.0f);
+				Log("coop: cheat: magic potion filled by %s", player);
+			}
+			if ((pressed & PAD_X) && g_config.cheats && t.Leader() != me && !g.suspended) {
+				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+				int ev = me == HERO_ASTERIX ? 0x4800 : 0x4801;
+				Log("coop: cheat: %s makes %s the leader (trio event %04X)", player, HeroName(me), ev);
+				((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
+			}
 		}
 	}
 
@@ -648,60 +676,6 @@ void CoopFrame() {
 // Per-hero Life tick
 // ---------------------------------------------------------------------------
 
-// Events the non-leading player hero sets off in its own update. Hero code
-// flags some level events only for a player-controlled hero (+0x18 bit 0
-// clear) -- in single player that is the leader alone, the AI companion never
-// runs those paths. In co-op both heroes are player-driven, and player 2's
-// Obelix walking onto the spinning platform's blue circle ran "switch to
-// Obelix, Asterix waits here" with Asterix elsewhere. Around that hero's update
-// the event service's flag table (yellow pages +0x6C: 3 bytes per event group
-// at +0xC, flags in byte 2; group counts at +0x1C/+0x1E/+0x20) is snapshot,
-// and whatever it newly flagged is taken back.
-namespace {
-uint8_t g_eventSnap[8192];
-unsigned g_eventSnapN = 0;
-bool g_eventSnapActive = false;
-int g_eventSnapHero = -1;
-
-char* EventService(unsigned* groups) {
-	CKYellowPages* yp = YellowPages();
-	char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
-	if (!ev || !*(uint8_t**)(ev + 0xC)) return nullptr;
-	*groups = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
-	return ev;
-}
-
-void SnapEvents(int hero) {
-	unsigned n = 0;
-	char* ev = EventService(&n);
-	g_eventSnapActive = false;
-	if (!ev || n == 0 || n > sizeof(g_eventSnap)) return;
-	uint8_t* tab = *(uint8_t**)(ev + 0xC);
-	for (unsigned i = 0; i < n; i++) g_eventSnap[i] = tab[i * 3 + 2];
-	g_eventSnapN = n;
-	g_eventSnapHero = hero;
-	g_eventSnapActive = true;
-}
-
-void UndoNewEvents() {
-	if (!g_eventSnapActive) return;
-	g_eventSnapActive = false;
-	unsigned n = 0;
-	char* ev = EventService(&n);
-	if (!ev || n != g_eventSnapN) return;
-	uint8_t* tab = *(uint8_t**)(ev + 0xC);
-	for (unsigned i = 0; i < n; i++) {
-		uint8_t added = tab[i * 3 + 2] & ~g_eventSnap[i];
-		if (!added) continue;
-		tab[i * 3 + 2] &= ~added;
-		for (int b = 0; b < 8; b++)
-			if (added & (1 << b))
-				Log("coop: event %04X set off by %s (not leading) -- dropped", (i << 3) | b,
-					HeroName(g_eventSnapHero));
-	}
-}
-}
-
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	(void)hero;
 	if (!g.p2Joined || g.suspended) return;
@@ -712,7 +686,6 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	Trio t = GetTrio();
 	if (!t) return;
 	if (g.held[heroIndex]) return;   // the game's AI drives it for now
-	if (heroIndex != t.Leader()) SnapEvents(heroIndex);
 	EnforcePlayer(t, heroIndex);
 	if (Situation(t.GetHero(g.p1Hero)) != kSituationGroupAction &&
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
@@ -721,61 +694,69 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	// Player 1 steers relative to its own camera while player 2's hero leads.
 	if (heroIndex == g.p1Hero && t.Leader() == g.p2Hero) P1CamBeginHeroTick();
 
-	if (heroIndex != g.p2Hero || !g.p2ValuesReady) return;
-	InputManager im = GetInputManager();
-	if (!im) return;
-	uint8_t** values = (uint8_t**)(im.raw() + 0x1C);
-	g.savedValues = *values;
-	*values = g.p2Values;
-	// Some states read how long a binding has been held instead (FUN_00435900:
-	// CKInput+0x18, 0x20 bytes per binding, seconds at +0x18) -- Obelix holding
-	// the cable car's rope (situation 3) keeps hold while X is. Player 2 gets a copy of the
-	// bindings carrying his own values there.
-	static char p2Bindings[256 * 0x20];
-	char** bindings = (char**)(im.raw() + 0x18);
-	unsigned nb = *(uint8_t*)(im.raw() + 0x3A);
-	g.savedBindings = nullptr;
-	if (*bindings && nb > 0 && nb <= 256) {
-		memcpy(p2Bindings, *bindings, nb * 0x20);
-		for (unsigned i = 0; i < nb; i++) *(float*)(p2Bindings + i * 0x20 + 0x18) = g.p2HoldTime[i];
-		g.savedBindings = *bindings;
-		*bindings = p2Bindings;
+	if (heroIndex == g.p2Hero && g.p2ValuesReady) {
+		InputManager im = GetInputManager();
+		if (im) {
+			uint8_t** values = (uint8_t**)(im.raw() + 0x1C);
+			g.savedValues = *values;
+			*values = g.p2Values;
+			// Some states read how long a binding has been held instead
+			// (FUN_00435900: CKInput+0x18, 0x20 bytes per binding, seconds at
+			// +0x18) -- Obelix holding the cable car's rope (situation 3) keeps hold
+			// while X is. Player 2 gets a copy of the bindings carrying his own
+			// values there.
+			static char p2Bindings[256 * 0x20];
+			char** bindings = (char**)(im.raw() + 0x18);
+			unsigned nb = *(uint8_t*)(im.raw() + 0x3A);
+			g.savedBindings = nullptr;
+			if (*bindings && nb > 0 && nb <= 256) {
+				memcpy(p2Bindings, *bindings, nb * 0x20);
+				for (unsigned i = 0; i < nb; i++) *(float*)(p2Bindings + i * 0x20 + 0x18) = g.p2HoldTime[i];
+				g.savedBindings = *bindings;
+				*bindings = p2Bindings;
+			}
+			g.swapped = true;
+			InterlockedIncrement(&g_hookCounters.p2Routed);
+		}
 	}
-	g.swapped = true;
-	InterlockedIncrement(&g_hookCounters.p2Routed);
 
 	// Player-side hero code assumes the hero running it is the trio's leader:
 	// it asks the trio for "the companion" (trio+0x2D, or vtable +0x98) and means
 	// the *other* hero. Run as the companion, it gets itself back -- the lifter
-	// handler FUN_0049C030 then dereferences its own empty marker slot and
-	// crashes (axxl.exe+0x9C228). So for the length of player 2's tick, the trio
-	// says what that code expects: player 2's hero leads, player 1's follows.
-	uint8_t* trio = (uint8_t*)t.raw();
-	g.savedLeader    = trio[0x2C];
-	g.savedCompanion = trio[0x2D];
-	trio[0x2C] = (uint8_t)g.p2Hero;
-	trio[0x2D] = (uint8_t)g.p1Hero;
-	g.sliced = true;
-	// Offers meant for the real leader stay with it: the magic potion (CKHkTorch
-	// checks the leader is Asterix, then latches itself at trio+0x4C for one
-	// frame) must not be taken by player 2's Obelix while he poses as leader.
-	// The trio caches its nearby-enemy lists and distances once per frame, from
-	// the leader (FUN_0047CB40, valid while +0x3F4 bit 0 is set): lock-on and
-	// grabbing pick from them. Rebuild them for player 2's hero, and again after.
-	*(uint32_t*)(trio + 0x3F4) &= ~1u;
-	g.savedOffer = 0;
-	if (g.savedLeader != (uint8_t)g.p2Hero) {
+	// and launcher handler FUN_0049C030 then sends the hero to its own marker,
+	// and the next launcher dereferences the empty slot and crashes
+	// (axxl.exe+0x9C228). So for the length of the tick of whichever player's
+	// hero is not leading (player 2's Obelix at the start of level 2, player 1's
+	// Asterix after the belly slide), the trio says what that code expects:
+	// this hero leads, the other one follows.
+	if (heroIndex != t.Leader()) {
+		uint8_t* trio = (uint8_t*)t.raw();
+		int other = heroIndex == g.p1Hero ? g.p2Hero : g.p1Hero;
+		g.savedLeader    = trio[0x2C];
+		g.savedCompanion = trio[0x2D];
+		g.slicedHero     = (uint8_t)heroIndex;
+		g.slicedOther    = (uint8_t)other;
+		trio[0x2C] = (uint8_t)heroIndex;
+		trio[0x2D] = (uint8_t)other;
+		g.sliced = true;
+		// Offers meant for the real leader stay with it: the magic potion
+		// (latched at trio+0x4C for one frame) must not be taken by the other
+		// hero while it poses as leader.
+		// The trio caches its nearby-enemy lists and distances once per frame,
+		// from the leader (FUN_0047CB40, valid while +0x3F4 bit 0 is set):
+		// lock-on and grabbing pick from them. Rebuild them for this hero, and
+		// again after.
+		*(uint32_t*)(trio + 0x3F4) &= ~1u;
 		g.savedOffer = *(uint32_t*)(trio + 0x4C);
 		*(uint32_t*)(trio + 0x4C) = 0;
 	}
 
 	// With split-screen, player 2 steers relative to player 2's own camera.
-	P2CamBeginHeroTick();
+	if (heroIndex == g.p2Hero) P2CamBeginHeroTick();
 }
 
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
-	UndoNewEvents();
 	P2CamEndHeroTick();
 	if (g.sliced) {
 		g.sliced = false;
@@ -785,14 +766,14 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			*(uint32_t*)(trio + 0x3F4) &= ~1u;
 			if (g.savedOffer && *(uint32_t*)(trio + 0x4C) == 0) *(uint32_t*)(trio + 0x4C) = g.savedOffer;
 			g.savedOffer = 0;
-			if (trio[0x2C] == (uint8_t)g.p2Hero && trio[0x2D] == (uint8_t)g.p1Hero) {
+			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
 				trio[0x2C] = g.savedLeader;
 				trio[0x2D] = g.savedCompanion;
 			} else {
 				// A switch event ran during the tick and picked a new leader on
 				// purpose; that is the game's decision now.
 				Log("coop: the game changed the trio's leader during %s's tick (now %s)",
-					HeroName(g.p2Hero), HeroName(trio[0x2C]));
+					HeroName(g.slicedHero), HeroName(trio[0x2C]));
 			}
 		}
 	}

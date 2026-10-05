@@ -6,3 +6,4 @@ ghidra/
 decomp/
 # test run artefacts
 testruns/
+userlogs/

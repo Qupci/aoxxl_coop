@@ -202,7 +202,7 @@ char* __cdecl VoiceUpdateHook(char* v) {
 
 void SoundSetP2Listener() {
 	float m[16];
-	if (!SplitActive() || !P2CamMatrix(m)) {
+	if (!SplitActive() || !OtherViewMatrix(m)) {
 		g_l2Index = -1;
 		return;
 	}

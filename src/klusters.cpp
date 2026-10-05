@@ -140,7 +140,7 @@ void KlusterSetP2Camera() {
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
 	float m[16];
-	if (!svc || !*(void**)(svc + 0x18) || !P2CamMatrix(m)) return;
+	if (!svc || !*(void**)(svc + 0x18) || !OtherViewMatrix(m)) return;
 	memcpy(g_fakeFrame + 0x10, m, sizeof(m));
 	*(void**)(g_fakeSvc + 0x18) = *(void**)(svc + 0x18);
 	*(void**)(g_fakeSvc + 0x1C) = &g_fakeOwner;

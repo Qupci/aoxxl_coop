@@ -18,6 +18,20 @@ $game = Join-Path (Split-Path -Parent $coop) "Game Files"
 $shots = Join-Path $game "shots"
 
 Get-Process axxl -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
+
+# The game keeps only three logs (xxl_coop.log, .1, .2) and every test run
+# rotates them: save any log from a real play session (no "autotest:" line in
+# it) to coop\userlogs\ first, so a test never pushes one out.
+$userLogs = Join-Path $coop "userlogs"
+foreach ($name in "xxl_coop.log", "xxl_coop.1.log", "xxl_coop.2.log") {
+    $f = Join-Path $game $name
+    if (-not (Test-Path $f)) { continue }
+    if (Select-String -Path $f -Pattern "autotest:" -SimpleMatch -Quiet) { continue }
+    New-Item -ItemType Directory -Force $userLogs | Out-Null
+    $stamp = (Get-Item $f).LastWriteTime.ToString("yyyyMMdd-HHmmss")
+    $dest = Join-Path $userLogs "$stamp-$name"
+    if (-not (Test-Path $dest)) { Copy-Item $f $dest; "saved play log: $dest" }
+}
 if (-not $NoDeploy) { Copy-Item (Join-Path $coop "build\xxl_coop.asi") $game -Force }
 if (Test-Path $shots) { Remove-Item (Join-Path $shots "*") -Force -ErrorAction SilentlyContinue }
 

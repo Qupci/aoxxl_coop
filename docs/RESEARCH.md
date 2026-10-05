@@ -153,6 +153,17 @@ the mod (`coop_diag`) exist to do exactly that.
   `0x628E0C`); it asks the trio about the leader standing on it (trio events `0x0B01`, `0x0C09`) and
   then sends "switch to Obelix, Asterix waits" (`0x4801`/`0x4802` via CKSrvEvent). Level 2's six
   `CKHkPressionStone`s are elsewhere. Excluded from proximity slicing (only the real leader).
+* **Roman squads**: one `CKGrpEnemy` group (Life `CKGrpEnemyLife`, vt `0x628938`, slot 17 →
+  `FUN_0052AC70`) ticks every squad (group `+0x0C`, chained `+4`, isSubclass `0x604`): `FUN_0052D340`,
+  then the squad AI (vf31 `+0x7C`, activates via vf33 on first run) only while the trio leader's
+  position (trio vf27 `+0x6C`) is inside the squad box (`+0x11C..+0x124` max, `+0x128..+0x130` min),
+  else vf31+vf35 if `+0x152` bit 1, else idle time `+0x138`. Level 2 has 57 squads, boxes large
+  enough to hold both heroes. The mod runs a squad for the non-leading player (trio sliced, enemy
+  cache dropped) when only that hero is in the box, or both are and it is nearer the box middle.
+* **Launchers / lifters and the non-leader**: run unsliced, the non-leading player's tick sent
+  itself to "the companion's" marker (`0x4804` → AI order 1, situation 13); the next launcher by
+  the leader then crashed at `axxl.exe+0x9C228`. The trio is now sliced around the tick of
+  whichever player hero is not leading (was: only player 2's).
 * **Belly slide** (`0x480B` → `0x4801`, mode 3): Obelix leads, Asterix rides as the AI variant
   (`f18=0F`); the player variant (`0C`) keeps him at the top. Both heroes' `+kHero_pos` stay frozen
   during rides (cable car, slide) while their nodes move — cameras must follow the node (LTM `+0x80`).
