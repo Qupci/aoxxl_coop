@@ -16,7 +16,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -330,7 +330,11 @@ const Step kBossButton[] = {
 };
 
 const Step kRegions[] = {
-	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" }, END(2500),
+	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" },
+	{ 2000, S_EVGROUP, 0x10D, 0, 0, 0, 0, "group 10D" }, { 2000, S_EVGROUP, 0x14D, 0, 0, 0, 0, "group 14D" },
+	{ 2000, S_EVGROUP, 0x058, 0, 0, 0, 0, "group 058" }, { 2000, S_EVGROUP, 0x1A0, 0, 0, 0, 0, "group 1A0" },
+	{ 2000, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	END(2500),
 };
 
 const Step kJoinLead2[] = {
@@ -1197,6 +1201,28 @@ void RunStep(const Step& s) {
 		if (!h) break;
 		Log("autotest: %s +%03X %02X -> %02X", HeroName(s.a), s.b, *(uint8_t*)(h.raw() + s.b), (int)s.x);
 		*(uint8_t*)(h.raw() + s.b) = (uint8_t)(int)s.x;
+		break;
+	}
+	case S_EVGROUP: {   // event service group a: kind, mask, flags, and the detector tests feeding it
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		if (!ev) break;
+		unsigned n1 = *(uint16_t*)(ev + 0x1C), n2 = *(uint16_t*)(ev + 0x1E), n3 = *(uint16_t*)(ev + 0x20);
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		unsigned gi = (unsigned)s.a;
+		const char* kind = gi < n1 ? "OR" : gi < n1 + n2 ? "AND (accumulating)" : gi < n1 + n2 + n3 ? "AND (same frame)" : "?";
+		Log("autotest: event groups %u/%u/%u; group %03X (%s): %u targets, mask %02X, flags %02X", n1, n2, n3, gi, kind,
+		    tab[gi * 3], tab[gi * 3 + 1], tab[gi * 3 + 2]);
+		// Targets: +0x10 object pointers and +0x14 message ids, both in group order.
+		unsigned first = 0;
+		for (unsigned k = 0; k < gi; k++) first += tab[k * 3];
+		char** objs = *(char***)(ev + 0x10);
+		uint16_t* msgs = *(uint16_t**)(ev + 0x14);
+		for (unsigned k = 0; k < tab[gi * 3]; k++) {
+			char* o = objs ? objs[first + k] : nullptr;
+			Log("autotest:   target %u: %p vt %08X message %04X", k, o, o ? (unsigned)*(uintptr_t*)o : 0,
+			    msgs ? msgs[first + k] : 0);
+		}
 		break;
 	}
 	case S_REGIONS:

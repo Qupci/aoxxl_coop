@@ -555,6 +555,18 @@ void CoopFrame() {
 
 	Trio t = GetTrio();
 	TrackStuckModes(t);
+	{   // diagnostics: the streamed sector (level object = yellow pages +0x90, current +0x24, next +0x34)
+		static int lastSector = -99;
+		char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+		int sec = lvl ? *(int*)(lvl + 0x24) : -99;
+		if (sec != lastSector && t) {
+			Hero ha = t.GetHero(HERO_ASTERIX), ho = t.GetHero(HERO_OBELIX);
+			Log("coop: sector %d -> %d (next %d); leader %s; Asterix (%.0f %.0f %.0f) Obelix (%.0f %.0f %.0f)",
+			    lastSector, sec, lvl ? *(int*)(lvl + 0x34) : -99, HeroName(t.Leader()), ha ? ha.Pos().x : 0,
+			    ha ? ha.Pos().y : 0, ha ? ha.Pos().z : 0, ho ? ho.Pos().x : 0, ho ? ho.Pos().y : 0, ho ? ho.Pos().z : 0);
+		}
+		lastSector = sec;
+	}
 	// The cutscene hold counts down whether or not player 2 is in: a player 2
 	// dropped by a level change during a cutscene left it frozen above zero, and
 	// every Start after that was refused as "cutscene".
