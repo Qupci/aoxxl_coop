@@ -46,8 +46,9 @@ struct CoopState {
 	int     p1Hero   = -1;
 	int     p2Hero   = -1;
 	DWORD   p2BackHeldAt = 0;
-	bool    p2BackCombo = false;
-	bool    cineRegrouped = false;  // RegroupForCutscene done for the current cutscene   // Back is held for Back+A (warp), not to leave
+	bool    p2BackCombo = false;    // Back is held for a combo, not to leave
+	bool    cineRegrouped = false;  // RegroupForCutscene done for the current cutscene
+	int     joinLeader = -1;        // the trio's leader when player 2 joined
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
@@ -240,15 +241,22 @@ void Release(const char* why) {
 		Log("coop: player 2 left (%s) during a scripted sequence; leader stays %s", why, HeroName(t.Leader()));
 	} else if (t && p1 >= 0 && p2 >= 0) {
 		Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
-		if (t.Leader() == p2 && h1 && h2) {
+		// Back to player 1's hero only if it led when player 2 came in: joined
+		// while the game led with Obelix (after the belly slides), it stays so.
+		if (t.Leader() == p2 && g.joinLeader == p1 && h1 && h2) {
 			// The switch handler only accepts a target that looks like a companion.
 			*F18(h1) = HeroAiVariant(*F18(h1));
 			t.SwitchTo(p1);
 		}
-		if (h2 && HeroModePlayable(*F18(h2))) *F18(h2) = HeroAiVariant(*F18(h2));
+		// Single player from here: the leader is player 1's, the other one the AI
+		// companion following it.
+		int lead = t.Leader(), comp = lead == p1 ? p2 : p1;
+		Hero hl = t.GetHero(lead), hc = t.GetHero(comp);
+		if (hl && HeroModePlayable(*F18(hl))) *F18(hl) = HeroPlayerVariant(*F18(hl));
+		if (hc && HeroModePlayable(*F18(hc))) *F18(hc) = HeroAiVariant(*F18(hc));
 		t.CompanionFollow();
-		Log("coop: player 2 left (%s); %s is AI again, leader=%s", why, HeroName(p2),
-			HeroName(t.Leader()));
+		Log("coop: player 2 left (%s); %s is AI again, leader=%s (player 1's now)", why, HeroName(comp),
+			HeroName(lead));
 	} else {
 		Log("coop: player 2 left (%s)", why);
 	}
@@ -307,22 +315,26 @@ void TryJoin(Trio t) {
 		}
 		g.p2Joined = true;
 		g.p2Pad    = pad;
-		g.p1Hero   = t.Leader();
-		g.p2Hero   = OtherHero(g.p1Hero);
+		// Player 2 plays Obelix (ini p2_hero), whoever leads right now: after the
+		// belly slides the game leads with Obelix, and "the hero player 1 is not
+		// driving" handed player 2 Asterix. p2_hero = other keeps that rule.
+		if (g_config.p2Hero == HERO_ASTERIX || g_config.p2Hero == HERO_OBELIX) g.p2Hero = g_config.p2Hero;
+		else g.p2Hero = OtherHero(t.Leader());
+		g.p1Hero = OtherHero(g.p2Hero);
+		g.joinLeader = t.Leader();
 		// Joining in the middle of a scripted sequence (Asterix already seated in
-		// the cable car, Obelix leading to pull it): player 1 keeps the hero the
-		// game borrowed, and gets it back when the sequence is over.
-		{
-			Hero other = t.GetHero(g.p2Hero);
-			int order = other ? (int)other.Order() : 0;
-			if (other && !other.IsPlayerControlled() && IsScriptedOrder(order)) {
-				g.p2Hero = g.p1Hero;
-				g.p1Hero = OtherHero(g.p2Hero);
-				g.held[g.p1Hero] = true;
-				g.heldSince[g.p1Hero] = GetTickCount();
-				g.lastOrder[g.p1Hero] = (uint8_t)order;
-				Log("coop: joining mid-sequence: %s is the game's (AI order %d), player 1 gets it back after",
-					HeroName(g.p1Hero), order);
+		// the cable car, Obelix leading to pull it): a hero the game has borrowed
+		// stays the game's until the sequence is over.
+		const int both[2] = { g.p1Hero, g.p2Hero };
+		for (int idx : both) {
+			Hero h = t.GetHero(idx);
+			int order = h ? (int)h.Order() : 0;
+			if (h && idx != t.Leader() && !h.IsPlayerControlled() && IsScriptedOrder(order)) {
+				g.held[idx] = true;
+				g.heldSince[idx] = GetTickCount();
+				g.lastOrder[idx] = (uint8_t)order;
+				Log("coop: joining mid-sequence: %s is the game's (AI order %d) until the sequence ends",
+					HeroName(idx), order);
 			}
 		}
 		g.p2BackHeldAt = 0;
@@ -542,6 +554,11 @@ void CoopFrame() {
 
 	Trio t = GetTrio();
 	TrackStuckModes(t);
+	// The cutscene hold counts down whether or not player 2 is in: a player 2
+	// dropped by a level change during a cutscene left it frozen above zero, and
+	// every Start after that was refused as "cutscene".
+	if (CutsceneBars()) g.cutsceneHold = kCutsceneHoldFrames;
+	else if (g.cutsceneHold > 0) g.cutsceneHold--;
 	{
 		static bool dumped = false;
 		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
@@ -627,8 +644,6 @@ void CoopFrame() {
 	// Cutscenes: the letterbox bars, held a few frames after they go so a scene
 	// handing over to the next one does not flicker co-op on and off.
 	LogCutsceneSignals();
-	if (CutsceneBars()) g.cutsceneHold = kCutsceneHoldFrames;
-	else if (g.cutsceneHold > 0) g.cutsceneHold--;
 	bool cinematic = g.cutsceneHold > 0;
 	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
 	                h1.Busy() || h2.Busy() || groupAction || cinematic;
@@ -959,7 +974,12 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 		uint8_t* ai = (uint8_t*)(h.raw() + 0x561);
 		if (fr.idled[i] && *ai == 0) *ai = 0xFF;   // the AI driver enters its state from scratch
 		int order = (int)h.Order();
-		if (i != t.Leader() && order != fr.order[i] && IsScriptedOrder(order)) {
+		// "The companion waits here" (0x4802) is the game's even when the order
+		// value was already 3 from an earlier wait: the boss puts Asterix on its
+		// button (situation 0x0F), hands the lead to Obelix and tells Asterix to
+		// wait -- left to player 1 he walked off the button and was never launched.
+		bool waitEvent = ev == 0x4802 && order == 3;
+		if (i != t.Leader() && (order != fr.order[i] || waitEvent) && IsScriptedOrder(order)) {
 			char why[32];
 			sprintf(why, "event %04X", ev);
 			Hold(t, i, why);

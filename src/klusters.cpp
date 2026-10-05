@@ -49,11 +49,16 @@ QueryFn g_origQuery = nullptr;
 // (near/far planes, view window), +0x1C -> object whose +4 is the frame, planes
 // written at +0x4F0..+0x54C.
 struct FakeFrameOwner { void* vtbl; char* frame; };
-alignas(16) char g_fakeSvc[0x800];
-alignas(16) char g_fakeFrame[0xC0];
-FakeFrameOwner g_fakeOwner = { nullptr, g_fakeFrame };
+// Up to two extra views: player 2's camera, and player 1's own camera while the
+// game camera follows player 2's leading hero (then neither half shows the game
+// camera exactly, and each player's view needs its own frustum).
+const int kViews = 2;
+alignas(16) char g_fakeSvc[kViews][0x800];
+alignas(16) char g_fakeFrame[kViews][0xC0];
+FakeFrameOwner g_fakeOwner[kViews] = { { nullptr, g_fakeFrame[0] }, { nullptr, g_fakeFrame[1] } };
+bool  g_viewOn[kViews] = {};
+float g_viewPos[kViews][3];
 bool  g_p2Planes = false;
-float g_p2Pos[3];
 volatile long g_queries = 0, g_p2Only = 0;
 
 bool InFrustum(const char* planes, const float* c, float r) {
@@ -100,7 +105,7 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 	char* mgr = *(char**)((char*)yp + 0x90);
 	NextSectorFn next = (NextSectorFn)kNextSector;
 	const float* ref1 = ref ? ref : (const float*)(svc + 0x5B0);
-	const float* ref2 = ref ? nullptr : g_p2Pos;
+	const float* ref2 = ref ? nullptr : g_viewPos[0];
 	float scale = *(const float*)kKeyScale;
 	Entry* inside = nullptr;
 	Entry* out = nullptr;
@@ -116,11 +121,14 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 			uint32_t key = 0;
 			if (flags & 6) {
 				float d = Manhattan(c, ref1);
-				if (ref2) d = fminf(d, Manhattan(c, ref2));
+				for (int v = 0; ref2 && v < kViews; v++)
+					if (g_viewOn[v]) d = fminf(d, Manhattan(c, g_viewPos[v]));
 				key = (uint32_t)(-(int)(d * scale) - 1);
 			}
 			bool in1 = InFrustum(svc + 0x500, c, r);
-			bool in = in1 || InFrustum(g_fakeSvc + 0x500, c, r);
+			bool in = in1;
+			for (int v = 0; !in && v < kViews; v++)
+				if (g_viewOn[v]) in = InFrustum(g_fakeSvc[v] + 0x500, c, r);
 			if (in) {
 				if (!in1) InterlockedIncrement(&g_p2Only);
 				Insert(inside, e, key, (flags & 2) != 0);
@@ -139,14 +147,18 @@ void KlusterSetP2Camera() {
 	g_p2Planes = false;
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
-	float m[16];
-	if (!svc || !*(void**)(svc + 0x18) || !OtherViewMatrix(m)) return;
-	memcpy(g_fakeFrame + 0x10, m, sizeof(m));
-	*(void**)(g_fakeSvc + 0x18) = *(void**)(svc + 0x18);
-	*(void**)(g_fakeSvc + 0x1C) = &g_fakeOwner;
-	((BuildPlanesFn)kBuildPlanes)(g_fakeSvc, nullptr);
-	g_p2Pos[0] = m[12]; g_p2Pos[1] = m[13]; g_p2Pos[2] = m[14];
-	g_p2Planes = true;
+	if (!svc || !*(void**)(svc + 0x18)) return;
+	for (int v = 0; v < kViews; v++) {
+		float m[16];
+		g_viewOn[v] = v == 0 ? P2CamMatrix(m) : P1CamMatrix(m);
+		if (!g_viewOn[v]) continue;
+		memcpy(g_fakeFrame[v] + 0x10, m, sizeof(m));
+		*(void**)(g_fakeSvc[v] + 0x18) = *(void**)(svc + 0x18);
+		*(void**)(g_fakeSvc[v] + 0x1C) = &g_fakeOwner[v];
+		((BuildPlanesFn)kBuildPlanes)(g_fakeSvc[v], nullptr);
+		g_viewPos[v][0] = m[12]; g_viewPos[v][1] = m[13]; g_viewPos[v][2] = m[14];
+	}
+	g_p2Planes = g_viewOn[0] || g_viewOn[1];
 }
 
 long KlusterQueries() { return g_queries; }

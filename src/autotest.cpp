@@ -312,6 +312,18 @@ const Step kRepair[] = {
 	END(11000),
 };
 
+// joinlead2: the game leads with Obelix (as after the belly slides) when player
+// 2 joins: player 2 still gets Obelix, and leaving keeps Obelix leading.
+const Step kJoinLead2[] = {
+	MARK(0, "baseline"),
+	{ 300, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	VPAD(1500, 1, PAD_START, 0, 0, "p2 start"), VPAD(1700, 1, 0, 0, 0, "p2 release"),
+	VPAD(2500, 1, 0, 0, 1, "p2 up"), P1(2500, 0, 1, 0, "p1 right"),
+	VPAD(4000, 1, 0, 0, 0, "p2 neutral"), P1(4000, 0, 0, 0, "p1 neutral"),
+	VPAD(5000, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	END(6500),
+};
+
 // warp: player 2 walks off, then Back + A brings Obelix back to Asterix; Back
 // alone held long enough must still leave afterwards.
 const Step kWarp[] = {
@@ -848,6 +860,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("potion", kPotion),
 	SCENARIO("pursuito", kPursuitO),
 	SCENARIO("dash", kDash),
+	SCENARIO("joinlead2", kJoinLead2),
 	SCENARIO("lifterp2", kLifterP2),
 	SCENARIO("repair", kRepair),
 	SCENARIO("release", kRelease),

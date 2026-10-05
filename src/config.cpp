@@ -57,6 +57,11 @@ void CoopConfig::Load(const char* iniPath) {
 		else if (pb[0]) p1Pad = atoi(pb);
 	}
 	dropHoldMs  = GetPrivateProfileIntA("coop", "drop_hold_ms", dropHoldMs, full);
+	{
+		char hb[32] = {};
+		GetPrivateProfileStringA("coop", "p2_hero", "obelix", hb, sizeof(hb), full);
+		p2Hero = (hb[0] == 'a' || hb[0] == 'A') ? 0 : (hb[0] == 'o' && hb[1] == 'b') || (hb[0] == 'O' && hb[1] == 'b') ? 1 : -1;
+	}
 
 	verbose     = ReadBool("debug", "verbose", verbose, full);
 	forceLevel  = GetPrivateProfileIntA("debug", "force_level", forceLevel, full);

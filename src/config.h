@@ -18,6 +18,7 @@ struct CoopConfig {
 	bool  splitScreen   = true;   // off = shared camera on the leader
 	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect
 	int   dropHoldMs    = 1500;
+	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with
 	float deadzone      = 0.24f;
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
