@@ -947,3 +947,13 @@ pre-dialogue track and writes it back into +0x94 (`WatchSpyCameras`), checked ag
   the order broke and Asterix was parked for good. Safe sequence (ini safe_sequence): contacts from
   the non-leading player don't reach a lever whose event group switches the trio to the hero who
   leads already (autotest `lever`, control run with the option off shows 0x48B7).
+
+### Launcher started by the non-leading player (2026-10-05)
+Group action (hero situation 0x0D): the non-leader that starts one (sector 2's CKHkTrioCatapult)
+takes the lead for it (round 8). Co-op used to suspend only for player 1's hero in a group action,
+so a launch by player 2 kept split screen and player control of the other hero, and the lead stayed
+with Obelix after landing (the user's "far away" camera = the mod's own follow camera seeded from the
+launcher's 9.7-unit flight camera). Now either hero's group action suspends co-op (the game flies the
+companion along), and when co-op resumes the lead goes back to the previous leader (trio 0x4800/1).
+Autotests `launchp2` / `launcha` match after landing (positions, leader, game camera). Follow
+cameras are seeded at most 6 units out.

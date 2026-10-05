@@ -165,7 +165,18 @@ static void PollKeyboard(PadState& p) {
 	if (!p.connected) Log("pads: keyboard available as a controller (slot %d)", kKeyboardPad);
 	p.connected = true;
 	const int* k = g_config.keys;
-	bool focus = GameHasFocus() && !InspectorTyping();
+	// Enter ends an Inspector edit on its key-down: the field lets go of the
+	// keyboard while the key is still held, and it read as player 2's Start.
+	// After typing, keys count again only once every one has been let go.
+	static bool afterTyping = false;
+	bool typing = InspectorTyping();
+	if (typing) afterTyping = true;
+	else if (afterTyping) {
+		bool any = false;
+		for (int i = 0; i < CoopConfig::KEY_COUNT; i++) any |= KeyDown(k[i]);
+		if (!any && !KeyDown(VK_RETURN) && !KeyDown(VK_ESCAPE) && !KeyDown(VK_TAB)) afterTyping = false;
+	}
+	bool focus = GameHasFocus() && !typing && !afterTyping;
 	auto down = [&](int idx) { return focus && KeyDown(k[idx]); };
 	uint16_t b = 0;
 	if (down(CoopConfig::KEY_JUMP))   b |= PAD_A;

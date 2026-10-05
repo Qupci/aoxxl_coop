@@ -84,7 +84,10 @@ void Seed(Hero leader) {
 	Vector3 gpos = *(Vector3*)(srv + 0x5B0), glook = *(Vector3*)(srv + 0x5BC);
 	Vector3 off = gpos - glook;
 	float d = sqrtf(off.len2());
+	// Seeded right after a scripted shot (a launcher's flight camera keeps 9.7
+	// units) the view started far out; a follow camera stays near the hero.
 	cam.dist = (d > 1.5f && d < 15.0f) ? d : 5.0f;
+	if (cam.dist > 6.0f) cam.dist = 6.0f;
 	cam.pitch = d > 0.01f ? asinf(off.y / d) : 0.4f;
 	// The level-start camera is often almost level; start a bit higher so the
 	// ground around player 2 is visible.

@@ -18,7 +18,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -510,6 +510,44 @@ const Step kLever[] = {
 	SHOT(10000, "lever_1"),
 	END(12000),
 };
+
+// launchp2: player 2's Obelix (not leading) starts sector 2's launcher; co-op
+// has to suspend as for the leader, and Asterix lead again after the landing.
+// launchp2 / launcha: sector 2's launcher started by player 2's Obelix (not
+// leading) or by the leader Asterix; afterwards both walk, the game camera is
+// logged. Co-op has to suspend for the flight either way, Asterix lead after.
+const Step kLaunchP2[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "other hero next to the launcher" },
+	{ 4000, S_PLACE, HERO_OBELIX, 17, 0, 0, 0, "launcher hero on the launcher" },
+	VPAD(5500, 1, PAD_X, 0, 0, "p2 X"), VPAD(5700, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "launch_1"),
+	SHOT(31000, "launch_2"),
+	P1(32000, 0, 0, 1, "p1 forward"), SHOT(34000, "launch_3"),
+	P1(35000, 0, 1, 1, "p1 forward right"), SHOT(37000, "launch_4"),
+	P1(38000, 0, 0, 0, "p1 stop"),
+	VPAD(38500, 1, 0, 0, 1, "p2 forward"), SHOT(40500, "launch_5"), VPAD(41000, 1, 0, 0, 0, "p2 stop"),
+	END(42000),
+};
+const Step kLaunchA[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_OBELIX, 18, 0, 0, 0, "other hero next to the launcher" },
+	{ 4000, S_PLACE, HERO_ASTERIX, 17, 0, 0, 0, "launcher hero on the launcher" },
+	P1(5500, PAD_X, 0, 0, "p1 X"), P1(5700, 0, 0, 0, "p1 release"),
+	SHOT(8000, "launch_1"),
+	SHOT(31000, "launch_2"),
+	P1(32000, 0, 0, 1, "p1 forward"), SHOT(34000, "launch_3"),
+	P1(35000, 0, 1, 1, "p1 forward right"), SHOT(37000, "launch_4"),
+	P1(38000, 0, 0, 0, "p1 stop"),
+	VPAD(38500, 1, 0, 0, 1, "p2 forward"), SHOT(40500, "launch_5"), VPAD(41000, 1, 0, 0, 0, "p2 stop"),
+	END(42000),
+};
+
+
 
 const Step kRegions[] = {
 	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" },
@@ -1076,6 +1114,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("torch", kTorch),
 	SCENARIO("torchgrab", kTorchGrab),
 	SCENARIO("lever", kLever),
+	SCENARIO("launchp2", kLaunchP2),
+	SCENARIO("launcha", kLaunchA),
 	SCENARIO("spygroups", kSpyGroups),
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
@@ -1111,6 +1151,8 @@ const float kSpots[][3] = {
 	{ -744.80f, 514.60f, -980.60f },    // 14: next to the level 2 torch (-744.3 514.2 -981.4)
 	{ 134.20f, 12.60f, -572.30f },      // 15: at sector 5's lever behind the iron crates (134.2 12.1 -573.7)
 	{ 144.30f, 2.60f, -566.50f },       // 16: sector 5, next to the hearth (142.8 2.1 -568.2)
+	{ -264.30f, 13.20f, -521.00f },     // 17: on top of sector 2's launcher (CKHkTrioCatapult, -264.3 12.3 -521.0)
+	{ -270.00f, 9.00f, -521.00f },      // 18: next to that launcher
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
@@ -1135,6 +1177,7 @@ struct AutotestState {
 	char*   watchEnemy = nullptr;   // CKHkBasicEnemy chosen by NEAR_ENEMY
 	char*   watchClue = nullptr;    // CKHkClueMan (the spy), WATCHCLUE
 	char*   watchTorch = nullptr;   // CKHkTorch nearest Asterix, TORCH
+	bool    watchCam = false;       // the game camera (service +0x5B0 pos, +0x5BC look, track), WATCHCAM
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
 	struct Glide { bool on; Vector3 from, to; DWORD start, ms; } glide[HERO_COUNT] = {};
@@ -1267,6 +1310,18 @@ void LogTick(float t) {
 		line.Add(" | bonus hidden=%d following=%d target=%p", node ? (*(uint8_t*)(node + 0x10) & 2) != 0 : -1,
 			following, *(void**)(at.watchBonus + 0x20));
 		(void)life;
+	}
+	if (at.watchCam) {
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		if (cs) {
+			const float* cp = (const float*)(cs + 0x5B0);
+			const float* cl = (const float*)(cs + 0x5BC);
+			char* tr = *(char**)(cs + 0x38);
+			float dx = cp[0] - cl[0], dz = cp[2] - cl[2];
+			line.Add(" | gamecam (%.1f %.1f %.1f) look (%.1f %.1f %.1f) yaw %.2f dist %.1f track vt %08X", cp[0], cp[1], cp[2],
+			         cl[0], cl[1], cl[2], atan2f(dz, dx), sqrtf(dx * dx + dz * dz), tr ? (unsigned)*(uintptr_t*)tr : 0);
+		}
 	}
 	if (at.watchTorch) {
 		Trio t = GetTrio();
@@ -1542,6 +1597,7 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_WATCHCAM: at.watchCam = true; break;
 	case S_LEVERS: {   // every lever (CKHkActivator, 2,52): position, events, whom they switch to
 		unsigned n = GetNumLvlClassInstances(2, 52);
 		for (unsigned i = 0; i < n; i++) {

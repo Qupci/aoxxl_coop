@@ -71,6 +71,8 @@ struct CoopState {
 	Vector3  stuckPos[HERO_COUNT];
 	uint8_t  savedLeader = 0, savedCompanion = 0;
 	uint8_t  slicedHero = 0, slicedOther = 0;   // what the trio said during the sliced tick
+	int      groupTookLead = -1;      // a hero that took the lead to start a group action
+	int      groupPrevLeader = -1;    // ... and the leader before it, who gets it back after
 	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
 
 	bool    suspended = false;
@@ -783,6 +785,7 @@ void CoopFrame() {
 		Log("coop: level %d -> %d", g.lastLevel, level);
 		g.lastLevel = level;
 		g_trackBeforeSpy = nullptr;   // the old level's camera tracks are gone
+		g.groupTookLead = g.groupPrevLeader = -1;
 		g_spyWalk.on = false;
 		if (g.p2Joined) {
 			// The old hero objects are gone; there is nothing to hand back.
@@ -906,10 +909,12 @@ void CoopFrame() {
 		}
 	}
 
-	// Scripted modes belong to the game. So does a group action player 1 starts
+	// Scripted modes belong to the game. So does a group action either player
+	// starts (a launcher started by the non-leading player too: the game flies
+	// the companion along and runs its own camera, as when the leader starts it)
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
 	// companion" to a marker and waits for it, which only an AI companion does.
-	bool groupAction = Situation(h1) == kSituationGroupAction;
+	bool groupAction = Situation(h1) == kSituationGroupAction || Situation(h2) == kSituationGroupAction;
 	// Cutscenes: the letterbox bars, held a few frames after they go so a scene
 	// handing over to the next one does not flicker co-op on and off.
 	LogCutsceneSignals();
@@ -923,6 +928,18 @@ void CoopFrame() {
 			HeroName(g.p2Hero), ModeName(HeroMode(h2.Flags18())),
 			cinematic ? ", cutscene" : "", groupAction ? ", group action" : "");
 		CoopLogState(scripted ? "suspend" : "resume");
+		// A group action the non-leading player started is over: the lead goes
+		// back where it was (single player never hands it over for a launcher).
+		if (!scripted && g.groupTookLead >= 0) {
+			int took = g.groupTookLead, prev = g.groupPrevLeader;
+			g.groupTookLead = g.groupPrevLeader = -1;
+			if (t.Leader() == took && prev >= 0 && prev != took && !g.held[prev]) {
+				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+				int ev = prev == HERO_ASTERIX ? 0x4800 : 0x4801;
+				Log("coop: %s's group action is over; %s leads again (trio event %04X)", HeroName(took), HeroName(prev), ev);
+				((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
+			}
+		}
 	}
 	{
 		CKYellowPages* yp = YellowPages();
@@ -1216,7 +1233,10 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 				// asks the trio for its leader all along, outside this tick too --
 				// with the other hero still leading it kept putting that one on
 				// the activator's spot. The hero that started it leads from now.
-				Log("coop: %s started a group action while not leading -- it leads now", HeroName(g.slicedHero));
+				Log("coop: %s started a group action while not leading -- it leads until it is over",
+				    HeroName(g.slicedHero));
+				g.groupTookLead = g.slicedHero;
+				g.groupPrevLeader = g.savedLeader;
 			} else if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
 				trio[0x2C] = g.savedLeader;
 				trio[0x2D] = g.savedCompanion;
