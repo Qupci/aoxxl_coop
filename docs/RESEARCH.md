@@ -920,3 +920,8 @@ the spy waits forever; walking there by hand does not help. `WatchSpyWalk` puts 
 target and resends 0x5120 when the walk stalls (2.5 s no progress) or drops out. In autotests even a
 normal dialogue stops after sound 0x84 (needs something the test doesn't provide), so tests compare
 with `spya` up to that point.
+Spy camera: `CKHkClueMan::sendEvent` 0x5139 (dialogue start) saves the camera service's track
+(yp+0x68 +0x38) into spy +0x94/+0x98; the end (FUN_004B9760, just before sending trio 0x5121)
+switches back via camera service +0x34 = spy +0x94 (+0xE0 = 1.0, +0xE4 = 0). A second start saves
+the dialogue's CKCameraFixTrack (vt 0x6244EC) → camera stuck after the dialogue. Co-op keeps the
+pre-dialogue track and writes it back into +0x94 (`WatchSpyCameras`), checked again at 0x5121.
