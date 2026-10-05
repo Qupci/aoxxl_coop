@@ -900,3 +900,23 @@ uses the spot for clue men, and the slicing range is at least the spy's radius.
 Dialogue: the zone in front of the spy (plane-cross 66 for the first one) sends trio 0x5120;
 the trio walks the *leader* to the spy (situation 09) — if player 2 set it off from afar, player 1
 has to steer Asterix there.
+
+### Sector streaming: Sas boxes (2026-10-05)
+CKLevel (yellow pages +0x90): sectors at +4 (sector box at sector +0x18, max xyz then min xyz),
+current +0x24, loading +0x2C, requested +0x34 (-2 = none). `CKLevel::vf17` (0x40FD10) takes the
+trio leader's position (game manager vf28 -> trio vf27) and checks the *current sector's* Sas list
+(sector +0x10, count +0x14; FUN_00410DA0 with ECX = sector). A CKSas (12,17) has two boxes at a
+sector border: +0xC (max xyz, min xyz) streams in sector +4, +0x24 streams in sector +8. Zone events
+can switch too (CKLevel message 0x1222 "wait for sector to load", e.g. level 2 group #263, with
+rectangles for both heroes). Level 2 example: sector 1 Sas 0 = (-800..-806) -> 1, (-808..-815) -> 2
+at y 526..537, z -965..-974. Co-op: `WatchSectors` brings a player's hero that stands in another,
+unloaded sector's box for 2 s (no load pending) to the other player (autotest `sas`).
+
+### Roman agent dialogue walk
+Trio 0x5120 (FUN_00482610 case 0x20): leader +0x3F0 |= 2, param (0x34 bytes: +0 four bytes, +4
+walk target, then directions) copied to hero +0x4C8; on arrival the trio sends 0x5120 back to the
+spy, which starts the talk. A leader who falls off the walk (water reset) comes back playable and
+the spy waits forever; walking there by hand does not help. `WatchSpyWalk` puts the leader on the
+target and resends 0x5120 when the walk stalls (2.5 s no progress) or drops out. In autotests even a
+normal dialogue stops after sound 0x84 (needs something the test doesn't provide), so tests compare
+with `spya` up to that point.
