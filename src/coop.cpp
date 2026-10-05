@@ -66,6 +66,7 @@ struct CoopState {
 	bool     hidDash = false;         // game manager +0x5C bit 19 hidden for the tick
 	int      aiCycle[HERO_COUNT] = {};   // ticks left in the AI variant (situation reset)
 	DWORD    stuckSince[HERO_COUNT] = {};
+	DWORD    outsideSince[HERO_COUNT] = {};   // WatchSectors: outside the streamed sector since
 	Vector3  stuckPos[HERO_COUNT];
 	uint8_t  savedLeader = 0, savedCompanion = 0;
 	uint8_t  slicedHero = 0, slicedOther = 0;   // what the trio said during the sliced tick
@@ -477,6 +478,122 @@ void CheckMarker(DWORD now) {
 
 static void SetHeroPosition(Hero h, const Vector3& to);
 
+// The level streams one sector at a time besides sector 0 (CKLevel, yellow
+// pages +0x90: sectors at +4, current +0x24, loading +0x2C, requested +0x34).
+// The switch is the leader's: each sector lists Sas (sector +0x10, count +0x14;
+// CKSas: two boxes at the border, +0xC and +0x24, standing in the first loads
+// sector +4, in the second sector +8), checked against the trio leader's
+// position only (CKLevel::vf17 -> FUN_00410DA0); zone events can switch it too
+// (CKLevel 0x1222). A player's hero left in an unloaded sector has no ground
+// under it. One outside the current sector's box (sector +0x18: max xyz, min
+// xyz) for two seconds, with no load going on, is brought to the other player.
+static void WatchSectors(Trio t, DWORD now) {
+	CKYellowPages* yp = YellowPages();
+	char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+	int cur = lvl ? *(int*)(lvl + 0x24) : -2;
+	char** secs = lvl ? *(char***)(lvl + 4) : nullptr;
+	bool settled = lvl && cur > 0 && *(int*)(lvl + 0x2C) == -2 && *(int*)(lvl + 0x34) == -2 && secs && secs[cur];
+	if (!settled || !t || !g.p2Joined || g.suspended || g.held[g.p1Hero] || g.held[g.p2Hero]) {
+		memset(g.outsideSince, 0, sizeof(g.outsideSince));
+		return;
+	}
+	auto inBox = [secs](int n, const Vector3& p) {
+		const float* b = (const float*)(secs[n] + 0x18);
+		return p.x <= b[0] && p.x > b[3] && p.y <= b[1] && p.y > b[4] && p.z <= b[2] && p.z > b[5];
+	};
+	auto inside = [&](const Vector3& p) { return inBox(cur, p); };
+	// Only in another sector's box counts: places built from sector 0 alone are
+	// outside every streamed sector's box and always there.
+	int nsec = 0;
+	while (nsec < 64 && secs[nsec] && *(void**)secs[nsec] == *(void**)secs[0]) nsec++;
+	auto unloaded = [&](const Vector3& p) {
+		for (int n = 1; n < nsec; n++)
+			if (n != cur && inBox(n, p)) return n;
+		return 0;
+	};
+	int idx[2] = { g.p1Hero, g.p2Hero };
+	for (int k = 0; k < 2; k++) {
+		int i = idx[k], o = idx[1 - k];
+		Hero h = t.GetHero(i), other = t.GetHero(o);
+		if (!h || !other || inside(h.Pos()) || !unloaded(h.Pos())) { g.outsideSince[i] = 0; continue; }
+		if (!g.outsideSince[i]) { g.outsideSince[i] = now; continue; }
+		if ((int)(now - g.outsideSince[i]) < 2000 || !inside(other.Pos()) || !HeroModePlayable(other.Flags18()))
+			continue;
+		g.outsideSince[i] = 0;
+		Vector3 from = h.Pos(), to = other.Pos();
+		to.y += 1.0f;
+		SetHeroPosition(h, to);
+		Log("coop: %s in sector %d (at %.0f %.0f %.0f), not streamed (sector %d is): brought to %s at (%.1f %.1f %.1f)",
+		    HeroName(i), unloaded(from), from.x, from.y, from.z, cur, HeroName(o), to.x, to.y, to.z);
+	}
+}
+
+// A Roman agent's dialogue (CKHkClueMan, trio event 0x5120, parameter: +4 the
+// spot to walk to, then directions and a second point, 0x34 bytes) has the
+// trio walk the *leader* there (situation 09); the dialogue starts when the
+// walk ends there. Set off by player 2's Obelix with Asterix far behind, the
+// walk jumped into the water on the way, Asterix came back playable, and the
+// spy never talked -- walking him there by hand does not end the walk. When
+// the walk stops getting closer, or drops out before arriving, the leader is
+// put on the spot and the event sent again.
+struct SpyWalk {
+	bool    on = false;
+	bool    resending = false;
+	int     tries = 0;
+	DWORD   since = 0, lastProgress = 0;
+	float   best = 0;
+	void*   trio = nullptr;
+	uint8_t param[0x34] = {};
+} g_spyWalk;
+
+static void WatchSpyWalk(Trio t, DWORD now) {
+	SpyWalk& w = g_spyWalk;
+	if (!w.on) return;
+	if (!g.p2Joined || !t || (int)(now - w.since) > 30000) { w.on = false; return; }
+	Hero lead = t.GetHero(t.Leader());
+	if (!lead || g.held[t.Leader()]) return;
+	const float* spot = (const float*)(w.param + 4);
+	Vector3 to(spot[0], spot[1], spot[2]);
+	float d = sqrtf((lead.Pos() - to).len2());
+	if (d < 3.0f) { w.on = false; return; }
+	if (d < w.best - 0.25f) { w.best = d; w.lastProgress = now; }
+	uint8_t sit = Situation(lead), f = lead.Flags18();
+	bool walking = sit == 0x09;
+	bool dropped = !walking && HeroModePlayable(f) && (int)(now - w.since) > 1000;
+	bool stuck = walking && (int)(now - w.lastProgress) > 2500;
+	if (!dropped && !stuck) return;
+	if (w.tries >= 2) { w.on = false; return; }
+	w.tries++;
+	Vector3 dst = to;
+	dst.y += 0.5f;
+	SetHeroPosition(lead, dst);
+	Log("coop: %s's walk to the Roman agent %s %.0f units short; put on the spot (%.1f %.1f %.1f), dialogue resent",
+	    HeroName(t.Leader()), stuck ? "stuck" : "dropped", d, dst.x, dst.y, dst.z);
+	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+	uint8_t copy[sizeof(w.param)];
+	memcpy(copy, w.param, sizeof(copy));
+	w.resending = true;
+	((SendFn)(*(void***)w.trio)[5])(w.trio, nullptr, 0x5120, copy);
+	w.resending = false;
+	w.since = w.lastProgress = now;
+	w.best = 1e30f;
+}
+
+void CoopNoteTrioEvent(void* trio, int event, void* param) {
+	SpyWalk& w = g_spyWalk;
+	event &= 0xFFFF;
+	if (event == 0x5121) { w.on = false; return; }
+	if (event != 0x5120 || !param || w.resending || !g.p2Joined) return;
+	memcpy(w.param, param, sizeof(w.param));
+	w.trio = trio;
+	w.on = true;
+	w.tries = 0;
+	w.since = w.lastProgress = GetTickCount();
+	w.best = 1e30f;
+	const float* spot = (const float*)(w.param + 4);
+	Log("coop: Roman agent's dialogue: the leader walks to (%.1f %.1f %.1f)", spot[0], spot[1], spot[2]);
+}
+
 // A cutscene set off by one player far from the other (player 2's Obelix at the
 // Roman agent while Asterix was back at the lifter): the scene and the script
 // after it want both heroes there, and the AI could not find a path across the
@@ -692,6 +809,8 @@ void CoopFrame() {
 			RegroupForCutscene(t, h1, h2);
 		}
 	}
+	WatchSpyWalk(t, now);
+	WatchSectors(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
 	// whatever mode the game put it -- whichever player it belongs to. Rides only
 	// work that way: on the belly slide (mode 3) Obelix leads and Asterix rides

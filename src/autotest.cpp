@@ -383,7 +383,7 @@ const Step kMusicA2[] = {
 };
 
 const Step kSpyGroups[] = {
-	MARK(0, "baseline"),
+	MARK(0, "baseline"), SECTORS(200),
 	{ 500, S_EVGROUP, 0x98, 0, 0, 0, 0, "group 098 (#152)" },
 	{ 500, S_EVGROUP, 0x9B, 0, 0, 0, 0, "group 09B (box 16)" },
 	{ 500, S_EVGROUP, 0xE1, 0, 0, 0, 0, "group 0E1 (0708, spy dialogue)" },
@@ -406,7 +406,8 @@ const Step kSpyA[] = {
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	GLIDE(1500, HERO_ASTERIX, 7, 4000),
 	SHOT(6000, "spya_1"),
-	END(10000),
+	SHOT(25000, "spya_2"),
+	END(40000),
 };
 
 // spy2o: player 2's Obelix goes on alone to the lifter area's spy (Asterix
@@ -419,6 +420,35 @@ const Step kSpy2O[] = {
 	{ 1500, S_PLACE, HERO_OBELIX, 9, 0, 0, 0, "obelix near the lifter area's spy" },
 	SHOT(5000, "spy2o_1"),
 	END(8000),
+};
+
+// spywalk: player 2's Obelix sets off the first spy's dialogue with Asterix
+// still at the start; the trio's walk has to bring Asterix there (or the mod
+// puts him there) and the dialogue has to end (trio event 0x5121).
+const Step kSpyWalk[] = {
+	MARK(0, "baseline"), SECTORS(200),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDE(1500, HERO_OBELIX, 7, 4000),
+	SHOT(12000, "spywalk_1"),
+	P1(20000, PAD_A, 0, 0, "p1 A"), P1(20200, 0, 0, 0, "p1 release"),
+	P1(23000, PAD_A, 0, 0, "p1 A"), P1(23200, 0, 0, 0, "p1 release"),
+	P1(26000, PAD_A, 0, 0, "p1 A"), P1(26200, 0, 0, 0, "p1 release"),
+	P1(29000, PAD_A, 0, 0, "p1 A"), P1(29200, 0, 0, 0, "p1 release"),
+	P1(32000, PAD_A, 0, 0, "p1 A"), P1(32200, 0, 0, 0, "p1 release"),
+	SHOT(34000, "spywalk_2"),
+	END(40000),
+};
+
+// sas: player 1's Asterix (leading) is put in the Sas box that streams in
+// sector 2; player 2's Obelix, left at the start (sector 1 only), has to be
+// brought over.
+const Step kSas[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas" },
+	SECTORS(4000),
+	SHOT(7000, "sas_1"),
+	END(9000),
 };
 
 const Step kRegions[] = {
@@ -980,6 +1010,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("spyo", kSpyO),
 	SCENARIO("spya", kSpyA),
 	SCENARIO("spy2o", kSpy2O),
+	SCENARIO("spywalk", kSpyWalk),
+	SCENARIO("sas", kSas),
 	SCENARIO("spygroups", kSpyGroups),
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
@@ -1008,6 +1040,7 @@ const float kSpots[][3] = {
 	{ -815.00f, 507.60f, -1061.00f },   // 7: past the spy's dialogue trigger (level 2 start area)
 	{ 16.00f, 51.50f, -124.50f },       // 8: where the music starts for the leader (checkpoint)
 	{ -759.40f, 508.50f, -1014.80f },   // 9: where the user's Obelix waited for the lifter area's spy
+	{ -811.50f, 531.00f, -970.00f },    // 10: sector 1's Sas box that streams in sector 2
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
@@ -1302,6 +1335,22 @@ void RunStep(const Step& s) {
 			}
 			Log("autotest:   sector %d %p idx=%d flags=%04X vt=%p box max(%.0f %.0f %.0f) min(%.0f %.0f %.0f)%s", i, sec,
 			    *(int16_t*)(sec + 4), *(uint16_t*)(sec + 6), *(void**)sec, b[0], b[1], b[2], b[3], b[4], b[5], who);
+		}
+		// Sas (CKSas, 12,17), listed per sector (+0x10, count +0x14): two boxes
+		// each; the leader inside the first streams in sector +4, inside the second
+		// sector +8. Only the current sector's list (and a loading one's) is checked
+		// (CKLevel::vf17 -> FUN_00410DA0 with ECX = the sector).
+		for (int i = 0; secs && i < 64; i++) {
+			char* sec = secs[i];
+			if (!sec || IsBadReadPtr(sec, 0x40) || *(void**)sec != *(void**)secs[0]) break;
+			char** sas = *(char***)(sec + 0x10);
+			unsigned ns = *(unsigned*)(sec + 0x14);
+			for (unsigned k = 0; sas && k < ns && k < 64; k++) {
+				char* a = sas[k];
+				const float* b = (const float*)(a + 0xC);
+				Log("autotest:   sector %d sas %u: -> %d in max(%.0f %.0f %.0f) min(%.0f %.0f %.0f), -> %d in max(%.0f %.0f %.0f) min(%.0f %.0f %.0f)",
+				    i, k, *(int*)(a + 4), b[0], b[1], b[2], b[3], b[4], b[5], *(int*)(a + 8), b[6], b[7], b[8], b[9], b[10], b[11]);
+			}
 		}
 		break;
 	}

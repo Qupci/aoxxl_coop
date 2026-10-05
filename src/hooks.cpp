@@ -46,6 +46,7 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 }
 
 int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) {
+	CoopNoteTrioEvent(self, event, param);
 	int cookie = CoopBeforeTrioEvent(event, _ReturnAddress());
 	int r = g_origTrioSendEvent(self, edx, event, param);
 	CoopAfterTrioEvent(event, cookie);

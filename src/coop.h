@@ -53,6 +53,8 @@ void CoopAfterLifeTick(int heroIndex, Hero hero);
 // Called around CKGrpTrio::sendEvent. `before` returns a cookie for `after`.
 int  CoopBeforeTrioEvent(int event, void* caller);
 void CoopAfterTrioEvent(int event, int cookie);
+// Also called before CKGrpTrio::sendEvent, with the event's parameter.
+void CoopNoteTrioEvent(void* trio, int event, void* param);
 
 bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
