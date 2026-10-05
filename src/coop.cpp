@@ -14,6 +14,7 @@
 //    (only its leader in a player state), then player control is re-applied.
 
 #include "coop.h"
+#include "detour.h"
 #include "klusters.h"
 #include "sound.h"
 #include "autotest.h"
@@ -489,7 +490,8 @@ static void SetHeroPosition(Hero h, const Vector3& to);
 // the leader's treatment: its own sector, moved by the Sas boxes it walks
 // through. A switch goes to the hero that made it -- the leader by a Sas, or
 // the hero whose zone fired -- and a player's hero whose sector is not the
-// streamed one (outside any Sas box) for two seconds is brought to the other.
+// streamed one (outside any Sas box) for a second (ini sector_catch_up_ms) is
+// brought to the other.
 struct SectorTrack {
 	int   level = -99;
 	int   lastCur = -2;
@@ -574,7 +576,8 @@ static void WatchSectors(Trio t, DWORD now) {
 		Hero h = t.GetHero(i), other = t.GetHero(o);
 		if (!h || !other || g_sec.sector[i] == cur || inSas[i]) { g.outsideSince[i] = 0; continue; }
 		if (!g.outsideSince[i]) { g.outsideSince[i] = now; continue; }
-		if ((int)(now - g.outsideSince[i]) < 2000 || g_sec.sector[o] != cur || !HeroModePlayable(other.Flags18()))
+		if ((int)(now - g.outsideSince[i]) < g_config.sectorCatchUpMs || g_sec.sector[o] != cur ||
+		    !HeroModePlayable(other.Flags18()))
 			continue;
 		g.outsideSince[i] = 0;
 		Vector3 from = h.Pos(), to = other.Pos();
@@ -864,6 +867,7 @@ void CoopFrame() {
 	//      played out of order never ends)
 	//   Y  [cheats] fill the magic potion
 	//   X  [cheats] your hero becomes the leader
+	//   D-pad up / down  [cheats] Asterix gets the nearest torch, lit / throws it away
 	// Player 1's controller is the one the game reads (pad identification).
 	{
 		int p1pad = Player1Pad();
@@ -873,7 +877,7 @@ void CoopFrame() {
 		for (int who = 0; who < 2 && !inCutscene; who++) {
 			bool held = who == 0 ? mod1 : mod2;
 			uint16_t pressed = who == 0 ? q.pressed : p.pressed;
-			if (!held || !(pressed & kFace)) continue;
+			if (!held || !(pressed & (kFace | PAD_DPAD_UP | PAD_DPAD_DOWN))) continue;
 			int me = who == 0 ? g.p1Hero : g.p2Hero, mate = who == 0 ? g.p2Hero : g.p1Hero;
 			Hero hm = who == 0 ? h1 : h2, hp = who == 0 ? h2 : h1;
 			const char* player = who == 0 ? "player 1" : "player 2";
@@ -891,6 +895,8 @@ void CoopFrame() {
 				SetPotionGauge(300.0f);
 				Log("coop: cheat: magic potion filled by %s", player);
 			}
+			if ((pressed & PAD_DPAD_UP) && g_config.cheats) CoopTorchCheat(true);
+			if ((pressed & PAD_DPAD_DOWN) && g_config.cheats) CoopTorchCheat(false);
 			if ((pressed & PAD_X) && g_config.cheats && t.Leader() != me && !g.suspended) {
 				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 				int ev = me == HERO_ASTERIX ? 0x4800 : 0x4801;
@@ -1000,8 +1006,98 @@ void CoopFrame() {
 // Per-hero Life tick
 // ---------------------------------------------------------------------------
 
+// Torch for Asterix (cheat). The level's carryable torches are CKHkTorch (2,32;
+// level 2's is at -744 514 -981). Near one, the leader is offered it every
+// frame (torch tick -> trio 0xC06 -> trio +0x4C, cleared again by the trio),
+// and the action button takes it (hero +0x3EC bit 0x10 -> bit 0x2000 ->
+// situation 5); Asterix then carries it (hero +0x464 = the torch, torch +0x3E
+// state 1, fire level in bits 2-4). Given here by making that offer and that
+// press inside Asterix's own tick, from any distance, then lit (0x5128).
+// Thrown away with the torch's 0x513C, as a level restart does.
+struct TorchCheat { int want = 0; int frames = 0; char* torch = nullptr; } g_torch;
+
+static char* NearestTorch(Hero a) {
+	char* best = nullptr;
+	float bd = 1e30f;
+	unsigned n = GetNumLvlClassInstances(2, 32);
+	for (unsigned i = 0; i < n; i++) {
+		char* c = (char*)GetLvlObject(2, 32, i);
+		char* node = c ? *(char**)(c + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr) continue;
+		Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+		float d = (p - a.Pos()).len2();
+		if (d < bd) { bd = d; best = c; }
+	}
+	return best;
+}
+
+void CoopTorchCheat(bool give) {
+	Trio t = GetTrio();
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+	if (!a) return;
+	if (give) {
+		if (*(char**)(a.raw() + 0x464)) { Log("coop: cheat: Asterix already has a torch"); return; }
+		g_torch.torch = NearestTorch(a);
+		g_torch.want = g_torch.torch ? 1 : 0;
+		g_torch.frames = 0;
+		Log("coop: cheat: torch %p for Asterix", g_torch.torch);
+		return;
+	}
+	char* c = *(char**)(a.raw() + 0x464);
+	if (!c) { Log("coop: cheat: Asterix has no torch"); return; }
+	typedef int(__fastcall* SendFn)(void*, void*, int, void*);
+	((SendFn)(*(void***)c)[5])(c, nullptr, 0x513C, nullptr);
+	*(char**)(a.raw() + 0x464) = nullptr;
+	*(uint32_t*)(a.raw() + 0x3EC) &= ~0x400000u;
+	Log("coop: cheat: Asterix threw torch %p away", c);
+}
+
+// The "take" press: Hero_ProcessPlayerInput puts action 5 into hero +0x3EC
+// bit 0x10, then FUN_00499CF0 (both heroes' player-state handlers; thiscall,
+// one argument, ret 4) turns it into +0x3EC bit 0x2000 when something is
+// offered (FUN_0049A080), and the situation chooser takes the offer. While the
+// cheat is pending the press is added at that handler's entry.
+typedef void(__fastcall* TakeFn)(char* hero, void* edx, int arg);
+const uintptr_t kTakeHandler = 0x499CF0;
+const uint8_t   kTakePrologue[7] = { 0x6A, 0xFF, 0x68, 0x48, 0xD7, 0x61, 0x00 };
+TakeFn g_origTake = nullptr;
+
+static void __fastcall TakeHook(char* hero, void* edx, int arg) {
+	if (g_torch.want) {
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+		if (a && hero == a.raw()) *(uint32_t*)(hero + 0x3EC) |= 0x10;
+	}
+	g_origTake(hero, edx, arg);
+}
+
+// For XXL Inspector's Cheats window (and anything else): 1 = give, 0 = throw away.
+extern "C" __declspec(dllexport) void __cdecl XXLCoopTorchCheat(int give) { CoopTorchCheat(give != 0); }
+
+static void TorchBeforeTick(int heroIndex, Hero hero) {
+	if (heroIndex != HERO_ASTERIX || !g_torch.want) return;
+	Trio t = GetTrio();
+	if (!t) return;
+	if (*(char**)(hero.raw() + 0x464) == g_torch.torch) {
+		// Lit, as from a brazier (0x5128: fire level 4 in torch +0x3E bits 2-4).
+		typedef int(__fastcall* SendFn)(void*, void*, int, void*);
+		char* c = g_torch.torch;
+		if (((*(uint8_t*)(c + 0x3E) >> 2) & 7) == 0) ((SendFn)(*(void***)c)[5])(c, nullptr, 0x5128, nullptr);
+		Log("coop: cheat: Asterix took the torch after %d frames (state %02X)", g_torch.frames, *(uint8_t*)(c + 0x3E));
+		g_torch.want = 0;
+		return;
+	}
+	if (++g_torch.frames > 60) {
+		Log("coop: cheat: Asterix did not take the torch (situation %02X)", Situation(hero));
+		g_torch.want = 0;
+		return;
+	}
+	*(char**)((char*)t.raw() + 0x4C) = g_torch.torch;
+}
+
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
-	(void)hero;
+	TorchBeforeTick(heroIndex, hero);
 	if (!g.p2Joined || g.suspended) return;
 	if (heroIndex != g.p1Hero && heroIndex != g.p2Hero) return;
 
@@ -1279,6 +1375,8 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 // ---------------------------------------------------------------------------
 
 void CoopInit() {
+	InstallDetour(kTakeHandler, (void*)TakeHook, (void**)&g_origTake, kTakePrologue, sizeof(kTakePrologue),
+	              "hero take press (fire cheat)");
 	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");

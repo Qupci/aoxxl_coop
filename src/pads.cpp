@@ -132,6 +132,29 @@ void PadsSetKeyboardOwnedByP2(bool owned) {
 
 static bool KeyDown(int vk) { return vk > 0 && (GetAsyncKeyState(vk) & 0x8000) != 0; }
 
+// XXL Inspector (behind the QoL patch as apd3d9.dll, or as the game's d3d9.dll)
+// exports XXLInspectorWantsKeyboard while one of its text fields has the
+// keyboard: typing coordinates there must not press player 2's keys (Enter
+// was Start: player 2 joined on the keyboard).
+static bool InspectorTyping() {
+	typedef int(__cdecl* WantsFn)();
+	static WantsFn fn = nullptr;
+	static DWORD lookedAt = 0;
+	DWORD now = GetTickCount();
+	if (!fn && (lookedAt == 0 || now - lookedAt > 5000)) {
+		lookedAt = now;
+		const char* names[] = { "apd3d9.dll", "d3d9.dll" };
+		for (const char* n : names) {
+			HMODULE m = GetModuleHandleA(n);
+			if (m && (fn = (WantsFn)GetProcAddress(m, "XXLInspectorWantsKeyboard")) != nullptr) {
+				Log("pads: XXL Inspector found (%s): its text fields keep the keyboard", n);
+				break;
+			}
+		}
+	}
+	return fn && fn() != 0;
+}
+
 static void PollKeyboard(PadState& p) {
 	uint16_t prev = p.buttons;
 	if (!g_config.keyboard) {
@@ -142,7 +165,7 @@ static void PollKeyboard(PadState& p) {
 	if (!p.connected) Log("pads: keyboard available as a controller (slot %d)", kKeyboardPad);
 	p.connected = true;
 	const int* k = g_config.keys;
-	bool focus = GameHasFocus();
+	bool focus = GameHasFocus() && !InspectorTyping();
 	auto down = [&](int idx) { return focus && KeyDown(k[idx]); };
 	uint16_t b = 0;
 	if (down(CoopConfig::KEY_JUMP))   b |= PAD_A;

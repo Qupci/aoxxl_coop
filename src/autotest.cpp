@@ -1,5 +1,6 @@
 #include "autotest.h"
 #include "coop.h"
+#include "proximity.h"
 #include "config.h"
 #include "inputmgr.h"
 #include "life.h"
@@ -17,7 +18,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -461,6 +462,53 @@ const Step kSectorZone[] = {
 	GLIDE(2500, HERO_OBELIX, 12, 2000),
 	SHOT(8000, "sectorzone_1"),
 	END(10000),
+};
+
+// torch: list the torches, move the nearest to Asterix, give it, later drop it.
+const Step kTorch[] = {
+	MARK(0, "baseline"), { 500, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 1500, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	SHOT(2500, "torch_0"),
+	{ 3000, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	SHOT(5000, "torch_1"),
+	{ 7000, S_TORCH, 7, 0, 0, 0, 0, "cheat: throw fire away" },
+	SHOT(9000, "torch_2"),
+	END(11000),
+};
+
+// torchgrab: Asterix put next to the torch picks it up with the buttons.
+const Step kTorchGrab[] = {
+	MARK(0, "baseline"), { 500, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 900, S_TORCH, 4, 0, 0, 0, 0, "watch offer" },
+	{ 1000, S_PLACE, HERO_ASTERIX, 14, 0, 0, 0, "asterix at the torch" },
+	P1(2500, PAD_Y, 0, 0, "p1 Y"), P1(2700, 0, 0, 0, "p1 release"),
+	SHOT(3500, "torchgrab_y"),
+	P1(4500, PAD_B, 0, 0, "p1 B"), P1(4700, 0, 0, 0, "p1 release"),
+	SHOT(5500, "torchgrab_b"),
+	P1(6500, PAD_X, 0, 0, "p1 X"), P1(6700, 0, 0, 0, "p1 release"),
+	SHOT(7500, "torchgrab_x"),
+	END(9000),
+};
+
+// lever: sector 5's lever behind the iron crates ("switch to Asterix") hit by
+// player 2's Obelix while Asterix leads: safe sequence keeps it from working.
+const Step kLever[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2500, S_PLACE, HERO_ASTERIX, 16, 0, 0, 0, "asterix at the hearth" },
+	{ 2600, S_LEVERS, 0, 0, 0, 0, 0, "levers" },
+	{ 3000, S_PLACE, HERO_OBELIX, 15, 0, 0, 0, "obelix at the lever" },
+	VPAD(3800, 1, 0, -1, -1, "p2 turn back-left"), VPAD(3900, 1, 0, 0, 0, "p2 stop"),
+	VPAD(4300, 1, PAD_X, 0, 0, "p2 X"), VPAD(4500, 1, 0, 0, 0, "p2 release"),
+	VPAD(5300, 1, 0, -1, 0, "p2 turn left"), VPAD(5400, 1, 0, 0, 0, "p2 stop"),
+	VPAD(5800, 1, PAD_X, 0, 0, "p2 X"), VPAD(6000, 1, 0, 0, 0, "p2 release"),
+	VPAD(6800, 1, 0, 0, -1, "p2 turn back"), VPAD(6900, 1, 0, 0, 0, "p2 stop"),
+	VPAD(7300, 1, PAD_X, 0, 0, "p2 X"), VPAD(7500, 1, 0, 0, 0, "p2 release"),
+	VPAD(8300, 1, 0, -1, -1, "p2 back-left step"), VPAD(8600, 1, 0, 0, 0, "p2 stop"),
+	VPAD(9000, 1, PAD_X, 0, 0, "p2 X"), VPAD(9200, 1, 0, 0, 0, "p2 release"),
+	SHOT(10000, "lever_1"),
+	END(12000),
 };
 
 const Step kRegions[] = {
@@ -1025,6 +1073,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("spywalk", kSpyWalk),
 	SCENARIO("sas", kSas),
 	SCENARIO("sectorzone", kSectorZone),
+	SCENARIO("torch", kTorch),
+	SCENARIO("torchgrab", kTorchGrab),
+	SCENARIO("lever", kLever),
 	SCENARIO("spygroups", kSpyGroups),
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
@@ -1057,6 +1108,9 @@ const float kSpots[][3] = {
 	{ -803.00f, 532.00f, -987.00f },    // 11: before the rectangles (#75/#76, at -811 533 -987) that switch to sector 2
 	{ -819.00f, 532.00f, -987.00f },    // 12: past them
 	{ -783.30f, 517.40f, -990.00f },    // 13: where the user's Asterix stayed behind in sector 1
+	{ -744.80f, 514.60f, -980.60f },    // 14: next to the level 2 torch (-744.3 514.2 -981.4)
+	{ 134.20f, 12.60f, -572.30f },      // 15: at sector 5's lever behind the iron crates (134.2 12.1 -573.7)
+	{ 144.30f, 2.60f, -566.50f },       // 16: sector 5, next to the hearth (142.8 2.1 -568.2)
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
@@ -1080,6 +1134,7 @@ struct AutotestState {
 	char*   watchCrate = nullptr;   // CKHkCrate chosen by NEAR_CRATE
 	char*   watchEnemy = nullptr;   // CKHkBasicEnemy chosen by NEAR_ENEMY
 	char*   watchClue = nullptr;    // CKHkClueMan (the spy), WATCHCLUE
+	char*   watchTorch = nullptr;   // CKHkTorch nearest Asterix, TORCH
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
 	struct Glide { bool on; Vector3 from, to; DWORD start, ms; } glide[HERO_COUNT] = {};
@@ -1212,6 +1267,16 @@ void LogTick(float t) {
 		line.Add(" | bonus hidden=%d following=%d target=%p", node ? (*(uint8_t*)(node + 0x10) & 2) != 0 : -1,
 			following, *(void**)(at.watchBonus + 0x20));
 		(void)life;
+	}
+	if (at.watchTorch) {
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+		char* node = *(char**)(at.watchTorch + 0x10);
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		line.Add(" | torch +3E=%02X at (%.1f %.1f %.1f) A+464=%p A+3EC=%08X trio+4C=%p", *(uint8_t*)(at.watchTorch + 0x3E),
+		         fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0, fr ? ((float*)(fr + 0x80))[2] : 0,
+		         a ? *(void**)(a.raw() + 0x464) : nullptr, a ? *(uint32_t*)(a.raw() + 0x3EC) : 0,
+		         t ? *(void**)((char*)t.raw() + 0x4C) : nullptr);
 	}
 	if (at.watchClue) {
 		line.Add(" | spies");
@@ -1415,6 +1480,79 @@ void RunStep(const Step& s) {
 			char* o = objs ? objs[first + k] : nullptr;
 			Log("autotest:   target %u: %p vt %08X message %04X", k, o, o ? (unsigned)*(uintptr_t*)o : 0,
 			    msgs ? msgs[first + k] : 0);
+		}
+		break;
+	}
+	case S_TORCH: {   // a: 0 list/watch, 1 give (fields), 2 move the torch to Asterix, 3 drop (0x513C)
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+		if (!a) break;
+		unsigned n = GetNumLvlClassInstances(2, 32);
+		if (s.a == 0) {
+			HMODULE insp = GetModuleHandleA("apd3d9.dll"), self = GetModuleHandleA("xxl_coop.asi");
+			Log("autotest: inspector %p wants-keyboard export %p; xxl_coop.asi %p torch export %p", insp,
+			    insp ? (void*)GetProcAddress(insp, "XXLInspectorWantsKeyboard") : nullptr, self,
+			    self ? (void*)GetProcAddress(self, "XXLCoopTorchCheat") : nullptr);
+			float best = 1e30f;
+			for (unsigned i = 0; i < n; i++) {
+				char* c = (char*)GetLvlObject(2, 32, i);
+				char* node = c ? *(char**)(c + 0x10) : nullptr;
+				char* fr = node ? *(char**)(node + 4) : nullptr;
+				if (!fr) continue;
+				Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+				Log("autotest: torch %u %p at (%.1f %.1f %.1f) +3E=%02X radius %.2f +18 %.2f +1C %.2f", i, c, p.x, p.y, p.z,
+				    *(uint8_t*)(c + 0x3E), *(float*)(c + 0x14), *(float*)(c + 0x18), *(float*)(c + 0x1C));
+				float d = (p - a.Pos()).len2();
+				if (d < best) { best = d; at.watchTorch = c; }
+			}
+			break;
+		}
+		char* c = at.watchTorch;
+		if (s.a == 4) {   // who writes the trio's offer (+0x4C) and Asterix's +0x464
+			const void* w[2] = { (char*)t.raw() + 0x4C, a.raw() + 0x464 };
+			WatchBytes(w, 2, 0, 0);
+			Log("autotest: watching trio+4C %p and Asterix+464 %p", w[0], w[1]);
+			break;
+		}
+		if (!c) break;
+		if (s.a == 6 || s.a == 7) {
+			CoopTorchCheat(s.a == 6);
+		} else if (s.a == 5) {   // offer it (trio +0x4C) and press "take" (+0x3EC bit 0x2000)
+			*(char**)((char*)t.raw() + 0x4C) = c;
+			*(uint32_t*)(a.raw() + 0x3EC) |= 0x2000;
+			Log("autotest: torch %p offered to Asterix", c);
+		} else if (s.a == 1) {
+			*(char**)(a.raw() + 0x464) = c;
+			*(uint32_t*)(a.raw() + 0x3EC) |= 0x400000;
+			Log("autotest: torch %p given to Asterix (fields)", c);
+		} else if (s.a == 2) {
+			char* node = *(char**)(c + 0x10);
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (fr) {
+				Vector3 p = a.Pos();
+				((float*)(fr + 0x40))[0] = p.x + 0.5f; ((float*)(fr + 0x40))[1] = p.y; ((float*)(fr + 0x40))[2] = p.z;
+			}
+			Log("autotest: torch %p moved to Asterix", c);
+		} else if (s.a == 3) {
+			typedef int(__fastcall* SendFn)(void*, void*, int, void*);
+			((SendFn)(*(void***)c)[5])(c, nullptr, 0x513C, nullptr);
+			*(char**)(a.raw() + 0x464) = nullptr;
+			*(uint32_t*)(a.raw() + 0x3EC) &= ~0x400000u;
+			Log("autotest: torch %p dropped (0x513C)", c);
+		}
+		break;
+	}
+	case S_LEVERS: {   // every lever (CKHkActivator, 2,52): position, events, whom they switch to
+		unsigned n = GetNumLvlClassInstances(2, 52);
+		for (unsigned i = 0; i < n; i++) {
+			char* l = (char*)GetLvlObject(2, 52, i);
+			char* node = l ? *(char**)(l + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!l) continue;
+			int to = ProximityLeverSwitchTarget(l);
+			Log("autotest: lever %u %p at (%.1f %.1f %.1f) events %04X/%04X%s%s", i, l, fr ? ((float*)(fr + 0x80))[0] : 0,
+			    fr ? ((float*)(fr + 0x80))[1] : 0, fr ? ((float*)(fr + 0x80))[2] : 0, *(uint16_t*)(l + 0x28),
+			    *(uint16_t*)(l + 0x2A), to >= 0 ? " switch to " : "", to >= 0 ? HeroName(to) : "");
 		}
 		break;
 	}

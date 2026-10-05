@@ -41,7 +41,7 @@ index bdff12e..f00e092 100644
  extern std::map<KClass*, char*> lvlObjectNames[32], gameObjectNames;
  extern uint lvlNumSectors;
 diff --git a/gui.cpp b/gui.cpp
-index 7d018cd..9d52329 100644
+index 7d018cd..7ee7a77 100644
 --- a/gui.cpp
 +++ b/gui.cpp
 @@ -29,6 +29,8 @@ void IGInit()
@@ -53,8 +53,52 @@ index 7d018cd..9d52329 100644
  #endif
  	ImGui::StyleColorsClassic();
  }
-@@ -966,5 +968,8 @@ void IGDX9Reset()
+@@ -181,6 +183,28 @@ void IGCheats()
+ 		ImGui::SameLine();
+ 		ImGui::Checkbox("Lock", &g_cheat_infinitePotion);
+ 	}
++
++	// Torch for Asterix, through the XXL co-op mod (xxl_coop.asi) when loaded.
++	{
++		typedef void (__cdecl *ft_torch)(int give);
++		static ft_torch coopTorch = 0;
++		static bool lookedUp = false;
++		if(!lookedUp) {
++			lookedUp = true;
++			HMODULE coop = GetModuleHandleA("xxl_coop.asi");
++			if(coop) coopTorch = (ft_torch)GetProcAddress(coop, "XXLCoopTorchCheat");
++		}
++		if(coopTorch) {
++			ImGui::AlignTextToFramePadding();
++			ImGui::Text("Asterix torch:");
++			ImGui::SameLine();
++			if(ImGui::Button("Give (lit)"))
++				coopTorch(1);
++			ImGui::SameLine();
++			if(ImGui::Button("Throw away"))
++				coopTorch(0);
++		}
++	}
+ 			
+ 	/*if(asterixHook)
+ 		if(ImGui::Button("Place Asterix at Egypt skip")) {
+@@ -964,7 +988,23 @@ void IGDX9Reset()
+ }
+ #endif
  
++// True while an ImGui text field (or a drag field being typed into) has the
++// keyboard. Other mods ask for it (exported: the XXL co-op mod reads the
++// keyboard for player 2 and must not see the typing).
++bool IGWantsTextInput()
++{
++	return ImGui::GetCurrentContext() && ImGui::GetIO().WantTextInput;
++}
++
++extern "C" __declspec(dllexport) int __cdecl XXLInspectorWantsKeyboard()
++{
++	return IGWantsTextInput() ? 1 : 0;
++}
++
  LRESULT __stdcall IGWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
  {
 +	// Messages can arrive before the D3D device (and with it ImGui) exists, e.g.
@@ -63,10 +107,10 @@ index 7d018cd..9d52329 100644
  	return ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
  }
 diff --git a/main.cpp b/main.cpp
-index 12eca96..c0d40f8 100644
+index 12eca96..3978320 100644
 --- a/main.cpp
 +++ b/main.cpp
-@@ -583,6 +583,23 @@ void ReadClassNameFile()
+@@ -583,6 +583,28 @@ void ReadClassNameFile()
  	}
  }
  
@@ -78,6 +122,11 @@ index 12eca96..c0d40f8 100644
 +LRESULT __stdcall LateWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 +{
 +	IGWndProc(hWnd, uMsg, wParam, lParam);
++	// Typing into a field: the keys are the Inspector's, not the game's.
++	extern bool IGWantsTextInput();
++	if (IGWantsTextInput() && (uMsg == WM_KEYDOWN || uMsg == WM_KEYUP || uMsg == WM_CHAR ||
++	                           uMsg == WM_SYSKEYDOWN || uMsg == WM_SYSKEYUP))
++		return 0;
 +	return CallWindowProcA(g_latePrevProc, hWnd, uMsg, wParam, lParam);
 +}
 +
@@ -90,7 +139,7 @@ index 12eca96..c0d40f8 100644
  void PatchStart_XXL()
  {
  #if XXLVER == 1
-@@ -590,14 +607,16 @@ void PatchStart_XXL()
+@@ -590,14 +612,16 @@ void PatchStart_XXL()
  	SetImmediateJump((void*)0x47A274, (uint)jmp_47A274);
  
  	gameStartInfo = (SGameStartInfo*)0x665310;
@@ -108,7 +157,7 @@ index 12eca96..c0d40f8 100644
  
  	// Crate randomizer
  	//SetImmediateJump((void*)0x00542698, (uint)asm_crate_mod);
-@@ -711,6 +730,18 @@ void PatchStart()
+@@ -711,6 +735,18 @@ void PatchStart()
  	SetMemProtection((void*)0x401000, PAGE_EXECUTE_READ);
  }
  
@@ -127,7 +176,7 @@ index 12eca96..c0d40f8 100644
  naked void EntryPointInterception()
  {
  	__asm {
-@@ -729,6 +760,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
+@@ -729,6 +765,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
  		exehi = GetModuleHandle(0);
  		exeRebase = (uint32_t)exehi - 0x400000;
  

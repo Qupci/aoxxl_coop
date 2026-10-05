@@ -930,3 +930,20 @@ Spy camera: `CKHkClueMan::sendEvent` 0x5139 (dialogue start) saves the camera se
 switches back via camera service +0x34 = spy +0x94 (+0xE0 = 1.0, +0xE4 = 0). A second start saves
 the dialogue's CKCameraFixTrack (vt 0x6244EC) → camera stuck after the dialogue. Co-op keeps the
 pre-dialogue track and writes it back into +0x94 (`WatchSpyCameras`), checked again at 0x5121.
+
+### Torches, levers, safe sequence (2026-10-05)
+* CKHkTorch (2,32): carryable torch. On the ground its tick offers itself to the leader within
+  +0x14 (trio 0xC06 -> trio +0x4C, cleared by the trio every frame; vf40 = leader is Asterix). The
+  hero's input processor sets +0x3EC bit 0x10 from action 5 (X); FUN_00499CF0 (thiscall, ret 4)
+  turns that into bit 0x2000 when something is offered (FUN_0049A080); the situation chooser then
+  picks situation 5 (take). Carried: hero +0x464 = torch, torch +0x3E state 1, fire level in bits
+  2-4 (0x5128 lights it: level 4). 0x513C (as CKHkAsterixLife::InitOnce does) throws it away.
+  Cheat (R3 + D-pad up/down, Inspector buttons): offer the nearest torch inside Asterix's tick and
+  add bit 0x10 at FUN_00499CF0's entry.
+* CKHkActivator (2,52, vtable 0x628DA0): lever; events +0x28 (on push) and +0x2A (on anim end);
+  hit through collision contacts 0x300 / projectile hits 0x301. Level 2 sector 5: the lever behind
+  the iron crates switches to Asterix (0x48B7); the hearth (CKHkHearth "on get fire") then has
+  Obelix lead and sends Asterix to a marker (0x4813). Hit by a non-leading Obelix while Asterix led,
+  the order broke and Asterix was parked for good. Safe sequence (ini safe_sequence): contacts from
+  the non-leading player don't reach a lever whose event group switches the trio to the hero who
+  leads already (autotest `lever`, control run with the option off shows 0x48B7).

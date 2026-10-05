@@ -1,3 +1,4 @@
+#include "config.h"
 #include "proximity.h"
 #include "coop.h"
 #include "detour.h"
@@ -429,6 +430,49 @@ int SendAs(char* receiver, int event, void* list, Trio t, int actor, int other, 
 	return r;
 }
 
+// Safe sequence (ini safe_sequence, on by default). A lever (CKHkActivator,
+// vtable 0x628DA0; events at +0x28 "on push" and +0x2A "on animation end")
+// whose event group tells the trio to switch to a hero (0x4800/0x48B7
+// Asterix, 0x4801/0x48B8 Obelix) is meant to be worked by the other hero, while
+// he leads: level 2's lever behind the iron crates (#45, "switch to Asterix")
+// is Obelix's, with Asterix to light the hearth after it (#428 then has Obelix
+// lead and sends Asterix to wait at a marker). Hit by the non-leading Obelix
+// while Asterix already led, the hearth came next with Asterix as the leader
+// -- he was sent off to his marker for good. Such a lever only answers the
+// non-leading player when its switch would change the leader.
+char* g_heldBackLogged = nullptr;   // the lever last reported
+
+int GroupSwitchTarget(unsigned ev) {   // the hero an event's group switches to, or -1
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return -1;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return -1;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	uint16_t* msgs = *(uint16_t**)(es + 0x14);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++) {
+		char* o = objs[first + k];
+		if (!o || *(uintptr_t*)o != 0x6256A0) continue;   // CKGrpTrio
+		unsigned m = msgs[first + k];
+		if (m == 0x4800 || m == 0x48B7) return HERO_ASTERIX;
+		if (m == 0x4801 || m == 0x48B8) return HERO_OBELIX;
+	}
+	return -1;
+}
+
+bool LeverHeldBack(char* receiver, Trio t) {
+	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
+	int lead = t.Leader();
+	unsigned evs[2] = { *(uint16_t*)(receiver + 0x28), *(uint16_t*)(receiver + 0x2A) };
+	for (unsigned ev : evs)
+		if (GroupSwitchTarget(ev) == lead) return true;
+	return false;
+}
+
 // `maskOf(entry, h1, h2)`: bit 0 if player 1's hero is in that contact, bit 1
 // for player 2's. Entries are chained through their first word. A contact list
 // with both heroes in it (both fighting the same Roman) is delivered in two
@@ -454,6 +498,27 @@ int DispatchAs(char* receiver, int event, void* list, MaskOf maskOf) {
 		all |= masks[n++];
 	}
 	if (all == 0) return send(receiver, nullptr, event, list);
+	int nl = CoopNonLeaderPlayer();
+	int nlMask = nl == p1 ? 1 : nl == p2 ? 2 : 0;
+	if (nlMask && (all & nlMask) && LeverHeldBack(receiver, t)) {
+		// The non-leader's contacts go nowhere; the rest as the game made them.
+		void* head = nullptr; void** tail = &head;
+		bool dropped = false;
+		for (int i = 0; i < n; i++) {
+			if (masks[i] & nlMask) { dropped = true; continue; }
+			*tail = entries[i];
+			tail = (void**)entries[i];
+		}
+		*tail = nullptr;
+		if (dropped && g_heldBackLogged != receiver) {
+			g_heldBackLogged = receiver;
+			Log("proximity: safe sequence: lever %p ignores %s -- it switches to %s, who leads already",
+			    receiver, HeroName(nl), HeroName(t.Leader()));
+		}
+		int r = head ? send(receiver, nullptr, event, head) : 0;
+		for (int i = 0; i < n; i++) *(void**)entries[i] = i + 1 < n ? entries[i + 1] : nullptr;
+		return r;
+	}
 	if (all == 1) return SendAs(receiver, event, list, t, p1, p2, p2);
 	bool mixed = false;
 	for (int i = 0; i < n; i++) if (!(masks[i] & 2)) mixed = true;
@@ -692,6 +757,11 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 } // namespace
 
 long ProximityP2Contacts() { return g_p2Contacts; }
+int ProximityLeverSwitchTarget(void* lever) {
+	char* l = (char*)lever;
+	int a = GroupSwitchTarget(*(uint16_t*)(l + 0x28));
+	return a >= 0 ? a : GroupSwitchTarget(*(uint16_t*)(l + 0x2A));
+}
 long ProximitySwappedZones() { return g_swappedZones; }
 long ProximityP2Squads() { return g_p2Squads; }
 long ProximityP2Beacons() { return g_p2Beacons; }

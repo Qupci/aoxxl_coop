@@ -32,7 +32,8 @@ void CoopLogState(const char* tag);
 bool CoopP2Joined();
 int  CoopP2Hero();
 int  CoopP1Hero();
-void CoopNoteZoneHero(int heroIndex);   // a trigger zone fired for this hero (sector attribution)
+void CoopNoteZoneHero(int heroIndex);
+void CoopTorchCheat(bool give);   // fire for Asterix from the nearest brazier, or thrown away   // a trigger zone fired for this hero (sector attribution)
 int  CoopNonLeaderPlayer();   // the player hero that is not the trio leader (-1 if none)
 int  CoopP2Pad();
 bool CoopSuspended();   // co-op paused for a scripted mode (ride, cinematic...)

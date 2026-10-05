@@ -63,6 +63,10 @@ void CoopConfig::Load(const char* iniPath) {
 		p2Hero = (hb[0] == 'a' || hb[0] == 'A') ? 0 : (hb[0] == 'o' && hb[1] == 'b') || (hb[0] == 'O' && hb[1] == 'b') ? 1 : -1;
 	}
 
+	safeSequence = ReadBool("coop", "safe_sequence", safeSequence, full);
+	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
+	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
+
 	verbose     = ReadBool("debug", "verbose", verbose, full);
 	forceLevel  = GetPrivateProfileIntA("debug", "force_level", forceLevel, full);
 	watchdog    = ReadBool("debug", "watchdog", watchdog, full);
@@ -90,7 +94,7 @@ void CoopConfig::Load(const char* iniPath) {
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d cheats=%d",
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d safeSequence=%d sectorCatchUpMs=%d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
-		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats);
+		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, safeSequence, sectorCatchUpMs);
 }

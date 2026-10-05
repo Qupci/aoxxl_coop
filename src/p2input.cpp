@@ -54,10 +54,10 @@ bool BuildP2Actions(int padIndex, uint8_t* out, int numActions) {
 
 void BuildActionsFromPad(const PadState& pad, uint8_t* out, int numActions) {
 	memset(out, 0, numActions);
-	// The mod's own combos (Back or the right stick button held, plus A, B, X
-	// or Y): the face buttons do not reach the hero while the modifier is held.
+	// The mod's own combos (Back or the right stick button held, plus A, B, X,
+	// Y or D-pad up/down): those do not reach the hero while the modifier is held.
 	PadState p = pad;
-	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y;
+	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y | PAD_DPAD_UP | PAD_DPAD_DOWN;
 	if (p.buttons & (PAD_BACK | PAD_RTHUMB)) {
 		p.buttons &= ~kFace;
 		p.pressed &= ~kFace;

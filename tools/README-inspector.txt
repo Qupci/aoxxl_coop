@@ -21,3 +21,11 @@ Built DLL: xxl-inspector\bin\apd3d9_xxl1_behind_qol.dll -> copy to
 Game Files\apd3d9.dll. F1 toggles the Inspector window.
 Build: build_inspector.bat-style cl/link with vcvars32 (VS 2022 Build Tools),
 /DXXLVER=1, see the patch's header for the source files.
+
+Co-op additions (2026-10-05):
+  - Cheats window: "Asterix torch: Give (lit) / Throw away" buttons, shown when
+    xxl_coop.asi is loaded (calls its export XXLCoopTorchCheat).
+  - While an Inspector text field has the keyboard (ImGui WantTextInput), key
+    messages are kept from the game, and the co-op mod's keyboard player is
+    paused (export XXLInspectorWantsKeyboard) -- typing coordinates no longer
+    joins player 2 on the keyboard.

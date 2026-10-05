@@ -17,6 +17,9 @@
 
 bool ProximityInstallHooks();
 
+// The hero a lever's (CKHkActivator) events switch the trio to, or -1.
+int ProximityLeverSwitchTarget(void* lever);
+
 // Diagnostics.
 long ProximitySlices();
 long ProximityP2Bonuses();   // bonuses sent flying to player 2's hero
