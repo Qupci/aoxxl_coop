@@ -1,0 +1,140 @@
+diff --git a/d3d9hook.cpp b/d3d9hook.cpp
+index cc9abde..e119100 100644
+--- a/d3d9hook.cpp
++++ b/d3d9hook.cpp
+@@ -10,13 +10,20 @@ ftDirect3DCreate9 oriDirect3DCreate9;
+ IDirect3D9 *WINAPI myDirect3DCreate9(int SDKVersion)
+ {
+ 	wchar_t tbuf[256]; HDirect3D9 *hd; IDirect3D9 *id;
++	if (g_lateLoad) LateStart();
+ 	if(!d3d9)
+ 	{
++		HMODULE self = 0;
++		GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
++		                   (LPCSTR)&myDirect3DCreate9, &self);
+ 		if(_access("apd3d9.dll", 0) != -1) // If apd3d9.dll exists.
+ 		{
+ 			d3d9 = LoadLibraryA("apd3d9.dll");
++			// Loaded as apd3d9.dll itself (behind another d3d9.dll, e.g. the XXL
++			// QoL patch): do not chain to ourselves.
++			if(d3d9 == self) { FreeLibrary(d3d9); d3d9 = 0; }
+ 		}
+-		else
++		if(!d3d9)
+ 		{
+ 			GetSystemDirectoryW(tbuf, 255);
+ 			wcscat_s(tbuf, 255, L"\\d3d9.dll");
+diff --git a/global.h b/global.h
+index bdff12e..f00e092 100644
+--- a/global.h
++++ b/global.h
+@@ -456,6 +456,11 @@ extern FILE *logfile;
+ extern void *odmvtbld[], *devvtbld[];
+ 
+ extern SGameStartInfo* gameStartInfo;
++// Loaded with LoadLibrary after the game started (as apd3d9.dll behind the
++// XXL QoL patch's d3d9.dll) instead of as the game's own d3d9.dll import.
++extern bool g_lateLoad;
++void LateStart();
++LRESULT __stdcall LateWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+ //extern CKYellowPages* yellowPages;
+ extern std::map<KClass*, char*> lvlObjectNames[32], gameObjectNames;
+ extern uint lvlNumSectors;
+diff --git a/gui.cpp b/gui.cpp
+index 7d018cd..9d52329 100644
+--- a/gui.cpp
++++ b/gui.cpp
+@@ -29,6 +29,8 @@ void IGInit()
+ #else
+ 	ImGui_ImplWin32_Init(gameStartInfo->hwnd);
+ 	ImGui_ImplDX9_Init(gamed3ddev);
++	extern void LateSubclass(HWND hwnd);
++	LateSubclass(gameStartInfo->hwnd);
+ #endif
+ 	ImGui::StyleColorsClassic();
+ }
+@@ -966,5 +968,8 @@ void IGDX9Reset()
+ 
+ LRESULT __stdcall IGWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+ {
++	// Messages can arrive before the D3D device (and with it ImGui) exists, e.g.
++	// when loaded as apd3d9.dll behind the XXL QoL patch.
++	if (!ImGui::GetCurrentContext()) return 0;
+ 	return ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
+ }
+diff --git a/main.cpp b/main.cpp
+index 12eca96..c0d40f8 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -583,6 +583,23 @@ void ReadClassNameFile()
+ 	}
+ }
+ 
++bool g_lateLoad = false;
++static WNDPROC g_latePrevProc = 0;
++
++// Late load: the window class is registered already, so the game window is
++// subclassed (chaining to whatever procedure it has, other mods included).
++LRESULT __stdcall LateWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
++{
++	IGWndProc(hWnd, uMsg, wParam, lParam);
++	return CallWindowProcA(g_latePrevProc, hWnd, uMsg, wParam, lParam);
++}
++
++void LateSubclass(HWND hwnd)
++{
++	if (g_lateLoad && hwnd && !g_latePrevProc)
++		g_latePrevProc = (WNDPROC)SetWindowLongPtrA(hwnd, GWLP_WNDPROC, (LONG_PTR)LateWndProc);
++}
++
+ void PatchStart_XXL()
+ {
+ #if XXLVER == 1
+@@ -590,14 +607,16 @@ void PatchStart_XXL()
+ 	SetImmediateJump((void*)0x47A274, (uint)jmp_47A274);
+ 
+ 	gameStartInfo = (SGameStartInfo*)0x665310;
++	if (!g_lateLoad) {
+ 	*(uint*)(0x479E8E) = (uint)hookWndProc;
+ 
+ 	// Remove cursor from window class
+ 	memcpy((void*)0x479EAE, "\x83\xC4\x08\x31\xC0\x90", 6); // add esp, 8 \ xor eax, eax
+ 
+-	// FOV Fix
++	// FOV Fix (late load: the QoL patch has its own, and other mods chain to it)
+ 	//SetImmediateJump((void*)0x00414b70, (uint)asm_fov_fix);
+ 	SetImmediateJump((void*)0x00414B70, (uint)P_CalcProjCamera);
++	}
+ 
+ 	// Crate randomizer
+ 	//SetImmediateJump((void*)0x00542698, (uint)asm_crate_mod);
+@@ -711,6 +730,18 @@ void PatchStart()
+ 	SetMemProtection((void*)0x401000, PAGE_EXECUTE_READ);
+ }
+ 
++void LateStart()
++{
++	static bool started = false;
++	if (started) return;
++	started = true;
++	SetMemProtection((void*)(0x401000 + exeRebase), PAGE_EXECUTE_READWRITE);
++	VerifyVersion();
++	ReadSettings();
++	PatchStart_XXL();
++	// .text stays writable: other mods patch it after us.
++}
++
+ naked void EntryPointInterception()
+ {
+ 	__asm {
+@@ -729,6 +760,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
+ 		exehi = GetModuleHandle(0);
+ 		exeRebase = (uint32_t)exehi - 0x400000;
+ 
++		// LoadLibrary'd after the game started (lpvReserved is NULL then): the
++		// entry point already ran; start when Direct3DCreate9 is called.
++		if (lpvReserved == NULL) { g_lateLoad = true; return TRUE; }
++
+ 		// Make the .text section writable.
+ 		SetMemProtection((void*)(0x401000 + exeRebase), PAGE_EXECUTE_READWRITE);
+ 
