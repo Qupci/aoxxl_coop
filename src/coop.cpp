@@ -215,6 +215,9 @@ bool CoopAllowedNow(Trio t, const char** why) {
 	if (GetNumLvlClassInstances(ax::kCKHkObelix) == 0) { *why = "Obelix not in level"; return false; }
 	Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
 	if (!a || !o) { *why = "hero missing"; return false; }
+	// Level 1: Obelix is in the level before Asterix finds him, waiting at his
+	// spot (hero +0x1A nonzero; trio 0x4883 "discover Obelix" clears it).
+	if (*(uint8_t*)(o.raw() + 0x1A) != 0) { *why = "Obelix has not joined Asterix yet"; return false; }
 	if (!HeroModePlayable(a.Flags18()) || !HeroModePlayable(o.Flags18())) { *why = "scripted mode"; return false; }
 	if (a.Busy() || o.Busy()) { *why = "hero busy"; return false; }
 	if (CutsceneBars() || g.cutsceneHold > 0) { *why = "cutscene"; return false; }
@@ -591,6 +594,32 @@ static void WatchSectors(Trio t, DWORD now) {
 	}
 }
 
+// Cutscenes (CKCinematicScene, 12,37; listed by the cinematic service, yellow
+// pages +0x80, +0x10 / count +0x14). CKSrvCinematic::vf17 ends a playing scene
+// (scene +0x20 bit 0) the game's own way (FUN_00461A80: every running bloc
+// finished) when its input view's action 0 -- Enter -- is pressed, if the scene
+// has flag 0x1000 ("end on pressing Enter") and not 0x180 == 0x80. Level 1's
+// long intro (scene 1, flags 0x4F16) has no 0x1000. [debug] skip_cutscenes
+// gives it to every scene.
+static void MakeCutscenesSkippable() {
+	if (!g_config.skipCutscenes) return;
+	CKYellowPages* yp = YellowPages();
+	char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+	char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+	unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
+	static char** doneFor = nullptr;
+	static unsigned doneN = 0;
+	if (!scenes || (scenes == doneFor && n == doneN)) return;
+	doneFor = scenes;
+	doneN = n;
+	unsigned changed = 0;
+	for (unsigned i = 0; i < n && i < 512; i++) {
+		uint16_t& f = *(uint16_t*)(scenes[i] + 0x20);
+		if ((f & 0x1000) == 0 && (f & 0x180) != 0x80) { f |= 0x1000; changed++; }
+	}
+	Log("coop: skip_cutscenes: %u of %u cutscenes now end on Enter", changed, n);
+}
+
 // A Roman agent's dialogue (CKHkClueMan, trio event 0x5120, parameter: +4 the
 // spot to walk to, then directions and a second point, 0x34 bytes) has the
 // trio walk the *leader* there (situation 09); the dialogue starts when the
@@ -797,6 +826,7 @@ void CoopFrame() {
 	Trio t = GetTrio();
 	TrackStuckModes(t);
 	WatchSectors(t, now);   // every frame: the heroes' sectors are tracked in single player too
+	MakeCutscenesSkippable();
 	{   // diagnostics: the streamed sector (level object = yellow pages +0x90, current +0x24, next +0x34)
 		static int lastSector = -99;
 		char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
@@ -1087,6 +1117,30 @@ static void __fastcall TakeHook(char* hero, void* edx, int arg) {
 		if (a && hero == a.raw()) *(uint32_t*)(hero + 0x3EC) |= 0x10;
 	}
 	g_origTake(hero, edx, arg);
+}
+
+// The magic potion. Hero_ReadCommandBlock (0x49A350, both heroes' player
+// states, thiscall, no arguments) sets hero +0x388 bit 0x4 -- "potion on",
+// which the movement code (speed +0x31C instead of +0x310, ...) and the rest
+// read -- only for a hero whose vtable slot 15 returns 0, which is Asterix
+// (Obelix's returns his class id): single player never lets Obelix drink.
+// A player's Obelix gets the bit too while the gauge (game manager +0x40 ->
+// +0x9C) is above zero ([coop] obelix_potion).
+typedef void(__fastcall* ReadCmdFn)(char* hero, void* edx);
+const uintptr_t kReadCommandBlock = 0x49A350;
+const uint8_t   kReadCmdPrologue[6] = { 0x51, 0x56, 0x8B, 0xF1, 0x8B, 0x06 };
+ReadCmdFn g_origReadCmd = nullptr;
+
+static void __fastcall ReadCmdHook(char* hero, void* edx) {
+	g_origReadCmd(hero, edx);
+	if (!g_config.obelixPotion || !g.p2Joined) return;
+	Trio t = GetTrio();
+	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	if (!o || hero != o.raw() || (g.p1Hero != HERO_OBELIX && g.p2Hero != HERO_OBELIX)) return;
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	char* sg = gm ? *(char**)(gm + 0x40) : nullptr;
+	if (sg && *(float*)(sg + 0x9C) > 0.0f) *(uint32_t*)(hero + 0x388) |= 4;
 }
 
 // For XXL Inspector's Cheats window (and anything else): 1 = give, 0 = throw away.
@@ -1397,6 +1451,8 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 void CoopInit() {
 	InstallDetour(kTakeHandler, (void*)TakeHook, (void**)&g_origTake, kTakePrologue, sizeof(kTakePrologue),
 	              "hero take press (fire cheat)");
+	InstallDetour(kReadCommandBlock, (void*)ReadCmdHook, (void**)&g_origReadCmd, kReadCmdPrologue,
+	              sizeof(kReadCmdPrologue), "hero potion flag (Obelix's potion)");
 	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");

@@ -64,6 +64,7 @@ void CoopConfig::Load(const char* iniPath) {
 	}
 
 	safeSequence = ReadBool("coop", "safe_sequence", safeSequence, full);
+	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
 	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
 	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
 
@@ -74,6 +75,7 @@ void CoopConfig::Load(const char* iniPath) {
 	renderProbe = ReadBool("debug", "render_probe", renderProbe, full);
 	splitTest   = ReadBool("debug", "split_test", splitTest, full);
 	cheats      = ReadBool("debug", "cheats", cheats, full);
+	skipCutscenes = ReadBool("debug", "skip_cutscenes", skipCutscenes, full);
 
 	char buf[64] = {};
 	GetPrivateProfileStringA("coop", "split_mode", "vertical", buf, sizeof(buf), full);
@@ -94,7 +96,7 @@ void CoopConfig::Load(const char* iniPath) {
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d cheats=%d safeSequence=%d sectorCatchUpMs=%d",
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
-		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, safeSequence, sectorCatchUpMs);
+		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs);
 }

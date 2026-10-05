@@ -18,7 +18,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -79,6 +79,8 @@ struct Step {
 #define CINE_LIST(t)                { t, S_CINE, -1, 0, 0, 0, 0, "cine list" }
 #define CINE_START(t)               { t, S_CINE, -2, 0, 0, 0, 0, "cine start" }
 #define CINE_STOP(t)                { t, S_CINE, -3, 0, 0, 0, 0, "cine stop" }
+// Ends every playing cutscene the game's own way (as Enter does on a skippable one).
+#define CINE_SKIP(t)                { t, S_CINE, -4, 0, 0, 0, 0, "cine skip" }
 // Turn the cutscene probe (extra state every log tick) on or off.
 #define PROBE(t, on)                { t, S_PROBE, on, 0, 0, 0, 0, "probe" }
 // Right stick of virtual pad `slot` (camera look).
@@ -548,6 +550,77 @@ const Step kLaunchA[] = {
 };
 
 
+
+// lvl1 (run with -Level 1): the intro skipped, then player 2 tries to join
+// before Obelix is found; state logged.
+const Step kLvl1[] = {
+	MARK(0, "baseline"), CINE_LIST(0), CINE_SKIP(200), CINE_LIST(600),
+	SHOT(2500, "lvl1_1"), CINE_LIST(3000), CINE_LIST(6000), CINE_LIST(9000), CINE_LIST(12000),
+	VPAD(13000, 1, PAD_START, 0, 0, "p2 start"), VPAD(13200, 1, 0, 0, 0, "p2 release"),
+	SHOT(15000, "lvl1_2"),
+	SECTORS(15500),
+	END(17000),
+};
+
+// lvl1obelix (-Level 1): Asterix finds Obelix (sector 2's rectangle starts the
+// cutscene, then trio 0x4883); player 2 can join only after that.
+const Step kLvl1Obelix[] = {
+	MARK(0, "baseline"), CINE_SKIP(200),
+	VPAD(6500, 1, PAD_START, 0, 0, "p2 start (too early)"), VPAD(6700, 1, 0, 0, 0, "p2 release"),
+	{ 7000, S_PLACE, HERO_ASTERIX, 19, 0, 0, 0, "asterix to sector 2's zone" },
+	{ 8800, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	{ 9000, S_PLACE, HERO_ASTERIX, 20, 0, 0, 0, "asterix before the rectangle" },
+	GLIDE(9500, HERO_ASTERIX, 21, 1500),
+	SHOT(11500, "lvl1obelix_1"),
+	CINE_SKIP(12000),
+	SHOT(18000, "lvl1obelix_2"),
+	VPAD(19000, 1, PAD_START, 0, 0, "p2 start"), VPAD(19200, 1, 0, 0, 0, "p2 release"),
+	VPAD(20000, 1, 0, 0, 1, "p2 forward"), VPAD(22000, 1, 0, 0, 0, "p2 stop"),
+	SHOT(22500, "lvl1obelix_3"),
+	END(24000),
+};
+
+// potionmove (level 2): both heroes run and jump without, then with the potion.
+const Step kPotionMove[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields" },
+	P1(2000, 0, 0, 1, "p1 run"), VPAD(2000, 1, 0, 0, 1, "p2 run"),
+	{ 3500, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields running" },
+	P1(4000, 0, 0, 0, "p1 stop"), VPAD(4000, 1, 0, 0, 0, "p2 stop"),
+	P1(4500, PAD_A, 0, 0, "p1 A"), P1(4700, 0, 0, 0, "p1 r"), P1(4900, PAD_A, 0, 0, "p1 A"), P1(5100, 0, 0, 0, "p1 r"),
+	P1(5300, PAD_A, 0, 0, "p1 A"), P1(5500, 0, 0, 0, "p1 r"),
+	VPAD(5500, 1, PAD_A, 0, 0, "p2 A"), VPAD(5700, 1, 0, 0, 0, "p2 r"), VPAD(5900, 1, PAD_A, 0, 0, "p2 A"), VPAD(6100, 1, 0, 0, 0, "p2 r"),
+	VPAD(6300, 1, PAD_A, 0, 0, "p2 A"), VPAD(6500, 1, 0, 0, 0, "p2 r"),
+	POTION(7000),
+	{ 7500, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields potion" },
+	P1(8000, 0, 0, -1, "p1 run back"), VPAD(8000, 1, 0, 0, -1, "p2 run back"),
+	{ 9500, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields potion running" },
+	P1(10000, 0, 0, 0, "p1 stop"), VPAD(10000, 1, 0, 0, 0, "p2 stop"),
+	P1(10500, PAD_A, 0, 0, "p1 A"), P1(10700, 0, 0, 0, "p1 r"), P1(10900, PAD_A, 0, 0, "p1 A"), P1(11100, 0, 0, 0, "p1 r"),
+	P1(11300, PAD_A, 0, 0, "p1 A"), P1(11500, 0, 0, 0, "p1 r"),
+	VPAD(11500, 1, PAD_A, 0, 0, "p2 A"), VPAD(11700, 1, 0, 0, 0, "p2 r"), VPAD(11900, 1, PAD_A, 0, 0, "p2 A"), VPAD(12100, 1, 0, 0, 0, "p2 r"),
+	VPAD(12300, 1, PAD_A, 0, 0, "p2 A"), VPAD(12500, 1, 0, 0, 0, "p2 r"),
+	END(13000),
+};
+
+// hurto / hurtop: player 2's Obelix stands 2 units from a Roman for a while,
+// without / with the magic potion (invincibility).
+const Step kHurtO[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
+	SHOT(6000, "hurt_1"),
+	END(14000),
+};
+const Step kHurtOP[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	POTION(1000),
+	{ 1500, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
+	SHOT(6000, "hurt_1"),
+	END(14000),
+};
 
 const Step kRegions[] = {
 	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" },
@@ -1116,6 +1189,11 @@ const Scenario kScenarios[] = {
 	SCENARIO("lever", kLever),
 	SCENARIO("launchp2", kLaunchP2),
 	SCENARIO("launcha", kLaunchA),
+	SCENARIO("lvl1", kLvl1),
+	SCENARIO("lvl1obelix", kLvl1Obelix),
+	SCENARIO("potionmove", kPotionMove),
+	SCENARIO("hurto", kHurtO),
+	SCENARIO("hurtop", kHurtOP),
 	SCENARIO("spygroups", kSpyGroups),
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
@@ -1153,6 +1231,9 @@ const float kSpots[][3] = {
 	{ 144.30f, 2.60f, -566.50f },       // 16: sector 5, next to the hearth (142.8 2.1 -568.2)
 	{ -264.30f, 13.20f, -521.00f },     // 17: on top of sector 2's launcher (CKHkTrioCatapult, -264.3 12.3 -521.0)
 	{ -270.00f, 9.00f, -521.00f },      // 18: next to that launcher
+	{ -2.22f, -2.30f, 58.62f },         // 19: level 1, the zone that streams in sector 2
+	{ 46.50f, 5.60f, 105.84f },         // 20: level 1, before the rectangle (52.1 5.5 105.8) where Asterix finds Obelix
+	{ 57.50f, 5.60f, 105.84f },         // 21: past it
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
@@ -1598,6 +1679,18 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_WATCHCAM: at.watchCam = true; break;
+	case S_HEROFIELDS: {   // movement parameters of both heroes: +0x300..+0x33C and +0x84 speed, +0x388
+		Trio t = GetTrio();
+		for (int h = 0; t && h < 2; h++) {
+			Hero hero = t.GetHero(h);
+			if (!hero) continue;
+			const float* f = (const float*)(hero.raw() + 0x300);
+			Log("autotest: %s +300: %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f  speed %.2f  388=%08X",
+			    HeroName(h), f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], f[13], f[14], f[15],
+			    *(float*)(hero.raw() + 0x84), *(uint32_t*)(hero.raw() + 0x388));
+		}
+		break;
+	}
 	case S_LEVERS: {   // every lever (CKHkActivator, 2,52): position, events, whom they switch to
 		unsigned n = GetNumLvlClassInstances(2, 52);
 		for (unsigned i = 0; i < n; i++) {
@@ -2064,10 +2157,21 @@ void RunStep(const Step& s) {
 		unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
 		if (!scenes) { Log("autotest: no cinematic service"); break; }
 		if (s.a == -1) {
-			Log("autotest: %u cinematic scenes, service flags %08X", n, *(uint32_t*)(cin + 0xC));
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			Log("autotest: %u cinematic scenes, service flags %08X, game manager +5C %08X", n, *(uint32_t*)(cin + 0xC),
+			    gm ? *(uint32_t*)(gm + 0x5C) : 0);
 			for (unsigned i = 0; i < n && i < 128; i++)
 				Log("autotest:   scene %u %p: f20=%04X f30=%02X", i, scenes[i],
 					*(uint16_t*)(scenes[i] + 0x20), *(uint8_t*)(scenes[i] + 0x30));
+			break;
+		}
+		if (s.a == -4) {
+			typedef void(__fastcall* SkipFn)(void* scene, void* edx);
+			for (unsigned i = 0; i < n && i < 512; i++)
+				if (*(uint16_t*)(scenes[i] + 0x20) & 1) {
+					Log("autotest: skipping scene %u (f20=%04X)", i, *(uint16_t*)(scenes[i] + 0x20));
+					((SkipFn)0x461A80)(scenes[i], nullptr);
+				}
 			break;
 		}
 		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);

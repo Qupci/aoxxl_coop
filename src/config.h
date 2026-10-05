@@ -18,6 +18,8 @@ struct CoopConfig {
 	bool  splitScreen   = true;   // off = shared camera on the leader
 	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect
 	int   dropHoldMs    = 1500;
+	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix
+	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)
 	bool  safeSequence  = true;   // the non-leading player can't set off levers meant for the leader's switch
 	int   sectorCatchUpMs = 1000; // a hero left in an unloaded sector this long is brought to the other
 	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with

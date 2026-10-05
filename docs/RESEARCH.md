@@ -957,3 +957,22 @@ launcher's 9.7-unit flight camera). Now either hero's group action suspends co-o
 companion along), and when co-op resumes the lead goes back to the previous leader (trio 0x4800/1).
 Autotests `launchp2` / `launcha` match after landing (positions, leader, game camera). Follow
 cameras are seeded at most 6 units out.
+
+### Level 1: intro, Obelix not yet found (2026-10-06)
+* Cutscenes: CKCinematicScene (12,37), listed by the cinematic service (yp+0x80, +0x10/+0x14). Scene
+  +0x20 flags: bit 0 playing, 0x1000 "end on Enter" (needs (flags & 0x180) != 0x80);
+  CKSrvCinematic::vf17 calls FUN_00461A80 (finish every running bloc) on its view's action 0. Level 1's
+  intro is scene 1 (flags 0x4F13 while playing), no 0x1000. After the skip the scene fades out for ~5 s
+  (game manager +0x5C bit 20 stays on meanwhile). `[debug] skip_cutscenes` adds 0x1000 to all scenes;
+  autotest CINE_SKIP calls FUN_00461A80 on playing scenes.
+* Obelix is in level 1 from the start, waiting at (56, 2, 106) (AI order 3); hero +0x1A is nonzero
+  until trio 0x4883 ("discover Obelix", from rectangle #17 at (52.1, 5.5, 105.8) crossed along x ->
+  cutscene scene 2) clears it. Co-op can't start before that ("Obelix has not joined Asterix yet").
+  Autotest `lvl1obelix` (-Level 1).
+
+### Magic potion on Obelix
+Hero_ReadCommandBlock (0x49A350) sets hero +0x388 bit 0x4 (potion) only when the hero's vtable slot
+15 returns 0 = Asterix (Obelix's returns his class id). With the bit, a player's Obelix runs at 15
+(vs 7) and takes no hits (autotests `potionmove`, `hurto`/`hurtop`: 10 hit frames vs 0). The triple
+jump is in Asterix's body-state table (extra states 0x4A3730/0x48D960/0x48DA50, CKHkAsterix_
+InitStateTables vs Obelix's FUN_004A69F0) -- Obelix has no third jump state/animation.
