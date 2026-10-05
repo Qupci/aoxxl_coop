@@ -909,8 +909,13 @@ trio leader's position (game manager vf28 -> trio vf27) and checks the *current 
 sector border: +0xC (max xyz, min xyz) streams in sector +4, +0x24 streams in sector +8. Zone events
 can switch too (CKLevel message 0x1222 "wait for sector to load", e.g. level 2 group #263, with
 rectangles for both heroes). Level 2 example: sector 1 Sas 0 = (-800..-806) -> 1, (-808..-815) -> 2
-at y 526..537, z -965..-974. Co-op: `WatchSectors` brings a player's hero that stands in another,
-unloaded sector's box for 2 s (no load pending) to the other player (autotest `sas`).
+at y 526..537, z -965..-974. Sector boxes overlap a lot (level 2: the spinning-platform area is inside both sector 1's and 2's
+boxes), so they can't tell where a hero is. Co-op `WatchSectors` tracks each player hero's own sector
+with the Sas boxes (as the engine does for the leader); a completed switch is credited to the
+leader's Sas or to the hero whose zone fired (`ZoneEventHero`: the enabled detection entry carrying
+the event -> its node -> hero); unknown switches (e.g. a forced load) move everyone along. A hero
+whose sector isn't the streamed one for 2 s (outside Sas boxes) is brought to the other player
+(autotests `sas`, `sectorzone`).
 
 ### Roman agent dialogue walk
 Trio 0x5120 (FUN_00482610 case 0x20): leader +0x3F0 |= 2, param (0x34 bytes: +0 four bytes, +4
