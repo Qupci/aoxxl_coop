@@ -164,6 +164,15 @@ the mod (`coop_diag`) exist to do exactly that.
   itself to "the companion's" marker (`0x4804` → AI order 1, situation 13); the next launcher by
   the leader then crashed at `axxl.exe+0x9C228`. The trio is now sliced around the tick of
   whichever player hero is not leading (was: only player 2's).
+* **Event service groups** (`CKSrvEvent`, `yp+0x6C`, tick `0x46B180`): table `+0xC` (count of
+  targets, mask, flags per group); the first `+0x1C` groups fire on any flag (OR), the next `+0x1E`
+  when flags == mask, kept across frames, the last `+0x20` when flags == mask within one frame.
+  Targets `+0x10` (objects), messages `+0x14` (u16), both in group order; each gets
+  `sendEvent(message, 0)`. Level 2 group `0x10D` (detector events `0x868..0x86B`, two crossings
+  per hero): `CKLevel` `0x1228` (stream sector 8, deferred switch `FUN_0040A830(0xCB, ...)`), a
+  `CKManagerEventStopCinematicBloc` `0x500`, trio `0x48ED`/`0x487D`/`0x487E`. Group `0x14D` (`0xA68`):
+  game manager `0x5302` (empties the potion). `CKLevel` messages `0x12xx`: `xx>>5 == 0` request
+  sector `xx&0x1F`, `== 1` request and switch.
 * **Potion dash**: while game manager `+0x5C` bit 19 is set, `Hero_ChooseSituationState`
   (`0x49C900`) sends any player-driven hero on the ground into situation `0x10`; it ends only by the
   hero's `+0x388` bit `0x4000`, which only the drinking hero gets. Hidden from the non-leader's tick.
