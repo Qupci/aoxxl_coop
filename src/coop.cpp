@@ -31,6 +31,8 @@
 #include <cstdlib>
 #include <cstring>
 
+void StartAiCycle(int idx, const char* why);   // below: two ticks through the AI variant
+
 namespace {
 
 // Player 2's action array. CKInput keeps a second bank of combo state right after
@@ -59,6 +61,11 @@ struct CoopState {
 	// The trio's leader/companion bytes while player 2's hero is ticking (see
 	// CoopBeforeLifeTick): saved values, and the values we put there.
 	bool     sliced = false;
+	uint8_t  sitBefore = 0xFF;        // the sliced hero's situation before its tick
+	bool     hidDash = false;         // game manager +0x5C bit 19 hidden for the tick
+	int      aiCycle[HERO_COUNT] = {};   // ticks left in the AI variant (situation reset)
+	DWORD    stuckSince[HERO_COUNT] = {};
+	Vector3  stuckPos[HERO_COUNT];
 	uint8_t  savedLeader = 0, savedCompanion = 0;
 	uint8_t  slicedHero = 0, slicedOther = 0;   // what the trio said during the sliced tick
 	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
@@ -107,7 +114,7 @@ uint8_t* F18(Hero h) { return (uint8_t*)(h.raw() + 0x18); }
 // playable one (normal or swimming). Scripted modes are left to the game.
 bool EnforcePlayer(Trio t, int idx) {
 	Hero h = t.GetHero(idx);
-	if (!h || (idx >= 0 && idx < HERO_COUNT && g.held[idx])) return false;
+	if (!h || (idx >= 0 && idx < HERO_COUNT && (g.held[idx] || g.aiCycle[idx] > 0))) return false;
 	uint8_t f = *F18(h);
 	if (!HeroModePlayable(f) || HeroIsPlayerVariant(f)) return false;
 	*F18(h) = HeroPlayerVariant(f);
@@ -247,6 +254,40 @@ void Release(const char* why) {
 	}
 }
 
+// A companion left in a ride mode after the ride (Obelix kept the launcher's
+// flight mode, 1, after landing -- and the save kept it): co-op could never
+// start again. With the leader in ordinary play, no cutscene, and the companion
+// not moving for 5 s, Start puts the companion back into ordinary play (AI).
+bool RepairStuckCompanion(Trio t) {
+	if (!t || CutsceneBars() || g.cutsceneHold > 0) return false;
+	Hero lead = t.GetHero(t.Leader());
+	int ci = t.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+	Hero c = t.GetHero(ci);
+	if (!lead || !c || !HeroModePlayable(lead.Flags18()) || lead.Busy() || HeroModePlayable(c.Flags18())) return false;
+	if (!g.stuckSince[ci] || GetTickCount() - g.stuckSince[ci] < 5000) return false;
+	uint8_t f = c.Flags18();
+	*(uint8_t*)(c.raw() + 0x18) = (uint8_t)((f & 0xE0) | 0x03);
+	Log("coop: %s was stuck in a ride mode (f18 %02X) with %s in ordinary play -- put back (f18 %02X)", HeroName(ci),
+	    f, HeroName(t.Leader()), c.Flags18());
+	g.stuckSince[ci] = 0;
+	return true;
+}
+
+// Track how long each hero has sat still in a non-playable mode (see above).
+void TrackStuckModes(Trio t) {
+	for (int i = 0; i < 2; i++) {
+		Hero h = t ? t.GetHero(i) : Hero();
+		if (!h || HeroModePlayable(h.Flags18())) { g.stuckSince[i] = 0; continue; }
+		CNode* node = h.hook->node;
+		const float* np = node && node->matrix ? (const float*)((char*)node->matrix + 0x80) : nullptr;
+		Vector3 p = np ? Vector3(np[0], np[1], np[2]) : h.Pos();
+		if (!g.stuckSince[i] || (p - g.stuckPos[i]).len2() > 0.25f) {
+			g.stuckSince[i] = GetTickCount();
+			g.stuckPos[i] = p;
+		}
+	}
+}
+
 void TryJoin(Trio t) {
 	if (g.pendingPad >= 0) {
 		if (PadIdentGameEventRecently(0)) g.pendingEcho = true;
@@ -259,6 +300,7 @@ void TryJoin(Trio t) {
 			return;
 		}
 		const char* why = "";
+		if (!CoopAllowedNow(t, &why) && RepairStuckCompanion(t)) CoopAllowedNow(t, &why);
 		if (!CoopAllowedNow(t, &why)) {
 			Log("coop: %s pressed Start but co-op cannot start now (%s)", PadName(pad), why);
 			return;
@@ -499,6 +541,7 @@ void CoopFrame() {
 	}
 
 	Trio t = GetTrio();
+	TrackStuckModes(t);
 	{
 		static bool dumped = false;
 		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
@@ -561,6 +604,8 @@ void CoopFrame() {
 				Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me),
 				    (int)hm.Order());
 				EnforcePlayer(t, me);
+			} else if ((pressed & PAD_B) && !g.suspended) {
+				StartAiCycle(me, "R3 + B");
 			}
 			if ((pressed & PAD_Y) && g_config.cheats) {
 				SetPotionGauge(300.0f);
@@ -686,6 +731,13 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	Trio t = GetTrio();
 	if (!t) return;
 	if (g.held[heroIndex]) return;   // the game's AI drives it for now
+	if (g.aiCycle[heroIndex] > 0) {
+		// One pass through the AI variant resets the hero's player situation, as
+		// leaving and rejoining co-op did (see StartAiCycle).
+		g.aiCycle[heroIndex]--;
+		if (HeroModePlayable(*F18(hero))) *F18(hero) = HeroAiVariant(*F18(hero));
+		return;
+	}
 	EnforcePlayer(t, heroIndex);
 	if (Situation(t.GetHero(g.p1Hero)) != kSituationGroupAction &&
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
@@ -739,6 +791,16 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 		trio[0x2C] = (uint8_t)heroIndex;
 		trio[0x2D] = (uint8_t)other;
 		g.sliced = true;
+		g.sitBefore = Situation(hero);
+		// The magic potion's dash: while game manager +0x5C bit 19 is up, every
+		// player-driven hero on the ground goes into situation 0x10 (dash), and
+		// only the hero that drank gets the flag (+0x388 bit 0x4000) that ends it.
+		// In single player the companion is an AI and never sees it; player 2's
+		// Obelix dashed until a cutscene. Hidden from the non-leader's tick.
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		g.hidDash = gm && (*(uint32_t*)(gm + 0x5C) & 0x80000);
+		if (g.hidDash) *(uint32_t*)(gm + 0x5C) &= ~0x80000u;
 		// Offers meant for the real leader stay with it: the magic potion
 		// (latched at trio+0x4C for one frame) must not be taken by the other
 		// hero while it poses as leader.
@@ -758,6 +820,12 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
 	P2CamEndHeroTick();
+	if (g.hidDash) {
+		g.hidDash = false;
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (gm) *(uint32_t*)(gm + 0x5C) |= 0x80000u;
+	}
 	if (g.sliced) {
 		g.sliced = false;
 		Trio t = GetTrio();
@@ -766,7 +834,15 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			*(uint32_t*)(trio + 0x3F4) &= ~1u;
 			if (g.savedOffer && *(uint32_t*)(trio + 0x4C) == 0) *(uint32_t*)(trio + 0x4C) = g.savedOffer;
 			g.savedOffer = 0;
-			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
+			Hero sh = t.GetHero(g.slicedHero);
+			bool startedGroup = sh && Situation(sh) == kSituationGroupAction && g.sitBefore != kSituationGroupAction;
+			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && startedGroup) {
+				// It started a group action (a launcher, a lifter): that sequence
+				// asks the trio for its leader all along, outside this tick too --
+				// with the other hero still leading it kept putting that one on
+				// the activator's spot. The hero that started it leads from now.
+				Log("coop: %s started a group action while not leading -- it leads now", HeroName(g.slicedHero));
+			} else if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
 				trio[0x2C] = g.savedLeader;
 				trio[0x2D] = g.savedCompanion;
 			} else {
@@ -856,6 +932,17 @@ static void SetHeroPosition(Hero h, const Vector3& to) {
 	}
 }
 
+// Two ticks in the AI variant: the Life's state change runs the player
+// situation's exit, the AI picks up, and the player variant starts afresh.
+void StartAiCycle(int idx, const char* why) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(idx) : Hero();
+	if (!h || idx < 0 || idx >= HERO_COUNT) return;
+	g.aiCycle[idx] = 2;
+	if (HeroModePlayable(*F18(h))) *F18(h) = HeroAiVariant(*F18(h));
+	Log("coop: %s reset through the AI (%s, situation %02X)", HeroName(idx), why, Situation(h));
+}
+
 void CoopAfterTrioEvent(int ev, int cookie) {
 	if (!cookie) return;
 	if (cookie != g_eventDepth) { g_eventDepth = cookie - 1 < 0 ? 0 : cookie - 1; return; }
@@ -880,6 +967,21 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 	}
 	// Not inside another event either: a switch sent by a mode event (0x480B,
 	// belly slide, sends 0x4801) is followed by the mode change itself.
+	// A switch that takes the lead from a player's hero in the middle of a
+	// situation of its own: in single player that hero becomes the AI companion,
+	// which ends the situation; kept as a player hero it stays in it. The boss
+	// of level 2 puts Obelix in situation 0x0F after his hit, then gives the lead
+	// to Asterix -- and the next blue circle handed player 2 an Obelix that could
+	// not move.
+	int lo = ev & 0xFF;
+	if (((ev >> 8) & 0xFF) == 0x48 && (lo == 0x00 || lo == 0x01 || lo == 0xB7 || lo == 0xB8)) {
+		const int both[2] = { g.p1Hero, g.p2Hero };
+		for (int idx : both) {
+			Hero h = t.GetHero(idx);
+			uint8_t sit = h ? Situation(h) : 0xFF;
+			if (h && idx != t.Leader() && !g.held[idx] && sit != 0x00 && sit != 0xFF) StartAiCycle(idx, "lost the lead");
+		}
+	}
 	if (!g.suspended && g_eventDepth == 0) {
 		EnforcePlayer(t, g.p1Hero);
 		EnforcePlayer(t, g.p2Hero);

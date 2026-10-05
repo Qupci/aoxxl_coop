@@ -164,6 +164,15 @@ the mod (`coop_diag`) exist to do exactly that.
   itself to "the companion's" marker (`0x4804` → AI order 1, situation 13); the next launcher by
   the leader then crashed at `axxl.exe+0x9C228`. The trio is now sliced around the tick of
   whichever player hero is not leading (was: only player 2's).
+* **Potion dash**: while game manager `+0x5C` bit 19 is set, `Hero_ChooseSituationState`
+  (`0x49C900`) sends any player-driven hero on the ground into situation `0x10`; it ends only by the
+  hero's `+0x388` bit `0x4000`, which only the drinking hero gets. Hidden from the non-leader's tick.
+* **Group actions started by the non-leader** (launchers): the sequence asks the trio for its leader
+  outside the activator's tick too; the activator is made the real leader (raw `trio+0x2C/+0x2D`).
+* **Situation `0x0F`** (`+0x3F0` bit `0x20000`, e.g. the level-2 boss after Obelix's hit): left by
+  becoming the AI companion. A player's hero losing the lead in a non-ground situation is passed
+  through the AI variant for two ticks (also R3 + B). A companion stuck in a ride mode (launcher
+  flight `f18=05`, kept by the save) is put back to `(f18 & 0xE0) | 3` when player 2 presses Start.
 * **Belly slide** (`0x480B` → `0x4801`, mode 3): Obelix leads, Asterix rides as the AI variant
   (`f18=0F`); the player variant (`0C`) keeps him at the top. Both heroes' `+kHero_pos` stay frozen
   during rides (cable car, slide) while their nodes move — cameras must follow the node (LTM `+0x80`).

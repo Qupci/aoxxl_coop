@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -50,6 +50,10 @@ struct Step {
 #define LOADSECTOR(t, n)            { t, S_LOADSECTOR, n, 0, 0, 0, 0, "load sector" }
 // Fills the magic potion gauge (game manager +0x40 -> +0x9C).
 #define POTION(t)                   { t, S_POTION, 0, 0, 0, 0, 0, "potion" }
+// Game manager +0x5C bit 19 (the potion dash flag) on (1) or off (0).
+#define DASHFLAG(t, on)             { t, S_DASHFLAG, on, 0, 0, 0, 0, "dash flag" }
+// Writes hero `hero`'s control byte (+0x18).
+#define SETF18(t, hero, v)          { t, S_SETF18, hero, v, 0, 0, 0, "set f18" }
 #define KEYMAP(t, layout)           { t, S_KEYMAP, layout, 0, 0, 0, 0, "keymap" }
 // Puts hero `hero` on the nearest visible bonus (CKHkBasicBonus) and watches it.
 #define TO_BONUS(t, hero)           { t, S_BONUS, hero, 0, 0, 0, 0, "to bonus" }
@@ -269,6 +273,43 @@ const Step kPursuitLead2[] = {
 	{ 2000, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
 	SHOT(5000, "pursuitlead2"),
 	END(10000),
+};
+
+// dash: the potion's dash flag goes up while player 2 is in; only the leader may
+// dash (situation 0x10), player 2's Obelix keeps walking.
+const Step kDash[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	DASHFLAG(1500, 1),
+	VPAD(1600, 1, 0, 0, 1, "p2 up"), VPAD(3500, 1, 0, 0, 0, "p2 neutral"),
+	DASHFLAG(4000, 0),
+	END(6000),
+};
+
+// lifterp2: player 2's Obelix (not leading) works the lifter; he must lead
+// the group action from then on.
+const Step kLifterP2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	TELEPORT(1500, HERO_OBELIX, 0, 0, 0),
+	TELEPORT(1500, HERO_ASTERIX, 0, 6, 0),
+	TELEPORT(1500, HERO_IDEFIX, 0, -6, 0),
+	VPAD(3000, 1, PAD_B, 0, 0, "p2 B"), VPAD(3200, 1, 0, 0, 0, "p2 release"),
+	VPAD(4500, 1, PAD_Y, 0, 0, "p2 Y"), VPAD(4700, 1, 0, 0, 0, "p2 release"),
+	VPAD(6000, 1, PAD_X, 0, 0, "p2 X"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
+	SHOT(9000, "lifterp2_01"),
+	SHOT(20000, "lifterp2_02"),
+	END(26000),
+};
+
+// repair: Obelix left in the launcher's flight mode (as in the user's save);
+// player 2's Start must put him back and join.
+const Step kRepair[] = {
+	MARK(0, "baseline"),
+	SETF18(500, HERO_OBELIX, 0x05),
+	VPAD(7000, 1, PAD_START, 0, 0, "p2 start"), VPAD(7200, 1, 0, 0, 0, "p2 release"),
+	VPAD(8500, 1, 0, 0, 1, "p2 up"), VPAD(10000, 1, 0, 0, 0, "p2 neutral"),
+	END(11000),
 };
 
 // warp: player 2 walks off, then Back + A brings Obelix back to Asterix; Back
@@ -806,6 +847,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("warp", kWarp),
 	SCENARIO("potion", kPotion),
 	SCENARIO("pursuito", kPursuitO),
+	SCENARIO("dash", kDash),
+	SCENARIO("lifterp2", kLifterP2),
+	SCENARIO("repair", kRepair),
 	SCENARIO("release", kRelease),
 	SCENARIO("pursuitlead2", kPursuitLead2),
 	SCENARIO("flask", kFlask),
@@ -1111,6 +1155,23 @@ void RunStep(const Step& s) {
 			const float* p = hk && hk->node && hk->node->matrix ? (const float*)((char*)hk->node->matrix + 0x80) : nullptr;
 			if (p) Log("autotest:   stone %u at (%.2f %.2f %.2f) flags %08X", k, p[0], p[1], p[2], *(uint32_t*)((char*)hk + 8));
 		}
+		break;
+	}
+	case S_DASHFLAG: {
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (!gm) break;
+		if (s.a) *(uint32_t*)(gm + 0x5C) |= 0x80000u;
+		else *(uint32_t*)(gm + 0x5C) &= ~0x80000u;
+		Log("autotest: dash flag %s", s.a ? "on" : "off");
+		break;
+	}
+	case S_SETF18: {
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		Log("autotest: %s f18 %02X -> %02X", HeroName(s.a), h.Flags18(), s.b);
+		*(uint8_t*)(h.raw() + 0x18) = (uint8_t)s.b;
 		break;
 	}
 	case S_POTION:

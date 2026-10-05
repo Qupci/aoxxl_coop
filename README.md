@@ -65,7 +65,7 @@ Both are already installed in `Game Files\`. The mod writes `xxl_coop.log` there
 | Start on a second pad (or Enter on the keyboard) | join / take over the other hero |
 | Hold Back for 1.5 s (Backspace) | leave co-op |
 | Hold R3 (P2 also Back / Backspace) + A | your hero jumps to your partner's side |
-| Hold R3 + B | take your hero back when the game keeps it waiting |
+| Hold R3 + B | take your hero back when the game keeps it waiting, or reset a hero that cannot move |
 | Hold R3 + Y / R3 + X (`cheats = on`) | fill the magic potion / make your hero the leader |
 
 Player 2's keyboard keys are in the `[keyboard]` section of `xxl_coop.ini` (default: WASD move,
