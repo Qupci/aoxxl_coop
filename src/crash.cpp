@@ -108,9 +108,68 @@ LONG WINAPI UnhandledFilter(EXCEPTION_POINTERS* ep) {
 	return g_prevFilter ? g_prevFilter(ep) : EXCEPTION_CONTINUE_SEARCH;
 }
 
+// Diagnostics: hardware write watchpoints (debug registers DR0..DR3) on up to
+// four bytes in the game thread; every write is logged with the writing code.
+// Set from the watchdog thread (a thread cannot reliably set its own DRs).
+const void* volatile g_watchAddr[4] = {};
+volatile long g_watchCount = 0, g_watchPending = 0, g_watchHits = 0;
+uintptr_t g_watchIgnoreLo = 0, g_watchIgnoreHi = 0;
+
+LONG CALLBACK WatchHandler(EXCEPTION_POINTERS* ep) {
+	if (ep->ExceptionRecord->ExceptionCode != EXCEPTION_SINGLE_STEP) return EXCEPTION_CONTINUE_SEARCH;
+	CONTEXT* c = ep->ContextRecord;
+	DWORD hit = c->Dr6 & 0xF;
+	if (!hit) return EXCEPTION_CONTINUE_SEARCH;
+	c->Dr6 = 0;
+	uintptr_t eip = c->Eip;
+	if (!(eip >= g_watchIgnoreLo && eip < g_watchIgnoreHi) && InterlockedIncrement(&g_watchHits) < 200) {
+		for (int i = 0; i < 4; i++)
+			if (hit & (1u << i)) {
+				char where[96];
+				Describe(eip, where, sizeof(where));
+				Log("watch: write to %p (now %02X) by the instruction before %s", g_watchAddr[i],
+				    *(const uint8_t*)g_watchAddr[i], where);
+				LogStack("watch", c->Esp);
+			}
+	}
+	return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+void ApplyWatches() {
+	if (!g_watchPending || !g_gameThreadId) return;
+	g_watchPending = 0;
+	HANDLE th = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, g_gameThreadId);
+	if (!th) return;
+	if (SuspendThread(th) != (DWORD)-1) {
+		CONTEXT c = {};
+		c.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+		if (GetThreadContext(th, &c)) {
+			DWORD* dr[4] = { &c.Dr0, &c.Dr1, &c.Dr2, &c.Dr3 };
+			c.Dr7 = 0;
+			for (int i = 0; i < g_watchCount && i < 4; i++) {
+				*dr[i] = (DWORD)(uintptr_t)g_watchAddr[i];
+				c.Dr7 |= (1u << (i * 2)) | (1u << (16 + i * 4));   // local enable, R/W = 01 (write), LEN = 00 (1 byte)
+			}
+			SetThreadContext(th, &c);
+			Log("watch: %ld write watchpoint(s) set", g_watchCount);
+		}
+		ResumeThread(th);
+	}
+	CloseHandle(th);
+}
+
 } // namespace
 
+void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t ignoreHi) {
+	for (int i = 0; i < n && i < 4; i++) g_watchAddr[i] = addrs[i];
+	g_watchIgnoreLo = ignoreLo;
+	g_watchIgnoreHi = ignoreHi;
+	g_watchCount = n < 4 ? n : 4;
+	g_watchPending = 1;
+}
+
 void CrashHandlerInstall() {
+	AddVectoredExceptionHandler(1, WatchHandler);
 	AddVectoredExceptionHandler(1, VectoredHandler);
 	g_prevFilter = SetUnhandledExceptionFilter(UnhandledFilter);
 }
@@ -120,6 +179,7 @@ void StallRegisterGameThread() {
 }
 
 void StallCheck(long frames) {
+	ApplyWatches();
 	static long lastFrames = -1;
 	static int  stillChecks = 0;
 	static bool reported = false;

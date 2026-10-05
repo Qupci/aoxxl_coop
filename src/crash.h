@@ -12,3 +12,9 @@ void StallCheck(long frameCounter);
 
 // Game thread: call once from the frame hook so StallCheck knows whom to sample.
 void StallRegisterGameThread();
+
+// Diagnostics: log every write to up to four bytes (hardware watchpoints on the
+// game thread, applied by the watchdog within ~2 s); writes by code in
+// [ignoreLo, ignoreHi) are not logged.
+#include <cstdint>
+void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t ignoreHi);

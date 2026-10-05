@@ -26,6 +26,7 @@ const uintptr_t kIdefixLifeVtbl  = 0x625DA0;
 const uintptr_t kHudHookVtbl     = 0x6285F0;   // CKHkInterfaceInGame (2,132)
 const uintptr_t kBonusGroupLife  = 0x6296FC;   // CKGrpBonusLife: handled per bonus below
 const uintptr_t kTrioGroupLife   = 0x625984;   // CKGrpTrioLife: the trio itself, always the real leader
+const uintptr_t kCheckpointLife  = 0x628B2C;   // CKGrpAsterixCheckpointLife: see CheckpointHook
 // Pressure plates (CKHkPressionStone::vf15) react to the object the trio's
 // leader stands on (trio vf29). The blue circles that hand control to the other
 // hero are such plates, and their event sequence assumes the leader stepped on
@@ -102,7 +103,8 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	char* hook = isGroup ? nullptr : *(char**)((char*)life + 0x10);
 	bool plate = hook && (*(uintptr_t*)hook == kPressionStoneVtbl || *(uintptr_t*)hook == kCorkscrewVtbl);
 	if (vt == kAsterixLifeVtbl || vt == kObelixLifeVtbl || vt == kIdefixLifeVtbl ||
-	    vt == kBonusGroupLife || vt == kTrioGroupLife || plate || !LifePos(life, isGroup, &at)) {
+	    vt == kBonusGroupLife || vt == kTrioGroupLife || vt == kCheckpointLife || plate ||
+	    !LifePos(life, isGroup, &at)) {
 		tick(life, nullptr, dt);
 		return;
 	}
@@ -215,6 +217,32 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			*(float*)(sq + 0x138) += *(float*)(dt + 0xC);
 		}
 	}
+}
+
+// Checkpoints (the druid's cauldrons: light pillar and jingle). The checkpoint
+// group's update (CKGrpAsterixCheckpoint::vf29, 0x536DD0) asks the trio for the
+// leader's position (vf27) and, within a checkpoint's radius, records it and
+// flags its event (game manager +0x332 + 2n) -- leader only. As a group it was
+// sliced to whichever hero stood nearest its first checkpoint, an arbitrary
+// one: in co-op even Asterix walked past checkpoints. Now it runs for the real
+// leader, then once more with the non-leading player's hero as the leader, so
+// either player reaches a checkpoint.
+typedef void(__fastcall* CheckpointFn)(char* self, void* edx, int arg);   // ret 4
+const uintptr_t kCheckpointVtbl = 0x628AB4, kCheckpointUpdate = 0x536DD0;
+const size_t    kCheckpointSlot = 29;
+CheckpointFn g_origCheckpoint = nullptr;
+
+void __fastcall CheckpointHook(char* self, void* edx, int arg) {
+	g_origCheckpoint(self, edx, arg);
+	Trio t = GetTrio();
+	int nl = CoopNonLeaderPlayer();
+	if (!t || nl < 0 || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(nl)) return;
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	tr[0x2C] = (uint8_t)nl;
+	tr[0x2D] = leader;
+	g_origCheckpoint(self, edx, arg);
+	if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
 }
 
 // CKGrpBonusPool vf39 "may this hero collect" ignores its argument and asks the
@@ -599,12 +627,13 @@ bool IsMusicGroup(unsigned group) {
 
 void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 	uintptr_t from = (uintptr_t)_ReturnAddress();
-	if (IsMusicGroup((eventId & 0xFFFF) >> 3)) {
+	unsigned grp = (eventId & 0xFFFF) >> 3;
+	if (IsMusicGroup(grp) || grp == 0x74 || grp == 0x77) {
 		Trio t = GetTrio();
 		Log("proximity: music event %04X flagged from %p (leader %s)", eventId & 0xFFFF, (void*)from,
 		    t ? HeroName(t.Leader()) : "?");
 	}
-	if (CoopP2Joined() && from >= kDetectTickBegin && from < kDetectTickEnd) {
+	if (from >= kDetectTickBegin && from < kDetectTickEnd) {
 		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
 		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
@@ -635,6 +664,8 @@ bool ProximityInstallHooks() {
 	                    (void*)ProjectileContactDispatch, "projectile hits, targets (0x301)");
 	ok &= PatchProjectileOwnerCall();
 	ok &= PatchBeaconCheck();
+	ok &= PatchVtableSlot(kCheckpointVtbl, kCheckpointSlot, kCheckpointUpdate, (void*)CheckpointHook,
+	                      (void**)&g_origCheckpoint, "CKGrpAsterixCheckpoint::update");
 	ok &= PatchVtableSlot(kEnemyLifeVtbl, kEnemyLifeSlot, kEnemyLifeTick, (void*)EnemyTickHook,
 	                      (void**)&g_origEnemyTick, "CKGrpEnemyLife::tick");
 	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,

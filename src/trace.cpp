@@ -31,6 +31,7 @@ Traced g_traced[] = {
 	{ 0x6291E0, 0x5424D0, "CrateCpnt" },
 	{ 0x627738, 0x004E3F00, "Roman" },
 	{ 0x624058, 0x0043C400, "SoundManager" },   // only its music messages (0x02xx) are logged
+	{ 0x629030, 0x0053F980, "LightPillar" },    // always logged, with its position
 };
 volatile long g_traceLines = 0;
 
@@ -49,6 +50,15 @@ int __fastcall TracedSendEvent(void* self, void* edx, int event, void* param) {
 			    _ReturnAddress(), tr ? HeroName(tr.Leader()) : "?", a ? a.Pos().x : 0, a ? a.Pos().y : 0,
 			    a ? a.Pos().z : 0, o ? o.Pos().x : 0, o ? o.Pos().y : 0, o ? o.Pos().z : 0);
 		}
+		return ((SendEventFn)t->original)(self, edx, event, param);
+	}
+	if (t->vtbl == 0x629030) {
+		char* node = *(char**)((char*)self + 0x10);
+		char* frame = node ? *(char**)(node + 4) : nullptr;
+		const float* p = frame ? (const float*)(frame + 0x80) : nullptr;
+		Trio tr = GetTrio();
+		Log("trace: light pillar %p at (%.0f %.0f %.0f) event %04X from %p; leader %s", self, p ? p[0] : 0,
+		    p ? p[1] : 0, p ? p[2] : 0, event, _ReturnAddress(), tr ? HeroName(tr.Leader()) : "?");
 		return ((SendEventFn)t->original)(self, edx, event, param);
 	}
 	// 0x906 is the crates' per-frame "where are you" query: noise.

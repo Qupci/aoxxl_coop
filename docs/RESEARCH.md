@@ -173,6 +173,21 @@ the mod (`coop_diag`) exist to do exactly that.
   `CKManagerEventStopCinematicBloc` `0x500`, trio `0x48ED`/`0x487D`/`0x487E`. Group `0x14D` (`0xA68`):
   game manager `0x5302` (empties the potion). `CKLevel` messages `0x12xx`: `xx>>5 == 0` request
   sector `xx&0x1F`, `== 1` request and switch.
+* **Checkpoints** (the "music" the user heard in sector 8 is a checkpoint's jingle):
+  `CKGrpAsterixCheckpoint::vf29` (`0x536DD0`, `ret 4`) walks the checkpoint beacons (beacon query
+  handler `0x16`) and, with the leader (trio vf27) within radius `+0x24` and trio vf57 true (leader
+  `f18 & 0x1E == 0`), stores the position (`+0x28..`), and on a new checkpoint index (profile
+  `+0x5F`) flags `gameManager+0x332+2n`; level 2's sector-8 checkpoint flags group `0xC1`, whose
+  targets show the `CKHkLightPillar` at (42 57 −120). The pillar plays sound `0x50` itself once
+  its shared effect nodes (`gm+0x18 → +0x9C/+0xA0`, scene nodes: `+0xC` = parent) are free
+  (`CKHkLightPillar::vf15` state 3 → `FUN_0053AE70`). The mod excludes the checkpoint group from
+  proximity slicing (it was sliced to whichever hero stood nearest its *first* checkpoint) and runs
+  vf29 a second time with the non-leading player as leader.
+* **Sound manager messages**: `0x01xx` → `FUN_0043C940`, `0x02xx` → play list sound `xx`
+  (`FUN_0043C010` → `FUN_0043B730`), `0x19xx` → stop. Streams start in `FUN_0043CC20` (cinematic
+  stream blocks, `CKSekens`). Diagnostics in the mod log every first (sound, caller) start.
+* **Diagnostics**: `WatchBytes()` (crash.cpp) sets hardware write watchpoints on the game thread
+  and logs the writing instruction plus a stack scan — found the checkpoint flagging in one run.
 * **Potion dash**: while game manager `+0x5C` bit 19 is set, `Hero_ChooseSituationState`
   (`0x49C900`) sends any player-driven hero on the ground into situation `0x10`; it ends only by the
   hero's `+0x388` bit `0x4000`, which only the drinking hero gets. Hidden from the non-leader's tick.

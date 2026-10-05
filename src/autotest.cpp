@@ -7,6 +7,7 @@
 #include "p2input.h"
 #include "pads.h"
 #include "sound.h"
+#include "crash.h"
 
 #include <cmath>
 #include <cstdio>
@@ -16,7 +17,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -338,8 +339,10 @@ const Step kMusicA[] = {
 	{ 3500, S_PLACE, HERO_OBELIX, 6, 0, 0, 0, "obelix at entrance" },
 	{ 3500, S_PLACE, HERO_IDEFIX, 6, 0, 0, 0, "idefix at entrance" },
 	SECTORS(4500),
+	{ 1000, S_WATCHGROUPS, 0, 0, 0, 0, 0, "watch groups" },
 	GLIDE(5000, HERO_ASTERIX, 7, 4000),
 	SHOT(9500, "musica"),
+	{ 9600, S_MUSICGROUPS, 0, 0, 0, 0, 0, "music groups" },
 	END(14000),
 };
 const Step kMusicO[] = {
@@ -349,9 +352,12 @@ const Step kMusicO[] = {
 	{ 3500, S_PLACE, HERO_OBELIX, 6, 0, 0, 0, "obelix at entrance" },
 	{ 3500, S_PLACE, HERO_IDEFIX, 6, 0, 0, 0, "idefix at entrance" },
 	VPAD(4000, 1, PAD_START, 0, 0, "p2 start"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
-	GLIDE(5000, HERO_OBELIX, 7, 4000),
-	SHOT(9500, "musico"),
-	END(14000),
+	VPAD(4600, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(4800, 1, PAD_BACK | PAD_A, 0, 0, "p2 back+A (warp to Asterix)"),
+	VPAD(5000, 1, 0, 0, 0, "p2 release"),
+	GLIDE(6000, HERO_OBELIX, 7, 4000),
+	SHOT(10500, "musico"),
+	SHOT(14000, "musico2"),
+	END(15000),
 };
 
 // savestate: Obelix in the player variant without player 2 (a save made during
@@ -361,6 +367,19 @@ const Step kSaveState[] = {
 	SETF18(500, HERO_OBELIX, 0x00),
 	P1(1500, 0, 1, 0, "p1 right"), P1(3000, 0, 0, 0, "p1 neutral"),
 	END(4000),
+};
+
+const Step kMusicA2[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(500, 8),
+	{ 3500, S_PLACE, HERO_ASTERIX, 6, 0, 0, 0, "asterix at entrance" },
+	{ 3500, S_PLACE, HERO_IDEFIX, 6, 0, 0, 0, "idefix at entrance" },
+	VPAD(4000, 1, PAD_START, 0, 0, "p2 start"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	VPAD(4600, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(4800, 1, PAD_BACK | PAD_A, 0, 0, "p2 back+A (warp to Asterix)"),
+	VPAD(5000, 1, 0, 0, 0, "p2 release"),
+	GLIDE(6000, HERO_ASTERIX, 7, 4000),
+	SHOT(10500, "musica2"),
+	END(15000),
 };
 
 const Step kRegions[] = {
@@ -922,6 +941,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
 	SCENARIO("musico", kMusicO),
+	SCENARIO("musica2", kMusicA2),
 	SCENARIO("bossbutton", kBossButton),
 	SCENARIO("lifterp2", kLifterP2),
 	SCENARIO("repair", kRepair),
@@ -1264,6 +1284,16 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_WATCHGROUPS: {   // hardware watch on the flag bytes of event groups 0x74, 0x77, 0xC1
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		if (!ev) break;
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		const void* a[3] = { tab + 0x74 * 3 + 2, tab + 0x77 * 3 + 2, tab + 0xC1 * 3 + 2 };
+		WatchBytes(a, 3, 0x46B180, 0x46B331);   // not CKSrvEvent::vf17 clearing them
+		Log("autotest: watching group flags 074/077/0C1 at %p %p %p", a[0], a[1], a[2]);
+		break;
+	}
 	case S_MUSICGROUPS: {   // every event group that messages the sound manager, and the detectors feeding it
 		CKYellowPages* yp = YellowPages();
 		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
@@ -1278,8 +1308,23 @@ void RunStep(const Step& s) {
 		for (unsigned gi = 0; gi < n; first += tab[gi * 3], gi++) {
 			for (unsigned k = 0; k < tab[gi * 3]; k++) {
 				char* o = objs[first + k];
-				if (!o || *(uintptr_t*)o != 0x624058) continue;
-				Log("autotest: group %03X (%s, mask %02X) -> sound manager %04X", gi,
+				if (!o || (*(uintptr_t*)o != 0x624058 && *(uintptr_t*)o != 0x629030)) continue;
+				const float* pp = nullptr;
+				if (*(uintptr_t*)o == 0x629030) {
+					char* nd = *(char**)(o + 0x10);
+					char* fr = nd ? *(char**)(nd + 4) : nullptr;
+					pp = fr ? (const float*)(fr + 0x80) : nullptr;
+					if (!pp || fabsf(pp[0] - 42) > 3 || fabsf(pp[2] + 120) > 3) continue;   // the sector-8 pillar only
+				}
+				Log("autotest: group %03X (%s, mask %02X, flags %02X) -> %s %p %04X", gi,
+				    gi < n1 ? "OR" : gi < n1 + n2 ? "AND acc" : "AND frame", tab[gi * 3 + 1], tab[gi * 3 + 2],
+				    *(uintptr_t*)o == 0x629030 ? "light pillar" : "sound manager", o, msgs[first + k]);
+				for (unsigned k2 = 0; k2 < tab[gi * 3]; k2++) {
+					char* o2 = objs[first + k2];
+					Log("autotest:       target %p vt %08X message %04X", o2, o2 ? (unsigned)*(uintptr_t*)o2 : 0,
+					    msgs[first + k2]);
+				}
+				if (false) Log("autotest: group %03X (%s, mask %02X) -> sound manager %04X", gi,
 				    gi < n1 ? "OR" : gi < n1 + n2 ? "AND acc" : "AND frame", tab[gi * 3 + 1], msgs[first + k]);
 				struct L { const char* name; int base, count; } ls[5] = { { "box-enter", 0x2C, 0x30 },
 					{ "sphere-enter", 0x34, 0x38 }, { "plane-cross", 0x3C, 0x40 }, { "box-level", 0x44, 0x48 },

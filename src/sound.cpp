@@ -24,9 +24,11 @@
 #include "log.h"
 #include "p2cam.h"
 #include "splitscreen.h"
+#include "trio.h"
 
 #include <cmath>
 #include <cstring>
+#include <intrin.h>
 
 namespace {
 
@@ -300,6 +302,57 @@ void __fastcall SoundTickHook(char* sm, void* edx, char* dt) {
 	}
 }
 
+// Diagnostics: streams (music, voices) start through FUN_0043CC20 (sound
+// manager, slot = 3 channels of 0x134 bytes): called by cinematic stream blocks
+// (FUN_0046A070, CKStreamAloneCinematicBloc::vf12) and CKSekens (FUN_00439110).
+typedef int(__fastcall* StreamStartFn)(char* self, void* edx, unsigned id, void* b, int c, char d, char e);
+const uintptr_t kStreamStart = 0x43CC20;
+const uint8_t   kStreamStartPrologue[5] = { 0x83, 0xEC, 0x28, 0x53, 0x55 };
+StreamStartFn g_origStreamStart = nullptr;
+
+int __fastcall StreamStartHook(char* self, void* edx, unsigned id, void* b, int c, char d, char e) {
+	Trio t = GetTrio();
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	int r = g_origStreamStart(self, edx, id, b, c, d, e);
+	Log("sound: stream %u started (%p, %d, %d, %d) -> channel %d, from %p; leader %s; Asterix (%.1f %.1f %.1f) "
+	    "Obelix (%.1f %.1f %.1f)", id & 0xFF, b, c, d, e, r, _ReturnAddress(), t ? HeroName(t.Leader()) : "?",
+	    a ? a.Pos().x : 0, a ? a.Pos().y : 0, a ? a.Pos().z : 0, o ? o.Pos().x : 0, o ? o.Pos().y : 0,
+	    o ? o.Pos().z : 0);
+	return r;
+}
+
+// Diagnostics: every distinct (sound, calling code) pair is logged the first
+// time it starts (FUN_0043B730), with both heroes' positions -- a music loop
+// that only starts for the leader shows up as a new pair at that moment.
+typedef int(__fastcall* SoundStartFn)(char* self, void* edx, uint32_t* inst, float vol, float pitch, int p4,
+                                      float p5, int p6);
+const uint8_t kSoundStartPrologue[10] = { 0xD9, 0x44, 0x24, 0x08, 0xD8, 0x1D, 0xD4, 0x22, 0x62, 0x00 };
+SoundStartFn g_origSoundStart = nullptr;
+struct SeenStart { uint32_t id; uintptr_t from; };
+SeenStart g_seen[1024];
+volatile long g_nSeen = 0;
+
+int __fastcall SoundStartHook(char* self, void* edx, uint32_t* inst, float vol, float pitch, int p4, float p5,
+                              int p6) {
+	uintptr_t from = (uintptr_t)_ReturnAddress();
+	uint32_t id = inst ? inst[0] : 0;
+	bool seen = false;
+	for (long i = 0; i < g_nSeen && !seen; i++) seen = g_seen[i].id == id && g_seen[i].from == from;
+	if (!seen && g_nSeen < 1024) {
+		g_seen[g_nSeen].id = id;
+		g_seen[g_nSeen].from = from;
+		g_nSeen++;
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+		const float* sp = inst && !(inst[0xE] & 0x10) ? (const float*)(inst + 1) : nullptr;
+		Log("sound: first start of sound %08X (instance %p at %.0f %.0f %.0f) from %p; leader %s; Asterix (%.1f %.1f "
+		    "%.1f) Obelix (%.1f %.1f %.1f)", id, inst, sp ? sp[0] : 0, sp ? sp[1] : 0, sp ? sp[2] : 0, (void*)from,
+		    t ? HeroName(t.Leader()) : "?", a ? a.Pos().x : 0, a ? a.Pos().y : 0, a ? a.Pos().z : 0,
+		    o ? o.Pos().x : 0, o ? o.Pos().y : 0, o ? o.Pos().z : 0);
+	}
+	return g_origSoundStart(self, edx, inst, vol, pitch, p4, p5, p6);
+}
+
 } // namespace
 
 void SoundSetP2Listener() {
@@ -346,6 +399,10 @@ bool SoundInstallHooks() {
 		{ 0xE8, 0x02, 0x5E, 0x15, 0x00 },   // 0x43B9B9
 		{ 0xE8, 0xFC, 0x5A, 0x15, 0x00 },   // 0x43BCBF
 	};
+	InstallDetour(kSoundStart, (void*)SoundStartHook, (void**)&g_origSoundStart, kSoundStartPrologue,
+	              sizeof(kSoundStartPrologue), "sound start (diagnostics)");
+	InstallDetour(kStreamStart, (void*)StreamStartHook, (void**)&g_origStreamStart, kStreamStartPrologue,
+	              sizeof(kStreamStartPrologue), "stream start (diagnostics)");
 	bool ok = PatchVtableSlot(kSoundMgrVtbl, kSoundMgrTickSlot, kSoundMgrTick, (void*)SoundTickHook,
 	                          (void**)&g_origSmTick, "CKSoundManager::tick");
 	ok &= PatchCallSite(0x43B0D5, kCall[0], 5, (void*)ThunkVoices, "sound range, playing voices");
