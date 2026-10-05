@@ -6,6 +6,7 @@
 #include "log.h"
 #include "p2input.h"
 #include "pads.h"
+#include "sound.h"
 
 #include <cmath>
 #include <cstdio>
@@ -15,7 +16,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -314,6 +315,24 @@ const Step kRepair[] = {
 
 // joinlead2: the game leads with Obelix (as after the belly slides) when player
 // 2 joins: player 2 still gets Obelix, and leaving keeps Obelix leading.
+// bossbutton: the boss's button sequence as in the user's log -- Asterix (with
+// an old wait order 3 left over) in situation 0x0F, then "Obelix leads" and
+// "the companion waits": Asterix must go to the game, not stay player 1's.
+const Step kBossButton[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_POKE8, HERO_ASTERIX, 0x564, 0, 3.0f, 0, "asterix order 3" },
+	{ 1500, S_POKE8, HERO_ASTERIX, 0x3E9, 0, 15.0f, 0, "asterix situation 0F" },
+	{ 1600, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 1600, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion waits" },
+	P1(2500, 0, 1, 0, "p1 right"), P1(4000, 0, 0, 0, "p1 neutral"),
+	END(5000),
+};
+
+const Step kRegions[] = {
+	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" }, END(2500),
+};
+
 const Step kJoinLead2[] = {
 	MARK(0, "baseline"),
 	{ 300, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
@@ -861,6 +880,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("pursuito", kPursuitO),
 	SCENARIO("dash", kDash),
 	SCENARIO("joinlead2", kJoinLead2),
+	SCENARIO("regions", kRegions),
+	SCENARIO("bossbutton", kBossButton),
 	SCENARIO("lifterp2", kLifterP2),
 	SCENARIO("repair", kRepair),
 	SCENARIO("release", kRelease),
@@ -1170,6 +1191,17 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_POKE8: {   // hero a, byte offset b, value x
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		Log("autotest: %s +%03X %02X -> %02X", HeroName(s.a), s.b, *(uint8_t*)(h.raw() + s.b), (int)s.x);
+		*(uint8_t*)(h.raw() + s.b) = (uint8_t)(int)s.x;
+		break;
+	}
+	case S_REGIONS:
+		SoundDumpRegions();
+		break;
 	case S_DASHFLAG: {
 		CKYellowPages* yp = YellowPages();
 		char* gm = yp ? (char*)yp->gameManager : nullptr;

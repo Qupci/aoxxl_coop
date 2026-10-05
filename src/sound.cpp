@@ -54,6 +54,27 @@ float Dist2(const float* a, const float* b) {
 
 // Replacement for FUN_005917C0 at the range checks: the distance from the sound
 // `s` to the nearer of the game's listener `l` and player 2's camera.
+// Region sounds (music and ambience zones: sound definition +0xC bit 0) also
+// need the listener inside the sound instance's box (+0x20/+0x24/+0x28 max
+// x/y/z, +0x2C/+0x30/+0x34 min) to start (vf17's deferred list) and to keep
+// playing (vf17's voice loop, right after the range check at 0x43B0D5, on the
+// same listener copy). The listener is the game camera, which follows the
+// leader: a music zone only the non-leading player stood in stayed silent. In
+// the voice loop the copy is pointed at player 2's camera for a region voice
+// whose box holds it but not the listener; it is put back at the next check.
+char* g_sm = nullptr;   // set by the vf17 wrapper
+const float* TrueListener() {
+	char* wrap = g_sm ? *(char**)((char*)g_sm + 4) : nullptr;
+	char* obj = wrap ? *(char**)wrap : nullptr;
+	return obj ? (const float*)(obj + 0x28) : nullptr;
+}
+
+bool InRegionBox(const char* inst, const float* p) {
+	const float* b = (const float*)inst;
+	return b[0x2C / 4] < p[0] && p[0] <= b[0x20 / 4] && b[0x34 / 4] < p[2] && p[2] <= b[0x28 / 4] &&
+	       b[0x30 / 4] < p[1] && p[1] <= b[0x24 / 4];
+}
+
 volatile long g_checked = 0, g_mismatch = 0;
 
 float __cdecl RangeDist(float sq, const float* s, const float* l) {
@@ -80,7 +101,13 @@ float __cdecl RangeDist(float sq, const float* s, const float* l) {
 // Deferred-sound records (vf17, 0x43B512): ESI = the 0x1C-byte record, +4 the
 // sound; its position is the sound's own (+4..+0xC) or, with +0x38 bit 4, its
 // owner's frame (+4 -> +4 -> LTM position +0x80).
-float __cdecl RangeDistRecord(float sq, const char* rec, const float* l) {
+float __cdecl RangeDistRecord(float sq, const char* rec, float* l) {
+	const float* tl = TrueListener();
+	if (tl && l) {   // the voice loop may have left player 2's camera there
+		l[0] = tl[0]; l[1] = tl[1]; l[2] = tl[2];
+		const float* s0 = nullptr;
+		(void)s0;
+	}
 	const float* s = nullptr;
 	const char* snd = rec ? *(const char* const*)(rec + 4) : nullptr;
 	if (snd) {
@@ -92,6 +119,7 @@ float __cdecl RangeDistRecord(float sq, const char* rec, const float* l) {
 			s = (const float*)(snd + 4);
 		}
 	}
+	if (s && l) sq = Dist2(s, l);
 	return RangeDist(sq, s, l);
 }
 
@@ -100,15 +128,34 @@ float __cdecl RangeDistRecord(float sq, const char* rec, const float* l) {
 //   0x43B0D5 (vf17, playing voices): sound at +0x2C, listener at +0x20.
 //   0x43B512 (vf17, deferred sounds): sound via ESI, listener at +0x20.
 //   0x43B9B9 / 0x43BCBF (FUN_0043B730): sound at +0x18, listener at +0x24.
+volatile long g_regionKept = 0, g_regionStarted = 0;
+
+float __cdecl RangeDistVoice(float sq, const float* s, float* l, const char* rec) {
+	const float* tl = TrueListener();
+	if (tl && l) { l[0] = tl[0]; l[1] = tl[1]; l[2] = tl[2]; }
+	P2Listener l2;
+	if (!s || !l || !CurrentP2(l2)) return RangeDist(sq, s, l);
+	float d1 = Dist2(s, l), d2 = Dist2(s, l2.pos);
+	const char* def = rec ? *(const char* const*)(rec + 4) : nullptr;
+	const char* inst = rec ? *(const char* const*)(rec + 8) : nullptr;
+	if (def && inst && (*(const uint8_t*)(def + 0xC) & 1) && InRegionBox(inst, l2.pos) && !InRegionBox(inst, l)) {
+		l[0] = l2.pos[0]; l[1] = l2.pos[1]; l[2] = l2.pos[2];
+		InterlockedIncrement(&g_regionKept);
+		return sqrtf(d2);
+	}
+	return sqrtf(d1 < d2 ? d1 : d2);
+}
+
 __declspec(naked) void ThunkVoices() {
 	__asm {
 		lea  eax, [esp + 4 + 0x20]
 		lea  ecx, [esp + 4 + 0x2C]
+		push ebx
 		push eax
 		push ecx
-		push dword ptr [esp + 12]
-		call RangeDist
-		add  esp, 12
+		push dword ptr [esp + 16]
+		call RangeDistVoice
+		add  esp, 16
 		ret
 	}
 }
@@ -198,6 +245,61 @@ char* __cdecl VoiceUpdateHook(char* v) {
 	return r;
 }
 
+typedef void(__fastcall* SmTickFn)(char* self, void* edx, char* dt);
+const uintptr_t kSoundMgrVtbl = 0x624058, kSoundMgrTick = 0x43ADD0;
+const size_t    kSoundMgrTickSlot = 17;
+SmTickFn g_origSmTick = nullptr;
+typedef int(__fastcall* StartFn)(char* self, void* edx, void* inst, int a, int b, int c, int d, int e);
+const uintptr_t kSoundStart = 0x43B730;
+
+void __fastcall SoundTickHook(char* sm, void* edx, char* dt) {
+	g_sm = sm;
+	g_origSmTick(sm, edx, dt);
+	{   // diagnostics: region sounds (music/ambience zones) leaving or joining the waiting list
+		static int lastRegions = -1;
+		char* a = *(char**)(sm + 0x18);
+		unsigned c = *(unsigned*)(sm + 0x20);
+		int n = 0;
+		for (unsigned i = 0; a && i < c && i < 512; i++) {
+			const char* def = *(const char* const*)(a + i * 0x1C);
+			if (def && (*(const uint8_t*)(def + 0xC) & 1)) n++;
+		}
+		if (n != lastRegions) {
+			if (lastRegions >= 0) Log("sound: region sounds waiting %d -> %d", lastRegions, n);
+			lastRegions = n;
+		}
+	}
+	P2Listener l2;
+	char* wrap = *(char**)((char*)sm + 4);
+	char* obj = wrap ? *(char**)wrap : nullptr;
+	if (!obj || !CurrentP2(l2)) return;
+	float* lp = (float*)(obj + 0x28);
+	// Deferred sounds: +0x18 array of 0x1C-byte records (+0 definition, +4 the
+	// instance, +8/+0xC/+0x10/+0x18 the start arguments), +0x20 count.
+	char* arr = *(char**)((char*)sm + 0x18);
+	unsigned& count = *(unsigned*)((char*)sm + 0x20);
+	for (unsigned i = 0; arr && i < count; i++) {
+		int* r = (int*)(arr + i * 0x1C);
+		const char* def = (const char*)r[0];
+		char* inst = (char*)r[1];
+		if (!def || !inst || !(*(const uint8_t*)(def + 0xC) & 1)) continue;
+		if (!InRegionBox(inst, l2.pos) || InRegionBox(inst, lp)) continue;
+		const float* sp = (*(uint8_t*)(inst + 0x38) & 0x10) ? nullptr : (const float*)(inst + 4);
+		if (sp && Dist2(sp, l2.pos) >= *(const float*)(def + 8) * *(const float*)(def + 8)) continue;
+		float saved[3] = { lp[0], lp[1], lp[2] };
+		lp[0] = l2.pos[0]; lp[1] = l2.pos[1]; lp[2] = l2.pos[2];
+		*(uint32_t*)(inst + 0x38) &= ~4u;
+		((StartFn)kSoundStart)(sm, nullptr, inst, r[2], r[3], (char)r[6], r[4], 0);
+		lp[0] = saved[0]; lp[1] = saved[1]; lp[2] = saved[2];
+		InterlockedIncrement(&g_regionStarted);
+		Log("sound: region sound %p started for player 2's camera", inst);
+		// Taken off the deferred list, as vf17 does after starting one.
+		unsigned last = --count;
+		if (i != last) memcpy(arr + i * 0x1C, arr + last * 0x1C, 0x1C);
+		i--;
+	}
+}
+
 } // namespace
 
 void SoundSetP2Listener() {
@@ -216,6 +318,25 @@ void SoundSetP2Listener() {
 }
 
 long SoundNearP2() { return g_nearP2; }
+long SoundRegionKept() { return g_regionKept; }
+long SoundRegionStarted() { return g_regionStarted; }
+
+void SoundDumpRegions() {
+	if (!g_sm) { Log("sound: no sound manager seen yet"); return; }
+	char* arr = *(char**)(g_sm + 0x18);
+	unsigned count = *(unsigned*)(g_sm + 0x20);
+	int n = 0;
+	for (unsigned i = 0; arr && i < count; i++) {
+		int* r = (int*)(arr + i * 0x1C);
+		const char* def = (const char*)r[0];
+		const float* b = (const float*)r[1];
+		if (!def || !b || !(*(const uint8_t*)(def + 0xC) & 1)) continue;
+		n++;
+		Log("sound:   region (waiting) %p box x %.0f..%.0f y %.0f..%.0f z %.0f..%.0f range %.0f", b,
+		    b[0x2C / 4], b[0x20 / 4], b[0x30 / 4], b[0x24 / 4], b[0x34 / 4], b[0x28 / 4], *(const float*)(def + 8));
+	}
+	Log("sound: %u waiting sounds, %d of them region sounds", count, n);
+}
 long SoundMixedAsP2() { return g_mixedAsP2; }
 
 bool SoundInstallHooks() {
@@ -225,7 +346,9 @@ bool SoundInstallHooks() {
 		{ 0xE8, 0x02, 0x5E, 0x15, 0x00 },   // 0x43B9B9
 		{ 0xE8, 0xFC, 0x5A, 0x15, 0x00 },   // 0x43BCBF
 	};
-	bool ok = PatchCallSite(0x43B0D5, kCall[0], 5, (void*)ThunkVoices, "sound range, playing voices");
+	bool ok = PatchVtableSlot(kSoundMgrVtbl, kSoundMgrTickSlot, kSoundMgrTick, (void*)SoundTickHook,
+	                          (void**)&g_origSmTick, "CKSoundManager::tick");
+	ok &= PatchCallSite(0x43B0D5, kCall[0], 5, (void*)ThunkVoices, "sound range, playing voices");
 	ok &= PatchCallSite(0x43B512, kCall[1], 5, (void*)ThunkDeferred, "sound range, deferred sounds");
 	ok &= PatchCallSite(0x43B9B9, kCall[2], 5, (void*)ThunkStart, "sound range, start (1)");
 	ok &= PatchCallSite(0x43BCBF, kCall[3], 5, (void*)ThunkStart, "sound range, start (2)");

@@ -133,6 +133,7 @@ void Hold(Trio t, int idx, const char* why) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
 	g.held[idx] = true;
+	g.aiCycle[idx] = 0;   // the game's now; no reset pass afterwards
 	g.heldSince[idx] = GetTickCount();
 	uint8_t f = *F18(h);
 	if (HeroModePlayable(f)) *F18(h) = HeroAiVariant(f);
@@ -929,7 +930,11 @@ int CoopBeforeTrioEvent(int ev, void* caller) {
 		Hero h = t.GetHero(i);
 		if (!h || i == t.Leader() || g.held[i]) continue;
 		uint8_t f = *F18(h);
-		if (!HeroModePlayable(f) || !HeroIsPlayerVariant(f)) continue;
+		// A hero in its reset pass (StartAiCycle) is still a player's: the boss
+		// sends "Obelix leads" and then "Asterix waits" one after the other, and
+		// the wait must still hand Asterix to the game.
+		bool cycling = g.aiCycle[i] > 0;
+		if (!HeroModePlayable(f) || (!HeroIsPlayerVariant(f) && !cycling)) continue;
 		fr.used[i] = true;
 		fr.order[i] = (uint8_t)h.Order();
 		*F18(h) = HeroAiVariant(f);

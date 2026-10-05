@@ -54,11 +54,11 @@ DWORD WINAPI WatchdogThread(LPVOID) {
 			long cs = SplitFrames();
 			long cp = ProximitySlices();
 			Log("watch: level=%d next=%d | per 2s: frames=%ld lifeTicks A=%ld O=%ld p2Routed=%ld "
-				"split=%ld nearestHero=%ld p2Bonuses=%ld p2Beacons=%ld p2Contacts=%ld klusters=%ld/%ld sound=%ld/%ld | "
+				"split=%ld nearestHero=%ld p2Bonuses=%ld p2Beacons=%ld p2Contacts=%ld klusters=%ld/%ld sound=%ld/%ld region=%ld/%ld | "
 				"enforced=%ld trioEvents=%ld | p2=%s%s",
 				curLevel, nextLevel, ci - lastInput, ca - lastAst, co - lastObe, cr - lastRouted,
 				cs - lastSplit, cp - lastProx, ProximityP2Bonuses(), ProximityP2Beacons(),
-				ProximityP2Contacts(), KlusterQueries(), KlusterP2Only(), SoundNearP2(), SoundMixedAsP2(),
+				ProximityP2Contacts(), KlusterQueries(), KlusterP2Only(), SoundNearP2(), SoundMixedAsP2(), SoundRegionKept(), SoundRegionStarted(),
 				g_hookCounters.enforced,
 				g_hookCounters.trioEvents,
 				CoopP2Joined() ? HeroName(CoopP2Hero()) : "-",
