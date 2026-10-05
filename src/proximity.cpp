@@ -547,6 +547,33 @@ const uintptr_t kDetectTick = 0x46BE90;
 DetectTickFn g_origDetectTick = nullptr;
 volatile long g_swappedZones = 0;
 bool g_inSwappedPass = false;
+char* g_tickingDet = nullptr;   // the detection service inside DetectTickHook
+
+// Which hero set off zone event `ev`: the enabled test carrying it, and the
+// node it is bound to right now (the swapped pass has the nodes swapped).
+int ZoneEventHero(unsigned ev) {
+	char* det = g_tickingDet;
+	Trio t = GetTrio();
+	if (!det || !t) return -1;
+	char** nodes = *(char***)(det + 0x18);
+	unsigned nn = *(uint16_t*)(det + 0x20);
+	const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+	for (int base : bases) {
+		char* e = *(char**)(det + base);
+		unsigned n = *(uint16_t*)(det + base + 4);
+		for (unsigned i = 0; e && i < n; i++, e += 8) {
+			if (*(uint16_t*)(e + 6) != (uint16_t)ev || !(e[4] & 1)) continue;
+			unsigned obj = *(uint16_t*)(e + 2);
+			if (!nodes || obj >= nn) return -1;
+			for (int h = 0; h < HERO_COUNT; h++) {
+				Hero hero = t.GetHero(h);
+				if (hero && (char*)hero.hook->node == nodes[obj]) return h;
+			}
+			return -1;
+		}
+	}
+	return -1;
+}
 
 int NodeIndex(char* det, Hero h) {
 	char** nodes = *(char***)(det + 0x18);
@@ -562,7 +589,8 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 	            !CoopHeroHeld(HERO_ASTERIX) && !CoopHeroHeld(HERO_OBELIX);
 	int ia = coop ? NodeIndex(det, t.GetHero(HERO_ASTERIX)) : -1;
 	int io = coop ? NodeIndex(det, t.GetHero(HERO_OBELIX)) : -1;
-	if (ia < 0 || io < 0) { g_origDetectTick(det, edx, arg); return; }
+	g_tickingDet = det;
+	if (ia < 0 || io < 0) { g_origDetectTick(det, edx, arg); g_tickingDet = nullptr; return; }
 
 	float* prev = *(float**)(det + 0x1C);
 	float prevA[3], prevO[3];
@@ -611,6 +639,7 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 		for (unsigned i = 0; e && i < n; i++, e += 8, k++)
 			if (k < sizeof(saved)) e[4] = (char)saved[k];
 	}
+	g_tickingDet = nullptr;
 }
 
 // Zone events: logged while player 2 is in (the second pass marked as such).
@@ -652,6 +681,8 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 	}
 	if (from >= kDetectTickBegin && from < kDetectTickEnd) {
 		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
+		int zh = ZoneEventHero(eventId & 0xFFFF);
+		if (zh >= 0) CoopNoteZoneHero(zh);
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
 		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
 	}

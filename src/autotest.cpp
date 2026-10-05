@@ -451,6 +451,18 @@ const Step kSas[] = {
 	END(9000),
 };
 
+// sectorzone: player 2's Obelix crosses the rectangle that switches to
+// sector 2 (a zone, not a Sas) while Asterix, leading, stays in sector 1.
+const Step kSectorZone[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 13, 0, 0, 0, "asterix behind" },
+	{ 1500, S_PLACE, HERO_OBELIX, 11, 0, 0, 0, "obelix before the rectangles" },
+	GLIDE(2500, HERO_OBELIX, 12, 2000),
+	SHOT(8000, "sectorzone_1"),
+	END(10000),
+};
+
 const Step kRegions[] = {
 	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" },
 	{ 2000, S_EVGROUP, 0x10D, 0, 0, 0, 0, "group 10D" }, { 2000, S_EVGROUP, 0x14D, 0, 0, 0, 0, "group 14D" },
@@ -1012,6 +1024,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spy2o", kSpy2O),
 	SCENARIO("spywalk", kSpyWalk),
 	SCENARIO("sas", kSas),
+	SCENARIO("sectorzone", kSectorZone),
 	SCENARIO("spygroups", kSpyGroups),
 	SCENARIO("savestate", kSaveState),
 	SCENARIO("musica", kMusicA),
@@ -1041,6 +1054,9 @@ const float kSpots[][3] = {
 	{ 16.00f, 51.50f, -124.50f },       // 8: where the music starts for the leader (checkpoint)
 	{ -759.40f, 508.50f, -1014.80f },   // 9: where the user's Obelix waited for the lifter area's spy
 	{ -811.50f, 531.00f, -970.00f },    // 10: sector 1's Sas box that streams in sector 2
+	{ -803.00f, 532.00f, -987.00f },    // 11: before the rectangles (#75/#76, at -811 533 -987) that switch to sector 2
+	{ -819.00f, 532.00f, -987.00f },    // 12: past them
+	{ -783.30f, 517.40f, -990.00f },    // 13: where the user's Asterix stayed behind in sector 1
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));

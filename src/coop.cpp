@@ -480,51 +480,109 @@ static void SetHeroPosition(Hero h, const Vector3& to);
 
 // The level streams one sector at a time besides sector 0 (CKLevel, yellow
 // pages +0x90: sectors at +4, current +0x24, loading +0x2C, requested +0x34).
-// The switch is the leader's: each sector lists Sas (sector +0x10, count +0x14;
-// CKSas: two boxes at the border, +0xC and +0x24, standing in the first loads
-// sector +4, in the second sector +8), checked against the trio leader's
-// position only (CKLevel::vf17 -> FUN_00410DA0); zone events can switch it too
-// (CKLevel 0x1222). A player's hero left in an unloaded sector has no ground
-// under it. One outside the current sector's box (sector +0x18: max xyz, min
-// xyz) for two seconds, with no load going on, is brought to the other player.
+// Each sector lists Sas (sector +0x10, count +0x14; CKSas: two boxes at the
+// border, +0xC and +0x24 -- in the first, sector +4 is wanted, in the second
+// sector +8), checked against the trio leader's position only (CKLevel::vf17
+// -> FUN_00410DA0, starting from the current sector's list). Zone events switch
+// too (CKLevel 0x1222: level 2's rectangles #75/#76), for either hero. Sector
+// boxes overlap too much to tell where a hero is, so each player's hero gets
+// the leader's treatment: its own sector, moved by the Sas boxes it walks
+// through. A switch goes to the hero that made it -- the leader by a Sas, or
+// the hero whose zone fired -- and a player's hero whose sector is not the
+// streamed one (outside any Sas box) for two seconds is brought to the other.
+struct SectorTrack {
+	int   level = -99;
+	int   lastCur = -2;
+	int   sector[HERO_COUNT] = {};
+	int   zoneHero = -1;
+	DWORD zoneAt = 0;
+} g_sec;
+
+void CoopNoteZoneHero(int heroIndex) {
+	g_sec.zoneHero = heroIndex;
+	g_sec.zoneAt = GetTickCount();
+}
+
 static void WatchSectors(Trio t, DWORD now) {
 	CKYellowPages* yp = YellowPages();
 	char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
 	int cur = lvl ? *(int*)(lvl + 0x24) : -2;
 	char** secs = lvl ? *(char***)(lvl + 4) : nullptr;
-	bool settled = lvl && cur > 0 && *(int*)(lvl + 0x2C) == -2 && *(int*)(lvl + 0x34) == -2 && secs && secs[cur];
-	if (!settled || !t || !g.p2Joined || g.suspended || g.held[g.p1Hero] || g.held[g.p2Hero]) {
+	if (!t || !secs || cur <= 0 || !secs[cur]) return;
+	int nsec = 0;
+	while (nsec < 64 && secs[nsec] && *(void**)secs[nsec] == *(void**)secs[0]) nsec++;
+	if (cur >= nsec) return;
+	int idx[2] = { HERO_ASTERIX, HERO_OBELIX };   // the two player heroes, joined or not
+	if (g.lastLevel != g_sec.level) {   // new level (or first look): everyone where the level is
+		g_sec.level = g.lastLevel;
+		g_sec.lastCur = cur;
+		for (int i = 0; i < HERO_COUNT; i++) g_sec.sector[i] = cur;
 		memset(g.outsideSince, 0, sizeof(g.outsideSince));
 		return;
 	}
-	auto inBox = [secs](int n, const Vector3& p) {
-		const float* b = (const float*)(secs[n] + 0x18);
-		return p.x <= b[0] && p.x > b[3] && p.y <= b[1] && p.y > b[4] && p.z <= b[2] && p.z > b[5];
-	};
-	auto inside = [&](const Vector3& p) { return inBox(cur, p); };
-	// Only in another sector's box counts: places built from sector 0 alone are
-	// outside every streamed sector's box and always there.
-	int nsec = 0;
-	while (nsec < 64 && secs[nsec] && *(void**)secs[nsec] == *(void**)secs[0]) nsec++;
-	auto unloaded = [&](const Vector3& p) {
-		for (int n = 1; n < nsec; n++)
-			if (n != cur && inBox(n, p)) return n;
-		return 0;
-	};
-	int idx[2] = { g.p1Hero, g.p2Hero };
+	// Sas boxes, as CKLevel::vf17 checks them, for each player's own sector.
+	bool inSas[HERO_COUNT] = {};
+	for (int i : idx) {
+		Hero h = t.GetHero(i);
+		int s = g_sec.sector[i];
+		if (!h || s <= 0 || s >= nsec) { g_sec.sector[i] = cur; continue; }
+		Vector3 p = h.Pos();
+		char** sas = *(char***)(secs[s] + 0x10);
+		unsigned ns = *(unsigned*)(secs[s] + 0x14);
+		for (unsigned k = 0; sas && k < ns && k < 64; k++) {
+			const float* b = (const float*)(sas[k] + 0xC);
+			for (int half = 0; half < 2; half++, b += 6) {
+				if (p.x <= b[0] && p.x > b[3] && p.y <= b[1] && p.y > b[4] && p.z <= b[2] && p.z > b[5]) {
+					int to = *(int*)(sas[k] + (half ? 8 : 4));
+					inSas[i] = true;
+					if (to > 0 && to < nsec) g_sec.sector[i] = to;
+					k = ns;
+					break;
+				}
+			}
+		}
+	}
+	// A completed switch: whose was it?
+	if (cur != g_sec.lastCur) {
+		int L = t.Leader();
+		if (L < 0 || L >= HERO_COUNT) L = idx[0];
+		bool zoneRecent = g_sec.zoneHero >= 0 && (int)(now - g_sec.zoneAt) < 5000;
+		const char* why;
+		if (g_sec.sector[L] == cur) why = "the leader's Sas";
+		else if (zoneRecent) { g_sec.sector[g_sec.zoneHero] = cur; why = "a zone"; }
+		else { for (int i : idx) g_sec.sector[i] = cur; why = "unknown, everyone moved along"; }
+		Log("coop: sector %d -> %d (%s%s%s); Asterix's sector %d, Obelix's %d", g_sec.lastCur, cur, why,
+		    zoneRecent && g_sec.sector[L] != cur ? " of " : "", zoneRecent && g_sec.sector[L] != cur ? HeroName(g_sec.zoneHero) : "",
+		    g_sec.sector[HERO_ASTERIX], g_sec.sector[HERO_OBELIX]);
+		g_sec.lastCur = cur;
+		g_sec.zoneHero = -1;
+	}
+	// Heroes together are in the same place: whatever the game did to put them
+	// there (warp, respawn, its own teleports).
+	Hero h1 = t.GetHero(idx[0]), h2 = t.GetHero(idx[1]);
+	if (h1 && h2 && (h1.Pos() - h2.Pos()).len2() < 8.0f * 8.0f &&
+	    (g_sec.sector[idx[0]] == cur || g_sec.sector[idx[1]] == cur))
+		g_sec.sector[idx[0]] = g_sec.sector[idx[1]] = cur;
+
+	bool settled = *(int*)(lvl + 0x2C) == -2 && *(int*)(lvl + 0x34) == -2;
+	if (!settled || !g.p2Joined || g.suspended || g.held[HERO_ASTERIX] || g.held[HERO_OBELIX]) {
+		memset(g.outsideSince, 0, sizeof(g.outsideSince));
+		return;
+	}
 	for (int k = 0; k < 2; k++) {
 		int i = idx[k], o = idx[1 - k];
 		Hero h = t.GetHero(i), other = t.GetHero(o);
-		if (!h || !other || inside(h.Pos()) || !unloaded(h.Pos())) { g.outsideSince[i] = 0; continue; }
+		if (!h || !other || g_sec.sector[i] == cur || inSas[i]) { g.outsideSince[i] = 0; continue; }
 		if (!g.outsideSince[i]) { g.outsideSince[i] = now; continue; }
-		if ((int)(now - g.outsideSince[i]) < 2000 || !inside(other.Pos()) || !HeroModePlayable(other.Flags18()))
+		if ((int)(now - g.outsideSince[i]) < 2000 || g_sec.sector[o] != cur || !HeroModePlayable(other.Flags18()))
 			continue;
 		g.outsideSince[i] = 0;
 		Vector3 from = h.Pos(), to = other.Pos();
 		to.y += 1.0f;
 		SetHeroPosition(h, to);
-		Log("coop: %s in sector %d (at %.0f %.0f %.0f), not streamed (sector %d is): brought to %s at (%.1f %.1f %.1f)",
-		    HeroName(i), unloaded(from), from.x, from.y, from.z, cur, HeroName(o), to.x, to.y, to.z);
+		Log("coop: %s left in sector %d (at %.0f %.0f %.0f), sector %d is streamed: brought to %s at (%.1f %.1f %.1f)",
+		    HeroName(i), g_sec.sector[i], from.x, from.y, from.z, cur, HeroName(o), to.x, to.y, to.z);
+		g_sec.sector[i] = cur;
 	}
 }
 
@@ -732,6 +790,7 @@ void CoopFrame() {
 
 	Trio t = GetTrio();
 	TrackStuckModes(t);
+	WatchSectors(t, now);   // every frame: the heroes' sectors are tracked in single player too
 	{   // diagnostics: the streamed sector (level object = yellow pages +0x90, current +0x24, next +0x34)
 		static int lastSector = -99;
 		char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
@@ -871,7 +930,6 @@ void CoopFrame() {
 		}
 	}
 	WatchSpyWalk(t, now);
-	WatchSectors(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
 	// whatever mode the game put it -- whichever player it belongs to. Rides only
 	// work that way: on the belly slide (mode 3) Obelix leads and Asterix rides
