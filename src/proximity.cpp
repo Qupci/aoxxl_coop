@@ -575,8 +575,35 @@ const uint8_t   kFlagEventPrologue[7] = { 0x8B, 0xD1, 0x66, 0x8B, 0x4C, 0x24, 0x
 const uintptr_t kDetectTickBegin = 0x46BE90, kDetectTickEnd = 0x46C0CE;   // CKSrvDetection::vf17
 FlagEventFn g_origFlagEvent = nullptr;
 
+// Diagnostics: events flagged into a group that messages the sound manager
+// (music), logged with the flagging code's address.
+bool IsMusicGroup(unsigned group) {
+	static void* cachedFor = nullptr;
+	static uint8_t music[1024 / 8];
+	CKYellowPages* yp = YellowPages();
+	char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!ev) return false;
+	if (cachedFor != *(void**)(ev + 0xC)) {
+		cachedFor = *(void**)(ev + 0xC);
+		memset(music, 0, sizeof(music));
+		unsigned n = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		char** objs = *(char***)(ev + 0x10);
+		unsigned first = 0;
+		for (unsigned gi = 0; gi < n && gi < 1024; first += tab[gi * 3], gi++)
+			for (unsigned k = 0; k < tab[gi * 3]; k++)
+				if (objs[first + k] && *(uintptr_t*)objs[first + k] == 0x624058) music[gi >> 3] |= 1 << (gi & 7);
+	}
+	return group < 1024 && (music[group >> 3] & (1 << (group & 7)));
+}
+
 void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 	uintptr_t from = (uintptr_t)_ReturnAddress();
+	if (IsMusicGroup((eventId & 0xFFFF) >> 3)) {
+		Trio t = GetTrio();
+		Log("proximity: music event %04X flagged from %p (leader %s)", eventId & 0xFFFF, (void*)from,
+		    t ? HeroName(t.Leader()) : "?");
+	}
 	if (CoopP2Joined() && from >= kDetectTickBegin && from < kDetectTickEnd) {
 		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,

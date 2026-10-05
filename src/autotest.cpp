@@ -16,7 +16,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -329,11 +329,45 @@ const Step kBossButton[] = {
 	END(5000),
 };
 
+// music: sector 8 streamed in, both heroes at its entrance, then one hero walks
+// (glides) to the spot where the music starts for the leader.
+const Step kMusicA[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(500, 8),
+	{ 3500, S_PLACE, HERO_ASTERIX, 6, 0, 0, 0, "asterix at entrance" },
+	{ 3500, S_PLACE, HERO_OBELIX, 6, 0, 0, 0, "obelix at entrance" },
+	{ 3500, S_PLACE, HERO_IDEFIX, 6, 0, 0, 0, "idefix at entrance" },
+	SECTORS(4500),
+	GLIDE(5000, HERO_ASTERIX, 7, 4000),
+	SHOT(9500, "musica"),
+	END(14000),
+};
+const Step kMusicO[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(500, 8),
+	{ 3500, S_PLACE, HERO_ASTERIX, 6, 0, 0, 0, "asterix at entrance" },
+	{ 3500, S_PLACE, HERO_OBELIX, 6, 0, 0, 0, "obelix at entrance" },
+	{ 3500, S_PLACE, HERO_IDEFIX, 6, 0, 0, 0, "idefix at entrance" },
+	VPAD(4000, 1, PAD_START, 0, 0, "p2 start"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	GLIDE(5000, HERO_OBELIX, 7, 4000),
+	SHOT(9500, "musico"),
+	END(14000),
+};
+
+// savestate: Obelix in the player variant without player 2 (a save made during
+// co-op): he must go back to being the AI companion.
+const Step kSaveState[] = {
+	MARK(0, "baseline"),
+	SETF18(500, HERO_OBELIX, 0x00),
+	P1(1500, 0, 1, 0, "p1 right"), P1(3000, 0, 0, 0, "p1 neutral"),
+	END(4000),
+};
+
 const Step kRegions[] = {
 	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" },
 	{ 2000, S_EVGROUP, 0x10D, 0, 0, 0, 0, "group 10D" }, { 2000, S_EVGROUP, 0x14D, 0, 0, 0, 0, "group 14D" },
 	{ 2000, S_EVGROUP, 0x058, 0, 0, 0, 0, "group 058" }, { 2000, S_EVGROUP, 0x1A0, 0, 0, 0, 0, "group 1A0" },
-	{ 2000, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	{ 2000, S_MUSICGROUPS, 0, 0, 0, 0, 0, "music groups" },
 	END(2500),
 };
 
@@ -885,6 +919,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("dash", kDash),
 	SCENARIO("joinlead2", kJoinLead2),
 	SCENARIO("regions", kRegions),
+	SCENARIO("savestate", kSaveState),
+	SCENARIO("musica", kMusicA),
+	SCENARIO("musico", kMusicO),
 	SCENARIO("bossbutton", kBossButton),
 	SCENARIO("lifterp2", kLifterP2),
 	SCENARIO("repair", kRepair),
@@ -904,6 +941,8 @@ const float kSpots[][3] = {
 	{ -771.90f, 515.60f, -976.80f },    // 3: Asterix near the spinning platform
 	{ -777.20f, 515.90f, -977.00f },    // 4: where player 2's Obelix set off the circle
 	{ -744.00f, 509.00f, -1006.00f },   // 5: the lifter's zone (sphere bound to Asterix, event 0408)
+	{ -8.00f, 45.50f, -146.00f },       // 6: sector 8's entrance (where the user's sector switched)
+	{ 16.00f, 51.50f, -124.50f },       // 7: where the music starts for the leader
 };
 
 const int kNumSpots = (int)(sizeof(kSpots) / sizeof(kSpots[0]));
@@ -1222,6 +1261,38 @@ void RunStep(const Step& s) {
 			char* o = objs ? objs[first + k] : nullptr;
 			Log("autotest:   target %u: %p vt %08X message %04X", k, o, o ? (unsigned)*(uintptr_t*)o : 0,
 			    msgs ? msgs[first + k] : 0);
+		}
+		break;
+	}
+	case S_MUSICGROUPS: {   // every event group that messages the sound manager, and the detectors feeding it
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+		if (!ev) break;
+		unsigned n = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
+		unsigned n1 = *(uint16_t*)(ev + 0x1C), n2 = *(uint16_t*)(ev + 0x1E);
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		char** objs = *(char***)(ev + 0x10);
+		uint16_t* msgs = *(uint16_t**)(ev + 0x14);
+		unsigned first = 0;
+		for (unsigned gi = 0; gi < n; first += tab[gi * 3], gi++) {
+			for (unsigned k = 0; k < tab[gi * 3]; k++) {
+				char* o = objs[first + k];
+				if (!o || *(uintptr_t*)o != 0x624058) continue;
+				Log("autotest: group %03X (%s, mask %02X) -> sound manager %04X", gi,
+				    gi < n1 ? "OR" : gi < n1 + n2 ? "AND acc" : "AND frame", tab[gi * 3 + 1], msgs[first + k]);
+				struct L { const char* name; int base, count; } ls[5] = { { "box-enter", 0x2C, 0x30 },
+					{ "sphere-enter", 0x34, 0x38 }, { "plane-cross", 0x3C, 0x40 }, { "box-level", 0x44, 0x48 },
+					{ "sphere-level", 0x4C, 0x50 } };
+				for (const L& l : ls) {
+					char* e = det ? *(char**)(det + l.base) : nullptr;
+					unsigned cnt = det ? *(uint16_t*)(det + l.count) : 0;
+					for (unsigned i = 0; e && i < cnt; i++, e += 8)
+						if ((*(uint16_t*)(e + 6) >> 3) == gi)
+							Log("autotest:     fed by %s %u: obj %u flags %02X/%02X event %04X", l.name, i,
+							    *(uint16_t*)(e + 2), (uint8_t)e[4], (uint8_t)e[5], *(uint16_t*)(e + 6));
+				}
+			}
 		}
 		break;
 	}

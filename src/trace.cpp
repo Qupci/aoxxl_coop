@@ -30,6 +30,7 @@ Traced g_traced[] = {
 	{ 0x62928C, 0x544060, "HkCrate" },
 	{ 0x6291E0, 0x5424D0, "CrateCpnt" },
 	{ 0x627738, 0x004E3F00, "Roman" },
+	{ 0x624058, 0x0043C400, "SoundManager" },   // only its music messages (0x02xx) are logged
 };
 volatile long g_traceLines = 0;
 
@@ -38,6 +39,18 @@ int __fastcall TracedSendEvent(void* self, void* edx, int event, void* param) {
 	const Traced* t = nullptr;
 	for (const Traced& c : g_traced) if (c.vtbl == vt) { t = &c; break; }
 	if (!t) return 0;   // cannot happen: only these vtables point here
+	// Music: the sound manager's 0x02xx messages (play track ...), always logged,
+	// with both heroes' positions -- what starts it, and for which hero.
+	if (t->vtbl == 0x624058) {
+		if ((event >> 8) == 0x02) {
+			Trio tr = GetTrio();
+			Hero a = tr ? tr.GetHero(HERO_ASTERIX) : Hero(), o = tr ? tr.GetHero(HERO_OBELIX) : Hero();
+			Log("trace: music message %04X from %p; leader %s; Asterix (%.1f %.1f %.1f) Obelix (%.1f %.1f %.1f)", event,
+			    _ReturnAddress(), tr ? HeroName(tr.Leader()) : "?", a ? a.Pos().x : 0, a ? a.Pos().y : 0,
+			    a ? a.Pos().z : 0, o ? o.Pos().x : 0, o ? o.Pos().y : 0, o ? o.Pos().z : 0);
+		}
+		return ((SendEventFn)t->original)(self, edx, event, param);
+	}
 	// 0x906 is the crates' per-frame "where are you" query: noise.
 	if (CoopP2Joined() && event != 0x906 && event != 0x4C01 && InterlockedIncrement(&g_traceLines) < 4000) {
 		Trio tr = GetTrio();

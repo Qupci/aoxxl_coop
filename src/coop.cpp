@@ -577,6 +577,19 @@ void CoopFrame() {
 		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
 	}
 	if (!g.p2Joined) {
+		// Without player 2 the hero that is not leading is the AI companion. A
+		// save made during co-op stores player 2's hero in the player variant:
+		// loaded alone, Obelix then mirrored player 1's every move.
+		if (t && CoopGameplayLive()) {
+			int ci = t.Leader() == HERO_ASTERIX ? HERO_OBELIX : t.Leader() == HERO_OBELIX ? HERO_ASTERIX : -1;
+			Hero c = ci >= 0 ? t.GetHero(ci) : Hero();
+			uint8_t f = c ? *F18(c) : 0;
+			if (c && HeroModePlayable(f) && HeroIsPlayerVariant(f) && !CutsceneBars()) {
+				*F18(c) = HeroAiVariant(f);
+				Log("coop: %s was a player hero without player 2 (from the save?) -- AI companion again (f18 %02X -> %02X)",
+				    HeroName(ci), f, *F18(c));
+			}
+		}
 		TryJoin(t);
 		return;
 	}
