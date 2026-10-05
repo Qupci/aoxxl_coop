@@ -26,6 +26,7 @@
 #include "p2cam.h"
 #include "pads.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -43,7 +44,8 @@ struct CoopState {
 	int     p1Hero   = -1;
 	int     p2Hero   = -1;
 	DWORD   p2BackHeldAt = 0;
-	bool    p2BackCombo = false;   // Back is held for Back+A (warp), not to leave
+	bool    p2BackCombo = false;
+	bool    cineRegrouped = false;  // RegroupForCutscene done for the current cutscene   // Back is held for Back+A (warp), not to leave
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
@@ -412,10 +414,35 @@ void CheckMarker(DWORD now) {
 	}
 }
 
+static void SetHeroPosition(Hero h, const Vector3& to);
+
+// A cutscene set off by one player far from the other (player 2's Obelix at the
+// Roman agent while Asterix was back at the lifter): the scene and the script
+// after it want both heroes there, and the AI could not find a path across the
+// level -- a softlock. Once the cutscene camera is up, a hero more than 40 units
+// away from the other is brought to the one the camera is looking at.
+static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
+	CKYellowPages* yp = YellowPages();
+	char* srv = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	if (!srv || g.held[g.p1Hero] || g.held[g.p2Hero]) return;
+	Vector3 look = *(Vector3*)(srv + 0x5BC);
+	float apart = (h1.Pos() - h2.Pos()).len2();
+	if (apart < 40.0f * 40.0f) return;
+	bool p1Near = (h1.Pos() - look).len2() <= (h2.Pos() - look).len2();
+	Hero away = p1Near ? h2 : h1, close = p1Near ? h1 : h2;
+	int farIdx = p1Near ? g.p2Hero : g.p1Hero, nearIdx = p1Near ? g.p1Hero : g.p2Hero;
+	Vector3 to = close.Pos();
+	to.y += 1.0f;
+	SetHeroPosition(away, to);
+	Log("coop: cutscene with the heroes %.0f units apart: %s brought to %s at (%.1f %.1f %.1f)", sqrtf(apart),
+	    HeroName(farIdx), HeroName(nearIdx), to.x, to.y, to.z);
+	(void)t;
+}
+
 // Puts `who` just above `to`'s position (it lands next to it; overlapping heroes
 // push apart). Hero position +kHero_pos and the node's matrix (+0x40) both
 // carry the position.
-static void WarpToPartner(Hero who, Hero to) {
+static void WarpToPartner(int whoIdx, Hero who, int toIdx, Hero to) {
 	Vector3 dst = to.Pos();
 	dst.y += 1.0f;
 	who.Pos() = dst;
@@ -423,8 +450,8 @@ static void WarpToPartner(Hero who, Hero to) {
 		float* hp = (float*)((char*)who.hook->node->matrix + 0x40);
 		hp[0] = dst.x; hp[1] = dst.y; hp[2] = dst.z;
 	}
-	Log("coop: player 2's %s warped to %s (Back + A) at (%.1f %.1f %.1f)", HeroName(g.p2Hero),
-	    HeroName(g.p1Hero), dst.x, dst.y, dst.z);
+	Log("coop: %s warped to %s (Back + A) at (%.1f %.1f %.1f)", HeroName(whoIdx), HeroName(toIdx), dst.x, dst.y,
+	    dst.z);
 }
 
 void CoopFrame() {
@@ -442,6 +469,7 @@ void CoopFrame() {
 
 	PadsPoll();
 	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
+	TracePotionFrame();
 	SoundSetP2Listener();
 	CheckMarker(now);
 	{
@@ -483,7 +511,7 @@ void CoopFrame() {
 	// Start and Back are left alone during a cutscene: Start may be what skips it.
 	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars();
 	if (!inCutscene && (p.pressed & PAD_START)) { Release("pressed Start"); return; }
-	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & PAD_A)) g.p2BackCombo = true;
+	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & (PAD_A | PAD_Y))) g.p2BackCombo = true;
 	if (!(p.buttons & PAD_BACK)) g.p2BackCombo = false;
 	if (!inCutscene && (p.buttons & PAD_BACK) && !g.p2BackCombo) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
@@ -501,9 +529,23 @@ void CoopFrame() {
 	}
 
 	// Back + A: player 2's hero joins player 1's (lost, stuck, or fell behind).
-	if (g.p2BackCombo && (p.pressed & PAD_A) && !inCutscene && !g.suspended && !g.held[g.p1Hero] &&
-	    !g.held[g.p2Hero])
-		WarpToPartner(h2, h1);
+	// Player 1's pad (the one the game reads) does the same the other way round.
+	bool canWarp = !inCutscene && !g.suspended && !g.held[g.p1Hero] && !g.held[g.p2Hero];
+	if (g.p2BackCombo && (p.pressed & PAD_A) && canWarp)
+		WarpToPartner(g.p2Hero, h2, g.p1Hero, h1);
+	{
+		int p1pad = Player1Pad();
+		const PadState& q = PadGet(p1pad);
+		bool p1ok = p1pad >= 0 && p1pad != g.p2Pad && q.connected && (q.buttons & PAD_BACK);
+		if (p1ok && (q.pressed & PAD_A) && canWarp)
+			WarpToPartner(g.p1Hero, h1, g.p2Hero, h2);
+		// Test helper ([debug] cheats = on): Back + Y fills the magic potion.
+		if (g_config.cheats && !inCutscene &&
+		    ((p1ok && (q.pressed & PAD_Y)) || ((p.buttons & PAD_BACK) && (p.pressed & PAD_Y)))) {
+			SetPotionGauge(300.0f);
+			Log("coop: cheat: magic potion filled");
+		}
+	}
 
 	// Scripted modes belong to the game. So does a group action player 1 starts
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
@@ -523,13 +565,35 @@ void CoopFrame() {
 			HeroName(g.p1Hero), ModeName(HeroMode(h1.Flags18())),
 			HeroName(g.p2Hero), ModeName(HeroMode(h2.Flags18())),
 			cinematic ? ", cutscene" : "", groupAction ? ", group action" : "");
-		if (scripted) {
-			// Hand player 2's hero to the game for the duration.
-			uint8_t f = *F18(h2);
-			if (HeroModePlayable(f) && HeroIsPlayerVariant(f) && t.Leader() != g.p2Hero)
-				*F18(h2) = HeroAiVariant(f);
-		}
 		CoopLogState(scripted ? "suspend" : "resume");
+	}
+	{
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		char* track = cs ? *(char**)(cs + 0x38) : nullptr;
+		bool cineCam = track && *(uintptr_t*)track == 0x6245BC;   // plain CKCamera: a cutscene shot
+		if (!cinematic) g.cineRegrouped = false;
+		else if (!g.cineRegrouped && cineCam) {
+			g.cineRegrouped = true;
+			RegroupForCutscene(t, h1, h2);
+		}
+	}
+	// While suspended, the hero that is not leading is the game's companion, in
+	// whatever mode the game put it -- whichever player it belongs to. Rides only
+	// work that way: on the belly slide (mode 3) Obelix leads and Asterix rides
+	// along as the AI variant, whose handler carries him with Obelix; left in the
+	// player variant he stayed at the top of the slide.
+	if (g.suspended) {
+		const int both[2] = { g.p1Hero, g.p2Hero };
+		for (int idx : both) {
+			Hero h = idx == g.p1Hero ? h1 : h2;
+			uint8_t f = *F18(h);
+			if (idx != t.Leader() && HeroIsPlayerVariant(f)) {
+				*F18(h) = HeroAiVariant(f);
+				Log("coop: %s is the game's companion while suspended (f18 %02X -> %02X)", HeroName(idx), f,
+				    *F18(h));
+			}
+		}
 	}
 
 	InputManager im = GetInputManager();
@@ -803,6 +867,14 @@ int CoopBeforeTrioEvent(int ev, void* caller) {
 	return g_eventDepth;
 }
 
+static void SetHeroPosition(Hero h, const Vector3& to) {
+	h.Pos() = to;
+	if (h.hook->node && h.hook->node->matrix) {
+		float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
+		hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+	}
+}
+
 void CoopAfterTrioEvent(int ev, int cookie) {
 	if (!cookie) return;
 	if (cookie != g_eventDepth) { g_eventDepth = cookie - 1 < 0 ? 0 : cookie - 1; return; }
@@ -825,8 +897,12 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 			Hold(t, i, why);
 		}
 	}
-	EnforcePlayer(t, g.p1Hero);
-	EnforcePlayer(t, g.p2Hero);
+	// Not inside another event either: a switch sent by a mode event (0x480B,
+	// belly slide, sends 0x4801) is followed by the mode change itself.
+	if (!g.suspended && g_eventDepth == 0) {
+		EnforcePlayer(t, g.p1Hero);
+		EnforcePlayer(t, g.p2Hero);
+	}
 }
 
 // ---------------------------------------------------------------------------

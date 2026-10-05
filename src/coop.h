@@ -57,6 +57,9 @@ bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 bool TraceInstallHooks();   // trace.cpp: event logging for interaction debugging
 void TraceDumpCollisionTests(void* receiver);   // trace.cpp: collision tests involving `receiver`
+float PotionGauge();            // trace.cpp: the magic potion gauge (0 = none)
+void SetPotionGauge(float v);
+void TracePotionFrame();        // trace.cpp: once per frame
 void TraceDumpBindings();       // trace.cpp: which device byte feeds each mapped action
 
 // Shared vtable patcher (hooks.cpp).

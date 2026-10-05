@@ -54,11 +54,12 @@ bool BuildP2Actions(int padIndex, uint8_t* out, int numActions) {
 
 void BuildActionsFromPad(const PadState& pad, uint8_t* out, int numActions) {
 	memset(out, 0, numActions);
-	// Back + A is the mod's own "warp to player 1": A does not reach the hero.
+	// Back + A / Back + Y are the mod's own (warp, potion cheat): A and Y do not
+	// reach the hero while Back is held.
 	PadState p = pad;
 	if (p.buttons & PAD_BACK) {
-		p.buttons &= ~PAD_A;
-		p.pressed &= ~PAD_A;
+		p.buttons &= ~(PAD_A | PAD_Y);
+		p.pressed &= ~(PAD_A | PAD_Y);
 	}
 
 	// Stick: split into four one-sided axes the way the engine stores them.
@@ -86,7 +87,7 @@ bool BuildP2Held(int padIndex, uint8_t* out, int numActions) {
 	BuildActionsFromPad(p, out, numActions);   // stick axes
 	for (const ButtonMap& b : kButtons) {
 		if (!(p.buttons & b.padBit)) continue;
-		if (b.padBit == PAD_A && (p.buttons & PAD_BACK)) continue;
+		if ((b.padBit == PAD_A || b.padBit == PAD_Y) && (p.buttons & PAD_BACK)) continue;
 		if (b.held >= 0 && b.held < numActions) out[b.held] = 0xFF;
 		for (int i = 0; i < 2; i++)
 			if (b.edge[i] >= 0 && b.edge[i] < numActions) out[b.edge[i]] = 0xFF;

@@ -33,6 +33,13 @@ const uintptr_t kTrioGroupLife   = 0x625984;   // CKGrpTrioLife: the trio itself
 // it left Asterix waiting off the platform for good. Plates keep to the real
 // leader, as in single player (the AI companion never presses them either).
 const uintptr_t kPressionStoneVtbl = 0x628EE4;   // CKHkPressionStone (2,21)
+// The spinning platform's blue circle is not a pressure stone but part of the
+// platform itself, CKHkCorkscrew: its tick asks the trio about the leader
+// standing on it (trio events 0x0B01, 0x0C09) and then switches to Obelix with
+// "Asterix waits here". Ticked with player 2's Obelix posing as the leader, it
+// switched when Obelix stepped on it and left Asterix waiting off the platform
+// -- a softlock. It keeps to the real leader too.
+const uintptr_t kCorkscrewVtbl = 0x628E0C;       // CKHkCorkscrew (2,44)
 
 // Bonus pools (helmets and the like). CKGrpBonusPool::vf27 updates every active
 // bonus, then attracts those within the pool's radius of the leader's position
@@ -93,7 +100,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	uintptr_t vt = *(uintptr_t*)life;
 	Vector3 at;
 	char* hook = isGroup ? nullptr : *(char**)((char*)life + 0x10);
-	bool plate = hook && *(uintptr_t*)hook == kPressionStoneVtbl;
+	bool plate = hook && (*(uintptr_t*)hook == kPressionStoneVtbl || *(uintptr_t*)hook == kCorkscrewVtbl);
 	if (vt == kAsterixLifeVtbl || vt == kObelixLifeVtbl || vt == kIdefixLifeVtbl ||
 	    vt == kBonusGroupLife || vt == kTrioGroupLife || plate || !LifePos(life, isGroup, &at)) {
 		tick(life, nullptr, dt);

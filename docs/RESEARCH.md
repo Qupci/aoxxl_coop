@@ -139,6 +139,23 @@ the mod (`coop_diag`) exist to do exactly that.
   xyz. Collision (`FUN_004493C0`), klusters and rendering walk only the current sector and
   sector 0 — one streamed sector at a time. Level 2: 11 sectors, 0 and 1 loaded at the start.
   Teleports skip the zone events that stream sectors; autotest `GLIDE` moves heroes frame by frame.
+  The sector manager is the level object (game manager `+0x20`): writing a sector number to `+0x34`
+  streams it in (XXL Inspector's "go to sector"; autotest `LOADSECTOR`). Game speed: game loop
+  `+8` → time manager `+0x10` (float).
+* **Magic potion**: one global gauge, `[gameManager(yp+0x8C)+0x40]+0x9C` (float, 300 = full,
+  drains ~1/s; `+0x52` a byte the trio reads). `CKGrpTrioLife::vf17` → `FUN_0047DE80` starts the
+  trio's potion effects when the gauge is > 0 (`trio+0x5AC`), `FUN_0047EC30` per frame,
+  `FUN_0047FA90` ends them; game manager event `0x5302` empties it. The QoL patch's
+  `infinite_potion` rewrites 300.0 after every trio tick (`0x48445B`) and NOPs the clear at
+  `0x4FEDA4`. With the potion Asterix's `+0x84` (run speed) reads 15, P2's Obelix 7: the player
+  variant of Obelix has no potion code (single player never has Obelix drink).
+* **Spinning platform**: the platform and its blue circle are `CKHkCorkscrew` (2,44, vt
+  `0x628E0C`); it asks the trio about the leader standing on it (trio events `0x0B01`, `0x0C09`) and
+  then sends "switch to Obelix, Asterix waits" (`0x4801`/`0x4802` via CKSrvEvent). Level 2's six
+  `CKHkPressionStone`s are elsewhere. Excluded from proximity slicing (only the real leader).
+* **Belly slide** (`0x480B` → `0x4801`, mode 3): Obelix leads, Asterix rides as the AI variant
+  (`f18=0F`); the player variant (`0C`) keeps him at the top. Both heroes' `+kHero_pos` stay frozen
+  during rides (cable car, slide) while their nodes move — cameras must follow the node (LTM `+0x80`).
 
 ### 0.6 Other facts
 * `CKSrvCamera` = `yellowPages+0x68`; dir `+0xAC`; targets `+0xE8`.

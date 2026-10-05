@@ -30,12 +30,8 @@
 
 namespace {
 
-const uintptr_t kMix3D = 0x5DE840;
-const uint8_t   kMix3DPrologue[7] = { 0x83, 0xEC, 0x30, 0x8B, 0x44, 0x24, 0x34 };
 const uintptr_t kSqrt  = 0x5917C0;
 
-typedef void(__cdecl* Mix3DFn)(char** listener, int n, float* in, float* out, int param);
-Mix3DFn g_origMix = nullptr;
 
 // Player 2's camera, written by the game thread once per frame, read by the
 // game thread (range checks) and the mixer (whatever thread it runs on).
@@ -142,29 +138,64 @@ __declspec(naked) void ThunkStart() {
 	}
 }
 
-// FUN_005DE840: in[0..2] the voice's world position, in[3..5] its velocity.
-// The listener object is read at +0x28 (position) .. +0x6C; a copy moved to
-// player 2's camera stands in when the voice is nearer to it.
-void __cdecl Mix3DHook(char** listener, int n, float* in, float* out, int param) {
+// Voice update (FUN_005F06B0, cdecl(voice), the RwA 3D voice's update callback
+// at voice+0x30): mixes the voice from its world position (+0xA0 x negated,
+// +0xA4, +0xA8; velocity +0xAC..+0xB4) -- volume through FUN_005DE840 against
+// the listener (voice+0x94 -> +0x14 -> object), pan through the DirectSound 3D
+// buffer (SetAllParameters with voice+0x9C) against the DirectSound listener,
+// both player 1's camera. A voice nearer to player 2's camera is moved, for the
+// length of the update, to where it sits relative to player 2's camera but
+// around player 1's: distance and left/right then follow player 2's view.
+// +0x28 bit 2 = position changed (the 3D buffer is only updated then); it is
+// set on every update while the split screen is up, so the pan follows the
+// cameras turning, not just sounds moving.
+typedef char*(__cdecl* VoiceUpdateFn)(char* voice);
+const uintptr_t kVoiceUpdate = 0x5F06B0;
+const uint8_t   kVoiceUpdatePrologue[5] = { 0x83, 0xEC, 0x60, 0x53, 0x55 };
+VoiceUpdateFn g_origVoiceUpdate = nullptr;
+volatile DWORD g_refreshUntil = 0;
+
+float Dot(const float* a, const float* b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+
+// World vector `d` seen from frame (r2, u2, a2), re-expressed around (r1, u1, a1).
+void Remap(const float* d, const P2Listener& l2, const char* l1, float* out) {
+	const float* r1 = (const float*)(l1 + 0x58);
+	const float* u1 = (const float*)(l1 + 0x40);
+	const float* a1 = (const float*)(l1 + 0x4C);
+	float cr = Dot(d, l2.right), cu = Dot(d, l2.up), ca = Dot(d, l2.at);
+	for (int k = 0; k < 3; k++) out[k] = cr * r1[k] + cu * u1[k] + ca * a1[k];
+}
+
+char* __cdecl VoiceUpdateHook(char* v) {
 	P2Listener l2;
-	char* l = listener ? *listener : nullptr;
-	if (l && in && n == 1 && CurrentP2(l2)) {
-		const float* l1pos = (const float*)(l + 0x28);
-		if (Dist2(in, l2.pos) < Dist2(in, l1pos)) {
-			alignas(16) char copy[0x80];
-			memcpy(copy, l, sizeof(copy));
-			memcpy(copy + 0x28, l2.pos, 12);
-			memset(copy + 0x34, 0, 12);          // listener velocity
-			memcpy(copy + 0x40, l2.up, 12);
-			memcpy(copy + 0x4C, l2.at, 12);
-			memcpy(copy + 0x58, l2.right, 12);
-			char* p = copy;
-			InterlockedIncrement(&g_mixedAsP2);
-			g_origMix(&p, n, in, out, param);
-			return;
-		}
-	}
-	g_origMix(listener, n, in, out, param);
+	bool active = CurrentP2(l2);
+	DWORD now = GetTickCount();
+	if (active) g_refreshUntil = now + 1000;
+	char* dev = v ? *(char**)(v + 0x94) : nullptr;
+	char* l1 = dev ? *(char**)(dev + 0x14) : nullptr;
+	char* sample = v ? *(char**)(v + 0x84) : nullptr;
+	bool is3d = l1 && sample && (*(uint8_t*)(sample + 0x54) & 2);
+	if (!is3d) return g_origVoiceUpdate(v);
+	if ((int)(g_refreshUntil - now) > 0) *(uint32_t*)(v + 0x28) |= 4;
+	if (!active) return g_origVoiceUpdate(v);
+
+	float* vp = (float*)(v + 0xA0);
+	float saved[6];
+	memcpy(saved, vp, sizeof(saved));
+	float p[3] = { -vp[0], vp[1], vp[2] };
+	const float* l1pos = (const float*)(l1 + 0x28);
+	if (Dist2(p, l2.pos) >= Dist2(p, l1pos)) return g_origVoiceUpdate(v);
+
+	float d[3] = { p[0] - l2.pos[0], p[1] - l2.pos[1], p[2] - l2.pos[2] }, rd[3];
+	Remap(d, l2, l1, rd);
+	float vel[3] = { -vp[3], vp[4], vp[5] }, rv[3];
+	Remap(vel, l2, l1, rv);
+	vp[0] = -(l1pos[0] + rd[0]); vp[1] = l1pos[1] + rd[1]; vp[2] = l1pos[2] + rd[2];
+	vp[3] = -rv[0]; vp[4] = rv[1]; vp[5] = rv[2];
+	InterlockedIncrement(&g_mixedAsP2);
+	char* r = g_origVoiceUpdate(v);
+	memcpy(vp, saved, sizeof(saved));
+	return r;
 }
 
 } // namespace
@@ -198,8 +229,8 @@ bool SoundInstallHooks() {
 	ok &= PatchCallSite(0x43B512, kCall[1], 5, (void*)ThunkDeferred, "sound range, deferred sounds");
 	ok &= PatchCallSite(0x43B9B9, kCall[2], 5, (void*)ThunkStart, "sound range, start (1)");
 	ok &= PatchCallSite(0x43BCBF, kCall[3], 5, (void*)ThunkStart, "sound range, start (2)");
-	ok &= InstallDetour(kMix3D, (void*)Mix3DHook, (void**)&g_origMix, kMix3DPrologue,
-	                    sizeof(kMix3DPrologue), "3D sound mix");
+	ok &= InstallDetour(kVoiceUpdate, (void*)VoiceUpdateHook, (void**)&g_origVoiceUpdate, kVoiceUpdatePrologue,
+	                    sizeof(kVoiceUpdatePrologue), "3D voice update");
 	(void)kSqrt;
 	return ok;
 }

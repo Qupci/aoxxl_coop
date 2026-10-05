@@ -112,12 +112,24 @@ void Seed(Hero leader) {
 void ResetCam(Cam& c) { c.init = false; c.haveMatrix = false; c.havePrev = false; c.reach = 1.0f; }
 void P2CamReset() { ResetCam(g_cams[0]); ResetCam(g_cams[1]); }
 
-namespace {
 // Player 1's pad: the one the game reads (pad identification), if known.
 int Player1Pad() {
 	for (int i = 0; i < kMaxPads; i++)
 		if (i != CoopP2Pad() && PadGet(i).connected && PadIdentRole(i) == PAD_ROLE_GAME) return i;
 	return -1;
+}
+
+namespace {
+// Where the hero is drawn: its node's world position. A hero carried by
+// something (Asterix seated in the cable car) keeps its own position (+kHero_pos)
+// where it got on, while the node moves with the ride.
+Vector3 WorldPos(Hero h) {
+	CNode* node = h.hook->node;
+	const float* p = node && node->matrix ? (const float*)((char*)node->matrix + 0x80) : nullptr;
+	if (p && std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2]) &&
+	    (p[0] != 0.0f || p[1] != 0.0f || p[2] != 0.0f))
+		return Vector3(p[0], p[1], p[2]);
+	return h.Pos();
 }
 void UpdateCam(Hero hero, Hero leader, int pad);
 }
@@ -153,11 +165,12 @@ void UpdateCam(Hero hero, Hero leader, int pad) {
 	cam.lastTick = now;
 	if (dt < 0.0f || dt > 0.1f) dt = 0.016f;
 
-	Vector3 target = hero.Pos() + Vector3(0, cam.focusH, 0);
+	Vector3 heroAt = WorldPos(hero);
+	Vector3 target = heroAt + Vector3(0, cam.focusH, 0);
 	if (!cam.init) {
 		Seed(leader);
 		if (!cam.init) return;
-		target = hero.Pos() + Vector3(0, cam.focusH, 0);
+		target = heroAt + Vector3(0, cam.focusH, 0);
 		cam.focus = target;
 	}
 
@@ -170,7 +183,7 @@ void UpdateCam(Hero hero, Hero leader, int pad) {
 	// swing round behind a moving hero. The turn rate goes with sin(angle off
 	// behind), so walking sideways turns the view most, walking away needs no
 	// turn, and walking towards the camera does not spin it round.
-	Vector3 hp = hero.Pos();
+	Vector3 hp = heroAt;
 	bool stick = fabsf(p.rx) > 0.1f || fabsf(p.ry) > 0.1f;
 	cam.idle = stick ? 0.0f : cam.idle + dt;
 	if (cam.havePrev && dt > 0.0f) {
@@ -213,7 +226,7 @@ void UpdateCam(Hero hero, Hero leader, int pad) {
 	(void)want;
 	// Never below the hero's feet: water is not solid to the collision test, and
 	// a camera under the surface looking up at a swimming Obelix is useless.
-	float floorY = hero.Pos().y + 0.5f;
+	float floorY = heroAt.y + 0.5f;
 	if (cam.pos.y < floorY) cam.pos.y = floorY;
 
 	// Look-at matrix in the game camera's own convention.

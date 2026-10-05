@@ -12,7 +12,8 @@ struct CoopConfig {
 	bool  watchdog      = false;  // background thread reporting engine state every 2 s
 	bool  vtProfile     = false;  // count calls through hero / hero-life vtables
 	bool  renderProbe   = false;  // find the scene-render call via RwCamera.beginUpdate
-	bool  splitTest     = false;  // render the scene twice, to prove re-entrancy
+	bool  splitTest     = false;
+	bool  cheats        = false;  // test helpers: Back + Y fills the magic potion  // render the scene twice, to prove re-entrancy
 	int   splitMode     = SPLIT_VERTICAL;
 	bool  splitScreen   = true;   // off = shared camera on the leader
 	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect

@@ -64,6 +64,7 @@ void CoopConfig::Load(const char* iniPath) {
 	vtProfile   = ReadBool("debug", "vtable_profile", vtProfile, full);
 	renderProbe = ReadBool("debug", "render_probe", renderProbe, full);
 	splitTest   = ReadBool("debug", "split_test", splitTest, full);
+	cheats      = ReadBool("debug", "cheats", cheats, full);
 
 	char buf[64] = {};
 	GetPrivateProfileStringA("coop", "split_mode", "vertical", buf, sizeof(buf), full);
@@ -84,7 +85,7 @@ void CoopConfig::Load(const char* iniPath) {
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d",
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
-		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard);
+		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats);
 }

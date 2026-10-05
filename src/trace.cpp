@@ -165,3 +165,89 @@ void TraceDumpBindings() {
 		    i, b[4], b[0x10], src, w[0], w[1], w[2], w[3], w[4], *(void**)(b + 8));
 	}
 }
+
+// Magic potion probe. The potion is one global gauge, [game manager (yellow
+// pages +0x8C) +0x40] +0x9C (float, ~300 when full; +0x52 a byte the trio's
+// potion code reads), counting down; the trio starts its potion effects when the
+// gauge goes above 0 (FUN_0047DE80, trio +0x5AC = running) and ends them at 0
+// (FUN_0047FA90). Which of those effects reach which hero is not known yet: from
+// the moment the gauge fills, the heroes' and the trio's memory is compared with
+// that moment at a few checkpoints and the changed dwords are logged.
+namespace {
+const int kProbeHeroBytes = 0x1000, kProbeTrioBytes = 0x400;
+const DWORD kProbeAt[] = { 1500, 5000, 15000, 30000, 60000 };
+struct PotionProbe {
+	bool    on = false;
+	DWORD   start = 0;
+	int     next = 0;
+	uint8_t hero[2][kProbeHeroBytes];
+	uint8_t trio[kProbeTrioBytes];
+	char*   heroPtr[2] = {};
+	char*   trioPtr = nullptr;
+} g_potion;
+
+void ProbeDiff(const char* what, const uint8_t* before, const char* now, int bytes, int& budget) {
+	for (int off = 0; off < bytes && budget > 0; off += 4) {
+		uint32_t a = *(const uint32_t*)(before + off), b = *(const uint32_t*)(now + off);
+		if (a == b) continue;
+		float fa, fb;
+		memcpy(&fa, &a, 4); memcpy(&fb, &b, 4);
+		Log("potion:   %s+%03X %08X -> %08X (%g -> %g)", what, off, a, b, fa, fb);
+		budget--;
+	}
+}
+} // namespace
+
+float PotionGauge() {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? *(char**)((char*)yp + 0x8C) : nullptr;
+	char* prof = gm ? *(char**)(gm + 0x40) : nullptr;
+	return prof ? *(float*)(prof + 0x9C) : 0.0f;
+}
+
+void SetPotionGauge(float v) {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? *(char**)((char*)yp + 0x8C) : nullptr;
+	char* prof = gm ? *(char**)(gm + 0x40) : nullptr;
+	if (prof) *(float*)(prof + 0x9C) = v;
+}
+
+void TracePotionOffered() {
+	Trio t = GetTrio();
+	if (!t || g_potion.on) return;
+	for (int i = 0; i < 2; i++) {
+		Hero h = t.GetHero(i);
+		g_potion.heroPtr[i] = h ? h.raw() : nullptr;
+		if (h && !IsBadReadPtr(h.raw(), kProbeHeroBytes)) memcpy(g_potion.hero[i], h.raw(), kProbeHeroBytes);
+		else g_potion.heroPtr[i] = nullptr;
+	}
+	g_potion.trioPtr = t.raw();
+	memcpy(g_potion.trio, t.raw(), kProbeTrioBytes);
+	g_potion.on = true;
+	g_potion.start = GetTickCount();
+	g_potion.next = 0;
+	Log("potion: gauge filled (%.0f), leader %s; probing the heroes for a minute", PotionGauge(),
+	    HeroName(t.Leader()));
+}
+
+void TracePotionFrame() {
+	static float last = 0.0f;
+	float now = PotionGauge();
+	if (now > last + 1.0f && GetTrio()) {
+		Log("potion: gauge %.1f -> %.1f", last, now);
+		g_potion.on = false;
+		TracePotionOffered();
+	}
+	if (last > 0.0f && now <= 0.0f) Log("potion: gauge empty");
+	last = now;
+	if (!g_potion.on) return;
+	DWORD el = GetTickCount() - g_potion.start;
+	if (el < kProbeAt[g_potion.next]) return;
+	Log("potion: +%.1f s since the offer", el / 1000.0f);
+	int budget = 120;
+	static const char* names[2] = { "Asterix", "Obelix" };
+	for (int i = 0; i < 2; i++)
+		if (g_potion.heroPtr[i]) ProbeDiff(names[i], g_potion.hero[i], g_potion.heroPtr[i], kProbeHeroBytes, budget);
+	ProbeDiff("trio", g_potion.trio, g_potion.trioPtr, kProbeTrioBytes, budget);
+	if (++g_potion.next >= (int)(sizeof(kProbeAt) / sizeof(kProbeAt[0]))) g_potion.on = false;
+}

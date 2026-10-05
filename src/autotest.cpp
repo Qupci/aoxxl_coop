@@ -15,7 +15,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -45,6 +45,11 @@ struct Step {
 // frame by frame (walls ignored), so trigger zones and sector streaming see a
 // continuous path, unlike a teleport.
 #define GLIDE(t, hero, spot, ms)    { t, S_GLIDE, hero, spot, 0, ms, 0, "glide" }
+// Streams sector `n` in, the way XXL Inspector's "go to sector" does: the level
+// object (game manager +0x20, = yellow pages +0x90) loads +0x34 next.
+#define LOADSECTOR(t, n)            { t, S_LOADSECTOR, n, 0, 0, 0, 0, "load sector" }
+// Fills the magic potion gauge (game manager +0x40 -> +0x9C).
+#define POTION(t)                   { t, S_POTION, 0, 0, 0, 0, 0, "potion" }
 #define KEYMAP(t, layout)           { t, S_KEYMAP, layout, 0, 0, 0, 0, "keymap" }
 // Puts hero `hero` on the nearest visible bonus (CKHkBasicBonus) and watches it.
 #define TO_BONUS(t, hero)           { t, S_BONUS, hero, 0, 0, 0, 0, "to bonus" }
@@ -194,6 +199,24 @@ const Step kLifter[] = {
 	VPAD(27000, 1, 0, 1, 0, "p2 right"), VPAD(28500, 1, 0, 0, 0, "p2 neutral"),
 	SHOT(29000, "lifter_04_end"),
 	END(29500),
+};
+
+// potion: the magic potion while player 2 is in -- what each hero gets -- then
+// a second potion while the first runs (the user saw Obelix running on for good
+// after that), and the end of it.
+const Step kPotion[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	POTION(1500),
+	P1(2500, 0, 1, 0, "p1 right"), VPAD(2500, 1, 0, -1, 0, "p2 left"),
+	P1(4000, 0, 0, 0, "p1 neutral"), VPAD(4000, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(4200, "potion_01"),
+	VPAD(5000, 1, PAD_A, 0, 0, "p2 A"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	VPAD(5500, 1, PAD_A, 0, 0, "p2 A"), VPAD(5700, 1, 0, 0, 0, "p2 release"),
+	VPAD(6000, 1, PAD_A, 0, 0, "p2 A"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
+	POTION(8000),
+	VPAD(9000, 1, 0, 1, 0, "p2 right"), VPAD(10500, 1, 0, 0, 0, "p2 neutral"),
+	END(70000),
 };
 
 // warp: player 2 walks off, then Back + A brings Obelix back to Asterix; Back
@@ -596,20 +619,12 @@ const Step kLead2[] = {
 // circle (level 2): player 2's Obelix where he set off the spinning platform's
 // blue circle in a player's session, Asterix nearby.
 const Step kCircle[] = {
-	MARK(0, "baseline"),
+	MARK(0, "baseline"), { 0, S_PLATES, 0, 0, 0, 0, 0, "plates" },
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	GLIDE(1000, HERO_ASTERIX, 3, 6000), GLIDE(1000, HERO_OBELIX, 3, 6000), GLIDE(1000, HERO_IDEFIX, 3, 6000),
-	SECTORS(7500),
-	SHOT(8000, "circle_00"),
-	GLIDE(8500, HERO_OBELIX, 4, 1500),
-	SHOT(10500, "circle_01"),
-	VPAD(11000, 1, 0, -0.5f, 0, "p2 left"), VPAD(11600, 1, 0, 0, 0.5f, "p2 up"),
-	VPAD(12200, 1, 0, 0.5f, 0, "p2 right"), VPAD(12800, 1, 0, 0, -0.5f, "p2 down"),
-	VPAD(13400, 1, 0, 0, 0, "p2 neutral"),
-	SHOT(14000, "circle_02"),
-	P1(14500, 0, 1, 0, "p1 right"), P1(16000, 0, 0, 0, "p1 neutral"),
-	SHOT(16500, "circle_03"),
-	END(17000),
+	SHOT(7500, "circle_00"),
+	{ 7600, S_PLATES, 0, 0, 0, 0, 0, "plates" },
+	END(8000),
 };
 
 // borrow (level 2): the trio tells the companion (player 2's Obelix) to wait
@@ -737,6 +752,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("kbd", kKbd),
 	SCENARIO("lifter2", kLifter2),
 	SCENARIO("warp", kWarp),
+	SCENARIO("potion", kPotion),
 	SCENARIO("p2mirror", kP2Mirror),
 	SCENARIO("p2busy", kP2Busy),
 };
@@ -1022,6 +1038,28 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_LOADSECTOR: {
+		CKYellowPages* yp = YellowPages();
+		char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+		if (!lvl) break;
+		Log("autotest: loading sector %d (current %d)", s.a, *(int*)(lvl + 0x24));
+		*(int*)(lvl + 0x34) = s.a;
+		break;
+	}
+	case S_PLATES: {
+		unsigned n = GetNumLvlClassInstances(2, 21);
+		Log("autotest: %u pressure stones (blue circles)", n);
+		for (unsigned k = 0; k < n && k < 64; k++) {
+			KHook* hk = (KHook*)GetLvlObject(2, 21, k);
+			const float* p = hk && hk->node && hk->node->matrix ? (const float*)((char*)hk->node->matrix + 0x80) : nullptr;
+			if (p) Log("autotest:   stone %u at (%.2f %.2f %.2f) flags %08X", k, p[0], p[1], p[2], *(uint32_t*)((char*)hk + 8));
+		}
+		break;
+	}
+	case S_POTION:
+		SetPotionGauge(300.0f);
+		Log("autotest: potion gauge filled");
+		break;
 	case S_GLIDE: {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
