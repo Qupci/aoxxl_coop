@@ -546,7 +546,12 @@ struct SpyWalk {
 	uint8_t param[0x34] = {};
 } g_spyWalk;
 
+const uintptr_t kFixTrackVtbl = 0x6244EC, kPlainCameraVtbl = 0x6245BC;
+void* g_trackBeforeSpy = nullptr;
+static void WatchSpyCameras();
+
 static void WatchSpyWalk(Trio t, DWORD now) {
+	WatchSpyCameras();
 	SpyWalk& w = g_spyWalk;
 	if (!w.on) return;
 	if (!g.p2Joined || !t || (int)(now - w.since) > 30000) { w.on = false; return; }
@@ -575,14 +580,67 @@ static void WatchSpyWalk(Trio t, DWORD now) {
 	w.resending = true;
 	((SendFn)(*(void***)w.trio)[5])(w.trio, nullptr, 0x5120, copy);
 	w.resending = false;
+
 	w.since = w.lastProgress = now;
 	w.best = 1e30f;
+}
+
+// The spy saves the camera service's track (+0x38) when its dialogue starts
+// (CKHkClueMan::sendEvent 0x5139, into spy +0x94) and puts it back (+0x34, the
+// track to switch to; +0xE0 blend 1.0, +0xE4 0) at the end, just before it
+// sends 0x5121. A second start -- the walk resent, or the player pressing X on
+// the spy again -- saves the dialogue's own CKCameraFixTrack, and the camera
+// stayed on it after the dialogue. The track from before the first start is
+// kept here and put back if the spy restored anything else.
+
+static char* CameraService() {
+	CKYellowPages* yp = YellowPages();
+	return yp ? *(char**)((char*)yp + 0x68) : nullptr;
+}
+
+
+// Diagnostics: what the spies saved, logged when it changes during a dialogue.
+static void WatchSpyCameras() {
+	static void* last[8];
+	if (!g_trackBeforeSpy) { memset(last, 0, sizeof(last)); return; }
+	unsigned n = GetNumLvlClassInstances(2, 161);
+	for (unsigned i = 0; i < n && i < 8; i++) {
+		char* c = (char*)GetLvlObject(2, 161, i);
+		void* saved = c ? *(void**)(c + 0x94) : nullptr;
+		if (saved == last[i]) continue;
+		uintptr_t vt = saved ? *(uintptr_t*)saved : 0;
+		if (saved && saved != g_trackBeforeSpy && (vt == kFixTrackVtbl || vt == kPlainCameraVtbl)) {
+			*(void**)(c + 0x94) = g_trackBeforeSpy;   // a second start saved the dialogue's own camera
+			Log("coop: spy %u saved the dialogue's camera %p (vt %08X) as the one to go back to; set to %p", i,
+			    saved, (unsigned)vt, g_trackBeforeSpy);
+			saved = g_trackBeforeSpy;
+		}
+		last[i] = saved;
+	}
 }
 
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	SpyWalk& w = g_spyWalk;
 	event &= 0xFFFF;
-	if (event == 0x5121) { w.on = false; return; }
+	char* cs = CameraService();
+	if (event == 0x5121) {
+		w.on = false;
+		void* to = cs ? *(void**)(cs + 0x34) : nullptr;
+		if (cs && g_trackBeforeSpy && to != g_trackBeforeSpy) {
+			Log("coop: Roman agent's dialogue ended on camera track %p (vt %08X); back to %p (vt %08X)", to,
+			    to ? (unsigned)*(uintptr_t*)to : 0, g_trackBeforeSpy, (unsigned)*(uintptr_t*)g_trackBeforeSpy);
+			*(void**)(cs + 0x34) = g_trackBeforeSpy;
+			*(float*)(cs + 0xE0) = 1.0f;
+			*(uint8_t*)(cs + 0xE4) = 0;
+		}
+		g_trackBeforeSpy = nullptr;
+		return;
+	}
+	if (event == 0x5120 && cs) {
+		void* cur = *(void**)(cs + 0x38);
+		uintptr_t vt = cur ? *(uintptr_t*)cur : 0;
+		if (!g_trackBeforeSpy && cur && vt != kFixTrackVtbl && vt != kPlainCameraVtbl) g_trackBeforeSpy = cur;
+	}
 	if (event != 0x5120 || !param || w.resending || !g.p2Joined) return;
 	memcpy(w.param, param, sizeof(w.param));
 	w.trio = trio;
@@ -663,6 +721,8 @@ void CoopFrame() {
 	if (level != g.lastLevel) {
 		Log("coop: level %d -> %d", g.lastLevel, level);
 		g.lastLevel = level;
+		g_trackBeforeSpy = nullptr;   // the old level's camera tracks are gone
+		g_spyWalk.on = false;
 		if (g.p2Joined) {
 			// The old hero objects are gone; there is nothing to hand back.
 			ForgetP2();
@@ -682,6 +742,7 @@ void CoopFrame() {
 			    lastSector, sec, lvl ? *(int*)(lvl + 0x34) : -99, HeroName(t.Leader()), ha ? ha.Pos().x : 0,
 			    ha ? ha.Pos().y : 0, ha ? ha.Pos().z : 0, ho ? ho.Pos().x : 0, ho ? ho.Pos().y : 0, ho ? ho.Pos().z : 0);
 		}
+		if (sec != lastSector) g_trackBeforeSpy = nullptr;   // no dialogue spans a sector change
 		lastSector = sec;
 	}
 	// The cutscene hold counts down whether or not player 2 is in: a player 2
