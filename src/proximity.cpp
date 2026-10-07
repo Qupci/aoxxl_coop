@@ -6,6 +6,7 @@
 #include "trio.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <intrin.h>
 #include <cstring>
 #include <utility>
@@ -316,6 +317,43 @@ void __fastcall CheckpointHook(char* self, void* edx, int arg) {
 	tr[0x2D] = leader;
 	g_origCheckpoint(self, edx, arg);
 	if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
+}
+
+// Fight mode (music, fight camera). The trio's tick (CKGrpTrioLife::vf17 ->
+// FUN_00481950, thiscall, one argument) looks through its cached list of
+// enemies near the leader (trio vf62..67, built from the leader's position by
+// FUN_0047CB40 while +0x3F4 bit 0 is clear): an enemy updated this frame within
+// +0x400 starts the fight -- the fight's music event group (+0x40E + 2 x the
+// enemy's answer to 0x4C1A), the camera's fight bits, +0x3F4 bit 0x40 -- and
+// refreshes +0x408; the fight ends +0x404 s after the last such enemy. Player
+// 2's Obelix fought Romans in silence (level 5 sector 1). The non-leading
+// player's hero gets a pass first, as the leader, so its fight starts and keeps
+// the fight alive; then the game's own pass for the real leader.
+typedef void(__fastcall* FightFn)(char* trio, void* edx, void* time);
+const uintptr_t kFightMode = 0x481950;
+const uint8_t   kFightModePrologue[7] = { 0x51, 0x56, 0x8B, 0xF1, 0x57, 0x8B, 0x06 };
+FightFn g_origFight = nullptr;
+volatile long g_p2Fights = 0;
+
+void __fastcall FightHook(char* trio, void* edx, void* time) {
+	Trio t = GetTrio();
+	int nl = CoopNonLeaderPlayer();
+	if (t && trio == t.raw() && nl >= 0 && CoopP2Joined() && !CoopSuspended() && !CoopHeroHeld(nl)) {
+		uint8_t* tr = (uint8_t*)trio;
+		uint8_t leader = tr[0x2C], companion = tr[0x2D];
+		bool wasOn = (*(uint32_t*)(tr + 0x3F4) & 0x40) != 0;
+		tr[0x2C] = (uint8_t)nl;
+		tr[0x2D] = leader;
+		*(uint32_t*)(tr + 0x3F4) &= ~1u;   // the enemy cache is the leader's
+		g_origFight(trio, edx, time);
+		if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
+		*(uint32_t*)(tr + 0x3F4) &= ~1u;
+		if (!wasOn && (*(uint32_t*)(tr + 0x3F4) & 0x40)) {
+			InterlockedIncrement(&g_p2Fights);
+			Log("proximity: fight mode (music) started by %s (not leading)", HeroName(nl));
+		}
+	}
+	g_origFight(trio, edx, time);
 }
 
 // CKGrpBonusPool vf39 "may this hero collect" ignores its argument and asks the
@@ -810,6 +848,20 @@ bool IsMusicGroup(unsigned group) {
 void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 	uintptr_t from = (uintptr_t)_ReturnAddress();
 	unsigned grp = (eventId & 0xFFFF) >> 3;
+	static const bool logAll = getenv("XXL_LOGFLAGS") != nullptr;   // diagnostics: every flagged event
+	if (logAll) {
+		static unsigned last[64];
+		static int nLast = 0;
+		bool seen = false;
+		static const bool all = getenv("XXL_LOGFLAGS")[0] == '2';
+		for (int i = 0; i < nLast && !all; i++) if (last[i] == ((eventId & 0xFFFF) ^ (unsigned)from << 16)) seen = true;
+		if (!seen) {
+			if (nLast < 64) last[nLast++] = (eventId & 0xFFFF) ^ (unsigned)from << 16;
+			Trio t = GetTrio();
+			Log("proximity: event %04X (group %03X) flagged from %p, leader %s", eventId & 0xFFFF, grp, (void*)from,
+			    t ? HeroName(t.Leader()) : "?");
+		}
+	}
 	if (IsMusicGroup(grp) || grp == 0x74 || grp == 0x77) {
 		Trio t = GetTrio();
 		Log("proximity: music event %04X flagged from %p (leader %s)", eventId & 0xFFFF, (void*)from,
@@ -859,6 +911,8 @@ bool ProximityInstallHooks() {
 	                      (void**)&g_origEnemyTick, "CKGrpEnemyLife::tick");
 	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,
 	                      (void**)&g_origDetectTick, "CKSrvDetection::tick");
+	ok &= InstallDetour(kFightMode, (void*)FightHook, (void**)&g_origFight, kFightModePrologue,
+	                    sizeof(kFightModePrologue), "trio fight mode (music) for the non-leader");
 	ok &= InstallDetour(kFlagEvent, (void*)FlagEventHook, (void**)&g_origFlagEvent, kFlagEventPrologue,
 	                    sizeof(kFlagEventPrologue), "event flag (zones)");
 	return ok;

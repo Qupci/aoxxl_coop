@@ -182,6 +182,8 @@ void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t i
 	g_watchPending = 1;
 }
 
+void LogBacktrace(const char* tag, uintptr_t esp) { LogStack(tag, esp); }
+
 void WatchBytesRW(const void* addr) {
 	g_watchAddr[0] = addr;
 	g_watchCount = 1;

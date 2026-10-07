@@ -12,6 +12,7 @@
 #include "crash.h"
 
 #include <cmath>
+#include <intrin.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,7 +20,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -806,6 +807,39 @@ const Step kHelmets3[] = {
 	END(13500),
 };
 
+// music5a / music5o (-Level 5): the fight at the start of level 5 (340.98
+// 11.13 246.87). a: the leader Asterix walks into it; o: player 2's Obelix
+// (not leading), Asterix stays back. Music events and streams are logged.
+const Step kMusic5A[] = {
+	MARK(0, "baseline"), { 200, S_FINDGROUPS, 0x624C2C, 0x501, 0, 1, 0, "event blocs started" },
+	{ 300, S_WATCHGROUP2, 0x43, 0x64, 0, 0, 0, "music groups" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_ASTERIX, 340.98f, 11.6f, 246.87f, 4000),
+	SHOT(7000, "music_1"),
+	END(16000),
+};
+// music5l (-Level 5): Obelix leads (trio 0x4801), then player 2's Obelix walks in.
+const Step kMusic5L[] = {
+	MARK(0, "baseline"), { 200, S_FINDGROUPS, 0x624C2C, 0x501, 0, 1, 0, "event blocs started" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	GLIDEAT(1500, HERO_OBELIX, 340.98f, 11.6f, 246.87f, 4000),
+	SHOT(7000, "music_1"),
+	END(16000),
+};
+const Step kGroup38[] = {
+	MARK(0, "baseline"), { 500, S_EVGROUP, 0x38, 0, 0, 0, 0, "group 038" }, { 500, S_EVGROUP, 0x76, 0, 0, 0, 0, "group 076" },
+	CINE_LIST(600),
+	END(1000),
+};
+const Step kMusic5O[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_OBELIX, 340.98f, 11.6f, 246.87f, 4000),
+	SHOT(7000, "music_1"),
+	END(16000),
+};
+
 const Step kInputDump[] = {
 	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
 	END(1000),
@@ -1410,6 +1444,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("combop2", kComboP2),
 	SCENARIO("combop1", kComboP1),
 	SCENARIO("helmets3", kHelmets3),
+	SCENARIO("music5a", kMusic5A),
+	SCENARIO("music5o", kMusic5O),
+	SCENARIO("group38", kGroup38),
+	SCENARIO("music5l", kMusic5L),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1902,6 +1940,61 @@ void RunStep(const Step& s) {
 				k2 += sprintf(buf + k2, " ]");
 			}
 			Log("autotest: %s", buf);
+		}
+		break;
+	}
+	case S_WATCHGROUP2: {   // write watch on the flag bytes of event groups a and b
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		if (!ev) break;
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		const void* w[2] = { tab + s.a * 3 + 2, tab + s.b * 3 + 2 };
+		WatchBytes(w, 2, 0x46B180, 0x46B331);
+		Log("autotest: watching groups %03X and %03X", s.a, s.b);
+		break;
+	}
+	case S_FINDGROUPS: {   // event groups messaging an object of vtable a with message b; watch the first's flag byte
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		if (!ev) break;
+		unsigned n = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		char** objs = *(char***)(ev + 0x10);
+		uint16_t* msgs = *(uint16_t**)(ev + 0x14);
+		const void* watch[4];
+		int nw = 0;
+		unsigned first = 0;
+		for (unsigned gi = 0; gi < n; first += tab[gi * 3], gi++)
+			for (unsigned k = 0; k < tab[gi * 3]; k++) {
+				char* o = objs[first + k];
+				if (!o || *(uintptr_t*)o != (uintptr_t)(unsigned)s.a || (s.b && msgs[first + k] != s.b)) continue;
+				Log("autotest: group %03X messages %p (vt %08X) with %04X; flag byte %p", gi, o, s.a, msgs[first + k],
+				    tab + gi * 3 + 2);
+				if (nw < 4) watch[nw++] = tab + gi * 3 + 2;
+			}
+		if (nw && s.x == 0) WatchBytes(watch, nw, 0x46B180, 0x46B331);   // not CKSrvEvent::vf17 clearing them
+		if (s.x == 1) {   // instead: hook the target class's sendEvent and log who gets the message
+			static uintptr_t s_vt = 0;
+			static unsigned s_msg = 0;
+			typedef int(__fastcall* SendFn)(void*, void*, int, void*);
+			static SendFn s_orig = nullptr;
+			struct H { static int __fastcall Hook(void* self, void* edx, int ev, void* p) {
+				if ((unsigned)(ev & 0xFFFF) == s_msg) {
+					Log("autotest: %p (vt %08X) got %04X", self, (unsigned)s_vt, ev & 0xFFFF);
+					LogBacktrace("autotest: message", (uintptr_t)_AddressOfReturnAddress());
+				}
+				return s_orig(self, edx, ev, p);
+			} };
+			if (!s_orig) {
+				s_vt = (uintptr_t)(unsigned)s.a;
+				s_msg = (unsigned)s.b;
+				DWORD old;
+				void** slot = (void**)s_vt + 5;
+				VirtualProtect(slot, 4, PAGE_EXECUTE_READWRITE, &old);
+				s_orig = (SendFn)*slot;
+				*slot = (void*)&H::Hook;
+				VirtualProtect(slot, 4, old, &old);
+			}
 		}
 		break;
 	}

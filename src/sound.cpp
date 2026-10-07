@@ -20,6 +20,7 @@
 // there; the two halves are mixed into one output.
 
 #include "coop.h"
+#include "crash.h"
 #include "detour.h"
 #include "log.h"
 #include "p2cam.h"
@@ -318,6 +319,7 @@ int __fastcall StreamStartHook(char* self, void* edx, unsigned id, void* b, int 
 	    "Obelix (%.1f %.1f %.1f)", id & 0xFF, b, c, d, e, r, _ReturnAddress(), t ? HeroName(t.Leader()) : "?",
 	    a ? a.Pos().x : 0, a ? a.Pos().y : 0, a ? a.Pos().z : 0, o ? o.Pos().x : 0, o ? o.Pos().y : 0,
 	    o ? o.Pos().z : 0);
+	LogBacktrace("sound: stream start", (uintptr_t)_AddressOfReturnAddress());
 	return r;
 }
 
@@ -414,3 +416,4 @@ bool SoundInstallHooks() {
 	(void)kSqrt;
 	return ok;
 }
+
