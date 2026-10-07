@@ -300,6 +300,88 @@ char __fastcall SpawnPointHook(char* squad, void* edx, float* out) {
 	return ok;
 }
 
+// Squads with spawn markers (squad +0x5C, 8 bytes each: +0 -> position;
+// count +0x64) bring Romans in with vf38 (thiscall(count, member group),
+// ret 8) instead: a marker picked from the game camera's position and look
+// (camera service +0x5B0 / +0x5BC). Player 2 watched them pop up on a marker
+// behind player 1's camera (level 3 sector 6). For a squad run for the
+// non-leading player that player's camera is used, and for every squad the
+// markers a player can see within 40 units are left out of the list for the call.
+typedef void(__fastcall* MarkerSpawnFn)(char* squad, void* edx, int count, unsigned group);
+const uintptr_t kMarkerSpawn = 0x52FB80;
+MarkerSpawnFn g_origMarkerSpawn = nullptr;
+volatile long g_markersHidden = 0;
+
+void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned group) {
+	CKYellowPages* yp = YellowPages();
+	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	unsigned n = *(unsigned*)(squad + 0x64);
+	char* list = *(char**)(squad + 0x5C);
+	if (!CoopP2Joined() || CoopSuspended() || !svc || !list || n == 0 || n > 64) {
+		g_origMarkerSpawn(squad, edx, count, group);
+		return;
+	}
+	uint32_t keep[64 * 2];
+	unsigned m = 0;
+	// The game keeps to markers outside a cone of 1.5 x the camera's field of
+	// view (camera +0x38 -> +0x44, degrees) for its own camera; the other view
+	// gets the same cone (within 40 units), and no marker within 8 units of a hero.
+	char* camObj = *(char**)(svc + 0x38);
+	float fov = camObj ? *(float*)(camObj + 0x44) : 60.0f;
+	if (!(fov > 10.0f && fov < 170.0f)) fov = 60.0f;
+	float cosLimit = cosf(fov * 1.5f * 0.5f * 0.01745329f);
+	float om[16];
+	bool other = OtherViewMatrix(om);
+	Trio tt = GetTrio();
+	Hero ha = tt ? tt.GetHero(HERO_ASTERIX) : Hero(), ho = tt ? tt.GetHero(HERO_OBELIX) : Hero();
+	for (unsigned i = 0; i < n; i++) {
+		const float* p = *(const float**)(list + i * 8);
+		if (p) {
+			Vector3 pv(p[0], p[1], p[2]);
+			if (KlusterSphereInAnyView(p, 1.5f, 40.0f)) continue;
+			if ((ha && (ha.Pos() - pv).len2() < 64.0f) || (ho && (ho.Pos() - pv).len2() < 64.0f)) continue;
+			if (other) {
+				float dx = p[0] - om[12], dy = p[1] - om[13], dz = p[2] - om[14];
+				float d = sqrtf(dx * dx + dy * dy + dz * dz);
+				if (d < 40.0f && d > 0.01f && (dx * om[8] + dy * om[9] + dz * om[10]) / d >= cosLimit) continue;
+			}
+		}
+		memcpy(keep + m * 2, list + i * 8, 8);
+		m++;
+	}
+	if (m < n && InterlockedIncrement(&g_markersHidden) % 120 == 1)
+		Log("proximity: squad %p: %u of %u spawn markers in a player's view, left out", squad, n - m, n);
+	static const bool logMarkers = getenv("XXL_LOGMARKERS") != nullptr;
+	if (logMarkers) {
+		float m2[16];
+		bool have = OtherViewMatrix(m2);
+		for (unsigned i = 0; i < n; i++) {
+			const float* p = *(const float**)(list + i * 8);
+			if (!p) continue;
+			float dx = p[0] - m2[12], dy = p[1] - m2[13], dz = p[2] - m2[14];
+			float d = sqrtf(dx * dx + dy * dy + dz * dz);
+			float dot = d > 0 ? (dx * m2[8] + dy * m2[9] + dz * m2[10]) / d : 0;
+			Log("proximity: marker %u (%.1f %.1f %.1f): seen %d; other view %d at %.1f, cos to its axis %.2f", i, p[0], p[1],
+			    p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), have, d, dot);
+		}
+	}
+	if (m == 0) return;   // all in sight: nobody comes this frame
+	float saved[6], mtx[16];
+	bool swapped = g_squadForNonLeader && OtherViewMatrix(mtx);
+	if (swapped) {
+		float* pos = (float*)(svc + 0x5B0);
+		float* look = (float*)(svc + 0x5BC);
+		memcpy(saved, pos, 12); memcpy(saved + 3, look, 12);
+		for (int k = 0; k < 3; k++) { pos[k] = mtx[12 + k]; look[k] = mtx[12 + k] + mtx[8 + k] * 5.0f; }
+	}
+	*(char**)(squad + 0x5C) = (char*)keep;
+	*(unsigned*)(squad + 0x64) = m;
+	g_origMarkerSpawn(squad, edx, count, group);
+	*(char**)(squad + 0x5C) = list;
+	*(unsigned*)(squad + 0x64) = n;
+	if (swapped) { memcpy(svc + 0x5B0, saved, 12); memcpy(svc + 0x5BC, saved + 3, 12); }
+}
+
 bool InSquadBox(const char* sq, const Vector3& p) {
 	const float* f = (const float*)sq;
 	return f[0x4A] < p.x && p.x <= f[0x47] && f[0x4C] < p.z && p.z <= f[0x49] && f[0x4B] < p.y && p.y <= f[0x48];
@@ -1015,6 +1097,12 @@ bool ProximityInstallHooks() {
 	                      (void**)&g_origEnemyTick, "CKGrpEnemyLife::tick");
 	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,
 	                      (void**)&g_origDetectTick, "CKSrvDetection::tick");
+	{
+		const uintptr_t vts[3] = { 0x6266B0, 0x62682C, 0x626A6C };   // CKGrpSquadEnemy, CKGrpSquad, CKGrpSquadJetPack
+		for (uintptr_t vt : vts)
+			ok &= PatchVtableSlot(vt, 38, kMarkerSpawn, (void*)MarkerSpawnHook, (void**)&g_origMarkerSpawn,
+			                      "squad marker spawn (both players' views)");
+	}
 	ok &= InstallDetour(kSpawnPoint, (void*)SpawnPointHook, (void**)&g_origSpawnPoint, kSpawnPointPrologue,
 	                    sizeof(kSpawnPointPrologue), "Roman reinforcement point (both players' cameras)");
 	ok &= InstallDetour(kFightMode, (void*)FightHook, (void**)&g_origFight, kFightModePrologue,

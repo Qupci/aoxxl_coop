@@ -885,10 +885,12 @@ const Step kTwistCo[] = {
 // hit). Live Romans and squads near the spot are logged.
 #define TAP2(t)  VPAD(t, 1, PAD_X, 0, 0, "p2 X"), VPAD(t + 120, 1, 0, 0, 0, "r")
 #define TAP1(t)  P1(t, PAD_X, 0, 0, "p1 X"), P1(t + 120, 0, 0, 0, "r")
-#define TAPS2(t) TAP2(t), TAP2(t + 500), TAP2(t + 1000), TAP2(t + 1500), TAP2(t + 2000), \
-                 TAP2(t + 2500), TAP2(t + 3000), TAP2(t + 3500), TAP2(t + 4000), TAP2(t + 4500)
-#define TAPS1(t) TAP1(t), TAP1(t + 500), TAP1(t + 1000), TAP1(t + 1500), TAP1(t + 2000), \
-                 TAP1(t + 2500), TAP1(t + 3000), TAP1(t + 3500), TAP1(t + 4000), TAP1(t + 4500)
+#define FACE2(t) { t, S_ENEMY, HERO_OBELIX, 3, 0, 0, 0, "obelix faces the nearest roman" }
+#define TAPS2(t) FACE2(t - 50), TAP2(t), TAP2(t + 500), FACE2(t + 950), TAP2(t + 1000), TAP2(t + 1500), TAP2(t + 2000), \
+                 FACE2(t + 2450), TAP2(t + 2500), TAP2(t + 3000), TAP2(t + 3500), TAP2(t + 4000), TAP2(t + 4500)
+#define FACE1(t) { t, S_ENEMY, HERO_ASTERIX, 3, 0, 0, 0, "asterix faces the nearest roman" }
+#define TAPS1(t) FACE1(t - 50), TAP1(t), TAP1(t + 500), FACE1(t + 950), TAP1(t + 1000), TAP1(t + 1500), TAP1(t + 2000), \
+                 FACE1(t + 2450), TAP1(t + 2500), TAP1(t + 3000), TAP1(t + 3500), TAP1(t + 4000), TAP1(t + 4500)
 const Step kFight4O[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -898,6 +900,23 @@ const Step kFight4O[] = {
 	TAPS2(28000), TAPS2(33000), TAPS2(38000), TAPS2(43000), TAPS2(48000),
 	SHOT(53000, "fight4_end"),
 	END(54000),
+};
+// fight36 (-Level 3): sector 6 -- player 1's Asterix at -188.0 2.6 -229.9
+// (camera looking towards -z), player 2's Obelix fights at -184.1 2.6 -230.0;
+// new Romans and where they appear are logged (the user saw them pop up on
+// the marker at -195.2 2.6 -219.3 in player 2's view).
+const Step kFight36[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -187.99f, 3.2f, -229.88f), PLACEAT(4000, HERO_OBELIX, -184.14f, 3.2f, -230.0f),
+	P1(4200, 0, 0, -1, "p1 face -z"), P1(4400, 0, 0, 0, "p1 stop"),
+	{ 4500, S_WATCHENEMIES, 0, 0, 0, -186.0f, 2.6f, "watch romans", -228.0f },
+	POTION(4600),
+	TAPS2(5000), TAPS2(10000), TAPS2(15000), TAPS2(20000), TAPS2(25000), POTION(29000),
+	TAPS2(30000), TAPS2(35000), TAPS2(40000),
+	SHOT(45000, "fight36_end"),
+	END(46000),
 };
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
@@ -1523,6 +1542,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("twistco", kTwistCo),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("fight4a", kFight4A),
+	SCENARIO("fight36", kFight36),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1577,6 +1597,7 @@ struct AutotestState {
 	bool    watchCam = false;       // the game camera (service +0x5B0 pos, +0x5BC look, track), WATCHCAM
 	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
 	bool    watchEnemies = false;   // Romans and squads near enemyPoint, WATCHENEMIES
+	bool    enemiesPrimed = false;
 	Vector3 enemyPoint;
 	Vector3 beaconPoint;
 	int     cineScene = -1;         // scene started by CINE_START
@@ -1715,6 +1736,10 @@ void LogTick(float t) {
 	if (at.watchEnemies) {   // live Romans near the point; squads near it (flags, member groups)
 		int live = 0;
 		const int ids[2] = { 93, 148 };
+		static char* seen[256];
+		static int nSeen = 0;
+		char* now[256];
+		int nNow = 0;
 		for (int id : ids)
 			for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n; i++) {
 				char* e = (char*)GetLvlObject(2, id, i);
@@ -1722,8 +1747,16 @@ void LogTick(float t) {
 				char* fr = node ? *(char**)(node + 4) : nullptr;
 				if (!fr || (*(uint8_t*)(node + 0x10) & 2)) continue;
 				Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
-				if ((p - at.enemyPoint).len2() < 30.0f * 30.0f) live++;
+				if ((p - at.enemyPoint).len2() >= 30.0f * 30.0f) continue;
+				live++;
+				if (nNow < 256) now[nNow++] = e;
+				bool old = false;
+				for (int k = 0; k < nSeen; k++) old = old || seen[k] == e;
+				if (!old && at.enemiesPrimed) Log("autotest: Roman %p appeared at (%.1f %.1f %.1f)", e, p.x, p.y, p.z);
 			}
+		memcpy(seen, now, nNow * sizeof(char*));
+		nSeen = nNow;
+		at.enemiesPrimed = true;
 		line.Add(" | romans near %d", live);
 		for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 			char* sq = (char*)GetLvlObject(4, 26, i);
@@ -2595,6 +2628,7 @@ void RunStep(const Step& s) {
 		if (yaw < 0) yaw += 6.2831855f;
 		*(float*)(h.raw() + 0xCC) = yaw;
 		*(float*)(h.raw() + 0xD4) = yaw;
+		if (s.b == 3) break;   // only turn to face it
 		if (s.b == 1) {   // the opposite side of the same Roman, facing it
 			face = face * -1.0f;
 			yaw = atan2f(face.z, face.x);
