@@ -18,7 +18,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -758,6 +758,40 @@ const Step kShopO[] = {
 	END(25000),
 };
 
+// combop2 / combop1: the combo cheat (Back + D-pad left on player 2's pad),
+// then Twister (A X B Y) by player 2's Obelix / player 1's Asterix, then Club
+// (A A X B) next to a Roman.
+#define TAP_P2(t, btn, n) VPAD(t, 1, btn, 0, 0, n), VPAD(t + 90, 1, 0, 0, 0, "release")
+#define TAP_P1(t, btn, n) P1(t, btn, 0, 0, n), P1(t + 90, 0, 0, 0, "release")
+const Step kComboP2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(1500, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(1600, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (combo cheat)"),
+	VPAD(1800, 1, 0, 0, 0, "p2 release"),
+	TAP_P2(3000, PAD_A, "p2 A"), TAP_P2(3650, PAD_X, "p2 X"), TAP_P2(3760, PAD_B, "p2 B"), TAP_P2(3870, PAD_Y, "p2 Y"),
+	SHOT(4000, "combo_twister"),
+	{ 8000, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix next to a roman" },
+	VPAD(8500, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(8600, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (bar again)"),
+	VPAD(8800, 1, 0, 0, 0, "p2 release"),
+	TAP_P2(9500, PAD_A, "p2 A"), TAP_P2(9620, PAD_A, "p2 A"), TAP_P2(10350, PAD_X, "p2 X"), TAP_P2(10460, PAD_B, "p2 B"),
+	SHOT(10500, "combo_club"),
+	END(14000),
+};
+const Step kComboP1[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(1500, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(1600, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (combo cheat)"),
+	VPAD(1800, 1, 0, 0, 0, "p2 release"),
+	TAP_P1(3000, PAD_A, "p1 A"), TAP_P1(3180, PAD_X, "p1 X"), TAP_P1(3360, PAD_B, "p1 B"), TAP_P1(3540, PAD_Y, "p1 Y"),
+	SHOT(4000, "combo_twister"),
+	END(8000),
+};
+
+const Step kInputDump[] = {
+	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
+	END(1000),
+};
+
 const Step kRegions[] = {
 	MARK(0, "baseline"), { 2000, S_REGIONS, 0, 0, 0, 0, 0, "regions" },
 	{ 2000, S_EVGROUP, 0x10D, 0, 0, 0, 0, "group 10D" }, { 2000, S_EVGROUP, 0x14D, 0, 0, 0, 0, "group 14D" },
@@ -1353,6 +1387,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("catapulta", kCatapultA),
 	SCENARIO("shop", kShop),
 	SCENARIO("shopo", kShopO),
+	SCENARIO("inputdump", kInputDump),
+	SCENARIO("combop2", kComboP2),
+	SCENARIO("combop1", kComboP1),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1766,6 +1803,67 @@ void RunStep(const Step& s) {
 		*(float*)(h.raw() + 0xCC) = yaw;
 		*(float*)(h.raw() + 0xD4) = yaw;
 		Log("autotest: %s put %.1f from (2,%d) %p at (%.1f %.1f %.1f)", HeroName(s.a), dist, s.b, best, bp.x, bp.y, bp.z);
+		break;
+	}
+	case S_INPUTDUMP: {   // CKInput: bindings (source +0xC, filter +8) and the named views' action tables
+		InputManager im = GetInputManager();
+		char* in = im.raw();
+		if (!in) break;
+		unsigned nb = im.NumActions();
+		char* binds = *(char**)(in + 0x18);
+		for (unsigned i = 0; binds && i < nb; i++) {
+			char* b = binds + i * 0x20;
+			char* src = *(char**)(b + 0xC);
+			char* flt = *(char**)(b + 8);
+			Log("autotest: binding %2u: flags %02X %02X %02X %02X analog %u src %p vt %p (raw %p) filter %p vt %p", i,
+			    (uint8_t)b[4], (uint8_t)b[5], (uint8_t)b[6], (uint8_t)b[7], (uint8_t)b[0x10], src, src ? *(void**)src : nullptr,
+			    src ? *(void**)(src + 0x14) : nullptr, flt, flt ? *(void**)flt : nullptr);
+		}
+		unsigned nv = *(uint8_t*)(in + 0x38);
+		char** views = *(char***)(in + 0x40);
+		for (unsigned v = 0; views && v < nv; v++) {
+			char* view = views[v] ? views[v] + 0x10 : nullptr;
+			uint8_t* remap = view ? *(uint8_t**)(view + 8) : nullptr;
+			char line[256];
+			int k = 0;
+			for (int a = 0; remap && a < 24; a++) k += sprintf(line + k, " %u", remap[a]);
+			Log("autotest: view %u (%p, name hash %08X):%s", v, view, *(uint32_t*)(*(char**)(in + 0x5C) + 4 * v),
+			    remap ? line : " -");
+		}
+		Trio t = GetTrio();
+		char* hv = t ? *(char**)(t.raw() + 0x28) : nullptr;
+		uint8_t* hr = hv ? *(uint8_t**)(hv + 8) : nullptr;
+		char line[256];
+		int k = 0;
+		for (int a = 0; hr && a < 24; a++) k += sprintf(line + k, " %u", hr[a]);
+		Log("autotest: heroes' view (trio +0x28) %p:%s", hv, hr ? line : " -");
+		// Combos (CKInput +0x34: +4 on, +5 count, +8 entries of 0x14: +4 on, +5 steps, +8 steps of
+		// 0x10: +4 items, +5 forbidden, +8 items / +0xC forbidden of 0x10: +0 binding, +1 threshold,
+		// +4 hold time; entry +0xC time allowed)
+		char* cm = *(char**)(in + 0x34);
+		unsigned nc = cm ? *(uint8_t*)(cm + 5) : 0;
+		Log("autotest: combo manager %p vt %p on %u, %u combos", cm, cm ? *(void**)cm : nullptr, cm ? *(uint8_t*)(cm + 4) : 0, nc);
+		for (unsigned c = 0; cm && c < nc; c++) {
+			char* e = *(char**)(cm + 8) + c * 0x14;
+			unsigned ns = *(uint8_t*)(e + 5);
+			char buf[512];
+			int k2 = sprintf(buf, "combo %u (value %u): on %u, time %.2f:", c, nb + c, *(uint8_t*)(e + 4), *(float*)(e + 0xC));
+			for (unsigned s2 = 0; s2 < ns && k2 < 440; s2++) {
+				char* st = *(char**)(e + 8) + s2 * 0x10;
+				k2 += sprintf(buf + k2, " [");
+				for (unsigned it = 0; it < *(uint8_t*)(st + 4) && k2 < 440; it++) {
+					char* item = *(char**)(st + 8) + it * 0x10;
+					k2 += sprintf(buf + k2, " %u>=%u", *(uint8_t*)item, *(uint8_t*)(item + 1));
+					if (*(float*)(item + 4) != 0.0f) k2 += sprintf(buf + k2, " held %.2f", *(float*)(item + 4));
+				}
+				for (unsigned it = 0; it < *(uint8_t*)(st + 5) && k2 < 440; it++) {
+					char* item = *(char**)(st + 0xC) + it * 0x10;
+					k2 += sprintf(buf + k2, " !%u>%u", *(uint8_t*)item, *(uint8_t*)(item + 1));
+				}
+				k2 += sprintf(buf + k2, " ]");
+			}
+			Log("autotest: %s", buf);
+		}
 		break;
 	}
 	case S_WATCHRW: {   // every reader/writer of hero a's byte at +b

@@ -80,6 +80,114 @@ void BuildActionsFromPad(const PadState& pad, uint8_t* out, int numActions) {
 	}
 }
 
+// Combos. CKInput::Update ends with the combo recognizer (FUN_004353C0,
+// thiscall on CKInput +0x34, args: value array, bindings; ret 8): every combo
+// entry (+8, 0x14 bytes: +4 on, +5 steps, +6 current step, +8 steps, +0xC time
+// allowed, +0x10 deadline) walks its steps (0x10 bytes: +4 items, +5 forbidden,
+// +8 items / +0xC forbidden of 0x10 bytes: +0 binding, +1 threshold, +4 hold
+// time, +0xC latched) over the bindings' values and hold times, and writes 0xFF
+// into value numActions + k when combo k completes. The heroes' view reads those
+// as actions 0x10.. (Club A A X B, Power Hammer A B X, Mole A A Y B, Twister A X
+// B Y). Player 2's values never went through it. It runs again here on player
+// 2's values with a private copy of its state (steps and items carry state too).
+namespace {
+struct ComboCopy {
+	char*  src = nullptr;          // the game's manager it was copied from
+	char*  srcEntries = nullptr;
+	char   mgr[0x0C] = {};
+	char*  entries = nullptr;
+	unsigned count = 0;
+	char*  pool = nullptr;         // steps and items, one allocation
+} g_combo;
+
+void FreeComboCopy() {
+	delete[] g_combo.entries;
+	delete[] g_combo.pool;
+	g_combo = ComboCopy();
+}
+
+bool CopyCombos(char* src) {
+	FreeComboCopy();
+	unsigned n = *(uint8_t*)(src + 5);
+	char* se = *(char**)(src + 8);
+	if (!se || n == 0 || n > 32) return false;
+	size_t poolSize = 0;
+	for (unsigned c = 0; c < n; c++) {
+		char* e = se + c * 0x14;
+		unsigned ns = *(uint8_t*)(e + 5);
+		poolSize += ns * 0x10;
+		for (unsigned s = 0; s < ns; s++) {
+			char* st = *(char**)(e + 8) + s * 0x10;
+			poolSize += (*(uint8_t*)(st + 4) + *(uint8_t*)(st + 5)) * 0x10;
+		}
+	}
+	g_combo.entries = new char[n * 0x14];
+	g_combo.pool = new char[poolSize + 16];
+	memcpy(g_combo.entries, se, n * 0x14);
+	char* p = g_combo.pool;
+	for (unsigned c = 0; c < n; c++) {
+		char* e = g_combo.entries + c * 0x14;
+		unsigned ns = *(uint8_t*)(e + 5);
+		char* steps = p;
+		memcpy(steps, *(char**)(e + 8), ns * 0x10);
+		p += ns * 0x10;
+		*(char**)(e + 8) = steps;
+		*(uint8_t*)(e + 6) = 0;
+		*(float*)(e + 0x10) = 0.0f;
+		for (unsigned s = 0; s < ns; s++) {
+			char* st = steps + s * 0x10;
+			for (int list = 0; list < 2; list++) {
+				unsigned cnt = *(uint8_t*)(st + 4 + list);
+				char*& items = *(char**)(st + 8 + 4 * list);
+				if (!items || !cnt) continue;
+				memcpy(p, items, cnt * 0x10);
+				items = p;
+				for (unsigned i = 0; i < cnt; i++) p[i * 0x10 + 0xC] = 0;
+				p += cnt * 0x10;
+			}
+		}
+	}
+	memcpy(g_combo.mgr, src, sizeof(g_combo.mgr));
+	*(char**)(g_combo.mgr + 8) = g_combo.entries;
+	g_combo.src = src;
+	g_combo.srcEntries = se;
+	g_combo.count = n;
+	return true;
+}
+} // namespace
+
+int P2RecognizeCombos(uint8_t* values, int numActions, char* bindings) {
+	CKYellowPages* yp = YellowPages();
+	char* input = yp ? *(char**)((char*)yp + 0x14) : nullptr;
+	char* src = input ? *(char**)(input + 0x34) : nullptr;
+	if (!src || !values || !bindings) return 0;
+	if (src != g_combo.src || *(char**)(src + 8) != g_combo.srcEntries || *(uint8_t*)(src + 5) != g_combo.count) {
+		if (!CopyCombos(src)) return 0;
+	}
+	if (numActions + (int)g_combo.count > 256) return 0;
+	typedef int(__fastcall* RecognizeFn)(void* mgr, void* edx, uint8_t* values, char* bindings);
+	((RecognizeFn)0x4353C0)(g_combo.mgr, nullptr, values, bindings);
+	return (int)g_combo.count;
+}
+
+// Cheat: every combo learned (the merchant's item bits the heroes' combo
+// actions ask for, game manager +0x40 -> +0x10: 1 Club, 2 Power Hammer, 4
+// Twister, 8 Twister Fusion, 0x10 Mole) and the combo bar full, as
+// FUN_0048C860 fills it (that object +0x10 bit 0x4000; +0xA4 = +0xA0, +0xC4 =
+// byte +0xBB).
+void CombosCheat() {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	char* sg = gm ? *(char**)(gm + 0x40) : nullptr;
+	if (!sg) return;
+	*(uint32_t*)(sg + 0x10) |= 0x1F;
+	if (!(*(uint32_t*)(sg + 0x10) & 0x4000)) {
+		*(uint32_t*)(gm + 0xA4) = *(uint32_t*)(gm + 0xA0);
+		*(uint32_t*)(gm + 0xC4) = *(uint8_t*)(gm + 0xBB);
+		*(uint32_t*)(sg + 0x10) |= 0x4000;
+	}
+}
+
 // Which actions are physically held right now (level, for edge-triggered
 // bindings too) -- what the engine's per-binding hold timers follow.
 bool BuildP2Held(int padIndex, uint8_t* out, int numActions) {

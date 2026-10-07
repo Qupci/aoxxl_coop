@@ -53,6 +53,7 @@ struct CoopState {
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
+	int     p2Combos = 0;             // combo bytes after the actions (P2RecognizeCombos)
 
 	uint8_t* savedValues = nullptr;   // CKInput's own array while player 2's is in
 	char*    savedBindings = nullptr; // CKInput+0x18 likewise (hold time in seconds at +0x18 each)
@@ -958,6 +959,7 @@ void CoopFrame() {
 	//   Y  [cheats] fill the magic potion
 	//   X  [cheats] your hero becomes the leader
 	//   D-pad up / down  [cheats] Asterix gets the nearest torch, lit / throws it away
+	//   D-pad left  [cheats] every combo learned, combo bar full
 	// Player 1's controller is the one the game reads (pad identification).
 	{
 		int p1pad = Player1Pad();
@@ -967,7 +969,7 @@ void CoopFrame() {
 		for (int who = 0; who < 2 && !inCutscene; who++) {
 			bool held = who == 0 ? mod1 : mod2;
 			uint16_t pressed = who == 0 ? q.pressed : p.pressed;
-			if (!held || !(pressed & (kFace | PAD_DPAD_UP | PAD_DPAD_DOWN))) continue;
+			if (!held || !(pressed & (kFace | PAD_DPAD_UP | PAD_DPAD_DOWN | PAD_DPAD_LEFT))) continue;
 			int me = who == 0 ? g.p1Hero : g.p2Hero, mate = who == 0 ? g.p2Hero : g.p1Hero;
 			Hero hm = who == 0 ? h1 : h2, hp = who == 0 ? h2 : h1;
 			const char* player = who == 0 ? "player 1" : "player 2";
@@ -987,6 +989,10 @@ void CoopFrame() {
 			}
 			if ((pressed & PAD_DPAD_UP) && g_config.cheats) CoopTorchCheat(true);
 			if ((pressed & PAD_DPAD_DOWN) && g_config.cheats) CoopTorchCheat(false);
+			if ((pressed & PAD_DPAD_LEFT) && g_config.cheats) {
+				CombosCheat();
+				Log("coop: cheat: every combo learned and the combo bar filled by %s", player);
+			}
 			if ((pressed & PAD_X) && g_config.cheats && t.Leader() != me && !g.suspended) {
 				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 				int ev = me == HERO_ASTERIX ? 0x4800 : 0x4801;
@@ -1071,7 +1077,9 @@ void CoopFrame() {
 	int n = im.NumActions();
 	if (n > (int)kMaxActions) n = (int)kMaxActions;
 	if (n > 0 && BuildP2Actions(g.p2Pad, g.p2Values, n)) {
-		memset(g.p2Values + n, 0, kP2ValuesSize - n);
+		// The combo bytes after the actions belong to the recognizer below and
+		// carry over from frame to frame.
+		if (n + g.p2Combos < kP2ValuesSize) memset(g.p2Values + n + g.p2Combos, 0, kP2ValuesSize - n - g.p2Combos);
 		g.p2ValuesReady = true;
 		// Hold timers, as CKInput_UpdateBinding keeps them at binding +0x18.
 		uint8_t held[kP2ValuesSize] = {};
@@ -1081,6 +1089,20 @@ void CoopFrame() {
 			if (!held[i]) { g.p2HoldStart[i] = -1.0f; g.p2HoldTime[i] = 0.0f; continue; }
 			if (g.p2HoldStart[i] <= 0) g.p2HoldStart[i] = t;
 			g.p2HoldTime[i] = t - g.p2HoldStart[i] + 0.001f;   // non-zero from the first frame
+		}
+		// Player 2's combos (A A X B and so on), recognised the way the game
+		// recognises player 1's.
+		char* binds = im ? *(char**)(im.raw() + 0x18) : nullptr;
+		if (binds) {
+			static char comboBindings[kP2ValuesSize * 0x20];
+			memcpy(comboBindings, binds, n * 0x20);
+			for (int i = 0; i < n; i++) *(float*)(comboBindings + i * 0x20 + 0x18) = g.p2HoldTime[i];
+			int c = P2RecognizeCombos(g.p2Values, n, comboBindings);
+			if (c > 0 && n + c <= kP2ValuesSize) {
+				g.p2Combos = c;
+				for (int k = 0; k < c; k++)
+					if (g.p2Values[n + k] == 0xFF) Log("coop: player 2's combo %d (action %02X) entered", k, 0x10 + k);
+			}
 		}
 		// The merchant's menu reads the game's one input: either player can
 		// browse it (player 2's Obelix may be the one who opened it).
@@ -1248,6 +1270,11 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 
 // For XXL Inspector's Cheats window (and anything else): 1 = give, 0 = throw away.
 extern "C" __declspec(dllexport) void __cdecl XXLCoopTorchCheat(int give) { CoopTorchCheat(give != 0); }
+// Every combo learned and the combo bar full (Inspector's Cheats window).
+extern "C" __declspec(dllexport) void __cdecl XXLCoopCombosCheat() {
+	CombosCheat();
+	Log("coop: cheat: every combo learned and the combo bar filled (Inspector)");
+}
 
 static void TorchBeforeTick(int heroIndex, Hero hero) {
 	if (heroIndex != HERO_ASTERIX || !g_torch.want) return;

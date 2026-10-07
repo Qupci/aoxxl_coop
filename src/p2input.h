@@ -24,3 +24,10 @@ bool BuildP2Held(int padIndex, uint8_t* out, int numActions);
 // Same mapping from an explicit pad state (used by autotest to synthesise
 // player 1's input). Clears `out` first.
 void BuildActionsFromPad(const PadState& p, uint8_t* out, int numActions);
+
+// Runs the game's combo recognizer on player 2's action values (numActions
+// bytes, then one byte per combo that must persist from frame to frame) with
+// `bindings` carrying player 2's hold times; returns the number of combos.
+int P2RecognizeCombos(uint8_t* values, int numActions, char* bindings);
+// Cheat: all combos learned, combo bar full.
+void CombosCheat();
