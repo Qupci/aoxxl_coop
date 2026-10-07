@@ -1032,3 +1032,15 @@ InitStateTables vs Obelix's FUN_004A69F0) -- Obelix has no third jump state/anim
   camera. Far helmets can still drop out when both views see many nearer ones (capacity).
 * Diagnostics: env XXL_KLOG="x,z" (kluster list per handler near a point), XXL_LOGTRIO (single
   player trio events), autotest S_P1COMBO (P1 combo action), S_WATCHENEMIES.
+* **Twister Fusion** (round 23): Twister (attack 10, handler 0x493F70) sub-states hero `+0x38E & 0x3F`:
+  0x22 start, 0x23 spin, 0x25 merging (FUN_00498800), 0x26 fused tornado (FUN_00498A30), 0x27 end.
+  Fuse check FUN_004984F0: own request `+0x188` (X while spinning, needs `+0x189` "partner near",
+  set only by the AI companion's spin within trio `+0x3D8`) + companion at 0x23; AI variant follows the
+  leader's request. Co-op: nearness emulated, non-leader's request moved to the leader (leader drives),
+  the partner runs the check and both steps through their AI branch (f18 bit 0 + real leader for the
+  call), split screen off (CoopOneScreen) during 0x25/0x26 -- not suspension (AI switch ends the Twister).
+* **Marker spawns** (squad vf38, 0x52FB80, thiscall(count, group) ret 8): markers squad `+0x5C`
+  (8 bytes, +0 -> position), count `+0x64`; picked from the game camera (svc `+0x5B0` pos,
+  `+0x5BC` look) outside a cone of 1.5 x FOV (camera `+0x38` -> `+0x44`). Co-op: list filtered per
+  call (no marker in any player's view within 40 units, P2's cone, or within 8 units of a hero),
+  non-leader squads use that player's camera.

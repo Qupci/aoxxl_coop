@@ -389,7 +389,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 }
 
 bool WantSplit() {
-	return g_config.splitScreen && CoopP2Joined() && !CoopSuspended();
+	return g_config.splitScreen && CoopP2Joined() && !CoopSuspended() && !CoopOneScreen();
 }
 
 void __fastcall GraphicTickHook(void* self, void* edx, void* dt) {

@@ -929,6 +929,19 @@ const Step kFight4A[] = {
 	END(54000),
 };
 
+// twistco2: like twistco, but player 2 (not leading) asks for the fusion with X.
+const Step kTwistCo2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 1500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SHOT(2500, "twistco2_1"),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4100, 1, 0, 0, 0, "p2 release"),
+	SHOT(5000, "twistco2_2"),
+	SHOT(7000, "twistco2_3"),
+	END(16000),
+};
+
 const Step kInputDump[] = {
 	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
 	END(1000),
@@ -1540,6 +1553,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("camp2", kCamp2),
 	SCENARIO("twistsp", kTwistSP),
 	SCENARIO("twistco", kTwistCo),
+	SCENARIO("twistco2", kTwistCo2),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),
@@ -1680,10 +1694,12 @@ void LogTick(float t) {
 	for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++) {
 		Hero h = tr.GetHero(i);
 		if (!h) continue;
-		line.Add(" | %c f18=%02X L=%02X sit=%02X body=%02X ai=%02X pos=(%7.2f %6.2f %7.2f)",
-			i == HERO_ASTERIX ? 'A' : 'O', h.Flags18(), LifeLastState(i),
+		char* hn = (char*)h.hook->node;
+		line.Add(" | %c%s f18=%02X L=%02X sit=%02X body=%02X ai=%02X atk=%02X/%02X pos=(%7.2f %6.2f %7.2f)",
+			i == HERO_ASTERIX ? 'A' : 'O', hn && (*(uint8_t*)(hn + 0x10) & 2) ? "(hidden)" : "", h.Flags18(), LifeLastState(i),
 			*(uint8_t*)(h.raw() + 0x3E9), *(uint8_t*)(h.raw() + 0xE5),
-			*(uint8_t*)(h.raw() + 0x561), h.Pos().x, h.Pos().y, h.Pos().z);
+			*(uint8_t*)(h.raw() + 0x561), *(uint8_t*)(h.raw() + 0x135), *(uint8_t*)(h.raw() + 0x38E) & 0x3F,
+			h.Pos().x, h.Pos().y, h.Pos().z);
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
 	{   // the button prompt (CKGrpMeca, game manager +0x18: owner +0x90; gm +0x5C bit 0, kind +0x68)

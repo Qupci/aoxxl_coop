@@ -79,6 +79,7 @@ struct CoopState {
 
 	bool    suspended = false;
 	bool    shopping = false;            // a merchant's menu is open
+	bool    oneScreen = false;           // Twister Fusion: co-op on, split screen off
 	bool    held[HERO_COUNT] = {};       // a player's hero the game has borrowed (scripted AI order)
 	uint8_t lastOrder[HERO_COUNT] = {};
 	DWORD   heldSince[HERO_COUNT] = {};
@@ -388,6 +389,7 @@ int  CoopNonLeaderPlayer() {
 int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
+bool CoopOneScreen() { return g.oneScreen; }
 bool CoopHeroHeld(int idx) { return g.p2Joined && idx >= 0 && idx < HERO_COUNT && g.held[idx]; }
 
 void CoopRequestLeave(const char* why) {
@@ -490,6 +492,8 @@ void CheckMarker(DWORD now) {
 }
 
 static void SetHeroPosition(Hero h, const Vector3& to);
+static void TwisterNearness(Trio t, Hero h1, Hero h2);
+static bool FusionOn(Hero h1, Hero h2);
 
 // The level streams one sector at a time besides sector 0 (CKLevel, yellow
 // pages +0x90: sectors at +4, current +0x24, loading +0x2C, requested +0x34).
@@ -1017,6 +1021,14 @@ void CoopFrame() {
 		shopping = s && (*(uint8_t*)(s + 8) & 7) != 0;
 	}
 	g.shopping = shopping;
+	if (!g.suspended) TwisterNearness(t, h1, h2);
+	// The fused tornado is one: one screen while it lasts (the heroes stay the
+	// players' -- made the AI companion, the partner's Twister ended at once).
+	bool fusion = FusionOn(h1, h2);
+	if (fusion != g.oneScreen) {
+		g.oneScreen = fusion;
+		Log("coop: Twister Fusion %s -- split screen %s", fusion ? "on" : "over", fusion ? "off" : "back");
+	}
 	// Cutscenes: the letterbox bars, held a few frames after they go so a scene
 	// handing over to the next one does not flicker co-op on and off.
 	LogCutsceneSignals();
@@ -1323,6 +1335,125 @@ static char __fastcall ChooseAttackHook(char* hero, void* edx, int current) {
 	Log("coop: %s spins along with %s's Twister (attack state %d)", HeroName(me),
 	    HeroName(me == g.p1Hero ? g.p2Hero : g.p1Hero), twist);
 	return twist;
+}
+
+// Twister Fusion. The Twister (attack state 10, handler 0x493F70) steps
+// through body sub-states (hero +0x38E & 0x3F): 0x22 start, 0x23 spinning,
+// 0x25 fused (then 0x27), 0x24/0x26 the plain end. From 0x23, FUN_004984F0
+// (thiscall, no args, bool) fuses a hero whose fusion request (+0x188, set by
+// X while spinning, but only with +0x189 "partner near") is up and whose
+// companion spins (0x23) -- or, in the AI variant, the companion of a leader
+// whose request is up. +0x189 is only ever set by the AI companion's spin
+// (FUN_00498560, within trio +0x3D8 of the leader). Two player-driven heroes:
+//  * spinning near each other, both get +0x189 (CoopFrame);
+//  * the non-leader's request becomes the leader's -- the leader drives the
+//    fused tornado, as in single player;
+//  * co-op stands aside while a fusion is asked for or running, so the partner
+//    is the AI companion that follows the leader's request (split screen off).
+typedef char(__fastcall* FuseFn)(char* hero, void* edx);
+const uintptr_t kFuseCheck = 0x4984F0;
+const uint8_t   kFuseCheckPrologue[7] = { 0x56, 0x8B, 0xF1, 0x57, 0x8B, 0x4E, 0x14 };
+FuseFn g_origFuse = nullptr;
+DWORD g_fusionAsked = 0;
+
+static uint8_t SubState(Hero h) { return *(uint8_t*)(h.raw() + 0x38E) & 0x3F; }
+
+static char __fastcall FuseHook(char* hero, void* edx) {
+	Trio t = GetTrio();
+	if (!g.p2Joined || !t) return g_origFuse(hero, edx);
+	int me = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
+	int leadIdx = g.sliced ? g.savedLeader : t.Leader();   // the real leader, also inside a sliced tick
+	Hero lead = t.GetHero(leadIdx);
+	if (me < 0 || !lead) return g_origFuse(hero, edx);
+	if (me != leadIdx) {
+		// The non-leader's own request becomes the leader's.
+		if (*(uint8_t*)(hero + 0x188) && Twisting(lead)) {
+			*(uint8_t*)(lead.raw() + 0x188) = 1;
+			*(uint8_t*)(hero + 0x188) = 0;
+			if (!g_fusionAsked || GetTickCount() - g_fusionAsked > 1500)
+				Log("coop: %s asks for the Twister Fusion -- %s leads it", HeroName(me), HeroName(leadIdx));
+			g_fusionAsked = GetTickCount();
+			return 0;
+		}
+		// Follow the leader's request the way the AI companion does: the check's
+		// AI branch, with the real leader and companion, this hero as AI.
+		if (Twisting(lead) && *(uint8_t*)(lead.raw() + 0x188)) {
+			uint8_t* tr = (uint8_t*)t.raw();
+			uint8_t l = tr[0x2C], c = tr[0x2D], f = *(uint8_t*)(hero + 0x18);
+			tr[0x2C] = (uint8_t)leadIdx;
+			tr[0x2D] = (uint8_t)me;
+			*(uint8_t*)(hero + 0x18) = f | 1;
+			char r = g_origFuse(hero, edx);
+			*(uint8_t*)(hero + 0x18) = f;
+			tr[0x2C] = l;
+			tr[0x2D] = c;
+			if (r) Log("coop: %s joins %s's Twister Fusion", HeroName(me), HeroName(leadIdx));
+			return r;
+		}
+		return g_origFuse(hero, edx);
+	}
+	if (*(uint8_t*)(hero + 0x188)) {
+		if (!g_fusionAsked || GetTickCount() - g_fusionAsked > 1500) Log("coop: Twister Fusion asked for");
+		g_fusionAsked = GetTickCount();
+	}
+	return g_origFuse(hero, edx);
+}
+
+// The fusion's steps: 0x25 (FUN_00498800: the companion closes in, and hides
+// once the leader is at 0x26) and 0x26 (FUN_00498A30: the leader drives the
+// one big tornado, the companion waits) -- each thiscall, no args, bool. The
+// non-leading player's hero takes their AI branch (two tornados otherwise).
+typedef char(__fastcall* FuseStepFn)(char* hero, void* edx);
+const uintptr_t kFuseStep25 = 0x498800, kFuseStep26 = 0x498A30;
+const uint8_t   kFuseStep25Prologue[7] = { 0x83, 0xEC, 0x14, 0x56, 0x8B, 0xF1, 0x57 };
+const uint8_t   kFuseStep26Prologue[6] = { 0x83, 0xEC, 0x08, 0x56, 0x8B, 0xF1 };
+FuseStepFn g_origFuseStep25 = nullptr, g_origFuseStep26 = nullptr;
+
+static char FuseStepAsCompanion(FuseStepFn orig, char* hero, void* edx) {
+	Trio t = GetTrio();
+	if (!g.p2Joined || !t) return orig(hero, edx);
+	int me = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
+	int leadIdx = g.sliced ? g.savedLeader : t.Leader();
+	Hero lead = t.GetHero(leadIdx);
+	if (me < 0 || me == leadIdx || !lead || !Twisting(lead)) return orig(hero, edx);
+	uint8_t ls = SubState(lead);
+	bool fusing = ls == 0x25 || ls == 0x26 || (g_fusionAsked && GetTickCount() - g_fusionAsked < 1500);
+	if (!fusing) return orig(hero, edx);
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t l = tr[0x2C], c = tr[0x2D], f = *(uint8_t*)(hero + 0x18);
+	tr[0x2C] = (uint8_t)leadIdx;
+	tr[0x2D] = (uint8_t)me;
+	*(uint8_t*)(hero + 0x18) = f | 1;
+	char r = orig(hero, edx);
+	*(uint8_t*)(hero + 0x18) = (*(uint8_t*)(hero + 0x18) & ~1) | (f & 1);
+	tr[0x2C] = l;
+	tr[0x2D] = c;
+	return r;
+}
+static char __fastcall FuseStep25Hook(char* hero, void* edx) { return FuseStepAsCompanion(g_origFuseStep25, hero, edx); }
+static char __fastcall FuseStep26Hook(char* hero, void* edx) { return FuseStepAsCompanion(g_origFuseStep26, hero, edx); }
+
+// Both player heroes spinning near each other: the "partner near" flag the AI
+// companion's spin would set.
+static void TwisterNearness(Trio t, Hero h1, Hero h2) {
+	if (!Twisting(h1) || !Twisting(h2) || SubState(h1) != 0x23 || SubState(h2) != 0x23) return;
+	float d = sqrtf((h1.Pos() - h2.Pos()).len2());
+	float near2 = *(float*)(t.raw() + 0x3D8);
+	if (!(d < near2)) return;
+	if (!*(uint8_t*)(h1.raw() + 0x189) || !*(uint8_t*)(h2.raw() + 0x189))
+		Log("coop: both Twisters %.1f apart (fusion range %.1f): Twister Fusion possible", d, near2);
+	*(uint8_t*)(h1.raw() + 0x189) = 1;
+	*(uint8_t*)(h2.raw() + 0x189) = 1;
+}
+
+static bool FusionOn(Hero h1, Hero h2) {
+	if (g_fusionAsked && GetTickCount() - g_fusionAsked < 1500) return true;
+	Hero both[2] = { h1, h2 };
+	for (Hero h : both) {
+		uint8_t s = SubState(h);
+		if (Twisting(h) && (s == 0x25 || s == 0x26)) return true;
+	}
+	return false;
 }
 
 // For XXL Inspector's Cheats window (and anything else): 1 = give, 0 = throw away.
@@ -1664,6 +1795,12 @@ void CoopInit() {
 	              sizeof(kReadCmdPrologue), "hero potion flag (Obelix's potion)");
 	InstallDetour(kHeroPrompt, (void*)PromptHook, (void**)&g_origPrompt, kHeroPromptPrologue,
 	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");
+	InstallDetour(kFuseStep25, (void*)FuseStep25Hook, (void**)&g_origFuseStep25, kFuseStep25Prologue,
+	              sizeof(kFuseStep25Prologue), "Twister Fusion step 0x25 (partner as companion)");
+	InstallDetour(kFuseStep26, (void*)FuseStep26Hook, (void**)&g_origFuseStep26, kFuseStep26Prologue,
+	              sizeof(kFuseStep26Prologue), "Twister Fusion step 0x26 (partner as companion)");
+	InstallDetour(kFuseCheck, (void*)FuseHook, (void**)&g_origFuse, kFuseCheckPrologue, sizeof(kFuseCheckPrologue),
+	              "Twister Fusion check (both players)");
 	InstallDetour(kChooseAttack, (void*)ChooseAttackHook, (void**)&g_origChooseAttack, kChooseAttackPrologue,
 	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
