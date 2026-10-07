@@ -6,6 +6,7 @@
 #include "life.h"
 #include "log.h"
 #include "p2input.h"
+#include "p2cam.h"
 #include "pads.h"
 #include "sound.h"
 #include "crash.h"
@@ -18,7 +19,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -787,6 +788,24 @@ const Step kComboP1[] = {
 	END(8000),
 };
 
+// helmets3 (-Level 3): player 2's Obelix looks at the placed helmets around
+// (29.5 0.1 44.2) from 60 units away while player 1's Asterix, south of them,
+// runs about (turning the game camera); beacon bonuses near them are counted.
+const Step kHelmets3[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, 89.92f, 0.6f, 32.69f), PLACEAT(1500, HERO_ASTERIX, 33.03f, -2.5f, -68.74f),
+	{ 2500, S_P2LOOK, 0, 0, 0, 29.48f, 0.12f, "p2 camera at the helmets", 44.15f },
+	{ 2500, S_WATCHBEACONS, 0, 0, 0, 29.48f, 0.12f, "watch the helmets", 44.15f },
+	SHOT(4000, "helmets_0"),
+	P1(4500, 0, 1, 0, "p1 right"), SHOT(6000, "helmets_1"),
+	P1(6500, 0, 0, -1, "p1 down"), SHOT(8000, "helmets_2"),
+	P1(8500, 0, -1, 0, "p1 left"), SHOT(10000, "helmets_3"),
+	P1(10500, 0, 0, 1, "p1 up"), SHOT(12000, "helmets_4"),
+	P1(12500, 0, 0, 0, "p1 stop"),
+	END(13500),
+};
+
 const Step kInputDump[] = {
 	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
 	END(1000),
@@ -1390,6 +1409,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("inputdump", kInputDump),
 	SCENARIO("combop2", kComboP2),
 	SCENARIO("combop1", kComboP1),
+	SCENARIO("helmets3", kHelmets3),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1441,6 +1461,8 @@ struct AutotestState {
 	char*   watchClue = nullptr;    // CKHkClueMan (the spy), WATCHCLUE
 	char*   watchTorch = nullptr;   // CKHkTorch nearest Asterix, TORCH
 	bool    watchCam = false;       // the game camera (service +0x5B0 pos, +0x5BC look, track), WATCHCAM
+	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
+	Vector3 beaconPoint;
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
 	struct Glide { bool on; Vector3 from, to; DWORD start, ms; } glide[HERO_COUNT] = {};
@@ -1573,6 +1595,23 @@ void LogTick(float t) {
 		} __except (EXCEPTION_EXECUTE_HANDLER) {
 			line.Add(" | probe fault");
 		}
+	}
+	if (at.watchBeacons) {   // bonuses the pools placed on beacons: near the watched point / all
+		int nearCount = 0, all = 0;
+		const int kPoolIds[2] = { 61, 63 };
+		for (int k = 0; k < 2; k++)
+			for (unsigned i = 0, n = GetNumLvlClassInstances(4, kPoolIds[k]); i < n; i++) {
+				char* pool = (char*)GetLvlObject(4, kPoolIds[k], i);
+				for (char* b = pool ? *(char**)(pool + 0x34) : nullptr; b; b = *(char**)(b + 0x14)) {
+					char* node = *(char**)(b + 0x10);
+					char* frame = node ? *(char**)(node + 4) : nullptr;
+					if (!frame) continue;
+					all++;
+					Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2]);
+					if ((p - at.beaconPoint).len2() < 12.0f * 12.0f) nearCount++;
+				}
+			}
+		line.Add(" | beacon bonuses near %d of %d", nearCount, all);
 	}
 	if (at.watchBonus) {
 		char* node = *(char**)(at.watchBonus + 0x10);
@@ -1976,6 +2015,8 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_WATCHCAM: at.watchCam = true; break;
+	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
+	case S_P2LOOK: P2CamLookToward(Vector3(s.x, s.y, s.z)); Log("autotest: player 2's camera turned"); break;
 	case S_HEROFIELDS: {   // movement parameters of both heroes: +0x300..+0x33C and +0x84 speed, +0x388
 		Trio t = GetTrio();
 		for (int h = 0; t && h < 2; h++) {

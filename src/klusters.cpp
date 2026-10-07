@@ -25,7 +25,9 @@
 #include "p2cam.h"
 #include "splitscreen.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -109,6 +111,19 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 	float scale = *(const float*)kKeyScale;
 	Entry* inside = nullptr;
 	Entry* out = nullptr;
+	// Sorted by camera distance (no explicit reference point): the managers fill
+	// a limited pool of live objects from the front of the list (helmets), so
+	// sorting by the distance to the nearest camera gave everything to the player
+	// standing close to beacons -- player 1 turning the camera made player 2's
+	// helmets 60 units away come and go. Each camera's visible klusters are
+	// ranked by distance to it, and the two rankings are interleaved.
+	const int kMaxFair = 1024;
+	static Entry* fe[kMaxFair];
+	static float fd[kMaxFair][kViews + 1];
+	static uint32_t fr[kMaxFair];
+	int nf = 0;
+	static const bool noFair = getenv("XXL_NOFAIR") != nullptr;   // autotest comparison
+	bool fair = !ref && (flags & 2) && !noFair;
 	for (char* sector = next(mgr, nullptr, nullptr); sector; sector = next(mgr, nullptr, sector)) {
 		for (char* k = *(char**)(sector + 0x34); k; k = *(char**)(k + 4)) {
 			signed char idx = *(signed char*)(*(char**)(k + 0x20) + slot);
@@ -126,16 +141,41 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 				key = (uint32_t)(-(int)(d * scale) - 1);
 			}
 			bool in1 = InFrustum(svc + 0x500, c, r);
+			bool inV[kViews] = {};
 			bool in = in1;
-			for (int v = 0; !in && v < kViews; v++)
-				if (g_viewOn[v]) in = InFrustum(g_fakeSvc[v] + 0x500, c, r);
+			for (int v = 0; v < kViews; v++)
+				if (g_viewOn[v]) { inV[v] = InFrustum(g_fakeSvc[v] + 0x500, c, r); in = in || inV[v]; }
 			if (in) {
 				if (!in1) InterlockedIncrement(&g_p2Only);
-				Insert(inside, e, key, (flags & 2) != 0);
+				if (fair && nf < kMaxFair) {
+					fe[nf] = e;
+					fd[nf][0] = in1 ? Manhattan(c, ref1) : 1e30f;
+					for (int v = 0; v < kViews; v++) fd[nf][v + 1] = inV[v] ? Manhattan(c, g_viewPos[v]) : 1e30f;
+					nf++;
+				} else {
+					Insert(inside, e, key, (flags & 2) != 0);
+				}
 			} else if (flags & 4) {
 				Insert(out, e, key, (flags & 8) != 0);
 			}
 		}
+	}
+	if (nf) {
+		// Rank per camera, then each kluster's best interleaved position:
+		// rank * cameras + camera.
+		const int cams = kViews + 1;
+		for (int i = 0; i < nf; i++) fr[i] = 0xFFFFFFFFu;
+		static int order[kMaxFair];
+		for (int cam = 0; cam < cams; cam++) {
+			int m = 0;
+			for (int i = 0; i < nf; i++) if (fd[i][cam] < 1e29f) order[m++] = i;
+			std::sort(order, order + m, [cam](int a, int b) { return fd[a][cam] < fd[b][cam]; });
+			for (int rank = 0; rank < m; rank++) {
+				uint32_t pos = (uint32_t)rank * cams + cam;
+				if (pos < fr[order[rank]]) fr[order[rank]] = pos;
+			}
+		}
+		for (int i = 0; i < nf; i++) Insert(inside, fe[i], 0xFFFFFFFFu - fr[i], true);
 	}
 	if (outside) *outside = out;
 	return inside;

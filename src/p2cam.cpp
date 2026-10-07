@@ -255,6 +255,17 @@ void UpdateCam(Hero hero, Hero leader, int pad) {
 
 } // namespace
 
+// Autotest: player 2's camera behind player 2's hero, looking towards `target`.
+void P2CamLookToward(const Vector3& target) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(CoopP2Hero()) : Hero();
+	if (!h || !g_cams[1].init) return;
+	Vector3 p = h.Pos();
+	g_cams[1].yaw = atan2f(p.z - target.z, p.x - target.x);
+	g_cams[1].pitch = 0.3f;
+	g_cams[1].idle = 0.0f;
+}
+
 bool P1CamMatrix(float out[16]) {
 	if (!g_cams[0].haveMatrix) return false;
 	memcpy(out, g_cams[0].m, sizeof(g_cams[0].m));
