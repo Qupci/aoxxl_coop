@@ -88,6 +88,9 @@ void Seed(Hero leader) {
 	// units) the view started far out; a follow camera stays near the hero.
 	cam.dist = (d > 1.5f && d < 15.0f) ? d : 5.0f;
 	if (cam.dist > 6.0f) cam.dist = 6.0f;
+	// ...and one seeded where the game camera had pulled in (a wall, the end of
+	// a dialogue's close-up) stayed zoomed in on the hero; walls pull it in anyway.
+	if (cam.dist < 4.0f) cam.dist = 4.0f;
 	cam.pitch = d > 0.01f ? asinf(off.y / d) : 0.4f;
 	// The level-start camera is often almost level; start a bit higher so the
 	// ground around player 2 is visible.
@@ -96,7 +99,7 @@ void Seed(Hero leader) {
 	if (cam.pitch > kPitchMax) cam.pitch = kPitchMax;
 	cam.yaw = atan2f(off.z, off.x);
 	float h = glook.y - leader.Pos().y;
-	cam.focusH = (h > 0.2f && h < 4.0f) ? h : 1.5f;
+	cam.focusH = (h > 1.0f && h < 4.0f) ? h : 1.5f;
 
 	// Matrix handedness and flags, copied from the game's own camera.
 	const float* gm = (const float*)((char*)(*(void**)((char*)rw + 4)) + 0x10);
@@ -171,6 +174,10 @@ void UpdateCam(Hero hero, Hero leader, int pad) {
 	Vector3 heroAt = WorldPos(hero);
 	Vector3 target = heroAt + Vector3(0, cam.focusH, 0);
 	if (!cam.init) {
+		// Not from a scripted shot: during a dialogue or cutscene the game camera
+		// is the scene's (a Roman agent's close-up seeded player 1's own camera at
+		// 3 units, focus at the hero's knees, after the dialogue in level 5).
+		if (CoopSuspended()) return;
 		Seed(leader);
 		if (!cam.init) return;
 		target = heroAt + Vector3(0, cam.focusH, 0);

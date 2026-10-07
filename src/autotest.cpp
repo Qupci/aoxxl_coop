@@ -18,7 +18,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -28,6 +28,7 @@ struct Step {
 	uint16_t    buttons;  // S_P1 / S_VPAD
 	float       x, y;     // S_P1 / S_VPAD left stick
 	const char* name;
+	float       z;        // PLACEAT / GLIDEAT: the point's z (x, y above)
 };
 
 #define MARK(t, n)                  { t, S_MARK,  0, 0, 0, 0, 0, n }
@@ -87,6 +88,9 @@ struct Step {
 #define VPADR(t, slot, x, y, n)     { t, S_VPADR, slot, 0, 0, x, y, n }
 // Puts hero `hero` next to lifter `lifter` (offset dx/dz, 1.5 units up).
 #define TELEPORT(t, hero, lifter, dx, dz) { t, S_TELEPORT, hero, lifter, 0, dx, dz, "teleport" }
+// Hero `hero` put at / moved frame by frame to a point given by its coordinates.
+#define PLACEAT(t, hero, X, Y, Z)       { t, S_PLACE, hero, -1, 0, X, Y, "place", Z }
+#define GLIDEAT(t, hero, X, Y, Z, ms)   { t, S_GLIDE, hero, -1, ms, X, Y, "glide", Z }
 
 // exp1: does a hero held in the player control state answer input? Player 1's
 // synthetic input goes to the shared action array, so if the theory holds both
@@ -620,6 +624,113 @@ const Step kHurtOP[] = {
 	{ 1500, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
 	SHOT(6000, "hurt_1"),
 	END(14000),
+};
+
+// plate3 (-Level 3): player 2's Obelix (not leading) steps on sector 1's
+// pressure plate (194.9 0.1 18.8, "activatable by hero"), then off it.
+const Step kPlate3[] = {
+	MARK(0, "baseline"), { 0, S_PLATES, 0, 0, 0, 0, 0, "plates" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, 194.85f, 1.5f, 18.76f),
+	{ 3500, S_PLATES, 0, 0, 0, 0, 0, "plates" },
+	SHOT(4000, "plate3_1"),
+	PLACEAT(5000, HERO_OBELIX, 194.85f, 1.5f, 26.0f),
+	{ 7000, S_PLATES, 0, 0, 0, 0, 0, "plates" },
+	END(7500),
+};
+
+// mgun3a / mgun3n / mgun3o (-Level 3): sector 6's machinegun (-172.1 6.1
+// -196.7). a: the leader Asterix presses X at it; n: Asterix, Obelix leading
+// (trio 0x4801), presses X; o: player 2's Obelix (not leading) presses X.
+#define MGUN_SETUP \
+	MARK(0, "baseline"), LOADSECTOR(200, 6), \
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), \
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f), \
+	SECTORS(3500)
+const Step kMgun3A[] = {
+	MGUN_SETUP,
+	PLACEAT(4500, HERO_ASTERIX, -172.13f, 6.6f, -196.69f), PLACEAT(4500, HERO_OBELIX, -176.0f, 6.6f, -199.0f),
+	SHOT(6000, "mgun_1"),
+	P1(6500, PAD_X, 0, 0, "p1 X"), P1(6700, 0, 0, 0, "p1 release"),
+	SHOT(8000, "mgun_2"),
+	END(10000),
+};
+const Step kMgun3N[] = {
+	MGUN_SETUP,
+	{ 4000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(4500, HERO_ASTERIX, -172.13f, 6.6f, -196.69f), PLACEAT(4500, HERO_OBELIX, -176.0f, 6.6f, -199.0f),
+	SHOT(6000, "mgun_1"),
+	P1(6500, PAD_X, 0, 0, "p1 X"), P1(6700, 0, 0, 0, "p1 release"),
+	SHOT(8000, "mgun_2"),
+	END(10000),
+};
+const Step kMgun3O[] = {
+	MGUN_SETUP,
+	PLACEAT(4500, HERO_OBELIX, -172.13f, 6.6f, -196.69f), PLACEAT(4500, HERO_ASTERIX, -176.0f, 6.6f, -199.0f),
+	SHOT(6000, "mgun_1"),
+	VPAD(6500, 1, PAD_X, 0, 0, "p2 X"), VPAD(6700, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "mgun_2"),
+	END(10000),
+};
+
+// spy3n (-Level 3): sector 2's Roman agent (176.4 6.2 -218.4); Obelix leads
+// (trio 0x4801) far away, player 1's Asterix talks to the agent with X, then
+// presses A now and then to go through the dialogue.
+const Step kSpy3N[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(3000, HERO_ASTERIX, 176.43f, 6.7f, -218.37f),
+	{ 2000, S_WATCHCLUE, 0, 0, 0, 0, 0, "spies" },
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(7000, "spy3n_1"),
+	P1(10000, PAD_A, 0, 0, "p1 A"), P1(10200, 0, 0, 0, "p1 r"), P1(14000, PAD_A, 0, 0, "p1 A"), P1(14200, 0, 0, 0, "p1 r"),
+	P1(18000, PAD_A, 0, 0, "p1 A"), P1(18200, 0, 0, 0, "p1 r"), P1(22000, PAD_A, 0, 0, "p1 A"), P1(22200, 0, 0, 0, "p1 r"),
+	P1(26000, PAD_X, 0, 0, "p1 X"), P1(26200, 0, 0, 0, "p1 r"), P1(30000, PAD_X, 0, 0, "p1 X"), P1(30200, 0, 0, 0, "p1 r"),
+	SHOT(32000, "spy3n_2"),
+	P1(34000, PAD_START, 0, 0, "p1 start"), P1(34200, 0, 0, 0, "p1 r"),
+	SHOT(36000, "spy3n_3"),
+	END(40000),
+};
+
+// catapultp (level 2): player 2's Obelix (not leading) stands on sector 2's
+// launcher: the "Activate" prompt (CKGrpMeca owner) is logged every tick;
+// catapulta: the same with the leader Asterix, for comparison.
+const Step kCatapultP[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "asterix next to the launcher" },
+	GLIDE(4000, HERO_OBELIX, 17, 1500),
+	SHOT(7000, "catapult_1"),
+	END(8000),
+};
+const Step kCatapultA[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_OBELIX, 18, 0, 0, 0, "obelix next to the launcher" },
+	GLIDE(4000, HERO_ASTERIX, 17, 1500),
+	{ 6000, S_WATCHRW, HERO_ASTERIX, 0x3F1, 0, 0, 0, "who reads the launcher bit" },
+	SHOT(7000, "catapult_1"),
+	END(8000),
+};
+
+// shop (level 2): the leader Asterix at sector 1's merchant (-764.3 508.2
+// -1013.0) presses X; probe on.
+const Step kShop[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	SHOT(3500, "shop_0"),
+	PROBE(3800, 1),
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
+	SHOT(6000, "shop_1"),
+	P1(7000, 0, 0, -1, "p1 down"), P1(7200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "shop_2"),
+	P1(9000, PAD_B, 0, 0, "p1 B"), P1(9200, 0, 0, 0, "p1 release"),
+	SHOT(10500, "shop_3"),
+	END(11000),
 };
 
 const Step kRegions[] = {
@@ -1208,6 +1319,14 @@ const Scenario kScenarios[] = {
 	SCENARIO("pursuita", kPursuitA),
 	SCENARIO("p2mirror", kP2Mirror),
 	SCENARIO("p2busy", kP2Busy),
+	SCENARIO("plate3", kPlate3),
+	SCENARIO("mgun3a", kMgun3A),
+	SCENARIO("mgun3n", kMgun3N),
+	SCENARIO("mgun3o", kMgun3O),
+	SCENARIO("spy3n", kSpy3N),
+	SCENARIO("catapultp", kCatapultP),
+	SCENARIO("catapulta", kCatapultA),
+	SCENARIO("shop", kShop),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1345,6 +1464,15 @@ void LogTick(float t) {
 			*(uint8_t*)(h.raw() + 0x561), h.Pos().x, h.Pos().y, h.Pos().z);
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
+	{   // the button prompt (CKGrpMeca, game manager +0x18: owner +0x90; gm +0x5C bit 0, kind +0x68)
+		// and the trio's machine offer (+0x48, +0x3F4 bit 8)
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		char* meca = gm ? *(char**)(gm + 0x18) : nullptr;
+		if (gm) line.Add(" | hud prompt %X", (*(uint32_t*)(gm + 0xCC) >> 4) & 0xF);
+		if (meca) line.Add(" | prompt %p kind %d on %d trio48 %p/%d", *(void**)(meca + 0x90), *(uint8_t*)(gm + 0x68),
+		                   *(uint32_t*)(gm + 0x5C) & 1, *(void**)(tr.raw() + 0x48), (*(uint32_t*)(tr.raw() + 0x3F4) >> 3) & 1);
+	}
 	if (at.probe) {
 		// Everything that might say "a cutscene has the player": cinematic scenes,
 		// the camera service's track and flags, game manager / trio flags, the
@@ -1579,13 +1707,23 @@ void RunStep(const Step& s) {
 		*(int*)(lvl + 0x34) = s.a;
 		break;
 	}
+	case S_WATCHRW: {   // every reader/writer of hero a's byte at +b
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		WatchBytesRW(h.raw() + s.b);
+		Log("autotest: watching every access to %s +%03X", HeroName(s.a), s.b);
+		break;
+	}
 	case S_PLATES: {
 		unsigned n = GetNumLvlClassInstances(2, 21);
 		Log("autotest: %u pressure stones (blue circles)", n);
 		for (unsigned k = 0; k < n && k < 64; k++) {
 			KHook* hk = (KHook*)GetLvlObject(2, 21, k);
 			const float* p = hk && hk->node && hk->node->matrix ? (const float*)((char*)hk->node->matrix + 0x80) : nullptr;
-			if (p) Log("autotest:   stone %u at (%.2f %.2f %.2f) flags %08X", k, p[0], p[1], p[2], *(uint32_t*)((char*)hk + 8));
+			if (p) Log("autotest:   stone %u %p at (%.2f %.2f %.2f) flags %08X ground %08X events %04X/%04X", k, hk, p[0], p[1], p[2],
+			           *(uint32_t*)((char*)hk + 8), *(uint32_t*)((char*)hk + 0x28), *(uint16_t*)((char*)hk + 0x30),
+			           *(uint16_t*)((char*)hk + 0x32));
 		}
 		break;
 	}
@@ -1716,7 +1854,9 @@ void RunStep(const Step& s) {
 			char* b = a ? *(char**)(a + 0x24) : nullptr;
 			char* c = b ? *(char**)(b + 0x64) : nullptr;
 			if (c) *(uint8_t*)(c + 0x10) |= 2;
-			Log("autotest: spies' gate opened (%p)", c);
+			Log("autotest: spies' gate opened (%p vt %p, from %p vt %p)", c, c ? *(void**)c : nullptr, b,
+			    b ? *(void**)b : nullptr);
+			if (c) { const void* w[1] = { c + 0x10 }; WatchBytes(w, 1, 0, 0); }
 		}
 		for (unsigned i = 0; i < n; i++) {
 			char* c = (char*)GetLvlObject(2, 161, i);
@@ -1811,13 +1951,13 @@ void RunStep(const Step& s) {
 	case S_GLIDE: {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
-		if (!h || s.a < 0 || s.a >= HERO_COUNT || s.b < 0 || s.b >= kNumSpots) break;
+		if (!h || s.a < 0 || s.a >= HERO_COUNT || s.b < -1 || s.b >= kNumSpots) break;
 		auto& g = at.glide[s.a];
 		g.on = true;
 		g.from = h.Pos();
-		g.to = Vector3(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
+		g.to = s.b < 0 ? Vector3(s.x, s.y, s.z) : Vector3(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
 		g.start = GetTickCount();
-		g.ms = (DWORD)s.x;
+		g.ms = s.b < 0 ? (DWORD)s.buttons : (DWORD)s.x;
 		Log("autotest: %s gliding to spot %d over %d ms", HeroName(s.a), s.b, (int)s.x);
 		break;
 	}
@@ -2087,8 +2227,8 @@ void RunStep(const Step& s) {
 	case S_PLACE: {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
-		if (!h || s.b < 0 || s.b >= kNumSpots) break;
-		Vector3 to(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
+		if (!h || s.b < -1 || s.b >= kNumSpots) break;
+		Vector3 to = s.b < 0 ? Vector3(s.x, s.y, s.z) : Vector3(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
 		h.Pos() = to;
 		if (h.hook->node && h.hook->node->matrix) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);

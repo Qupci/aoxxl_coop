@@ -114,6 +114,7 @@ LONG WINAPI UnhandledFilter(EXCEPTION_POINTERS* ep) {
 const void* volatile g_watchAddr[4] = {};
 volatile long g_watchCount = 0, g_watchPending = 0, g_watchHits = 0;
 uintptr_t g_watchIgnoreLo = 0, g_watchIgnoreHi = 0;
+volatile long g_watchReads = 0;   // R/W = 11: reads too (WatchBytesRW)
 
 LONG CALLBACK WatchHandler(EXCEPTION_POINTERS* ep) {
 	if (ep->ExceptionRecord->ExceptionCode != EXCEPTION_SINGLE_STEP) return EXCEPTION_CONTINUE_SEARCH;
@@ -122,6 +123,17 @@ LONG CALLBACK WatchHandler(EXCEPTION_POINTERS* ep) {
 	if (!hit) return EXCEPTION_CONTINUE_SEARCH;
 	c->Dr6 = 0;
 	uintptr_t eip = c->Eip;
+	if (g_watchReads) {   // read/write watch: each instruction once, no stack
+		static uintptr_t seen[128];
+		static int nSeen = 0;
+		for (int i = 0; i < nSeen; i++) if (seen[i] == eip) return EXCEPTION_CONTINUE_EXECUTION;
+		if (nSeen < 128) seen[nSeen++] = eip;
+		char where[96];
+		Describe(eip, where, sizeof(where));
+		Log("watch: access to %p (now %02X) by the instruction before %s", g_watchAddr[0], *(const uint8_t*)g_watchAddr[0],
+		    where);
+		return EXCEPTION_CONTINUE_EXECUTION;
+	}
 	if (!(eip >= g_watchIgnoreLo && eip < g_watchIgnoreHi) && InterlockedIncrement(&g_watchHits) < 200) {
 		for (int i = 0; i < 4; i++)
 			if (hit & (1u << i)) {
@@ -148,7 +160,8 @@ void ApplyWatches() {
 			c.Dr7 = 0;
 			for (int i = 0; i < g_watchCount && i < 4; i++) {
 				*dr[i] = (DWORD)(uintptr_t)g_watchAddr[i];
-				c.Dr7 |= (1u << (i * 2)) | (1u << (16 + i * 4));   // local enable, R/W = 01 (write), LEN = 00 (1 byte)
+				// local enable, R/W = 01 (write) or 11 (read/write), LEN = 00 (1 byte)
+				c.Dr7 |= (1u << (i * 2)) | ((g_watchReads ? 3u : 1u) << (16 + i * 4));
 			}
 			SetThreadContext(th, &c);
 			Log("watch: %ld write watchpoint(s) set", g_watchCount);
@@ -165,6 +178,14 @@ void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t i
 	g_watchIgnoreLo = ignoreLo;
 	g_watchIgnoreHi = ignoreHi;
 	g_watchCount = n < 4 ? n : 4;
+	g_watchReads = 0;
+	g_watchPending = 1;
+}
+
+void WatchBytesRW(const void* addr) {
+	g_watchAddr[0] = addr;
+	g_watchCount = 1;
+	g_watchReads = 1;
 	g_watchPending = 1;
 }
 

@@ -64,6 +64,7 @@ struct CoopState {
 	// CoopBeforeLifeTick): saved values, and the values we put there.
 	bool     sliced = false;
 	uint8_t  sitBefore = 0xFF;        // the sliced hero's situation before its tick
+	uint8_t  f18Before = 0;           // ... and its control bits
 	bool     hidDash = false;         // game manager +0x5C bit 19 hidden for the tick
 	int      aiCycle[HERO_COUNT] = {};   // ticks left in the AI variant (situation reset)
 	DWORD    stuckSince[HERO_COUNT] = {};
@@ -99,6 +100,9 @@ const int kCutsceneHoldFrames = 15;   // ~0.25 s
 // Hero situation-machine state (hero+0x3E9) of group actions: FUN_0049C030, which
 // sends the companion and Idefix to markers and waits for them (lifters).
 const uint8_t kSituationGroupAction = 0x0D;
+// The walk to a Roman agent and the talk with him (X on the spy, or trio 0x5120).
+const uint8_t kSituationTalk = 0x09;
+const int     kOrderDialoguePlace = 13;   // the companion's AI order from trio 0x48BA
 
 const char* ModeName(uint8_t mode) {
 	switch (mode) {
@@ -497,13 +501,22 @@ static void SetHeroPosition(Hero h, const Vector3& to);
 // the hero whose zone fired -- and a player's hero whose sector is not the
 // streamed one (outside any Sas box) for a second (ini sector_catch_up_ms) is
 // brought to the other.
+// Only a hero the streaming *left behind* (the sector switched away from it) is
+// brought over at once. A hero that walks through a Sas box towards a sector
+// that is not streamed (player 2's Obelix heading for the rectangle that
+// switches the streaming over to him) is left alone -- the level between
+// sectors is always there -- unless it falls (the floor it walked onto is not
+// loaded).
 struct SectorTrack {
 	int   level = -99;
 	int   lastCur = -2;
 	int   sector[HERO_COUNT] = {};
+	bool  leftBehind[HERO_COUNT] = {};
+	float outsideY[HERO_COUNT] = {};
 	int   zoneHero = -1;
 	DWORD zoneAt = 0;
 } g_sec;
+const float kFallBelow = 8.0f;   // units below where it left the streamed sector
 
 void CoopNoteZoneHero(int heroIndex) {
 	g_sec.zoneHero = heroIndex;
@@ -523,7 +536,7 @@ static void WatchSectors(Trio t, DWORD now) {
 	if (g.lastLevel != g_sec.level) {   // new level (or first look): everyone where the level is
 		g_sec.level = g.lastLevel;
 		g_sec.lastCur = cur;
-		for (int i = 0; i < HERO_COUNT; i++) g_sec.sector[i] = cur;
+		for (int i = 0; i < HERO_COUNT; i++) { g_sec.sector[i] = cur; g_sec.leftBehind[i] = false; }
 		memset(g.outsideSince, 0, sizeof(g.outsideSince));
 		return;
 	}
@@ -561,6 +574,7 @@ static void WatchSectors(Trio t, DWORD now) {
 		Log("coop: sector %d -> %d (%s%s%s); Asterix's sector %d, Obelix's %d", g_sec.lastCur, cur, why,
 		    zoneRecent && g_sec.sector[L] != cur ? " of " : "", zoneRecent && g_sec.sector[L] != cur ? HeroName(g_sec.zoneHero) : "",
 		    g_sec.sector[HERO_ASTERIX], g_sec.sector[HERO_OBELIX]);
+		for (int i : idx) g_sec.leftBehind[i] = g_sec.sector[i] != cur;
 		g_sec.lastCur = cur;
 		g_sec.zoneHero = -1;
 	}
@@ -570,6 +584,7 @@ static void WatchSectors(Trio t, DWORD now) {
 	if (h1 && h2 && (h1.Pos() - h2.Pos()).len2() < 8.0f * 8.0f &&
 	    (g_sec.sector[idx[0]] == cur || g_sec.sector[idx[1]] == cur))
 		g_sec.sector[idx[0]] = g_sec.sector[idx[1]] = cur;
+	for (int i : idx) if (g_sec.sector[i] == cur) g_sec.leftBehind[i] = false;
 
 	bool settled = *(int*)(lvl + 0x2C) == -2 && *(int*)(lvl + 0x34) == -2;
 	if (!settled || !g.p2Joined || g.suspended || g.held[HERO_ASTERIX] || g.held[HERO_OBELIX]) {
@@ -580,17 +595,20 @@ static void WatchSectors(Trio t, DWORD now) {
 		int i = idx[k], o = idx[1 - k];
 		Hero h = t.GetHero(i), other = t.GetHero(o);
 		if (!h || !other || g_sec.sector[i] == cur || inSas[i]) { g.outsideSince[i] = 0; continue; }
-		if (!g.outsideSince[i]) { g.outsideSince[i] = now; continue; }
-		if ((int)(now - g.outsideSince[i]) < g_config.sectorCatchUpMs || g_sec.sector[o] != cur ||
-		    !HeroModePlayable(other.Flags18()))
+		if (!g.outsideSince[i]) { g.outsideSince[i] = now; g_sec.outsideY[i] = h.Pos().y; continue; }
+		bool falling = h.Pos().y < g_sec.outsideY[i] - kFallBelow;
+		if ((!g_sec.leftBehind[i] && !falling) || (int)(now - g.outsideSince[i]) < g_config.sectorCatchUpMs ||
+		    g_sec.sector[o] != cur || !HeroModePlayable(other.Flags18()))
 			continue;
 		g.outsideSince[i] = 0;
 		Vector3 from = h.Pos(), to = other.Pos();
 		to.y += 1.0f;
 		SetHeroPosition(h, to);
-		Log("coop: %s left in sector %d (at %.0f %.0f %.0f), sector %d is streamed: brought to %s at (%.1f %.1f %.1f)",
-		    HeroName(i), g_sec.sector[i], from.x, from.y, from.z, cur, HeroName(o), to.x, to.y, to.z);
+		Log("coop: %s %s sector %d (at %.0f %.0f %.0f), sector %d is streamed: brought to %s at (%.1f %.1f %.1f)",
+		    HeroName(i), falling && !g_sec.leftBehind[i] ? "fell out of the streamed level into" : "left in",
+		    g_sec.sector[i], from.x, from.y, from.z, cur, HeroName(o), to.x, to.y, to.z);
 		g_sec.sector[i] = cur;
+		g_sec.leftBehind[i] = false;
 	}
 }
 
@@ -752,7 +770,13 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 	CKYellowPages* yp = YellowPages();
 	char* srv = yp ? *(char**)((char*)yp + 0x68) : nullptr;
-	if (!srv || g.held[g.p1Hero] || g.held[g.p2Hero]) return;
+	// A hero the game has borrowed stays where the game put it (seated in the
+	// cable car) -- except one sent to its place in a Roman agent's dialogue
+	// (trio 0x48BA, AI order 13): the talk waits for it to get there.
+	const int both[2] = { g.p1Hero, g.p2Hero };
+	for (int idx : both)
+		if (g.held[idx] && (int)t.GetHero(idx).Order() != kOrderDialoguePlace) return;
+	if (!srv) return;
 	Vector3 look = *(Vector3*)(srv + 0x5BC);
 	float apart = (h1.Pos() - h2.Pos()).len2();
 	if (apart < 40.0f * 40.0f) return;
@@ -764,7 +788,6 @@ static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 	SetHeroPosition(away, to);
 	Log("coop: cutscene with the heroes %.0f units apart: %s brought to %s at (%.1f %.1f %.1f)", sqrtf(apart),
 	    HeroName(farIdx), HeroName(nearIdx), to.x, to.y, to.z);
-	(void)t;
 }
 
 // Puts `who` just above `to`'s position (it lands next to it; overlapping heroes
@@ -1143,6 +1166,40 @@ static void __fastcall ReadCmdHook(char* hero, void* edx) {
 	if (sg && *(float*)(sg + 0x9C) > 0.0f) *(uint32_t*)(hero + 0x388) |= 4;
 }
 
+// The HUD's action prompt ("Activate" on a launcher...). FUN_0049A1A0, run by
+// every player state of both heroes (thiscall, no arguments), writes the
+// prompt for what its hero is offered into game manager +0xCC bits 4-7 (5 =
+// on a launcher, hero +0x3F0 bit 0x4000; 0xE = nothing). With two player
+// heroes the last one ticked wins: the leader's "nothing" wiped player 2's
+// "Activate" every frame. Within a frame a prompt from either player's hero
+// stays (the leader's first).
+typedef void(__fastcall* PromptFn)(char* hero, void* edx);
+const uintptr_t kHeroPrompt = 0x49A1A0;
+const uint8_t   kHeroPromptPrologue[8] = { 0xA1, 0xF4, 0x21, 0x66, 0x00, 0x56, 0x8B, 0xF1 };
+const unsigned  kPromptNone = 0xE;
+PromptFn g_origPrompt = nullptr;
+struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; } g_prompt;
+
+static void __fastcall PromptHook(char* hero, void* edx) {
+	g_origPrompt(hero, edx);
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	Trio t = GetTrio();
+	if (!gm || !t || !g.p2Joined || g.suspended) return;
+	int idx = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
+	if (idx < 0) return;
+	if (g_prompt.frame != g.frameNo) { g_prompt.frame = g.frameNo; g_prompt.kind = kPromptNone; g_prompt.leader = false; }
+	uint32_t& cc = *(uint32_t*)(gm + 0xCC);
+	unsigned kind = (cc >> 4) & 0xF;
+	bool leads = idx == t.Leader();
+	if (kind != kPromptNone) {
+		if (g_prompt.kind == kPromptNone || (leads && !g_prompt.leader)) { g_prompt.kind = kind; g_prompt.leader = leads; }
+		else cc = (cc & ~0xF0u) | (g_prompt.kind << 4);
+	} else if (g_prompt.kind != kPromptNone) {
+		cc = (cc & ~0xF0u) | (g_prompt.kind << 4);
+	}
+}
+
 // For XXL Inspector's Cheats window (and anything else): 1 = give, 0 = throw away.
 extern "C" __declspec(dllexport) void __cdecl XXLCoopTorchCheat(int give) { CoopTorchCheat(give != 0); }
 
@@ -1238,6 +1295,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 		trio[0x2D] = (uint8_t)other;
 		g.sliced = true;
 		g.sitBefore = Situation(hero);
+		g.f18Before = *F18(hero);
 		// The magic potion's dash: while game manager +0x5C bit 19 is up, every
 		// player-driven hero on the ground goes into situation 0x10 (dash), and
 		// only the hero that drank gets the flag (+0x388 bit 0x4000) that ends it.
@@ -1281,14 +1339,27 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			if (g.savedOffer && *(uint32_t*)(trio + 0x4C) == 0) *(uint32_t*)(trio + 0x4C) = g.savedOffer;
 			g.savedOffer = 0;
 			Hero sh = t.GetHero(g.slicedHero);
-			bool startedGroup = sh && Situation(sh) == kSituationGroupAction && g.sitBefore != kSituationGroupAction;
-			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && startedGroup) {
+			uint8_t sitNow = Situation(sh);
+			bool startedGroup = sh && sitNow == kSituationGroupAction && g.sitBefore != kSituationGroupAction;
+			// Talking to a Roman agent (X on the spy: situation 09, which sends the
+			// spy 0x5139 and the trio 0x48BA, then runs the dialogue from this
+			// hero's own player state). Left the companion, the cutscene made it
+			// the AI companion, which ended that state, and the dialogue never went
+			// on (level 3 sector 2).
+			bool startedTalk = sh && sitNow == kSituationTalk && g.sitBefore != kSituationTalk;
+			// Getting on a machine (X at a machinegun: trio 0x4809, mode 2) -- the
+			// trio's mode events act on the leader, and back as the companion the
+			// hero was made the AI companion of that mode, unable to shoot (level 3
+			// sector 6).
+			uint8_t modeNow = sh ? HeroMode(*F18(sh)) : 0;
+			bool startedMode = sh && HeroModePlayable(g.f18Before) && (modeNow == 1 || modeNow == 2);
+			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && (startedGroup || startedTalk || startedMode)) {
 				// It started a group action (a launcher, a lifter): that sequence
 				// asks the trio for its leader all along, outside this tick too --
 				// with the other hero still leading it kept putting that one on
 				// the activator's spot. The hero that started it leads from now.
-				Log("coop: %s started a group action while not leading -- it leads until it is over",
-				    HeroName(g.slicedHero));
+				Log("coop: %s started %s while not leading -- it leads until it is over", HeroName(g.slicedHero),
+				    startedTalk ? "a Roman agent's dialogue" : startedMode ? "a machine (mode change)" : "a group action");
 				g.groupTookLead = g.slicedHero;
 				g.groupPrevLeader = g.savedLeader;
 			} else if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
@@ -1453,6 +1524,8 @@ void CoopInit() {
 	              "hero take press (fire cheat)");
 	InstallDetour(kReadCommandBlock, (void*)ReadCmdHook, (void**)&g_origReadCmd, kReadCmdPrologue,
 	              sizeof(kReadCmdPrologue), "hero potion flag (Obelix's potion)");
+	InstallDetour(kHeroPrompt, (void*)PromptHook, (void**)&g_origPrompt, kHeroPromptPrologue,
+	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");
 	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");

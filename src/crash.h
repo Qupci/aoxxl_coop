@@ -18,3 +18,5 @@ void StallRegisterGameThread();
 // [ignoreLo, ignoreHi) are not logged.
 #include <cstdint>
 void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t ignoreHi);
+// Every instruction that reads or writes the byte at `addr`, logged once each.
+void WatchBytesRW(const void* addr);

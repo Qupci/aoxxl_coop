@@ -96,6 +96,10 @@ bool LifePos(int* life, bool isGroup, Vector3* out) {
 	if (!isGroup) {
 		if (*(uintptr_t*)owner == kHudHookVtbl) return false;
 		if (*(uintptr_t*)owner == kClueManVtbl) {
+			// Spawned, the spy offers its talk (trio 0x511F) to a leader within +0x70
+			// of where it stands -- which after a first dialogue can be far from its
+			// spot (level 4 sector 2): the hero nearest the spy itself is asked.
+			if (NodePos(*(void**)(owner + 0x10), out)) return true;
 			const float* p = (const float*)(owner + 0x12C);
 			if (!std::isfinite(p[0]) || !std::isfinite(p[1]) || !std::isfinite(p[2])) return false;
 			*out = Vector3(p[0], p[1], p[2]);
@@ -108,12 +112,63 @@ bool LifePos(int* life, bool isGroup, Vector3* out) {
 	return false;
 }
 
+int GroupSwitchTarget(unsigned ev);
+bool GroupMessagesTrio(unsigned ev);
+
+// Plain pressure plates (CKHkPressionStone, flags +8: bit 0x10 "activatable by
+// hero" -- pressed while the object under the trio leader's feet, trio vf29, is
+// the plate's +0x28 --, bit 0x40 by a pushed object) answer either player's
+// hero: ticked as usual when the leader is on it, otherwise with the
+// non-leading player's hero posing as the leader (level 3 sector 1's plate
+// stayed up under player 2's Obelix). Plates whose events (+0x30, +0x32) talk
+// to the trio -- the blue circles: "switch to Obelix, Asterix waits here" --
+// keep to the real leader, as above.
+bool PlateForEither(char* plate) {
+	if (!(*(uint32_t*)(plate + 8) & 0x10)) return false;
+	unsigned evs[2] = { *(uint16_t*)(plate + 0x30), *(uint16_t*)(plate + 0x32) };
+	for (unsigned ev : evs)
+		if (GroupMessagesTrio(ev)) return false;
+	return true;
+}
+
+volatile long g_p2Plates = 0;
+char* g_plateLogged = nullptr;
+
+void TickPlate(int* life, void* dt, char* plate, Trio t) {
+	TickFn tick = (TickFn)(*(void***)life)[17];
+	int nl = CoopNonLeaderPlayer();
+	typedef int(__fastcall* GroundFn)(void* trio, void* edx);
+	GroundFn ground = (GroundFn)(*(void***)t.raw())[29];
+	if (nl < 0 || CoopHeroHeld(nl) || ground(t.raw(), nullptr) == *(int*)(plate + 0x28)) {
+		tick(life, nullptr, dt);
+		return;
+	}
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	tr[0x2C] = (uint8_t)nl;
+	tr[0x2D] = leader;
+	bool on = ground(t.raw(), nullptr) == *(int*)(plate + 0x28);
+	tick(life, nullptr, dt);
+	if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
+	if (on) {
+		InterlockedIncrement(&g_p2Plates);
+		if (g_plateLogged != plate) {
+			g_plateLogged = plate;
+			Log("proximity: pressure plate %p pressed by %s (not leading)", plate, HeroName(nl));
+		}
+	}
+}
+
 void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const Vector3& pos1,
               const Vector3& pos2) {
 	TickFn tick = (TickFn)(*(void***)life)[17];
 	uintptr_t vt = *(uintptr_t*)life;
 	Vector3 at;
 	char* hook = isGroup ? nullptr : *(char**)((char*)life + 0x10);
+	if (hook && *(uintptr_t*)hook == kPressionStoneVtbl && PlateForEither(hook)) {
+		TickPlate(life, dt, hook, t);
+		return;
+	}
 	bool plate = hook && (*(uintptr_t*)hook == kPressionStoneVtbl || *(uintptr_t*)hook == kCorkscrewVtbl);
 	if (vt == kAsterixLifeVtbl || vt == kObelixLifeVtbl || vt == kIdefixLifeVtbl ||
 	    vt == kBonusGroupLife || vt == kTrioGroupLife || vt == kCheckpointLife || plate ||
@@ -462,6 +517,22 @@ int GroupSwitchTarget(unsigned ev) {   // the hero an event's group switches to,
 		if (m == 0x4801 || m == 0x48B8) return HERO_OBELIX;
 	}
 	return -1;
+}
+
+bool GroupMessagesTrio(unsigned ev) {   // does event `ev`'s group message the trio at all?
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return false;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return false;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++)
+		if (objs[first + k] && *(uintptr_t*)objs[first + k] == 0x6256A0) return true;
+	return false;
 }
 
 bool LeverHeldBack(char* receiver, Trio t) {
