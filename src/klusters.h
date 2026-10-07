@@ -10,6 +10,7 @@ void KlusterSetP2Camera();   // once per frame, after player 2's camera moved
 bool KlusterSphereInOtherViews(const float* c, float r);
 // In any player's view (the game camera's too) within maxDist of that camera?
 bool KlusterSphereInAnyView(const float* c, float r, float maxDist);
+bool KlusterSplitUp();   // two views are being culled for
 
 // Diagnostics.
 long KlusterQueries();       // queries answered with both frustums

@@ -546,12 +546,43 @@ bool PatchBeaconCheck() {
 	return true;
 }
 
+// Placed bonuses (helmets on beacons) per frame: pool +0x2C, 25 for level 3's
+// helmets out of 50 bonus objects (the rest serve dropped ones). Two views see
+// about twice as many beacons; with the split screen up the pool may place
+// three quarters as many again (still leaving some for drops), so that player 1's view does not take player 2's share.
+struct PoolCap {
+	char* pool; unsigned saved;
+	explicit PoolCap(void* p) : pool((char*)p), saved(*(unsigned*)((char*)p + 0x2C)) {
+		if (CoopP2Joined() && !CoopSuspended() && KlusterSplitUp()) *(unsigned*)(pool + 0x2C) = saved + saved * 3 / 4;
+	}
+	~PoolCap() { *(unsigned*)(pool + 0x2C) = saved; }
+};
+void LogPoolOnce(void* self) {
+	static void* logged[32];
+	static int nLogged = 0;
+	bool seen = false;
+	for (int i = 0; i < nLogged; i++) seen = seen || logged[i] == self;
+	if (!seen && nLogged < 32) {
+		logged[nLogged++] = self;
+		char* p = (char*)self;
+		int freeN = 0;
+		for (char* b = *(char**)(p + 0x38); b && freeN < 999; b = *(char**)(b + 0x14)) freeN++;
+		Log("proximity: bonus pool %p: handler %u, beacons per frame %u, free %d", self, *(uint8_t*)(p + 0x28),
+		    *(unsigned*)(p + 0x2C), freeN);
+	}
+}
+
 void __fastcall PoolUpdateHook(void* self, void* edx, void* dt) {
+	LogPoolOnce(self);
+	PoolCap cap(self);
 	g_origPoolUpdate(self, edx, dt);
 	AttractToPlayer2((char*)self);
 }
 
+void LogPoolOnce(void* self);
 void __fastcall AsterixPoolUpdateHook(void* self, void* edx, void* dt) {
+	LogPoolOnce(self);
+	PoolCap cap(self);
 	g_origAsterixPoolUpdate(self, edx, dt);
 	AttractToPlayer2((char*)self);
 }

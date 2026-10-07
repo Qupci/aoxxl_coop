@@ -1013,3 +1013,22 @@ InitStateTables vs Obelix's FUN_004A69F0) -- Obelix has no third jump state/anim
 * **Beacon klusters**: cameras' rankings interleaved (helmet pool capacity).
 * **Tools**: autotest PLACEAT/GLIDEAT, S_NEAROBJ, S_WATCHRW (read/write HW watch), S_INPUTDUMP,
   S_FINDGROUPS/S_WATCHGROUP2, env XXL_LOGFLAGS=1/2 (every flagged event), stream-start backtrace.
+
+### Round 22 (2026-10-07)
+* **Twister for both**: the attack chooser `FUN_00494DB0` (thiscall(current), ret 4) copies the
+  leader's Twister (state 9/10 at hero `+0x135`, table `+0x130`) only in the AI variant. Hooked:
+  a player's hero on the ground and not attacking copies the other player's freshly started Twister
+  (`FUN_004963D0` → 9 or 10); a copied Twister is never copied back. Fusion input still unknown
+  (X with both spinning did nothing in autotests, single player included).
+* **Reinforcements** (`FUN_00530060`, thiscall(out), ret 4, from squad vf37): spawn point = camera
+  service `+0x5B0` minus `+0x15C` plus random × `+0x144`, dropped on the ground, must be inside the
+  squad box and reachable. Squads run for the non-leader now use that player's camera (OtherViewMatrix);
+  points within 40 units in any player's frustum are refused (retried next frame). Squad member
+  groups (squad `+0x144`, 0x1C each): `+0x11` alive, `+0x15` fallen awaiting replacement, `+0x16`
+  spawned, `+0x18` budget.
+* **Helmet pools**: CKGrpBonusPool `+0x28` handler, `+0x2C` beacons placed per frame (level 3
+  helmets: 25 of 50 objects; the rest for drops), free list `+0x38` (via `+0x14`). With the split
+  screen up the cap is raised by 3/4; kluster ranking now balances beacons (entry `+0xC` count) per
+  camera. Far helmets can still drop out when both views see many nearer ones (capacity).
+* Diagnostics: env XXL_KLOG="x,z" (kluster list per handler near a point), XXL_LOGTRIO (single
+  player trio events), autotest S_P1COMBO (P1 combo action), S_WATCHENEMIES.

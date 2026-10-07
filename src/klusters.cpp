@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -161,21 +162,72 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 		}
 	}
 	if (nf) {
-		// Rank per camera, then each kluster's best interleaved position:
-		// rank * cameras + camera.
+		// Rank per camera, then merge the rankings so every camera gets the same
+		// number of objects (a kluster entry counts its beacons at +0xC): the next
+		// place goes to the camera that has had the fewest so far.
 		const int cams = kViews + 1;
 		for (int i = 0; i < nf; i++) fr[i] = 0xFFFFFFFFu;
-		static int order[kMaxFair];
+		static int order[kViews + 1][kMaxFair];
+		int m[kViews + 1] = {}, at[kViews + 1] = {};
+		unsigned given[kViews + 1] = {};
 		for (int cam = 0; cam < cams; cam++) {
-			int m = 0;
-			for (int i = 0; i < nf; i++) if (fd[i][cam] < 1e29f) order[m++] = i;
-			std::sort(order, order + m, [cam](int a, int b) { return fd[a][cam] < fd[b][cam]; });
-			for (int rank = 0; rank < m; rank++) {
-				uint32_t pos = (uint32_t)rank * cams + cam;
-				if (pos < fr[order[rank]]) fr[order[rank]] = pos;
+			for (int i = 0; i < nf; i++) if (fd[i][cam] < 1e29f) order[cam][m[cam]++] = i;
+			std::sort(order[cam], order[cam] + m[cam], [cam](int a, int b) { return fd[a][cam] < fd[b][cam]; });
+		}
+		for (uint32_t pos = 0;; pos++) {
+			int best = -1;
+			for (int cam = 0; cam < cams; cam++) {
+				while (at[cam] < m[cam] && fr[order[cam][at[cam]]] != 0xFFFFFFFFu) at[cam]++;
+				if (at[cam] < m[cam] && (best < 0 || given[cam] < given[best])) best = cam;
 			}
+			if (best < 0) break;
+			int i = order[best][at[best]++];
+			fr[i] = pos;
+			unsigned beacons = *(unsigned*)((char*)fe[i] + 0xC);
+			given[best] += beacons ? beacons : 1;
 		}
 		for (int i = 0; i < nf; i++) Insert(inside, fe[i], 0xFFFFFFFFu - fr[i], true);
+	}
+	static const char* klog = getenv("XXL_KLOG");   // diagnostics: "x,z" of a point to follow
+	if (klog && flags == 3) {
+		static float wx = 0, wz = 0;
+		static bool parsed = false;
+		if (!parsed) { parsed = true; sscanf(klog, "%f,%f", &wx, &wz); }
+		static DWORD last[256] = {};
+		if (GetTickCount() - last[handler & 0xFF] > 500) {
+			last[handler & 0xFF] = GetTickCount();
+			int rank = 0, found = -1, total = 0;
+			for (Entry* e = inside; e; e = e->next, rank++) total++;
+			// find the kluster around the point again and report its frustum tests and rank
+			for (char* sector = next(mgr, nullptr, nullptr); sector; sector = next(mgr, nullptr, sector))
+				for (char* k = *(char**)(sector + 0x34); k; k = *(char**)(k + 4)) {
+					const float* c = (const float*)(k + 8);
+					float r = *(const float*)(k + 0x14);
+					float dx = c[0] - wx, dz = c[2] - wz;
+					if (dx * dx + dz * dz > (r + 8) * (r + 8)) continue;
+					signed char idx = *(signed char*)(*(char**)(k + 0x20) + slot);
+					Entry* e = idx == -1 ? nullptr : (Entry*)(*(char**)(k + 0x1C) + idx * 0x18);
+					if (!e) continue;
+					int pos = -1, i = 0;
+					for (Entry* x = inside; x; x = x->next, i++) if (x == e) pos = i;
+					found = pos;
+					Log("klusters: handler %d: kluster (%.0f %.0f %.0f r%.0f) entry %p in game view %d, other %d/%d, rank %d of %d",
+					    handler & 0xFF, c[0], c[1], c[2], r, e, InFrustum(svc + 0x500, c, r), g_viewOn[0] && InFrustum(g_fakeSvc[0] + 0x500, c, r),
+					    g_viewOn[1] && InFrustum(g_fakeSvc[1] + 0x500, c, r), pos, total);
+				}
+			(void)found;
+			char buf[512];
+			int k2 = sprintf(buf, "klusters: handler %d list:", handler & 0xFF);
+			for (Entry* x = inside; x && k2 < 470; x = x->next) {
+				int fi = -1;
+				for (int i = 0; i < nf; i++) if (fe[i] == x) fi = i;
+				k2 += sprintf(buf + k2, " %u", *(unsigned*)((char*)x + 0xC));
+				if (fi >= 0)
+					for (int cam = 0; cam < kViews + 1; cam++)
+						if (fd[fi][cam] < 1e29f) k2 += sprintf(buf + k2, "%c%.0f", "GPQ"[cam], fd[fi][cam]);
+			}
+			Log("%s", buf);
+		}
 	}
 	if (outside) *outside = out;
 	return inside;
@@ -207,6 +259,8 @@ bool KlusterSphereInOtherViews(const float* c, float r) {
 		if (g_viewOn[v] && InFrustum(g_fakeSvc[v] + 0x500, c, r)) return true;
 	return false;
 }
+
+bool KlusterSplitUp() { return g_p2Planes && SplitActive(); }
 
 bool KlusterSphereInAnyView(const float* c, float r, float maxDist) {
 	CKYellowPages* yp = YellowPages();
