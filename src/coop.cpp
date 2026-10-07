@@ -1268,6 +1268,63 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	}
 }
 
+// The Twister for both. A hero's attack state machine (table +0x130, current
+// +0x135) takes its next state from FUN_00494DB0 (thiscall, the current state,
+// ret 4). In the AI variant it copies the leader's Twister (states 9 / 10, from
+// FUN_004963D0: 10 with Twister Fusion learned) -- in single player the
+// companion always spins along, and the two can fuse. A player-driven partner
+// never did. Now either player's Twister starts the other player's hero
+// spinning too, when it is on the ground and not attacking.
+typedef char(__fastcall* ChooseAttackFn)(char* hero, void* edx, int current);
+const uintptr_t kChooseAttack = 0x494DB0;
+const uint8_t   kChooseAttackPrologue[8] = { 0x53, 0x56, 0x8B, 0xF1, 0xF6, 0x46, 0x18, 0x01 };
+ChooseAttackFn g_origChooseAttack = nullptr;
+
+static bool Twisting(Hero h) {
+	uint8_t s = *(uint8_t*)(h.raw() + 0x135);
+	return s == 9 || s == 10;
+}
+
+// Only a Twister that just started, and not one that was itself copied: when
+// the first one ends, the other must not start it again (and so on forever).
+struct TwistTrack { bool on = false, copied = false; DWORD since = 0; } g_twist[HERO_COUNT];
+
+static void TrackTwisters(Trio t) {
+	const int both[2] = { HERO_ASTERIX, HERO_OBELIX };
+	for (int i : both) {
+		Hero h = t.GetHero(i);
+		bool on = h && Twisting(h);
+		if (on && !g_twist[i].on) g_twist[i].since = GetTickCount();
+		if (!on) g_twist[i].copied = false;
+		g_twist[i].on = on;
+	}
+}
+
+static char __fastcall ChooseAttackHook(char* hero, void* edx, int current) {
+	char next = g_origChooseAttack(hero, edx, current);
+	if (!g.p2Joined || g.suspended || next == 9 || next == 10) return next;
+	Trio t = GetTrio();
+	if (!t) return next;
+	int me = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
+	if (me < 0 || g.held[me]) return next;
+	int mateIdx = me == g.p1Hero ? g.p2Hero : g.p1Hero;
+	Hero mate = t.GetHero(mateIdx);
+	TrackTwisters(t);
+	if (g_twist[mateIdx].copied || GetTickCount() - g_twist[mateIdx].since > 400) return next;
+	uint8_t cur = (uint8_t)current;
+	bool free = cur == 0 || cur == 1 || cur == 4 || cur == 6 || cur == 0xFF;
+	auto busyBody = [](Hero h) { uint8_t b = *(uint8_t*)(h.raw() + 0x38E) & 0x3F; return b == 0x25 || b == 0x26 || b == 0x27; };
+	if (!mate || !Twisting(mate) || !free || Situation(Hero(t.GetHero(me))) != 0 || (uint8_t)next != cur ||
+	    busyBody(mate) || busyBody(t.GetHero(me)))
+		return next;
+	typedef char(__fastcall* TwisterFn)(char* hero, void* edx);
+	char twist = ((TwisterFn)0x4963D0)(hero, nullptr);
+	g_twist[me].copied = true;
+	Log("coop: %s spins along with %s's Twister (attack state %d)", HeroName(me),
+	    HeroName(me == g.p1Hero ? g.p2Hero : g.p1Hero), twist);
+	return twist;
+}
+
 // For XXL Inspector's Cheats window (and anything else): 1 = give, 0 = throw away.
 extern "C" __declspec(dllexport) void __cdecl XXLCoopTorchCheat(int give) { CoopTorchCheat(give != 0); }
 // Every combo learned and the combo bar full (Inspector's Cheats window).
@@ -1487,7 +1544,15 @@ int g_eventDepth = 0;
 
 int CoopBeforeTrioEvent(int ev, void* caller) {
 	InterlockedIncrement(&g_hookCounters.trioEvents);
-	if (!g.p2Joined) return 0;
+	if (!g.p2Joined) {
+		static const bool logTrio = getenv("XXL_LOGTRIO") != nullptr;   // diagnostics: single player too
+		static int last = -1;
+		if (logTrio && (ev & 0xFFFF) != last && ((ev >> 8) & 0xFF) != 0x51) {
+			last = ev & 0xFFFF;
+			Log("coop: (single player) trio event %04X from %p", ev & 0xFFFF, caller);
+		}
+		return 0;
+	}
 	ev &= 0xFFFF;
 	static int lastEv = -1;
 	static DWORD lastEvAt = 0;
@@ -1598,7 +1663,9 @@ void CoopInit() {
 	InstallDetour(kReadCommandBlock, (void*)ReadCmdHook, (void**)&g_origReadCmd, kReadCmdPrologue,
 	              sizeof(kReadCmdPrologue), "hero potion flag (Obelix's potion)");
 	InstallDetour(kHeroPrompt, (void*)PromptHook, (void**)&g_origPrompt, kHeroPromptPrologue,
-	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");	PadsInit();
+	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");
+	InstallDetour(kChooseAttack, (void*)ChooseAttackHook, (void**)&g_origChooseAttack, kChooseAttackPrologue,
+	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");
 }

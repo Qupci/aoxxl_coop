@@ -20,7 +20,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -854,6 +854,31 @@ const Step kMusic5O[] = {
 	END(16000),
 };
 
+// twistsp: single player -- player 1's Asterix does the Twister (combo 4),
+// the AI companion is watched; then X (fusion?) with them together.
+const Step kTwistSP[] = {
+	MARK(0, "baseline"), { 500, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 600, S_WATCHRW, HERO_OBELIX, 0xE5, 0, 1, 0, "obelix body writes" },
+	{ 3500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SHOT(4500, "twistsp_1"),
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6100, 0, 0, 0, "p1 release"),
+	SHOT(7000, "twistsp_2"),
+	SHOT(7000, "twistsp_3"),
+	END(14000),
+};
+// twistco: the same with player 2 joined (player 1 does it).
+const Step kTwistCo[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 1500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SHOT(2500, "twistco_1"),
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4100, 0, 0, 0, "p1 release"),
+	SHOT(5000, "twistco_2"),
+	SHOT(7000, "twistco_3"),
+	END(14000),
+};
+
 const Step kInputDump[] = {
 	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
 	END(1000),
@@ -1463,6 +1488,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("group38", kGroup38),
 	SCENARIO("music5l", kMusic5L),
 	SCENARIO("camp2", kCamp2),
+	SCENARIO("twistsp", kTwistSP),
+	SCENARIO("twistco", kTwistCo),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1502,6 +1529,7 @@ struct AutotestState {
 	int   forceReverts = 0;
 
 	bool     p1Active = false;
+	int      p1Combo = -1;          // P1COMBO: combo k's action for player 1 next frame
 	PadState p1;
 	uint16_t p1Prev = 0;
 	PadState vpad[kMaxPads];
@@ -1958,6 +1986,13 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_P1COMBO:
+		if (s.a < 0) { CombosCheat(); Log("autotest: combo cheat"); break; }
+		at.p1Active = true;
+		at.p1.connected = true;
+		at.p1Combo = s.a;
+		Log("autotest: player 1 combo %d", s.a);
+		break;
 	case S_WATCHGROUP2: {   // write watch on the flag bytes of event groups a and b
 		CKYellowPages* yp = YellowPages();
 		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
@@ -2017,6 +2052,12 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		if (s.x == 1) {   // writes only, with stacks
+			const void* w[1] = { h.raw() + s.b };
+			WatchBytes(w, 1, 0, 0);
+			Log("autotest: watching writes to %s +%03X", HeroName(s.a), s.b);
+			break;
+		}
 		WatchBytesRW(h.raw() + s.b);
 		Log("autotest: watching every access to %s +%03X", HeroName(s.a), s.b);
 		break;
@@ -2664,6 +2705,10 @@ void InjectP1() {
 	BuildActionsFromPad(at.p1, tmp, n);
 	for (int i = 0; i < n; i++)
 		if (tmp[i]) values[i] = tmp[i];
+	if (at.p1Combo >= 0) {   // a combo's action (value numActions + k) for one frame
+		values[im.NumActions() + at.p1Combo] = 0xFF;
+		at.p1Combo = -1;
+	}
 }
 
 } // namespace
