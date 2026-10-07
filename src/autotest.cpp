@@ -942,6 +942,87 @@ const Step kTwistCo2[] = {
 	END(16000),
 };
 
+// boat49 (-Level 4): player 2's Obelix (not leading) walks up to sector 9's
+// boat (-164.7 6.0 -642.2); he must not be sent into the boat's position.
+const Step kBoat49[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 9),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -164.66f, 6.6f, -640.0f),
+	PLACEAT(3200, HERO_OBELIX, -164.66f, 6.6f, -642.6f),
+	{ 3300, S_WATCHRW, HERO_OBELIX, 0x18, 0, 1, 0, "obelix control writes" },
+	GLIDEAT(4000, HERO_OBELIX, -164.4f, 6.2f, -651.6f, 2500),
+	SHOT(7000, "boat_1"), SHOT(12000, "boat_2"),
+	END(14000),
+};
+// circle45 (-Level 4): player 2's Obelix steps on sector 5's blue circle
+// (-908.1 39.6 -400.6) while Asterix leads.
+const Step kCircle45[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -900.1f, 40.5f, -400.6f), PLACEAT(3000, HERO_OBELIX, -903.1f, 40.5f, -400.6f),
+	{ 3500, S_PLATES, 0, 0, 0, 0, 0, "plates" },
+	GLIDEAT(4000, HERO_OBELIX, -908.1f, 40.2f, -400.59f, 1500),
+	SHOT(7000, "circle_1"), { 8000, S_PLATES, 0, 0, 0, 0, 0, "plates" }, SHOT(12000, "circle_2"),
+	END(14000),
+};
+// launch48 (-Level 4): player 2's Obelix (not leading) starts sector 8's
+// launcher (-990.2 308.2 -981.0); Asterix next to it. Then both walk.
+const Step kLaunch48[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -1003.84f, 269.6f, -988.73f), PLACEAT(3000, HERO_OBELIX, -1008.5f, 270.2f, -990.6f),
+	VPAD(5000, 1, PAD_X, 0, 0, "p2 X"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "launch48_1"), SHOT(20000, "launch48_2"), SHOT(35000, "launch48_3"),
+	P1(36000, 0, 0, 1, "p1 forward"), VPAD(36000, 1, 0, 0, 1, "p2 forward"),
+	P1(38000, 0, 0, 0, "p1 stop"), VPAD(38000, 1, 0, 0, 0, "p2 stop"),
+	SHOT(39000, "launch48_4"),
+	END(40000),
+};
+
+// lifterwait (level 2): player 2's Obelix waits by sector 1's lifter
+// (-746.8 495.9 -991.7) while Asterix stays at the start; teleports logged.
+const Step kLifterWait[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_WATCHRW, HERO_OBELIX, 0, 0, 2, 0, "obelix teleports" },
+	PLACEAT(3500, HERO_OBELIX, -746.8f, 499.5f, -991.7f),
+	VPAD(12000, 1, 0, 1, 0, "p2 walk off"), VPAD(13500, 1, 0, 0, 0, "p2 stop"),
+	SHOT(5000, "lifterwait_1"), SHOT(20000, "lifterwait_2"), SHOT(38000, "lifterwait_3"),
+	END(40000),
+};
+
+// detect58 (-Level 5): sector 8's zones (the lifter trigger near -378.7 17.6 -25.2).
+// lift58o / lift58a (-Level 5): sector 8 -- the hero crosses the lifter
+// trigger (-378.7 17.6 -25.2) along z, then x; o: player 2's Obelix (Asterix
+// stays at the sector's entrance), a: the leader Asterix.
+const Step kLift58O[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -324.78f, 10.3f, 9.6f),
+	PLACEAT(3000, HERO_OBELIX, -378.65f, 18.3f, -40.0f),
+	GLIDEAT(4000, HERO_OBELIX, -378.65f, 18.3f, -10.0f, 3000),
+	GLIDEAT(8000, HERO_OBELIX, -395.0f, 18.3f, -25.24f, 1500),
+	GLIDEAT(10000, HERO_OBELIX, -360.0f, 18.3f, -25.24f, 3000),
+	SHOT(14000, "lift58_1"), SHOT(20000, "lift58_2"),
+	END(22000),
+};
+const Step kLift58A[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, -324.78f, 10.3f, 9.6f),
+	PLACEAT(3000, HERO_ASTERIX, -378.65f, 18.3f, -40.0f),
+	GLIDEAT(4000, HERO_ASTERIX, -378.65f, 18.3f, -10.0f, 3000),
+	GLIDEAT(8000, HERO_ASTERIX, -395.0f, 18.3f, -25.24f, 1500),
+	GLIDEAT(10000, HERO_ASTERIX, -360.0f, 18.3f, -25.24f, 3000),
+	SHOT(14000, "lift58_1"), SHOT(20000, "lift58_2"),
+	END(22000),
+};
+const Step kDetect58[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	{ 3000, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	END(3500),
+};
+
 const Step kInputDump[] = {
 	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
 	END(1000),
@@ -1554,6 +1635,13 @@ const Scenario kScenarios[] = {
 	SCENARIO("twistsp", kTwistSP),
 	SCENARIO("twistco", kTwistCo),
 	SCENARIO("twistco2", kTwistCo2),
+	SCENARIO("boat49", kBoat49),
+	SCENARIO("lifterwait", kLifterWait),
+	SCENARIO("detect58", kDetect58),
+	SCENARIO("lift58o", kLift58O),
+	SCENARIO("lift58a", kLift58A),
+	SCENARIO("circle45", kCircle45),
+	SCENARIO("launch48", kLaunch48),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),
@@ -2165,6 +2253,11 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		if (s.x == 2) {   // teleports of the hero (x jumps by more than 10)
+			WatchFloatJump(&h.Pos().x);
+			Log("autotest: watching %s's teleports", HeroName(s.a));
+			break;
+		}
 		if (s.x == 1) {   // writes only, with stacks
 			const void* w[1] = { h.raw() + s.b };
 			WatchBytes(w, 1, 0, 0);

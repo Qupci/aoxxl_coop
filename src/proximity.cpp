@@ -45,6 +45,7 @@ const uintptr_t kPressionStoneVtbl = 0x628EE4;   // CKHkPressionStone (2,21)
 // switched when Obelix stepped on it and left Asterix waiting off the platform
 // -- a softlock. It keeps to the real leader too.
 const uintptr_t kCorkscrewVtbl = 0x628E0C;       // CKHkCorkscrew (2,44)
+const uintptr_t kBoatVtbl = 0x627EB8;            // CKHkBoat (2,39)
 // The spies (CKHkClueMan, 2,161). Their tick (vf15, 0x4B8FB0) spawns the spy
 // (FUN_004B12F0, node at hook +0x10) when the trio leader comes within +0x68
 // of its spot (+0x12C/+0x130/+0x134 x/y/z) and removes it (FUN_004B1790) when
@@ -117,6 +118,7 @@ bool LifePos(int* life, bool isGroup, Vector3* out) {
 
 int GroupSwitchTarget(unsigned ev);
 bool GroupMessagesTrio(unsigned ev);
+bool GroupCommandsTrio(unsigned ev);
 
 // Plain pressure plates (CKHkPressionStone, flags +8: bit 0x10 "activatable by
 // hero" -- pressed while the object under the trio leader's feet, trio vf29, is
@@ -759,6 +761,28 @@ bool GroupMessagesTrio(unsigned ev) {   // does event `ev`'s group message the t
 	return false;
 }
 
+// Does event `ev`'s group switch the trio's leader or order the companion to
+// wait (0x4800/0x4801/0x48B7/0x48B8, 0x4802, 0x4849)?
+bool GroupCommandsTrio(unsigned ev) {
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return false;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return false;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	uint16_t* msgs = *(uint16_t**)(es + 0x14);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++) {
+		if (!objs[first + k] || *(uintptr_t*)objs[first + k] != 0x6256A0) continue;
+		unsigned m = msgs[first + k];
+		if (m == 0x4800 || m == 0x4801 || m == 0x48B7 || m == 0x48B8 || m == 0x4802 || m == 0x4849) return true;
+	}
+	return false;
+}
+
 bool LeverHeldBack(char* receiver, Trio t) {
 	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
 	int lead = t.Leader();
@@ -973,6 +997,10 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 			k++;
 			unsigned obj = *(uint16_t*)(e + 2);
 			bool keep = (obj == (unsigned)ia || obj == (unsigned)io) && !(l.level && !(e[5] & 1));
+			// Zones that switch the trio's leader ("switch to Asterix, Obelix waits there"
+			// -- level 4 sector 5's blue circle, bound to Asterix) mean the hero
+			// they are bound to: set off by the other one they softlocked.
+			if (keep && GroupCommandsTrio(*(uint16_t*)(e + 6))) keep = false;
 			if (keep && (e[4] & 1)) any = true;
 			else e[4] &= ~1;
 		}

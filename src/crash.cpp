@@ -115,6 +115,8 @@ const void* volatile g_watchAddr[4] = {};
 volatile long g_watchCount = 0, g_watchPending = 0, g_watchHits = 0;
 uintptr_t g_watchIgnoreLo = 0, g_watchIgnoreHi = 0;
 volatile long g_watchReads = 0;   // R/W = 11: reads too (WatchBytesRW)
+volatile long g_watchJump = 0;    // WatchFloatJump
+float g_watchLast = 0;
 
 LONG CALLBACK WatchHandler(EXCEPTION_POINTERS* ep) {
 	if (ep->ExceptionRecord->ExceptionCode != EXCEPTION_SINGLE_STEP) return EXCEPTION_CONTINUE_SEARCH;
@@ -123,6 +125,18 @@ LONG CALLBACK WatchHandler(EXCEPTION_POINTERS* ep) {
 	if (!hit) return EXCEPTION_CONTINUE_SEARCH;
 	c->Dr6 = 0;
 	uintptr_t eip = c->Eip;
+	if (g_watchJump) {   // a float that moves by more than 10 at once
+		float now = *(const float*)g_watchAddr[0];
+		float d = now - g_watchLast;
+		g_watchLast = now;
+		if ((d > 10.0f || d < -10.0f) && InterlockedIncrement(&g_watchHits) < 50) {
+			char where[96];
+			Describe(eip, where, sizeof(where));
+			Log("watch: %p jumped by %.1f to %.1f, by the instruction before %s", g_watchAddr[0], d, now, where);
+			LogStack("watch", c->Esp);
+		}
+		return EXCEPTION_CONTINUE_EXECUTION;
+	}
 	if (g_watchReads) {   // read/write watch: each instruction once, no stack
 		static uintptr_t seen[128];
 		static int nSeen = 0;
@@ -179,6 +193,16 @@ void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t i
 	g_watchIgnoreHi = ignoreHi;
 	g_watchCount = n < 4 ? n : 4;
 	g_watchReads = 0;
+	g_watchJump = 0;
+	g_watchPending = 1;
+}
+
+void WatchFloatJump(const float* addr) {
+	g_watchAddr[0] = addr;
+	g_watchLast = *addr;
+	g_watchCount = 1;
+	g_watchReads = 0;
+	g_watchJump = 1;
 	g_watchPending = 1;
 }
 
@@ -188,6 +212,7 @@ void WatchBytesRW(const void* addr) {
 	g_watchAddr[0] = addr;
 	g_watchCount = 1;
 	g_watchReads = 1;
+	g_watchJump = 0;
 	g_watchPending = 1;
 }
 
