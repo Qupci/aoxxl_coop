@@ -4,6 +4,7 @@
 #include "detour.h"
 #include "klusters.h"
 #include "log.h"
+#include "p2cam.h"
 #include "trio.h"
 
 #include <cmath>
@@ -243,6 +244,62 @@ const size_t    kEnemyLifeSlot = 17;
 EnemyTickFn g_origEnemyTick = nullptr;
 volatile long g_p2Squads = 0, g_keptSquads = 0;
 
+// Reinforcements. A squad replaces its fallen Romans (vf37) at a point from
+// FUN_00530060 (thiscall, out position, ret 4): just behind the game camera --
+// camera service +0x5B0 position, minus +0x15C, plus a random share of +0x144
+// sideways -- dropped onto the ground, inside the squad's box, reachable. With
+// player 2's Obelix fighting alone, the game camera (player 1's) was far away:
+// the point was never in the box and nobody came back (level 4 sector 1). And
+// right behind player 1's camera is often in plain view of player 2's.
+// For a squad run for the non-leading player the point is taken behind that
+// player's own camera; any point a player can see is turned down (the squad
+// asks again next frame).
+typedef char(__fastcall* SpawnPointFn)(char* squad, void* edx, float* out);
+const uintptr_t kSpawnPoint = 0x530060;
+const uint8_t   kSpawnPointPrologue[7] = { 0x6A, 0xFF, 0x68, 0xA8, 0xFE, 0x61, 0x00 };
+SpawnPointFn g_origSpawnPoint = nullptr;
+bool g_squadForNonLeader = false;   // inside EnemyTickHook's non-leader pass
+volatile long g_spawnsMoved = 0, g_spawnsHidden = 0;
+
+char __fastcall SpawnPointHook(char* squad, void* edx, float* out) {
+	CKYellowPages* yp = YellowPages();
+	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	if (!CoopP2Joined() || CoopSuspended() || !svc) return g_origSpawnPoint(squad, edx, out);
+	float saved[9];
+	float m[16];
+	bool swapped = false;
+	if (g_squadForNonLeader && OtherViewMatrix(m)) {
+		float* pos = (float*)(svc + 0x5B0);
+		float* back = (float*)(svc + 0x15C);
+		float* side = (float*)(svc + 0x144);
+		memcpy(saved, pos, 12); memcpy(saved + 3, back, 12); memcpy(saved + 6, side, 12);
+		const float* look = (const float*)(svc + 0x5BC);
+		float fwd[3] = { look[0] - pos[0], look[1] - pos[1], look[2] - pos[2] };
+		float sgn = back[0] * fwd[0] + back[1] * fwd[1] + back[2] * fwd[2] >= 0 ? 1.0f : -1.0f;
+		float lb = sqrtf(back[0] * back[0] + back[1] * back[1] + back[2] * back[2]);
+		float ls = sqrtf(side[0] * side[0] + side[1] * side[1] + side[2] * side[2]);
+		for (int k = 0; k < 3; k++) {
+			pos[k] = m[12 + k];
+			back[k] = sgn * lb * m[8 + k];
+			side[k] = ls * m[k];
+		}
+		swapped = true;
+	}
+	char ok = g_origSpawnPoint(squad, edx, out);
+	if (swapped) {
+		memcpy(svc + 0x5B0, saved, 12); memcpy(svc + 0x15C, saved + 3, 12); memcpy(svc + 0x144, saved + 6, 12);
+		if (ok && InterlockedIncrement(&g_spawnsMoved) % 20 == 1)
+			Log("proximity: Roman reinforcement for %s's fight behind that player's camera (%.1f %.1f %.1f)",
+			    HeroName(GetTrio() ? GetTrio().Leader() : -1), out[0], out[1], out[2]);   // posing as the leader
+	}
+	if (ok && KlusterSphereInAnyView(out, 1.5f, 40.0f)) {
+		if (InterlockedIncrement(&g_spawnsHidden) % 60 == 1)
+			Log("proximity: Roman reinforcement point (%.1f %.1f %.1f) in a player's view -- not there", out[0], out[1], out[2]);
+		return 0;
+	}
+	return ok;
+}
+
 bool InSquadBox(const char* sq, const Vector3& p) {
 	const float* f = (const float*)sq;
 	return f[0x4A] < p.x && p.x <= f[0x47] && f[0x4C] < p.z && p.z <= f[0x49] && f[0x4B] < p.y && p.y <= f[0x48];
@@ -280,7 +337,9 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			tr[0x2C] = (uint8_t)nl;
 			tr[0x2D] = leader;
 			*(uint32_t*)(tr + 0x3F4) &= ~1u;   // the trio's enemy cache is per leader
+			g_squadForNonLeader = true;
 			((DtFn)vt[31])(sq, nullptr, dt);
+			g_squadForNonLeader = false;
 			if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
 			*(uint32_t*)(tr + 0x3F4) &= ~1u;
 			if (InterlockedIncrement(&g_p2Squads) % 300 == 1)
@@ -925,6 +984,8 @@ bool ProximityInstallHooks() {
 	                      (void**)&g_origEnemyTick, "CKGrpEnemyLife::tick");
 	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,
 	                      (void**)&g_origDetectTick, "CKSrvDetection::tick");
+	ok &= InstallDetour(kSpawnPoint, (void*)SpawnPointHook, (void**)&g_origSpawnPoint, kSpawnPointPrologue,
+	                    sizeof(kSpawnPointPrologue), "Roman reinforcement point (both players' cameras)");
 	ok &= InstallDetour(kFightMode, (void*)FightHook, (void**)&g_origFight, kFightModePrologue,
 	                    sizeof(kFightModePrologue), "trio fight mode (music) for the non-leader");
 	ok &= InstallDetour(kFlagEvent, (void*)FlagEventHook, (void**)&g_origFlagEvent, kFlagEventPrologue,

@@ -208,6 +208,20 @@ bool KlusterSphereInOtherViews(const float* c, float r) {
 	return false;
 }
 
+bool KlusterSphereInAnyView(const float* c, float r, float maxDist) {
+	CKYellowPages* yp = YellowPages();
+	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	auto closeTo = [&](const float* cam) {
+		float dx = c[0] - cam[0], dy = c[1] - cam[1], dz = c[2] - cam[2];
+		return dx * dx + dy * dy + dz * dz < maxDist * maxDist;
+	};
+	if (svc && closeTo((const float*)(svc + 0x5B0)) && InFrustum(svc + 0x500, c, r)) return true;
+	if (!g_p2Planes || !SplitActive()) return false;
+	for (int v = 0; v < kViews; v++)
+		if (g_viewOn[v] && closeTo(g_viewPos[v]) && InFrustum(g_fakeSvc[v] + 0x500, c, r)) return true;
+	return false;
+}
+
 long KlusterQueries() { return g_queries; }
 long KlusterP2Only() { return g_p2Only; }
 

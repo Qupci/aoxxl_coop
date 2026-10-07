@@ -20,7 +20,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -879,6 +879,37 @@ const Step kTwistCo[] = {
 	END(14000),
 };
 
+// fight4o / fight4a (-Level 4): the Romans at the start of level 4 (around
+// -299.2 0.6 89.3) fought for 50 s by player 2's Obelix (Asterix stays at the
+// start) / by the leader Asterix (Obelix stays). Potion on (invincible, one
+// hit). Live Romans and squads near the spot are logged.
+#define TAP2(t)  VPAD(t, 1, PAD_X, 0, 0, "p2 X"), VPAD(t + 120, 1, 0, 0, 0, "r")
+#define TAP1(t)  P1(t, PAD_X, 0, 0, "p1 X"), P1(t + 120, 0, 0, 0, "r")
+#define TAPS2(t) TAP2(t), TAP2(t + 500), TAP2(t + 1000), TAP2(t + 1500), TAP2(t + 2000), \
+                 TAP2(t + 2500), TAP2(t + 3000), TAP2(t + 3500), TAP2(t + 4000), TAP2(t + 4500)
+#define TAPS1(t) TAP1(t), TAP1(t + 500), TAP1(t + 1000), TAP1(t + 1500), TAP1(t + 2000), \
+                 TAP1(t + 2500), TAP1(t + 3000), TAP1(t + 3500), TAP1(t + 4000), TAP1(t + 4500)
+const Step kFight4O[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_WATCHENEMIES, 0, 0, 0, -299.16f, 0.57f, "watch romans", 89.27f },
+	PLACEAT(1000, HERO_OBELIX, -299.16f, 1.2f, 89.27f), POTION(1200),
+	TAPS2(3000), TAPS2(8000), TAPS2(13000), TAPS2(18000), TAPS2(23000), POTION(27000),
+	TAPS2(28000), TAPS2(33000), TAPS2(38000), TAPS2(43000), TAPS2(48000),
+	SHOT(53000, "fight4_end"),
+	END(54000),
+};
+const Step kFight4A[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_WATCHENEMIES, 0, 0, 0, -299.16f, 0.57f, "watch romans", 89.27f },
+	PLACEAT(1000, HERO_ASTERIX, -299.16f, 1.2f, 89.27f), POTION(1200),
+	TAPS1(3000), TAPS1(8000), TAPS1(13000), TAPS1(18000), TAPS1(23000), POTION(27000),
+	TAPS1(28000), TAPS1(33000), TAPS1(38000), TAPS1(43000), TAPS1(48000),
+	SHOT(53000, "fight4_end"),
+	END(54000),
+};
+
 const Step kInputDump[] = {
 	MARK(0, "baseline"), { 500, S_INPUTDUMP, 0, 0, 0, 0, 0, "input" },
 	END(1000),
@@ -1490,6 +1521,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("camp2", kCamp2),
 	SCENARIO("twistsp", kTwistSP),
 	SCENARIO("twistco", kTwistCo),
+	SCENARIO("fight4o", kFight4O),
+	SCENARIO("fight4a", kFight4A),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1543,6 +1576,8 @@ struct AutotestState {
 	char*   watchTorch = nullptr;   // CKHkTorch nearest Asterix, TORCH
 	bool    watchCam = false;       // the game camera (service +0x5B0 pos, +0x5BC look, track), WATCHCAM
 	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
+	bool    watchEnemies = false;   // Romans and squads near enemyPoint, WATCHENEMIES
+	Vector3 enemyPoint;
 	Vector3 beaconPoint;
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
@@ -1675,6 +1710,35 @@ void LogTick(float t) {
 			}
 		} __except (EXCEPTION_EXECUTE_HANDLER) {
 			line.Add(" | probe fault");
+		}
+	}
+	if (at.watchEnemies) {   // live Romans near the point; squads near it (flags, member groups)
+		int live = 0;
+		const int ids[2] = { 93, 148 };
+		for (int id : ids)
+			for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n; i++) {
+				char* e = (char*)GetLvlObject(2, id, i);
+				char* node = e ? *(char**)(e + 0x10) : nullptr;
+				char* fr = node ? *(char**)(node + 4) : nullptr;
+				if (!fr || (*(uint8_t*)(node + 0x10) & 2)) continue;
+				Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+				if ((p - at.enemyPoint).len2() < 30.0f * 30.0f) live++;
+			}
+		line.Add(" | romans near %d", live);
+		for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
+			char* sq = (char*)GetLvlObject(4, 26, i);
+			if (!sq) continue;
+			const float* f = (const float*)sq;
+			Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
+			if ((c - at.enemyPoint).len2() > 60.0f * 60.0f) continue;
+			line.Add(" sq%u f%04X", i, *(uint16_t*)(sq + 0x152));
+			unsigned ng = *(unsigned*)(sq + 0x14C);
+			char* gr = *(char**)(sq + 0x144);
+			for (unsigned g2 = 0; gr && g2 < ng && g2 < 4; g2++) {
+				char* e = gr + g2 * 0x1C;
+				line.Add(" [%u %u %u %u %d]", *(uint8_t*)(e + 0x11), *(uint8_t*)(e + 0x14), *(uint8_t*)(e + 0x15),
+				         *(uint16_t*)(e + 0x16), *(int16_t*)(e + 0x18));
+			}
 		}
 	}
 	if (at.watchBeacons) {   // bonuses the pools placed on beacons: near the watched point / all
@@ -2165,7 +2229,8 @@ void RunStep(const Step& s) {
 	}
 	case S_WATCHCAM: at.watchCam = true; break;
 	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
-	case S_P2LOOK: P2CamLookToward(Vector3(s.x, s.y, s.z)); Log("autotest: player 2's camera turned"); break;
+	case S_WATCHENEMIES: at.watchEnemies = true; at.enemyPoint = Vector3(s.x, s.y, s.z); break;
+	case S_P2LOOK:P2CamLookToward(Vector3(s.x, s.y, s.z)); Log("autotest: player 2's camera turned"); break;
 	case S_HEROFIELDS: {   // movement parameters of both heroes: +0x300..+0x33C and +0x84 speed, +0x388
 		Trio t = GetTrio();
 		for (int h = 0; t && h < 2; h++) {
