@@ -2,6 +2,7 @@
 #include "proximity.h"
 #include "coop.h"
 #include "detour.h"
+#include "klusters.h"
 #include "log.h"
 #include "trio.h"
 
@@ -240,7 +241,7 @@ typedef void(__fastcall* EnemyTickFn)(char* life, void* edx, char* dt);
 const uintptr_t kEnemyLifeVtbl = 0x628938, kEnemyLifeTick = 0x530930, kSquadPrep = 0x52D340;
 const size_t    kEnemyLifeSlot = 17;
 EnemyTickFn g_origEnemyTick = nullptr;
-volatile long g_p2Squads = 0;
+volatile long g_p2Squads = 0, g_keptSquads = 0;
 
 bool InSquadBox(const char* sq, const Vector3& p) {
 	const float* f = (const float*)sq;
@@ -286,7 +287,20 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 				Log("proximity: squad %p active for %s (not leading)", sq, HeroName(nl));
 		} else if (*(uint8_t*)(sq + 0x152) & 2) {
 			((DtFn)vt[31])(sq, nullptr, dt);
-			((VoidFn)vt[35])(sq, nullptr);
+			// vf35 resets an active squad nobody is near once its box is out of the
+			// game camera's frustum (vf34: every Roman back to the pool), so that
+			// they come back later at their spawn markers unseen. Player 2 was
+			// looking right at them: they vanished and popped back in. Kept while
+			// the other player's view has the box in sight.
+			const float* f = (const float*)sq;
+			float c[3] = { (f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f };
+			float hx = (f[0x47] - f[0x4A]) * 0.5f, hy = (f[0x48] - f[0x4B]) * 0.5f, hz = (f[0x49] - f[0x4C]) * 0.5f;
+			if (KlusterSphereInOtherViews(c, sqrtf(hx * hx + hy * hy + hz * hz))) {
+				if (InterlockedIncrement(&g_keptSquads) % 600 == 1)
+					Log("proximity: squad %p kept: out of the game camera's view, in the other player's", sq);
+			} else {
+				((VoidFn)vt[35])(sq, nullptr);
+			}
 		} else {
 			*(float*)(sq + 0x138) += *(float*)(dt + 0xC);
 		}

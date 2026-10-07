@@ -41,7 +41,7 @@ index bdff12e..f00e092 100644
  extern std::map<KClass*, char*> lvlObjectNames[32], gameObjectNames;
  extern uint lvlNumSectors;
 diff --git a/gui.cpp b/gui.cpp
-index 7d018cd..7ee7a77 100644
+index 7d018cd..d875b99 100644
 --- a/gui.cpp
 +++ b/gui.cpp
 @@ -29,6 +29,8 @@ void IGInit()
@@ -53,7 +53,7 @@ index 7d018cd..7ee7a77 100644
  #endif
  	ImGui::StyleColorsClassic();
  }
-@@ -181,6 +183,28 @@ void IGCheats()
+@@ -181,6 +183,38 @@ void IGCheats()
  		ImGui::SameLine();
  		ImGui::Checkbox("Lock", &g_cheat_infinitePotion);
  	}
@@ -78,11 +78,21 @@ index 7d018cd..7ee7a77 100644
 +			if(ImGui::Button("Throw away"))
 +				coopTorch(0);
 +		}
++		typedef void (__cdecl *ft_combos)();
++		static ft_combos coopCombos = 0;
++		static bool lookedUpCombos = false;
++		if(!lookedUpCombos) {
++			lookedUpCombos = true;
++			HMODULE coop = GetModuleHandleA("xxl_coop.asi");
++			if(coop) coopCombos = (ft_combos)GetProcAddress(coop, "XXLCoopCombosCheat");
++		}
++		if(coopCombos && ImGui::Button("All combos + full combo bar"))
++			coopCombos();
 +	}
  			
  	/*if(asterixHook)
  		if(ImGui::Button("Place Asterix at Egypt skip")) {
-@@ -964,7 +988,23 @@ void IGDX9Reset()
+@@ -964,7 +998,23 @@ void IGDX9Reset()
  }
  #endif
  

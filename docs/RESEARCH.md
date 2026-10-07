@@ -976,3 +976,40 @@ Hero_ReadCommandBlock (0x49A350) sets hero +0x388 bit 0x4 (potion) only when the
 (vs 7) and takes no hits (autotests `potionmove`, `hurto`/`hurtop`: 10 hit frames vs 0). The triple
 jump is in Asterix's body-state table (extra states 0x4A3730/0x48D960/0x48DA50, CKHkAsterix_
 InitStateTables vs Obelix's FUN_004A69F0) -- Obelix has no third jump state/animation.
+
+### Round 21 (2026-10-07): full-game issues
+* **Pressure plates** (CKHkPressionStone, flags `+8`): bit `0x10` = activatable by hero (trio vf29 =
+  object under the leader's feet, hero `+0x280`, == plate `+0x28`), bit `0x40` by a pushed object;
+  events `+0x30/+0x32`. Plates whose event groups message the trio stay leader-only (blue circles);
+  the others tick with the non-leader as leader when the leader is not on them.
+* **Non-leader takes the lead** (CoopAfterLifeTick) when its own tick starts a group action (sit 0x0D),
+  a Roman agent's talk (sit 0x09: X on the spy sends the spy 0x5139 and the trio 0x48BA, companion gets
+  AI order 13) or a machine (mode 1/2: machinegun = trio 0x4809, Asterix Life State4). Lead returned
+  when co-op resumes. Cutscene regroup also brings a hero on AI order 13.
+* **Spies**: talk offer (trio 0x511F) to a leader within `+0x70` of the spy node; slicing uses the node
+  once spawned. The "gate" `[[gm+0x18]+0x24]+0x64` is the button prompt's CAnimatedNode, not a gate.
+* **HUD action prompt** ("Activate"): `FUN_0049A1A0` (every player state) writes gm `+0xCC` bits 4-7
+  (5 = on a launcher, hero `+0x3F0` bit 0x4000 from trio 0x5130; 0xE none). Last hero ticked won;
+  now a prompt from either player's hero stays for the frame.
+* **Button prompts on objects**: CKGrpMeca (gm `+0x18`): owner `+0x90`, gm `+0x5C` bit 0, kind gm `+0x68`;
+  objects show them on 0x90D+kind, hide on 0x90A (event sequences).
+* **Merchant**: CKHkAsterixShop (2,172) state `+8` bits 0-2 (trio 0x5123 opens). Menu =
+  `FUN_004BFC50`, input view by name (FUN_00437FF0 on CKInput, name at 0x64F28C; view =
+  `[CKInput+0x40][i]+0x10`, remap at view `+8`); actions 2/0x12 left, 3/0x13 right, 4 buy, 5 back.
+  Purchases: `[gm+0x40]+0x10` bit per item index.
+* **Combos**: CKInput `+0x34` = combo recognizer (vt 0x623F18), run at the end of CKInput::Update
+  (`FUN_004353C0(values, bindings)`, ret 8); writes value `numActions + k`. Heroes' view (trio `+0x28`)
+  maps actions 0x10..0x15 to 59..64. Combos: 0 A A X B (Club, item bit 1), 1 A B X (Power Hammer, 2),
+  3 A A Y B (Mole, 0x10), 4 A X B Y (Twister, 4; Fusion item 8); 2/5 unused by heroes. Needs combo
+  bar `[gm+0x40]+0x10` bit 0x4000 (filled by FUN_0048C860: gm `+0xA4`=`+0xA0`, `+0xC4`). Combos are
+  accepted on the ground (FUN_00494DB0). Dev cheat: gm `+0x5C` bit 7 + gm `+0x408` == 0x24011980
+  (also unlocks menus, not used). Player 2: recognizer run on a deep copy for P2's values.
+* **Fight mode / music**: trio tick `FUN_00481950`: enemy from the leader's enemy cache within trio
+  `+0x400` → music group (trio `+0x40E`+2·id), camera bits, trio `+0x3F4` bit 0x40, `+0x408` refresh,
+  end after `+0x404` s (`+0x40C` group). Now also run for the non-leader first.
+* **Squad reset**: inactive squads out of the game camera frustum (vf35, planes svc `+0x500..+0x540`)
+  are reset (vf34, all Romans back to the pool); kept while the other player's view sees the box.
+  Reinforcements spawning at markers in P2's view: NOT found yet (not vf35, not kluster query).
+* **Beacon klusters**: cameras' rankings interleaved (helmet pool capacity).
+* **Tools**: autotest PLACEAT/GLIDEAT, S_NEAROBJ, S_WATCHRW (read/write HW watch), S_INPUTDUMP,
+  S_FINDGROUPS/S_WATCHGROUP2, env XXL_LOGFLAGS=1/2 (every flagged event), stream-start backtrace.

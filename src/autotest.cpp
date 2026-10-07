@@ -827,6 +827,20 @@ const Step kMusic5L[] = {
 	SHOT(7000, "music_1"),
 	END(16000),
 };
+// camp2 (level 2): player 2's Obelix watches the Roman camp's marker 26
+// (-790.6 508.6 -1078.8) from 14 units; player 1's Asterix at the start
+// walks away from it. Squad resets and Romans near the marker are logged.
+const Step kCamp2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, -778.0f, 509.0f, -1072.0f),
+	{ 2500, S_P2LOOK, 0, 0, 0, -790.6f, 508.6f, "p2 camera at the marker", -1078.8f },
+	SHOT(3000, "camp_0"),
+	P1(3500, 0, -1, 0, "p1 left"), SHOT(6000, "camp_1"), P1(7500, 0, 0, 0, "p1 stop"),
+	{ 8000, S_P2LOOK, 0, 0, 0, -790.6f, 508.6f, "p2 camera at the marker", -1078.8f },
+	SHOT(9000, "camp_2"), SHOT(12000, "camp_3"),
+	END(13000),
+};
 const Step kGroup38[] = {
 	MARK(0, "baseline"), { 500, S_EVGROUP, 0x38, 0, 0, 0, 0, "group 038" }, { 500, S_EVGROUP, 0x76, 0, 0, 0, 0, "group 076" },
 	CINE_LIST(600),
@@ -1448,6 +1462,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("music5o", kMusic5O),
 	SCENARIO("group38", kGroup38),
 	SCENARIO("music5l", kMusic5L),
+	SCENARIO("camp2", kCamp2),
 };
 
 // Fixed spots (level 2), from players' logs.

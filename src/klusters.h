@@ -5,6 +5,9 @@
 
 bool KlusterInstallHooks();
 void KlusterSetP2Camera();   // once per frame, after player 2's camera moved
+// Is the sphere in a view the game camera does not cover (player 2's, or player
+// 1's own while player 2's hero leads)? Same test as the camera service's planes.
+bool KlusterSphereInOtherViews(const float* c, float r);
 
 // Diagnostics.
 long KlusterQueries();       // queries answered with both frustums

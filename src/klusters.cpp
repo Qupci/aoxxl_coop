@@ -201,6 +201,13 @@ void KlusterSetP2Camera() {
 	g_p2Planes = g_viewOn[0] || g_viewOn[1];
 }
 
+bool KlusterSphereInOtherViews(const float* c, float r) {
+	if (!g_p2Planes || !SplitActive()) return false;
+	for (int v = 0; v < kViews; v++)
+		if (g_viewOn[v] && InFrustum(g_fakeSvc[v] + 0x500, c, r)) return true;
+	return false;
+}
+
 long KlusterQueries() { return g_queries; }
 long KlusterP2Only() { return g_p2Only; }
 
