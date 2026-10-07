@@ -18,7 +18,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -722,6 +722,7 @@ const Step kShop[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant (CKHkAsterixShop)" },
 	SHOT(3500, "shop_0"),
 	PROBE(3800, 1),
 	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
@@ -731,6 +732,30 @@ const Step kShop[] = {
 	P1(9000, PAD_B, 0, 0, "p1 B"), P1(9200, 0, 0, 0, "p1 release"),
 	SHOT(10500, "shop_3"),
 	END(11000),
+};
+
+// shopo (level 2): player 2's Obelix (not leading) opens the merchant with X.
+const Step kShopO[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	SHOT(3500, "shopo_0"),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	SHOT(6000, "shopo_1"),
+	VPAD(8000, 1, PAD_A, 0, 0, "p2 A"), VPAD(8200, 1, 0, 0, 0, "p2 release"),
+	SHOT(9500, "shopo_2"),
+	VPAD(10000, 1, 0, 1, 0, "p2 right"), VPAD(10300, 1, 0, 0, 0, "p2 release"),
+	SHOT(11500, "shopo_3"),
+	VPAD(12000, 1, 0, 1, 0, "p2 right"), VPAD(12300, 1, 0, 0, 0, "p2 release"),
+	SHOT(13000, "shopo_4"),
+	VPAD(14000, 1, PAD_X, 0, 0, "p2 X (back)"), VPAD(14200, 1, 0, 0, 0, "p2 release"),
+	SHOT(15500, "shopo_5"),
+	SHOT(17500, "shopo_6"),
+	SHOT(21000, "shopo_7"),
+	VPAD(22000, 1, 0, 0, 1, "p2 forward"), VPAD(23500, 1, 0, 0, 0, "p2 stop"),
+	SHOT(24000, "shopo_8"),
+	END(25000),
 };
 
 const Step kRegions[] = {
@@ -1327,6 +1352,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("catapultp", kCatapultP),
 	SCENARIO("catapulta", kCatapultA),
 	SCENARIO("shop", kShop),
+	SCENARIO("shopo", kShopO),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -1705,6 +1731,41 @@ void RunStep(const Step& s) {
 		if (!lvl) break;
 		Log("autotest: loading sector %d (current %d)", s.a, *(int*)(lvl + 0x24));
 		*(int*)(lvl + 0x34) = s.a;
+		break;
+	}
+	case S_NEAROBJ: {   // hero a put s.x units from the nearest object of class (2, b), facing it
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		unsigned n = GetNumLvlClassInstances(2, s.b);
+		char* best = nullptr;
+		Vector3 bp;
+		float bd = 1e30f;
+		for (unsigned i = 0; i < n; i++) {
+			char* o = (char*)GetLvlObject(2, s.b, i);
+			char* node = o ? *(char**)(o + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+			Log("autotest:   class (2,%d) #%u %p at (%.1f %.1f %.1f)", s.b, i, o, p.x, p.y, p.z);
+			float d = (p - h.Pos()).len2();
+			if (d < bd) { bd = d; best = o; bp = p; }
+		}
+		if (!best) { Log("autotest: no (2,%d) object with a node", s.b); break; }
+		Vector3 dir = h.Pos() - bp;
+		dir.y = 0;
+		float l = sqrtf(dir.len2());
+		dir = l > 0.01f ? dir * (1.0f / l) : Vector3(1, 0, 0);
+		float dist = s.x > 0 ? s.x : 1.5f;
+		Vector3 to(bp.x + dir.x * dist, bp.y + 0.5f, bp.z + dir.z * dist);
+		SetHeroPos(h, to);
+		Vector3 face = dir * -1.0f;   // facing it, as NEAR_CRATE does
+		h.Dir() = face;
+		float yaw = atan2f(face.z, face.x);
+		if (yaw < 0) yaw += 6.2831855f;
+		*(float*)(h.raw() + 0xCC) = yaw;
+		*(float*)(h.raw() + 0xD4) = yaw;
+		Log("autotest: %s put %.1f from (2,%d) %p at (%.1f %.1f %.1f)", HeroName(s.a), dist, s.b, best, bp.x, bp.y, bp.z);
 		break;
 	}
 	case S_WATCHRW: {   // every reader/writer of hero a's byte at +b

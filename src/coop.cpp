@@ -77,6 +77,7 @@ struct CoopState {
 	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
 
 	bool    suspended = false;
+	bool    shopping = false;            // a merchant's menu is open
 	bool    held[HERO_COUNT] = {};       // a player's hero the game has borrowed (scripted AI order)
 	uint8_t lastOrder[HERO_COUNT] = {};
 	DWORD   heldSince[HERO_COUNT] = {};
@@ -236,6 +237,7 @@ void ForgetP2() {
 	g.p2BackHeldAt = 0;
 	g.p2ValuesReady = false;
 	g.suspended = false;
+	g.shopping = false;
 	for (int i = 0; i < HERO_COUNT; i++) g.held[i] = false;
 }
 
@@ -805,6 +807,38 @@ static void WarpToPartner(int whoIdx, Hero who, int toIdx, Hero to) {
 	    dst.z);
 }
 
+// The merchant's menu (CKHkAsterixShop's state function FUN_004BFC50) asks a
+// named input view of CKInput (FUN_00437FF0 with the name at 0x64F28C; view =
+// [CKInput +0x40][index] + 0x10) for actions 2 / 0x12 (left), 3 / 0x13
+// (right), 4 (buy) and 5 (back); the view maps each action to a binding of the
+// value array (view +8, one byte per action) -- not the bindings the heroes'
+// view uses, which is all player 2's input fills. Player 2's presses are
+// written into the menu view's bindings, right after CKInput's update.
+static void ShopInputFromP2(const PadState& p, InputManager im, int n) {
+	static bool wasLeft = false, wasRight = false;
+	bool left = (p.buttons & PAD_DPAD_LEFT) || p.lx < -0.5f, right = (p.buttons & PAD_DPAD_RIGHT) || p.lx > 0.5f;
+	uint32_t press = 0;
+	if (left && !wasLeft) press |= 1u << 2;
+	if (right && !wasRight) press |= 1u << 3;
+	if (p.pressed & PAD_A) press |= 1u << 4;
+	if (p.pressed & (PAD_X | PAD_B)) press |= 1u << 5;
+	wasLeft = left;
+	wasRight = right;
+	char* input = im.raw();
+	uint8_t* v = im.Values();
+	if (!press || !input || !v) return;
+	typedef unsigned(__fastcall* FindViewFn)(void* input, void* edx, const char* name);
+	unsigned idx = ((FindViewFn)0x437FF0)(input, nullptr, (const char*)0x64F28C) & 0xFF;
+	char** views = *(char***)(input + 0x40);
+	if (idx == 0xFF || !views || !views[idx]) return;
+	uint8_t* remap = *(uint8_t**)(views[idx] + 0x10 + 8);
+	for (int a = 2; remap && a <= 5; a++)
+		if ((press & (1u << a)) && remap[a] < n) {
+			v[remap[a]] = 0xFF;
+			LogV("coop: merchant: player 2's action %d -> binding %u", a, remap[a]);
+		}
+}
+
 void CoopFrame() {
 	DWORD now = GetTickCount();
 	g.frames++;
@@ -897,7 +931,7 @@ void CoopFrame() {
 		return;
 	}
 	// Start and Back are left alone during a cutscene: Start may be what skips it.
-	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars();
+	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars() || g.shopping;
 	if (!inCutscene && (p.pressed & PAD_START)) { Release("pressed Start"); return; }
 	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y;
 	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & kFace)) g.p2BackCombo = true;
@@ -968,18 +1002,27 @@ void CoopFrame() {
 	// (situation 13: a lifter waiting for the trio, and the like): it sends "the
 	// companion" to a marker and waits for it, which only an AI companion does.
 	bool groupAction = Situation(h1) == kSituationGroupAction || Situation(h2) == kSituationGroupAction;
+	// The merchant (CKHkAsterixShop, 2,172): trio 0x5123 opens it, its state
+	// (+8 bits 0-2) is not 0 while its camera and menu are up. The menu is
+	// player 1's, full screen.
+	bool shopping = false;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16 && !shopping; i++) {
+		char* s = (char*)GetLvlObject(2, 172, i);
+		shopping = s && (*(uint8_t*)(s + 8) & 7) != 0;
+	}
+	g.shopping = shopping;
 	// Cutscenes: the letterbox bars, held a few frames after they go so a scene
 	// handing over to the next one does not flicker co-op on and off.
 	LogCutsceneSignals();
 	bool cinematic = g.cutsceneHold > 0;
 	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
-	                h1.Busy() || h2.Busy() || groupAction || cinematic;
+	                h1.Busy() || h2.Busy() || groupAction || cinematic || shopping;
 	if (scripted != g.suspended) {
 		g.suspended = scripted;
-		Log("coop: %s (%s %s / %s %s%s%s)", scripted ? "suspended for a scripted mode" : "resumed",
+		Log("coop: %s (%s %s / %s %s%s%s%s)", scripted ? "suspended for a scripted mode" : "resumed",
 			HeroName(g.p1Hero), ModeName(HeroMode(h1.Flags18())),
 			HeroName(g.p2Hero), ModeName(HeroMode(h2.Flags18())),
-			cinematic ? ", cutscene" : "", groupAction ? ", group action" : "");
+			cinematic ? ", cutscene" : "", groupAction ? ", group action" : "", shopping ? ", merchant" : "");
 		CoopLogState(scripted ? "suspend" : "resume");
 		// A group action the non-leading player started is over: the lead goes
 		// back where it was (single player never hands it over for a launcher).
@@ -1039,6 +1082,9 @@ void CoopFrame() {
 			if (g.p2HoldStart[i] <= 0) g.p2HoldStart[i] = t;
 			g.p2HoldTime[i] = t - g.p2HoldStart[i] + 0.001f;   // non-zero from the first frame
 		}
+		// The merchant's menu reads the game's one input: either player can
+		// browse it (player 2's Obelix may be the one who opened it).
+		if (g.shopping) ShopInputFromP2(p, im, n);
 	}
 
 	// Heroes the game has borrowed: a scripted AI order given to a player's hero
@@ -1525,8 +1571,7 @@ void CoopInit() {
 	InstallDetour(kReadCommandBlock, (void*)ReadCmdHook, (void**)&g_origReadCmd, kReadCmdPrologue,
 	              sizeof(kReadCmdPrologue), "hero potion flag (Obelix's potion)");
 	InstallDetour(kHeroPrompt, (void*)PromptHook, (void**)&g_origPrompt, kHeroPromptPrologue,
-	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");
-	PadsInit();
+	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");
 }
