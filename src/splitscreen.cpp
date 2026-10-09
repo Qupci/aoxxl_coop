@@ -303,6 +303,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	for (int i = 0; i < kNumLists; i++) stampLists[i] = &g_dummy;
 	float m2[16];
 	bool own2 = P2CamMatrix(m2);
+	if (SplitDebug() & 2) { own2 = false; d2 = Vector3(); }   // diagnostics: player 1's camera in both halves
 	auto placeP2 = [&] {
 		if (own2) {
 			memcpy(FrameModelling(cam), m2, sizeof(m2));

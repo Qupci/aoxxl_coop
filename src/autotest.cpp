@@ -20,7 +20,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -991,6 +991,25 @@ const Step kLaunch48A[] = {
 	END(40000),
 };
 
+// shine25 (level 2): sector 5 -- both heroes look at a x10 bonus
+// (167.1 5.0 -380.5); then Asterix's potion. Its shine must look the same in
+// both halves.
+const Step kShine25[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 166.93f, 2.8f, -371.8f), PLACEAT(3000, HERO_OBELIX, 168.51f, 2.7f, -372.3f),
+	P1(3500, 0, 0, -1, "p1 face -z"), P1(3650, 0, 0, 0, "p1 stop"),
+	VPAD(3500, 1, 0, 0, -1, "p2 face -z"), VPAD(3650, 1, 0, 0, 0, "p2 stop"),
+	{ 4000, S_P2LOOK, 0, 0, 0, 167.1f, 5.0f, "p2 looks at the bonus", -380.5f },
+	SHOT(6000, "shine25_1"), SHOT(6500, "shine25_2"),
+	{ 6600, S_NODEDUMP, 0, 0, 0, 167.1f, 5.0f, "bonus nodes", -380.5f },
+	POTION(7000),
+	SHOT(9000, "shine25_3"),
+	{ 9200, S_P2LOOK, 0, 0, 0, 166.93f, 3.3f, "p2 looks at asterix", -371.8f },
+	SHOT(10500, "shine25_4"),
+	END(11000),
+};
+
 // lifterwait (level 2): player 2's Obelix waits by sector 1's lifter
 // (-746.8 495.9 -991.7) while Asterix stays at the start; teleports logged.
 const Step kLifterWait[] = {
@@ -1699,6 +1718,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("circle45", kCircle45),
 	SCENARIO("launch48", kLaunch48),
 	SCENARIO("launch48a", kLaunch48A),
+	SCENARIO("shine25", kShine25),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),
@@ -2456,6 +2476,37 @@ void RunStep(const Step& s) {
 	case S_WATCHCAM: at.watchCam = true; break;
 	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
 	case S_WATCHENEMIES: at.watchEnemies = true; at.enemyPoint = Vector3(s.x, s.y, s.z); break;
+	case S_NODEDUMP: {   // bonuses (2,114) within 6 units of (x y z): their node trees
+		Vector3 c(s.x, s.y, s.z);
+		struct D {
+			static void Dump(char* node, int depth) {
+				for (; node && depth < 6; node = *(char**)(node + 8)) {
+					char* fr = *(char**)(node + 4);
+					const float* p = fr ? (const float*)(fr + 0x80) : nullptr;
+					Log("autotest: %*snode %p vt %08X flags %04X stamp %u at (%.1f %.1f %.1f) +1C %p +24 %p", depth * 2, "",
+					    node, *(uint32_t*)node, *(uint16_t*)(node + 0x10), *(uint16_t*)(node + 0x14), p ? p[0] : 0,
+					    p ? p[1] : 0, p ? p[2] : 0, *(void**)(node + 0x1C), *(void**)(node + 0x24));
+					Dump(*(char**)(node + 0x18), depth + 1);
+				}
+			}
+		};
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 114); i < n; i++) {
+			char* b = (char*)GetLvlObject(2, 114, i);
+			char* node = b ? *(char**)(b + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+			if ((p - c).len2() > 36.0f) continue;
+			Log("autotest: bonus %p at (%.1f %.1f %.1f)", b, p.x, p.y, p.z);
+			__try {
+				Log("autotest: node %p vt %08X flags %04X", node, *(uint32_t*)node, *(uint16_t*)(node + 0x10));
+				D::Dump(*(char**)(node + 0x18), 1);
+			} __except (EXCEPTION_EXECUTE_HANDLER) {
+				Log("autotest: (node tree unreadable)");
+			}
+		}
+		break;
+	}
 	case S_P2LOOK:P2CamLookToward(Vector3(s.x, s.y, s.z)); Log("autotest: player 2's camera turned"); break;
 	case S_HEROFIELDS: {   // movement parameters of both heroes: +0x300..+0x33C and +0x84 speed, +0x388
 		Trio t = GetTrio();

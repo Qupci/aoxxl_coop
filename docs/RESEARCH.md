@@ -1044,3 +1044,29 @@ InitStateTables vs Obelix's FUN_004A69F0) -- Obelix has no third jump state/anim
   `+0x5BC` look) outside a cone of 1.5 x FOV (camera `+0x38` -> `+0x44`). Co-op: list filtered per
   call (no marker in any player's view within 40 units, P2's cone, or within 8 units of a hero),
   non-leader squads use that player's camera.
+
+## Round 25 (2026-10-09)
+
+- **Lifter "sidekick not present"** (CKHkLifter::vf15 0x4AD670, vtable 0x625E2C): state 0 (bottom) with
+  flags +8 bit 0 ("wait for trio") counts +0x34 while the leader (trio vf29) stands on it without the
+  companion (vf44); past [gm+0x18]+0x24 → +0xA0 it flags event +0x70 (trio 0x4887 / 0x48BD teleport
+  Idefix / sidekick to marker). Ticked sliced to player 2's Obelix it teleported Obelix every 9 s.
+  Co-op zeroes +0x34 before every lifter tick: lifters wait for both players.
+- **Roman pool / vf36** (0x52F850): a squad activating (vf33 0x52EF70) with the CKGrpPoolSquad empty
+  calls vf36, which resets (vf34) every active squad of its group whose box lacks the camera look-at
+  (svc+0x5BC). Two players in different places → the squads around the non-leader freed each other
+  every frame, their Romans respawned at their start spots (hanging above the LV5-8 lifters).
+  Hooked: squads holding either hero are kept.
+- **Trio events 0x4813–0x4844** sidekick walk to marker n (companion +0x564 = 1), **0x4845–0x4876**
+  run to marker n (+0x564 = 2), **0x4885–0x48B6** teleport Idefix to marker n, **0x48BB–0x48EC**
+  teleport sidekick to marker n. Hero zones whose group sends these are left out of the swapped
+  detection pass (LV4-9 / LV5-4 boat boxes).
+- **Catapult flight** = situation 0x0D. A landing-zone 0x4800 (switch to Asterix) arriving while Obelix
+  leads in flight left both heroes hanging at the end of the flight (no 0x5135 landing). Leader switches
+  arriving during a flight are deferred until no hero is in 0x0D (CoopDeferTrioEvent).
+- **Shine (open)**: x10 bonus = CClone node (no children); the rays around it and the green potion aura on
+  Asterix are drawn only in the scene walk that is the frame's 2nd (normal split: stamp, P1, P2 → P1 only;
+  without the stamp walk → P2 only; an extra stamp walk before P2 doesn't help). Not CGlowNodeFx, not
+  CParticlesNodeFx near the bonus, not list 12 (that is the 2D HUD, HUD camera = parallel projection),
+  not the back-buffer copy stamp (renderer+0x24), not clone sync. P2's aura comes out orange/yellow instead
+  of green. `XXL_SPLITDBG=2` puts player 1's camera in both halves for A/B screenshots (shine25 scenario).
