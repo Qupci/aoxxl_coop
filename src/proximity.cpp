@@ -46,6 +46,14 @@ const uintptr_t kPressionStoneVtbl = 0x628EE4;   // CKHkPressionStone (2,21)
 // -- a softlock. It keeps to the real leader too.
 const uintptr_t kCorkscrewVtbl = 0x628E0C;       // CKHkCorkscrew (2,44)
 const uintptr_t kBoatVtbl = 0x627EB8;            // CKHkBoat (2,39)
+// Lifters (CKHkLifter::vf15, 0x4AD670) waiting at the bottom with "wait for
+// trio" (flags +8 bit 0) count the time the leader stands on them without the
+// companion (+0x34); past the game manager's limit they send their "sidekick
+// not present" event (+0x70: teleport Idefix and the sidekick onto the
+// lifter). Ticked with player 2's Obelix posing as the leader, it dropped the
+// real leader's companion -- Obelix himself -- onto the lifter every 9 s (level 5
+// sector 8). In co-op nobody is teleported: the lifter waits for both players.
+const uintptr_t kLifterVtbl = 0x625E2C;          // CKHkLifter (2,47)
 // The spies (CKHkClueMan, 2,161). Their tick (vf15, 0x4B8FB0) spawns the spy
 // (FUN_004B12F0, node at hook +0x10) when the trio leader comes within +0x68
 // of its spot (+0x12C/+0x130/+0x134 x/y/z) and removes it (FUN_004B1790) when
@@ -170,6 +178,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	uintptr_t vt = *(uintptr_t*)life;
 	Vector3 at;
 	char* hook = isGroup ? nullptr : *(char**)((char*)life + 0x10);
+	if (hook && *(uintptr_t*)hook == kLifterVtbl) *(float*)(hook + 0x34) = 0.0f;
 	if (hook && *(uintptr_t*)hook == kPressionStoneVtbl && PlateForEither(hook)) {
 		TickPlate(life, dt, hook, t);
 		return;
@@ -387,6 +396,47 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 bool InSquadBox(const char* sq, const Vector3& p) {
 	const float* f = (const float*)sq;
 	return f[0x4A] < p.x && p.x <= f[0x47] && f[0x4C] < p.z && p.z <= f[0x49] && f[0x4B] < p.y && p.y <= f[0x48];
+}
+
+// Out of Romans. A squad coming alive takes its Romans from the shared pool
+// (vf33); when the pool runs dry it calls vf36 (0x52F850), which sends back to
+// the pool (vf34) every active squad of its enemy group whose box does not hold
+// the game camera's look-at point (camera service +0x5BC) -- in single player,
+// every squad away from the leader. With player 1 fighting elsewhere, the
+// squads around player 2's Obelix freed each other every frame: their Romans
+// were spawned over and over at their starting spots, hanging in the air above
+// the lifters (level 5 sector 8) until Asterix came along. Squads around either
+// player's hero are kept as well.
+typedef void(__fastcall* SquadFreeFn)(char* squad, void* edx);
+const uintptr_t kSquadFree = 0x52F850;
+SquadFreeFn g_origSquadFree = nullptr;
+volatile long g_squadsSpared = 0;
+
+void __fastcall SquadFreeHook(char* squad, void* edx) {
+	CKYellowPages* yp = YellowPages();
+	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	Trio t = GetTrio();
+	Hero ha = t ? t.GetHero(HERO_ASTERIX) : Hero(), ho = t ? t.GetHero(HERO_OBELIX) : Hero();
+	char* grp = *(char**)(squad + 0x14);
+	if (!CoopP2Joined() || CoopSuspended() || !svc || !ha || !ho || !grp) {
+		g_origSquadFree(squad, edx);
+		return;
+	}
+	typedef char(__fastcall* IsSubFn)(void* self, void* edx, int id);
+	typedef void(__fastcall* VoidFn)(void* self, void* edx);
+	const float* look = (const float*)(svc + 0x5BC);
+	Vector3 lp(look[0], look[1], look[2]), pa = ha.Pos(), po = ho.Pos();
+	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
+		void** vt = *(void***)sq;
+		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604) || !(*(uint8_t*)(sq + 0x152) & 2)) continue;
+		if (InSquadBox(sq, lp)) continue;
+		if (InSquadBox(sq, pa) || InSquadBox(sq, po)) {
+			if (InterlockedIncrement(&g_squadsSpared) % 300 == 1)
+				Log("proximity: out of Romans; squad %p kept for the player in it", sq);
+			continue;
+		}
+		((VoidFn)vt[34])(sq, nullptr);
+	}
 }
 
 void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
@@ -1130,6 +1180,9 @@ bool ProximityInstallHooks() {
 		for (uintptr_t vt : vts)
 			ok &= PatchVtableSlot(vt, 38, kMarkerSpawn, (void*)MarkerSpawnHook, (void**)&g_origMarkerSpawn,
 			                      "squad marker spawn (both players' views)");
+		for (uintptr_t vt : vts)
+			ok &= PatchVtableSlot(vt, 36, kSquadFree, (void*)SquadFreeHook, (void**)&g_origSquadFree,
+			                      "squads freed for Romans (both players' squads kept)");
 	}
 	ok &= InstallDetour(kSpawnPoint, (void*)SpawnPointHook, (void**)&g_origSpawnPoint, kSpawnPointPrologue,
 	                    sizeof(kSpawnPointPrologue), "Roman reinforcement point (both players' cameras)");

@@ -1017,6 +1017,47 @@ const Step kLift58A[] = {
 	SHOT(14000, "lift58_1"), SHOT(20000, "lift58_2"),
 	END(22000),
 };
+// lift58u (-Level 5): the user's repro -- both at the sector's entrance
+// (-376.8 16.5 20.0), potion; player 2's Obelix (not leading) walks to
+// z = -30.7 (the lifters' Romans then hang in the air); later Asterix walks to
+// z = -19.1 (they land on the lifters at that moment).
+const Step kLift58U[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -376.82f, 17.2f, 20.05f), PLACEAT(3000, HERO_OBELIX, -374.8f, 17.2f, 20.05f),
+	POTION(3500),
+	{ 3600, S_WATCHENEMIES, 0, 0, 0, -376.0f, 5.0f, "watch romans", -45.0f },
+	GLIDEAT(4000, HERO_OBELIX, -376.82f, 17.5f, -30.68f, 4000),
+	SHOT(9000, "lift58u_1"), SHOT(14000, "lift58u_2"),
+	GLIDEAT(15000, HERO_ASTERIX, -376.82f, 17.5f, -19.07f, 3000),
+	SHOT(19000, "lift58u_3"), SHOT(23000, "lift58u_4"),
+	END(24000),
+};
+// lift58t (-Level 5): player 2's Obelix (not leading) on a sector 8 lifter
+// (-375.5 0 -39.2) while Asterix stays at the entrance: the lifter's "sidekick
+// not present" event must not keep teleporting him.
+// lift58l: like lift58u, but Obelix is made the leader instead of Asterix walking.
+const Step kLift58L[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -376.82f, 17.2f, 20.05f), PLACEAT(3000, HERO_OBELIX, -374.8f, 17.2f, 20.05f),
+	POTION(3500),
+	{ 3600, S_WATCHENEMIES, 0, 0, 0, -376.0f, 5.0f, "watch romans", -45.0f },
+	GLIDEAT(4000, HERO_OBELIX, -376.82f, 17.5f, -30.68f, 4000),
+	SHOT(9000, "lift58l_1"),
+	{ 13000, S_WATCHRW, HERO_OBELIX, 0, 0, 3, 0, "roman height writes" },
+	{ 15000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	SHOT(19000, "lift58l_2"),
+	END(22000),
+};
+const Step kLift58T[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -376.82f, 17.2f, 20.05f), PLACEAT(3000, HERO_OBELIX, -375.46f, 0.8f, -39.19f),
+	{ 3500, S_WATCHRW, HERO_OBELIX, 0, 0, 2, 0, "obelix teleports" },
+	SHOT(6000, "lift58t_1"), SHOT(20000, "lift58t_2"),
+	END(24000),
+};
 const Step kDetect58[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 8),
 	{ 3000, S_DETECT, 0, 0, 0, 0, 0, "detect" },
@@ -1640,6 +1681,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("detect58", kDetect58),
 	SCENARIO("lift58o", kLift58O),
 	SCENARIO("lift58a", kLift58A),
+	SCENARIO("lift58u", kLift58U),
+	SCENARIO("lift58t", kLift58T),
+	SCENARIO("lift58l", kLift58L),
 	SCENARIO("circle45", kCircle45),
 	SCENARIO("launch48", kLaunch48),
 	SCENARIO("fight4o", kFight4O),
@@ -1857,9 +1901,11 @@ void LogTick(float t) {
 				bool old = false;
 				for (int k = 0; k < nSeen; k++) old = old || seen[k] == e;
 				if (!old && at.enemiesPrimed) Log("autotest: Roman %p appeared at (%.1f %.1f %.1f)", e, p.x, p.y, p.z);
+				if (live <= 6) line.Add(" r(%.0f %.1f %.0f)", p.x, p.y, p.z);
 			}
 		memcpy(seen, now, nNow * sizeof(char*));
 		nSeen = nNow;
+		bool primed = at.enemiesPrimed;
 		at.enemiesPrimed = true;
 		line.Add(" | romans near %d", live);
 		for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
@@ -1868,7 +1914,10 @@ void LogTick(float t) {
 			const float* f = (const float*)sq;
 			Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
 			if ((c - at.enemyPoint).len2() > 60.0f * 60.0f) continue;
-			line.Add(" sq%u f%04X", i, *(uint16_t*)(sq + 0x152));
+			line.Add(" sq%u %p f%04X", i, sq, *(uint16_t*)(sq + 0x152));
+			if (!primed)
+				Log("autotest: squad %u %p box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f", i, sq, f[0x4A], f[0x47], f[0x4B],
+				    f[0x48], f[0x4C], f[0x49]);
 			unsigned ng = *(unsigned*)(sq + 0x14C);
 			char* gr = *(char**)(sq + 0x144);
 			for (unsigned g2 = 0; gr && g2 < ng && g2 < 4; g2++) {
@@ -2256,6 +2305,28 @@ void RunStep(const Step& s) {
 		if (s.x == 2) {   // teleports of the hero (x jumps by more than 10)
 			WatchFloatJump(&h.Pos().x);
 			Log("autotest: watching %s's teleports", HeroName(s.a));
+			break;
+		}
+		if (s.x == 3) {   // writes to the height of the Roman nearest the hero (node LTM y), with stacks
+			char* best = nullptr;
+			float bd = 1e9f;
+			const int ids[2] = { 93, 148 };
+			for (int id : ids)
+				for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n; i++) {
+					char* e = (char*)GetLvlObject(2, id, i);
+					char* node = e ? *(char**)(e + 0x10) : nullptr;
+					char* fr = node ? *(char**)(node + 4) : nullptr;
+					if (!fr || (*(uint8_t*)(node + 0x10) & 2)) continue;
+					Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+					float d = (p - h.Pos()).len2();
+					if (d < bd) { bd = d; best = e; }
+				}
+			if (!best) break;
+			char* fr = *(char**)(*(char**)(best + 0x10) + 4);
+			const void* w[1] = { fr + 0x84 };
+			WatchBytes(w, 1, 0, 0);
+			Log("autotest: watching writes to Roman %p's height (%.1f), %.1f from %s", best, *(float*)(fr + 0x84), sqrtf(bd),
+			    HeroName(s.a));
 			break;
 		}
 		if (s.x == 1) {   // writes only, with stacks
