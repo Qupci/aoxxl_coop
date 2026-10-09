@@ -811,8 +811,8 @@ bool GroupMessagesTrio(unsigned ev) {   // does event `ev`'s group message the t
 	return false;
 }
 
-// Does event `ev`'s group switch the trio's leader or order the companion to
-// wait (0x4800/0x4801/0x48B7/0x48B8, 0x4802, 0x4849)?
+// Does event `ev`'s group switch the trio's leader, order the companion to
+// wait (0x4800/0x4801/0x48B7/0x48B8, 0x4802, 0x4849) or send it somewhere?
 bool GroupCommandsTrio(unsigned ev) {
 	unsigned group = (ev & 0xFFFF) >> 3;
 	CKYellowPages* yp = YellowPages();
@@ -829,6 +829,11 @@ bool GroupCommandsTrio(unsigned ev) {
 		if (!objs[first + k] || *(uintptr_t*)objs[first + k] != 0x6256A0) continue;
 		unsigned m = msgs[first + k];
 		if (m == 0x4800 || m == 0x4801 || m == 0x48B7 || m == 0x48B8 || m == 0x4802 || m == 0x4849) return true;
+		// Sidekick walk / run to marker n (0x4813.., 0x4845..), teleport the sidekick
+		// to marker n (0x48BB..): the boats' boxes (level 4 sector 9, level 5 sector
+		// 4) send the companion behind the boat when the leader steps aboard; set off
+		// by player 2's Obelix, they marched Obelix himself there.
+		if ((m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC)) return true;
 	}
 	return false;
 }
@@ -1050,7 +1055,8 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 			// Zones that switch the trio's leader ("switch to Asterix, Obelix waits there"
 			// -- level 4 sector 5's blue circle, bound to Asterix) mean the hero
 			// they are bound to: set off by the other one they softlocked.
-			if (keep && GroupCommandsTrio(*(uint16_t*)(e + 6))) keep = false;
+			static const bool zoneAll = getenv("XXL_ZONEALL") != nullptr;   // diagnostics: the unfiltered swapped pass
+			if (keep && !zoneAll && GroupCommandsTrio(*(uint16_t*)(e + 6))) keep = false;
 			if (keep && (e[4] & 1)) any = true;
 			else e[4] &= ~1;
 		}

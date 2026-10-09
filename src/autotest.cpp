@@ -948,9 +948,8 @@ const Step kBoat49[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 9),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	PLACEAT(3000, HERO_ASTERIX, -164.66f, 6.6f, -640.0f),
-	PLACEAT(3200, HERO_OBELIX, -164.66f, 6.6f, -642.6f),
-	{ 3300, S_WATCHRW, HERO_OBELIX, 0x18, 0, 1, 0, "obelix control writes" },
-	GLIDEAT(4000, HERO_OBELIX, -164.4f, 6.2f, -651.6f, 2500),
+	PLACEAT(3200, HERO_OBELIX, -164.66f, 6.6f, -645.0f),
+	GLIDEAT(4000, HERO_OBELIX, -165.41f, 6.3f, -652.0f, 2000),
 	SHOT(7000, "boat_1"), SHOT(12000, "boat_2"),
 	END(14000),
 };
