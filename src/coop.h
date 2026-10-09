@@ -58,6 +58,8 @@ int  CoopBeforeTrioEvent(int event, void* caller);
 void CoopAfterTrioEvent(int event, int cookie);
 // Also called before CKGrpTrio::sendEvent, with the event's parameter.
 void CoopNoteTrioEvent(void* trio, int event, void* param);
+// A trio event to hold back for now (sent again later by the mod).
+bool CoopDeferTrioEvent(void* trio, int event);
 
 bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order

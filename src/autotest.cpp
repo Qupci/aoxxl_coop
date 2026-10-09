@@ -969,8 +969,21 @@ const Step kCircle45[] = {
 const Step kLaunch48[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 8),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
-	PLACEAT(3000, HERO_ASTERIX, -1003.84f, 269.6f, -988.73f), PLACEAT(3000, HERO_OBELIX, -1008.5f, 270.2f, -990.6f),
+	PLACEAT(3000, HERO_ASTERIX, -1006.3f, 274.0f, -989.6f), PLACEAT(3000, HERO_OBELIX, -1008.3f, 274.0f, -989.62f),
 	VPAD(5000, 1, PAD_X, 0, 0, "p2 X"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "launch48_1"), SHOT(20000, "launch48_2"), SHOT(35000, "launch48_3"),
+	P1(36000, 0, 0, 1, "p1 forward"), VPAD(36000, 1, 0, 0, 1, "p2 forward"),
+	P1(38000, 0, 0, 0, "p1 stop"), VPAD(38000, 1, 0, 0, 0, "p2 stop"),
+	SHOT(39000, "launch48_4"),
+	END(40000),
+};
+
+// launch48a: the same with the leader Asterix pressing X.
+const Step kLaunch48A[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, -1006.3f, 274.0f, -989.6f), PLACEAT(3000, HERO_ASTERIX, -1008.3f, 274.0f, -989.62f),
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5200, 0, 0, 0, "p1 release"),
 	SHOT(8000, "launch48_1"), SHOT(20000, "launch48_2"), SHOT(35000, "launch48_3"),
 	P1(36000, 0, 0, 1, "p1 forward"), VPAD(36000, 1, 0, 0, 1, "p2 forward"),
 	P1(38000, 0, 0, 0, "p1 stop"), VPAD(38000, 1, 0, 0, 0, "p2 stop"),
@@ -1685,6 +1698,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lift58l", kLift58L),
 	SCENARIO("circle45", kCircle45),
 	SCENARIO("launch48", kLaunch48),
+	SCENARIO("launch48a", kLaunch48A),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),

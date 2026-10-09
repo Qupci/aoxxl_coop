@@ -736,6 +736,51 @@ static void WatchSpyCameras() {
 	}
 }
 
+// Leader switches (0x4800/0x4801/0x48B7/0x48B8) that arrive while a hero is
+// flying from a trio catapult (situation 0x0D) wait until the flight is over.
+// Level 4 sector 8's launcher started by Obelix: a zone on the landing ground
+// bound to Asterix sends "switch to Asterix" as the trio comes down; taken from
+// Obelix in mid-flight, the landing never ended -- both heroes hung in the air
+// for good (also with Obelix leading in single player). With Asterix leading
+// the same switch only comes after the landing and changes nothing.
+const uint8_t kSituationCatapultFlight = 0x0D;
+int g_deferredSwitch = -1;
+DWORD g_deferredSince = 0;
+
+static bool IsLeaderSwitch(int ev) {
+	ev &= 0xFFFF;
+	return ev == 0x4800 || ev == 0x4801 || ev == 0x48B7 || ev == 0x48B8;
+}
+
+static bool HeroFlying(Trio t) {
+	for (int i = 0; i < 2; i++) {
+		Hero h = t.GetHero(i);
+		if (h && Situation(h) == kSituationCatapultFlight) return true;
+	}
+	return false;
+}
+
+bool CoopDeferTrioEvent(void* trio, int ev) {
+	Trio t = GetTrio();
+	if (!t || t.raw() != (char*)trio || !IsLeaderSwitch(ev) || !HeroFlying(t)) return false;
+	g_deferredSwitch = ev & 0xFFFF;
+	g_deferredSince = GetTickCount();
+	Log("coop: trio event %04X while flying from a catapult -- after the landing", g_deferredSwitch);
+	return true;
+}
+
+static void SendDeferredSwitch() {
+	if (g_deferredSwitch < 0) return;
+	Trio t = GetTrio();
+	if (!t) { g_deferredSwitch = -1; return; }
+	if (HeroFlying(t) && GetTickCount() - g_deferredSince < 20000) return;
+	int ev = g_deferredSwitch;
+	g_deferredSwitch = -1;
+	Log("coop: landed -- trio event %04X sent now", ev);
+	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
+}
+
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	SpyWalk& w = g_spyWalk;
 	event &= 0xFFFF;
@@ -859,6 +904,7 @@ void CoopFrame() {
 
 	PadsPoll();
 	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
+	SendDeferredSwitch();
 	TracePotionFrame();
 	SoundSetP2Listener();
 	CheckMarker(now);
