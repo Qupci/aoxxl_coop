@@ -1088,3 +1088,25 @@ both halves).
   player 2's view, were then skipped by player 1's walk (its work bit already cleared): only the red rays
   showed when teleporting there with split screen on. The split frame now tracks which systems were stepped
   (pointer set, generation per split frame) instead of trusting the stamp.
+
+## Round 27 (2026-10-12): each player gets a copy of the game camera
+
+* `CKSrvCamera` (yp `+0x68`, alloc `0x6A0`): vf17 `0x454620` = tick (thiscall(frame), dt at frame `+0xC`).
+  Target `+0xE8` = a hero's hook `+0x10`. `0x459050` (was "Node_FadeVisibility") is really
+  `SetTarget(target, transition s, cut)` (ret `0xC`), used by `CKGrpTrio_SwitchLeaderFollowup`.
+  Tracks: list `+0x20` (linked `+4`), next/current/previous `+0x34/+0x38/+0x3C`. Camera sectors
+  (`CKCameraSector`, list `+0x24`): box `+8..+0x1C`, track `+0x20`, flags `+0x29` (bit 1 on, bit 3
+  one-shot) -- the level's camera triggers, picked by the target's position (LV3-2 beach = fixed track).
+  Camera object `+0x1C` shares the main RwCamera's frame; view window/clip go to the main RwCamera.
+  Input view `+0x580`: actions 0-4 -> bindings 46-50 = right stick up, down, right, left, R3 (edge).
+  Fight camera = `+0xC` bits 28-31 (`0x80000000` on), end calls track vf24.
+* Track sizes: rigid `0x88`, classic `0xDC`, path `0x80`, fix `0x70`, axis `0x80`, plain `0x6C`,
+  passive path `0x94`, spy `0x11C`.
+* `gamecam.cpp`: the game's state = the leader's camera; the non-leading player's camera is a byte copy
+  of the service + its tracks, swapped in after the game's tick for a second tick (aimed at that hero,
+  with that player's camera input), then everything (service, all tracks, frame, window, clip, nodes
+  `+0x5D0/+0x5D4`) goes back. On a leader switch (SetTarget from the switch follow-up, or the leader
+  byte changing) the two states change places. Fight bits per hero (proximity FightHook records which
+  pass refreshed trio `+0x408`). Held heroes get the old follow camera (p2cam). ini `camera`, `split_fov`.
+* Autotests: cam32 / cam32o (beach trigger per player, right stick zoom), cam32s (switches), camfight,
+  cable33 (user's LV3-3 spot: P2 gets the passive path pull camera, P1 the follow camera), launch48.

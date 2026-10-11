@@ -20,7 +20,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -901,6 +901,18 @@ const Step kFight4O[] = {
 	SHOT(53000, "fight4_end"),
 	END(54000),
 };
+// camfight (-Level 4): player 2's Obelix next to sector 1's Romans while
+// Asterix stays at the start: player 2's camera pulls back for the fight,
+// player 1's does not.
+const Step kCamFight[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	SHOT(900, "camfight_0"),
+	PLACEAT(1000, HERO_OBELIX, -299.16f, 1.2f, 89.27f),
+	SHOT(2000, "camfight_1"), TAPS2(3000), SHOT(6000, "camfight_2"),
+	PLACEAT(8000, HERO_OBELIX, -260.0f, 1.2f, 89.27f), SHOT(16000, "camfight_3"),
+	END(16500),
+};
 // fight36 (-Level 3): sector 6 -- player 1's Asterix at -188.0 2.6 -229.9
 // (camera looking towards -z), player 2's Obelix fights at -184.1 2.6 -230.0;
 // new Romans and where they appear are logged (the user saw them pop up on
@@ -1021,6 +1033,68 @@ const Step kShine44[] = {
 	POTION(6000),
 	SHOT(8000, "shine44_2"),
 	END(8500),
+};
+
+// cam32o (-Level 3): the same beach, but player 2's Obelix walks to x 140 while
+// Asterix stays: player 2's copy of the game camera takes the fixed camera,
+// player 1's stays on the follow camera. Then player 2 pulls the camera back.
+const Step kCam32O[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 172.8f, 6.6f, -212.9f), PLACEAT(2500, HERO_OBELIX, 170.8f, 6.6f, -214.9f),
+	SHOT(4000, "cam32o_1"),
+	GLIDEAT(4500, HERO_OBELIX, 140.0f, 6.6f, -214.9f, 3000),
+	SHOT(8000, "cam32o_2"),
+	GLIDEAT(8500, HERO_OBELIX, 172.0f, 6.6f, -214.9f, 3000),
+	SHOT(12000, "cam32o_3"),
+	VPADR(12500, 1, 0.0f, -1.0f, "p2 pulls back"), SHOT(14000, "cam32o_4"),
+	VPADR(14100, 1, 0.0f, 1.0f, "p2 pulls in"), SHOT(15600, "cam32o_5"),
+	VPADR(15700, 1, 0.0f, 0.0f, "p2 stick free"),
+	END(16000),
+};
+
+// cam32s (-Level 3): as cam32o, then leader switches (0x4801 Obelix leads,
+// 0x4800 back): each half should keep its own camera across the switches.
+const Step kCam32S[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 172.8f, 6.6f, -212.9f), PLACEAT(2500, HERO_OBELIX, 170.8f, 6.6f, -214.9f),
+	GLIDEAT(3500, HERO_OBELIX, 150.0f, 6.6f, -214.9f, 2000),
+	SHOT(6500, "cam32s_1"),
+	{ 7000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	SHOT(7100, "cam32s_2"), SHOT(8500, "cam32s_3"),
+	{ 9000, S_TRIOEV, 0x4800, 0, 0, 0, 0, "asterix leads" },
+	SHOT(9100, "cam32s_4"), SHOT(10500, "cam32s_5"),
+	END(11000),
+};
+
+// cable33 (-Level 3): the user's cable car spot in sector 3 -- Asterix in the
+// car at 307.58 13.07 -209.15, player 2's Obelix below at the rope (y 10.34),
+// holding X and walking towards -x to pull. Player 1 (Asterix, held) should get
+// the follow camera, player 2 the game's.
+const Step kCable33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	SHOT(4000, "cable33_1"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"), SHOT(5500, "cable33_2"),
+	VPAD(6000, 1, PAD_X, -1.0f, 0, "p2 X + left"), SHOT(8000, "cable33_3"), SHOT(10000, "cable33_4"),
+	VPAD(11000, 1, 0, 0, 0, "p2 release"), SHOT(12000, "cable33_5"),
+	END(12500),
+};
+
+// cam32 (-Level 3): sector 2's beach -- both heroes at 170.8 6.1 -214.9, then
+// Asterix walks (glides) to x 140 and back: which camera the game uses where.
+const Step kCam32[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 170.8f, 6.6f, -214.9f), PLACEAT(2500, HERO_OBELIX, 172.8f, 6.6f, -214.9f),
+	{ 4000, S_CAMDUMP, 0, 0, 0, 0, 0, "camera dump" }, SHOT(4100, "cam32_1"),
+	GLIDEAT(4500, HERO_ASTERIX, 140.0f, 6.6f, -214.9f, 3000),
+	{ 8000, S_CAMDUMP, 0, 0, 0, 0, 0, "camera dump" }, SHOT(8100, "cam32_2"),
+	GLIDEAT(8500, HERO_ASTERIX, 172.0f, 6.6f, -214.9f, 3000),
+	{ 12000, S_CAMDUMP, 0, 0, 0, 0, 0, "camera dump" }, SHOT(12100, "cam32_3"),
+	END(12500),
 };
 
 // lifterwait (level 2): player 2's Obelix waits by sector 1's lifter
@@ -1733,7 +1807,12 @@ const Scenario kScenarios[] = {
 	SCENARIO("launch48a", kLaunch48A),
 	SCENARIO("shine25", kShine25),
 	SCENARIO("shine44", kShine44),
+	SCENARIO("cam32", kCam32),
+	SCENARIO("cam32o", kCam32O),
+	SCENARIO("cable33", kCable33),
+	SCENARIO("cam32s", kCam32S),
 	SCENARIO("fight4o", kFight4O),
+	SCENARIO("camfight", kCamFight),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),
 };
@@ -2518,6 +2597,53 @@ void RunStep(const Step& s) {
 			} __except (EXCEPTION_EXECUTE_HANDLER) {
 				Log("autotest: (node tree unreadable)");
 			}
+		}
+		break;
+	}
+	case S_CAMDUMP: {   // the camera service (yellow pages +0x68): state, tracks, sectors, input view
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		if (!cs) break;
+		__try {
+			Log("autotest: camsrv %p flags %08X next %p cur %p prev %p target %p/+EC %p curSector %p 5D0 %p 5D4 %p rw %p",
+			    cs, *(uint32_t*)(cs + 0xC), *(void**)(cs + 0x34), *(void**)(cs + 0x38), *(void**)(cs + 0x3C),
+			    *(void**)(cs + 0xE8), *(void**)(cs + 0xEC), *(void**)(cs + 0x4EC), *(void**)(cs + 0x5D0),
+			    *(void**)(cs + 0x5D4), *(void**)(cs + 0x1C));
+			char* tg = *(char**)(cs + 0xE8);
+			if (tg) Log("autotest: target vt %08X +4 %p +8 %p +C %p +10 %p", *(uint32_t*)tg, *(void**)(tg + 4),
+			            *(void**)(tg + 8), *(void**)(tg + 0xC), *(void**)(tg + 0x10));
+			Trio t = GetTrio();
+			for (int h = 0; t && h < 3; h++) {
+				Hero hero = t.GetHero(h);
+				if (hero) Log("autotest: hero %d hook %p +4 %p +C %p +10 %p", h, hero.raw(), *(void**)(hero.raw() + 4),
+				              *(void**)(hero.raw() + 0xC), *(void**)(hero.raw() + 0x10));
+			}
+			for (int k = 0; k < 3; k++) {
+				char* tr = *(char**)(cs + 0x34 + 4 * k);
+				if (!tr) continue;
+				char lb[512]; LineBuf l(lb);
+				l.Add("autotest: track[%d] %p vt %08X:", k, tr, *(uint32_t*)tr);
+				for (int o = 4; o < 0x6C; o += 4) l.Add(" %08X", *(uint32_t*)(tr + o));
+				Log("%s", l.c_str());
+			}
+			char* view = *(char**)(cs + 0x580);
+			if (view) {
+				uint8_t* remap = *(uint8_t**)(view + 8);
+				char* inp = *(char**)(view + 0xC);
+				InputManager im = GetInputManager();
+				Log("autotest: cam view %p input %p (game input %p) remap %u %u %u %u %u %u %u %u", view, inp,
+				    im ? im.raw() : nullptr, remap[0], remap[1], remap[2], remap[3], remap[4], remap[5], remap[6], remap[7]);
+			}
+			int n = 0;
+			for (char* sec = *(char**)(cs + 0x24); sec && n < 200; sec = *(char**)(sec + 4), n++) {
+				const float* b = (const float*)(sec + 8);
+				Log("autotest: camsector %p flags %02X box (%.1f %.1f %.1f)-(%.1f %.1f %.1f) track %p vt %08X time %.2f type %u",
+				    sec, *(uint8_t*)(sec + 0x29), b[0], b[1], b[2], b[3], b[4], b[5], *(void**)(sec + 0x20),
+				    *(void**)(sec + 0x20) ? *(uint32_t*)*(void**)(sec + 0x20) : 0, *(float*)(sec + 0x24), *(uint8_t*)(sec + 0x28));
+			}
+			Log("autotest: %d camera sectors (+20 list %p)", n, *(void**)(cs + 0x20));
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			Log("autotest: (camera service unreadable)");
 		}
 		break;
 	}

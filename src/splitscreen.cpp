@@ -6,6 +6,7 @@
 #include "trio.h"
 #include "p2cam.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -289,10 +290,28 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	p1cam.window[1] = cam->viewWindow[1];
 
 	// Half-screen view window: keep the horizontal field of view for a stacked
-	// split and the vertical one for a side-by-side split, so nothing is squashed.
-	float half[2] = { p1cam.window[0], p1cam.window[1] };
-	if (vertical) half[0] *= (float)vp1.w / (float)w;
-	else          half[1] *= (float)vp1.h / (float)h;
+	// split and the vertical one for a side-by-side split, so nothing is squashed;
+	// then widen it by the ini's split_fov degrees (on top of whatever the game,
+	// or a wide-FOV patch, set). Each player's from their own camera's window.
+	auto halfWindow = [&](const float in[2], float out[2]) {
+		out[0] = in[0];
+		out[1] = in[1];
+		if (vertical) out[0] *= (float)vp1.w / (float)w;
+		else          out[1] *= (float)vp1.h / (float)h;
+		float v = out[1];
+		if (g_config.splitFov != 0.0f && v > 0.0f) {
+			float a = atanf(v) + g_config.splitFov * 3.14159265f / 360.0f;
+			if (a > 1.4f) a = 1.4f;
+			if (a < 0.1f) a = 0.1f;
+			float s = tanf(a) / v;
+			out[0] *= s;
+			out[1] *= s;
+		}
+	};
+	float half[2], half1[2], half2[2], win[2];
+	halfWindow(p1cam.window, half);
+	if (P1CamWindow(win)) halfWindow(win, half1); else { half1[0] = half[0]; half1[1] = half[1]; }
+	if (P2CamWindow(win)) halfWindow(win, half2); else { half2[0] = half[0]; half2[1] = half[1]; }
 	if (!g_loggedLayout) {
 		g_loggedLayout = true;
 		char* frame = *(char**)((char*)cam + 4);
@@ -325,10 +344,16 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	float m2[16];
 	bool own2 = P2CamMatrix(m2);
 	if (SplitDebug() & 2) { own2 = false; d2 = Vector3(); }   // diagnostics: player 1's camera in both halves
+	bool p2Leads = t && t.Leader() == CoopP2Hero() && g_config.gameCamera;
 	auto placeP2 = [&] {
+		RwCameraSetViewWindow(cam, half2);
 		if (own2) {
 			memcpy(FrameModelling(cam), m2, sizeof(m2));
 			memcpy(FrameLtm(cam), m2, sizeof(m2));
+		} else if (p2Leads) {
+			// Player 2's hero leads: the game's camera is player 2's.
+			memcpy(FrameModelling(cam), p1cam.modelling, sizeof(p1cam.modelling));
+			memcpy(FrameLtm(cam), p1cam.ltm, sizeof(p1cam.ltm));
 		} else {
 			Translate(cam, p1cam, d2);
 		}
@@ -339,6 +364,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	float m1[16];
 	bool own1 = P1CamMatrix(m1);
 	auto placeP1 = [&] {
+		RwCameraSetViewWindow(cam, half1);
 		if (own1) {
 			memcpy(FrameModelling(cam), m1, sizeof(m1));
 			memcpy(FrameLtm(cam), m1, sizeof(m1));
@@ -352,7 +378,6 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	// 2. Stamp-only walk for player 2. Being the frame's first walk, it is also
 	//    the one that updates the swept collision spheres.
 	g_repeatWalk = false;
-	RwCameraSetViewWindow(cam, half);
 	placeP2();
 	SyncCameras(view, nullptr);
 	LogFrustum("p2 stamp", cam);

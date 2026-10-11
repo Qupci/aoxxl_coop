@@ -51,6 +51,15 @@ void CoopConfig::Load(const char* iniPath) {
 	enabled     = ReadBool("coop", "enabled", enabled, full);
 	splitScreen = ReadBool("coop", "split_screen", splitScreen, full);
 	{
+		char cb[32] = {};
+		GetPrivateProfileStringA("coop", "camera", "game", cb, sizeof(cb), full);
+		gameCamera = !(cb[0] == 'm' || cb[0] == 'M');
+		GetPrivateProfileStringA("coop", "split_fov", "15", cb, sizeof(cb), full);
+		splitFov = (float)atof(cb);
+		if (splitFov < -30.0f) splitFov = -30.0f;
+		if (splitFov > 60.0f) splitFov = 60.0f;
+	}
+	{
 		char pb[32] = {};
 		GetPrivateProfileStringA("coop", "p1_pad", "", pb, sizeof(pb), full);
 		if (pb[0] == 'k' || pb[0] == 'K') p1Pad = 4;   // the keyboard (pads.h kKeyboardPad)

@@ -63,6 +63,7 @@ bool CoopDeferTrioEvent(void* trio, int event);
 
 bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
+uint8_t* CoopP2CameraValues();   // player 2's input as the game camera reads it (nullptr: none)
 bool TraceInstallHooks();   // trace.cpp: event logging for interaction debugging
 void TraceDumpCollisionTests(void* receiver);   // trace.cpp: collision tests involving `receiver`
 float PotionGauge();            // trace.cpp: the magic potion gauge (0 = none)

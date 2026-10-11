@@ -53,6 +53,7 @@ struct CoopState {
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
+	uint8_t p2CamValues[kP2ValuesSize] = {};   // p2Values plus the right stick, for the game camera's ticks
 	int     p2Combos = 0;             // combo bytes after the actions (P2RecognizeCombos)
 
 	uint8_t* savedValues = nullptr;   // CKInput's own array while player 2's is in
@@ -390,6 +391,29 @@ int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
 bool CoopOneScreen() { return g.oneScreen; }
+// Player 2's input for the game camera (CKSrvCamera +0x580: an input view whose
+// actions 0-4 are the right stick up, down, right, left and its button -- the
+// game's bindings 46-50 -- which player 2's hero values never carry).
+uint8_t* CoopP2CameraValues() {
+	if (!g.p2Joined || !g.p2ValuesReady || g.p2Pad < 0) return nullptr;
+	CKYellowPages* yp = YellowPages();
+	char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	char* view = cs ? *(char**)(cs + 0x580) : nullptr;
+	uint8_t* remap = view ? *(uint8_t**)(view + 8) : nullptr;
+	memcpy(g.p2CamValues, g.p2Values, sizeof(g.p2CamValues));
+	if (!remap) return g.p2CamValues;
+	const PadState& p = PadGet(g.p2Pad);
+	auto put = [&](int action, float v) {
+		uint8_t b = remap[action];
+		if (v > 1.0f) v = 1.0f;
+		g.p2CamValues[b] = v > 0.0f ? (uint8_t)(v * 255.0f + 0.5f) : 0;
+	};
+	put(0, p.ry);  put(1, -p.ry);
+	put(2, p.rx);  put(3, -p.rx);
+	put(4, (p.pressed & PAD_RTHUMB) ? 1.0f : 0.0f);
+	return g.p2CamValues;
+}
+
 bool CoopHeroHeld(int idx) { return g.p2Joined && idx >= 0 && idx < HERO_COUNT && g.held[idx]; }
 
 void CoopRequestLeave(const char* why) {

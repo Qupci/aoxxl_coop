@@ -541,27 +541,58 @@ const uintptr_t kFightMode = 0x481950;
 const uint8_t   kFightModePrologue[7] = { 0x51, 0x56, 0x8B, 0xF1, 0x57, 0x8B, 0x06 };
 FightFn g_origFight = nullptr;
 volatile long g_p2Fights = 0;
+// Per hero: game time an enemy was last within the fight radius (a pass that
+// refreshed +0x408), for the fight camera of each player's own camera.
+float g_fightSeen[2] = { -1000.0f, -1000.0f };
+float g_fightNow = 0.0f, g_fightDelay = 0.0f;
 
 void __fastcall FightHook(char* trio, void* edx, void* time) {
 	Trio t = GetTrio();
 	int nl = CoopNonLeaderPlayer();
+	float now = time ? *(float*)((char*)time + 4) : 0.0f;
+	float& last = *(float*)(trio + 0x408);
+	bool nlFound = false;
 	if (t && trio == t.raw() && nl >= 0 && CoopP2Joined() && !CoopSuspended() && !CoopHeroHeld(nl)) {
 		uint8_t* tr = (uint8_t*)trio;
 		uint8_t leader = tr[0x2C], companion = tr[0x2D];
 		bool wasOn = (*(uint32_t*)(tr + 0x3F4) & 0x40) != 0;
+		float before = last;
 		tr[0x2C] = (uint8_t)nl;
 		tr[0x2D] = leader;
 		*(uint32_t*)(tr + 0x3F4) &= ~1u;   // the enemy cache is the leader's
 		g_origFight(trio, edx, time);
 		if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
 		*(uint32_t*)(tr + 0x3F4) &= ~1u;
+		nlFound = last != before;
+		if (nlFound && nl < 2) g_fightSeen[nl] = now;
 		if (!wasOn && (*(uint32_t*)(tr + 0x3F4) & 0x40)) {
 			InterlockedIncrement(&g_p2Fights);
 			Log("proximity: fight mode (music) started by %s (not leading)", HeroName(nl));
 		}
 	}
+	// The game's own pass, for the leader. After a refresh by the other hero,
+	// +0x408 is set just short of now so that the leader's own refresh shows
+	// (and the fight cannot end in between).
+	float mark = nlFound ? now - 0.01f : last;
+	last = mark;
+	int lead = t && trio == t.raw() ? t.Leader() : -1;
 	g_origFight(trio, edx, time);
+	if (last != mark && lead >= 0 && lead < 2) g_fightSeen[lead] = now;
+	if (nlFound && last == mark) last = now;
+	if (t && trio == t.raw()) {
+		g_fightNow = now;
+		g_fightDelay = *(float*)(trio + 0x404);
+	}
 }
+
+} // namespace
+
+bool ProximityHeroFighting(int hero) {
+	if (hero < 0 || hero > 1) return false;
+	return g_fightNow - g_fightSeen[hero] <= g_fightDelay;
+}
+
+namespace {
 
 // CKGrpBonusPool vf39 "may this hero collect" ignores its argument and asks the
 // trio's leader instead (the potion pool, type 3: leader must be Asterix), so it

@@ -21,7 +21,7 @@ cl /nologo /c /O2 /MT /EHsc /W3 /std:c++17 /D_CRT_SECURE_NO_WARNINGS ^
    "%ROOT%src\life.cpp" "%ROOT%src\trio.cpp" "%ROOT%src\pads.cpp" "%ROOT%src\inputmgr.cpp" ^
    "%ROOT%src\watchdog.cpp" "%ROOT%src\vtprofile.cpp" "%ROOT%src\detour.cpp" "%ROOT%src\p2input.cpp" ^
    "%ROOT%src\render.cpp" "%ROOT%src\autotest.cpp" "%ROOT%src\shot.cpp" "%ROOT%src\config.cpp" ^
-   "%ROOT%src\log.cpp" "%ROOT%src\padident.cpp" "%ROOT%src\crash.cpp" "%ROOT%src\splitscreen.cpp" "%ROOT%src\p2cam.cpp" "%ROOT%src\proximity.cpp" "%ROOT%src\trace.cpp" "%ROOT%src\klusters.cpp" "%ROOT%src\sound.cpp"
+   "%ROOT%src\log.cpp" "%ROOT%src\padident.cpp" "%ROOT%src\crash.cpp" "%ROOT%src\splitscreen.cpp" "%ROOT%src\p2cam.cpp" "%ROOT%src\gamecam.cpp" "%ROOT%src\proximity.cpp" "%ROOT%src\trace.cpp" "%ROOT%src\klusters.cpp" "%ROOT%src\sound.cpp"
 if errorlevel 1 goto :fail
 
 link /nologo /DLL /OUT:xxl_coop.asi *.obj kernel32.lib user32.lib gdi32.lib gdiplus.lib psapi.lib

@@ -27,6 +27,10 @@ void P2CamEndHeroTick();
 // Player 1's follow camera: only while player 2's hero is the trio's leader (the
 // game camera follows it).
 bool P1CamMatrix(float out[16]);
+// The view window of that player's copy of the game camera (its own field of
+// view), when that is the camera drawn for them.
+bool P1CamWindow(float window[2]);
+bool P2CamWindow(float window[2]);
 struct Vector3;
 void P2CamLookToward(const Vector3& target);   // autotest
 int  Player1Pad();                // the pad the game reads (pad identification), -1 if unknown

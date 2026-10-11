@@ -17,6 +17,10 @@
 
 bool ProximityInstallHooks();
 
+// Whether hero `hero` has had an enemy within the trio's fight radius in the
+// last fight-ending delay (trio +0x404 s): the fight camera, per player.
+bool ProximityHeroFighting(int hero);
+
 // The hero a lever's (CKHkActivator) events switch the trio to, or -1.
 int ProximityLeverSwitchTarget(void* lever);
 

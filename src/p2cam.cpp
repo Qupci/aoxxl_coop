@@ -1,5 +1,6 @@
 #include "p2cam.h"
 #include "coop.h"
+#include "gamecam.h"
 #include "config.h"
 #include "log.h"
 #include "pads.h"
@@ -76,12 +77,14 @@ int CollideAt(const Vector3& p) {
 	return ((CylFn)0x44A210)(coll, nullptr, pos, radius, half + half, result, 1);
 }
 
-void Seed(Hero leader) {
+void Seed(Hero leader, const char* state = nullptr) {
 	char* srv = CameraService();
 	RwCamera* rw = MainCamera();
 	if (!srv || !rw || !leader) return;
-	// The service keeps last frame's camera position at +0x5B0 and look-at at +0x5BC.
-	Vector3 gpos = *(Vector3*)(srv + 0x5B0), glook = *(Vector3*)(srv + 0x5BC);
+	// The service keeps last frame's camera position at +0x5B0 and look-at at +0x5BC
+	// (`state`: the copy of it that follows the other player's hero).
+	const char* st = state ? state : srv;
+	Vector3 gpos = *(const Vector3*)(st + 0x5B0), glook = *(const Vector3*)(st + 0x5BC);
 	Vector3 off = gpos - glook;
 	float d = sqrtf(off.len2());
 	// Seeded right after a scripted shot (a launcher's flight camera keeps 9.7
@@ -137,7 +140,7 @@ Vector3 WorldPos(Hero h) {
 		return Vector3(p[0], p[1], p[2]);
 	return h.Pos();
 }
-void UpdateCam(Hero hero, Hero leader, int pad);
+void UpdateCam(Hero hero, Hero leader, int pad, const char* seedState = nullptr);
 }
 
 void P2CamFrame() {
@@ -145,6 +148,25 @@ void P2CamFrame() {
 	Trio t = GetTrio();
 	if (!t) return;
 	Hero leader = t.GetHero(t.Leader());
+	if (g_config.gameCamera) {
+		// Each player not leading has a copy of the game's camera (gamecam.cpp),
+		// except while the game holds their hero for a scripted sequence (riding
+		// the cable car, waiting on the spinning platform): the other player's
+		// action drives the game's camera then, and the held player looks around
+		// with this follow camera.
+		const int heroes[2] = { CoopP1Hero(), CoopP2Hero() };
+		const int pads[2] = { Player1Pad(), CoopP2Pad() };
+		for (int p = 0; p < 2; p++) {
+			g_cur = &g_cams[p];
+			int idx = heroes[p];
+			if (idx >= 0 && idx != t.Leader() && CoopHeroHeld(idx))
+				UpdateCam(t.GetHero(idx), leader, pads[p], GameCamCopyState(idx));
+			else
+				ResetCam(g_cams[p]);
+		}
+		g_cur = &g_cams[1];
+		return;
+	}
 	g_cur = &g_cams[1];
 	UpdateCam(t.GetHero(CoopP2Hero()), leader, CoopP2Pad());
 	// Player 1 needs a camera of its own only while the game's camera follows
@@ -163,7 +185,7 @@ void P2CamFrame() {
 }
 
 namespace {
-void UpdateCam(Hero hero, Hero leader, int pad) {
+void UpdateCam(Hero hero, Hero leader, int pad, const char* seedState) {
 	if (!hero) return;
 
 	DWORD now = GetTickCount();
@@ -178,7 +200,7 @@ void UpdateCam(Hero hero, Hero leader, int pad) {
 		// is the scene's (a Roman agent's close-up seeded player 1's own camera at
 		// 3 units, focus at the hero's knees, after the dialogue in level 5).
 		if (CoopSuspended()) return;
-		Seed(leader);
+		Seed(leader, seedState);
 		if (!cam.init) return;
 		target = heroAt + Vector3(0, cam.focusH, 0);
 		cam.focus = target;
@@ -266,7 +288,34 @@ void P2CamLookToward(const Vector3& target) {
 	g_cams[1].idle = 0.0f;
 }
 
+namespace {
+// With the game camera copies: a player's own view unless their hero leads (then
+// the game's camera is theirs) -- the follow camera while held, else the copy.
+bool PlayerView(int idx, const Cam& c, float out[16], float window[2]) {
+	Trio t = GetTrio();
+	if (!t || idx < 0 || t.Leader() == idx) return false;
+	if (c.haveMatrix) {
+		memcpy(out, c.m, sizeof(c.m));
+		return window == nullptr;
+	}
+	float w[2];
+	if (!GameCamView(idx, out, w)) return false;
+	if (window) { window[0] = w[0]; window[1] = w[1]; }
+	return true;
+}
+}
+
+bool P1CamWindow(float window[2]) {
+	float m[16];
+	return g_config.gameCamera && PlayerView(CoopP1Hero(), g_cams[0], m, window);
+}
+bool P2CamWindow(float window[2]) {
+	float m[16];
+	return g_config.gameCamera && PlayerView(CoopP2Hero(), g_cams[1], m, window);
+}
+
 bool P1CamMatrix(float out[16]) {
+	if (g_config.gameCamera) return PlayerView(CoopP1Hero(), g_cams[0], out, nullptr);
 	if (!g_cams[0].haveMatrix) return false;
 	memcpy(out, g_cams[0].m, sizeof(g_cams[0].m));
 	return true;
@@ -279,26 +328,25 @@ bool OtherViewMatrix(float out[16]) {
 }
 
 bool P2CamMatrix(float out[16]) {
+	if (g_config.gameCamera) return PlayerView(CoopP2Hero(), g_cams[1], out, nullptr);
 	if (!cam.haveMatrix) return false;
 	memcpy(out, cam.m, sizeof(cam.m));
 	return true;
 }
 
-void BeginTickWith(Cam& c);
-void P2CamBeginHeroTick() { BeginTickWith(g_cams[1]); }
-void P1CamBeginHeroTick() { BeginTickWith(g_cams[0]); }
+void BeginTickWith(const float* m);
+void P2CamBeginHeroTick() { float m[16]; BeginTickWith(P2CamMatrix(m) ? m : nullptr); }
+void P1CamBeginHeroTick() { float m[16]; BeginTickWith(P1CamMatrix(m) ? m : nullptr); }
 void P1CamEndHeroTick() { P2CamEndHeroTick(); }
 
-void BeginTickWith(Cam& c) {
-	Cam* saved = g_cur;
-	g_cur = &c;
+void BeginTickWith(const float* m) {
 	basis.active = false;
-	if (!cam.haveMatrix) { g_cur = saved; return; }
+	if (!m) return;
 	Trio t = GetTrio();
-	if (!t) { g_cur = saved; return; }
+	if (!t) return;
 	char* trio = t.raw();
-	Vector3 fwd(cam.m[8], 0, cam.m[10]);
-	if (fwd.len2() < 1e-6f) { g_cur = saved; return; }
+	Vector3 fwd(m[8], 0, m[10]);
+	if (fwd.len2() < 1e-6f) return;
 	fwd = Normalize(fwd);
 	basis.a37C = *(float*)(trio + 0x37C);
 	basis.a384 = *(float*)(trio + 0x384);
@@ -311,7 +359,6 @@ void BeginTickWith(Cam& c) {
 	*(float*)(trio + 0x3A0) = 0.0f;
 	*(float*)(trio + 0x3A4) = fwd.z;
 	basis.active = true;
-	g_cur = saved;
 }
 
 void P2CamEndHeroTick() {

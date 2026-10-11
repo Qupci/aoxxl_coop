@@ -15,6 +15,7 @@
 #include "render.h"
 #include "autotest.h"
 #include "crash.h"
+#include "gamecam.h"
 #include "splitscreen.h"
 #include "proximity.h"
 
@@ -111,6 +112,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 
 	RenderInstallHooks();
 	SplitInstallHooks();
+	GameCamInstallHooks();
 	ProximityInstallHooks();
 	TraceInstallHooks();
 	KlusterInstallHooks();
