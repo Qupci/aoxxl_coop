@@ -293,7 +293,13 @@ namespace {
 // the game's camera is theirs) -- the follow camera while held, else the copy.
 bool PlayerView(int idx, const Cam& c, float out[16], float window[2]) {
 	Trio t = GetTrio();
-	if (!t || idx < 0 || t.Leader() == idx) return false;
+	if (!t || idx < 0) return false;
+	// Not t.Leader(): during the other hero's tick the trio's leader byte is
+	// sliced to that hero (CoopBeforeLifeTick), and its movement basis is asked
+	// for right then.
+	int lead = GameCamLiveHero();
+	if (lead < 0) lead = t.Leader();
+	if (lead == idx) return false;
 	if (c.haveMatrix) {
 		memcpy(out, c.m, sizeof(c.m));
 		return window == nullptr;
@@ -323,7 +329,9 @@ bool P1CamMatrix(float out[16]) {
 
 bool OtherViewMatrix(float out[16]) {
 	Trio t = GetTrio();
-	if (t && CoopP2Joined() && t.Leader() == CoopP2Hero() && P1CamMatrix(out)) return true;
+	int lead = t ? t.Leader() : -1;
+	if (g_config.gameCamera && GameCamLiveHero() >= 0) lead = GameCamLiveHero();
+	if (t && CoopP2Joined() && lead == CoopP2Hero() && P1CamMatrix(out)) return true;
 	return P2CamMatrix(out);
 }
 
@@ -353,6 +361,12 @@ void BeginTickWith(const float* m) {
 	memcpy(basis.b, trio + 0x39C, sizeof(basis.b));
 	float ang = atan2f(fwd.z, fwd.x);
 	if (ang < 0) ang += 6.2831855f;
+	static DWORD lastLog = 0;
+	if (g_config.verbose && GetTickCount() - lastLog > 1000) {
+		lastLog = GetTickCount();
+		Log("p2cam: hero tick basis from own camera: fwd (%.2f %.2f) angle %.2f (trio had %.2f / %.2f)", fwd.x, fwd.z,
+		    ang, *(float*)(trio + 0x37C), *(float*)(trio + 0x384));
+	}
 	*(float*)(trio + 0x37C) = ang;
 	*(float*)(trio + 0x384) = ang;
 	*(float*)(trio + 0x39C) = fwd.x;

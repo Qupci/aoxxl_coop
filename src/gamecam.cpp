@@ -377,6 +377,8 @@ bool GameCamView(int hero, float m[16], float window[2]) {
 	return true;
 }
 
+int GameCamLiveHero() { return g_active ? g_liveOwner : -1; }
+
 const char* GameCamCopyState(int hero) {
 	return g_active && g_copy.valid && g_copy.hero == hero ? (const char*)g_copy.svc : nullptr;
 }

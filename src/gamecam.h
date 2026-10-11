@@ -18,5 +18,9 @@ bool GameCamInstallHooks();
 // The copy's last view for `hero` (the hero that is not leading): the camera
 // frame's modelling matrix and the view window the game set for it.
 bool GameCamView(int hero, float m[16], float window[2]);
+// The hero the game's own camera follows (the real leader, also while the mod
+// has the trio's leader byte sliced for the other hero's tick); -1 if the
+// copies are off.
+int GameCamLiveHero();
 // The copy's service bytes (camera position +0x5B0, look-at +0x5BC), or nullptr.
 const char* GameCamCopyState(int hero);

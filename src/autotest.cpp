@@ -1083,6 +1083,19 @@ const Step kCable33[] = {
 	END(12500),
 };
 
+// p2dir (level 2): player 2 turns their camera (right stick) and then pushes
+// the left stick up: Obelix must walk away from player 2's camera.
+const Step kP2Dir[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	SHOT(2000, "p2dir_0"),
+	VPADR(2500, 1, 1.0f, 0.0f, "p2 turns camera"), VPADR(3700, 1, 0.0f, 0.0f, "p2 camera still"),
+	SHOT(4000, "p2dir_1"),
+	VPAD(4200, 1, 0, 0.0f, 1.0f, "p2 forward"), SHOT(5200, "p2dir_2"), VPAD(5700, 1, 0, 0, 0, "p2 stop"),
+	VPAD(6000, 1, 0, 1.0f, 0.0f, "p2 right"), SHOT(7000, "p2dir_3"), VPAD(7500, 1, 0, 0, 0, "p2 stop"),
+	END(8000),
+};
+
 // cam32 (-Level 3): sector 2's beach -- both heroes at 170.8 6.1 -214.9, then
 // Asterix walks (glides) to x 140 and back: which camera the game uses where.
 const Step kCam32[] = {
@@ -1809,6 +1822,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shine44", kShine44),
 	SCENARIO("cam32", kCam32),
 	SCENARIO("cam32o", kCam32O),
+	SCENARIO("p2dir", kP2Dir),
 	SCENARIO("cable33", kCable33),
 	SCENARIO("cam32s", kCam32S),
 	SCENARIO("fight4o", kFight4O),
