@@ -1010,6 +1010,19 @@ const Step kShine25[] = {
 	END(11000),
 };
 
+// shine44 (-Level 4): sector 4 -- both heroes at -720.4 10.0 -179.6, where the
+// game camera sees a x10 bonus at once; then Asterix's potion. Run with
+// XXL_SPLITDBG=2 for player 1's camera in both halves.
+const Step kShine44[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -720.4f, 10.5f, -179.6f), PLACEAT(3000, HERO_OBELIX, -718.4f, 10.5f, -179.6f),
+	SHOT(5000, "shine44_1a"), SHOT(5300, "shine44_1b"), SHOT(5600, "shine44_1c"), SHOT(5900, "shine44_1d"),
+	POTION(6500),
+	SHOT(8500, "shine44_2"),
+	END(9000),
+};
+
 // lifterwait (level 2): player 2's Obelix waits by sector 1's lifter
 // (-746.8 495.9 -991.7) while Asterix stays at the start; teleports logged.
 const Step kLifterWait[] = {
@@ -1719,6 +1732,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("launch48", kLaunch48),
 	SCENARIO("launch48a", kLaunch48A),
 	SCENARIO("shine25", kShine25),
+	SCENARIO("shine44", kShine44),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),

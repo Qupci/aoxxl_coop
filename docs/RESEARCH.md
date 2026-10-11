@@ -1070,3 +1070,16 @@ InitStateTables vs Obelix's FUN_004A69F0) -- Obelix has no third jump state/anim
   CParticlesNodeFx near the bonus, not list 12 (that is the 2D HUD, HUD camera = parallel projection),
   not the back-buffer copy stamp (renderer+0x24), not clone sync. P2's aura comes out orange/yellow instead
   of green. `XXL_SPLITDBG=2` puts player 1's camera in both halves for A/B screenshots (shine25 scenario).
+
+## Round 26 (2026-10-12): shine in player 2's view -- SOLVED
+
+The x10 bonuses' rays and the potion aura on Asterix are CParticlesNodeFx systems. Ruled-out leads
+from round 25 aside, the cause was the particle walk handling: player 1's walk stepped the systems and
+player 2's walk stepped them again with a tiny time step, which (a) found the aura's per-frame emission
+points (+0x40, cleared by the walk when +0x10 bit 12) already used up and (b) left the rays' systems
+drawing nothing in the half drawn right after a step. Now the stamp walk (player 2's camera, dummy lists)
+steps every system player 2 sees, and both real walks only add the stepped system's atomics
+(FUN_0041E390, thiscall(node, lists) -> visible) plus walk its children when the node's stamp
+(+0x14) is this frame's; unstepped systems (seen by player 1 only) are stepped by player 1's walk.
+Repro: shine44 (-Level 4, both heroes at -720.4 10 -179.6) with XXL_SPLITDBG=2 (player 1's camera in
+both halves).

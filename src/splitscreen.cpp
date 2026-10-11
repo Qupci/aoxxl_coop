@@ -64,45 +64,37 @@ void __fastcall DynSphereWalkHook(void* self, void* edx, void** lists, void* dt)
 }
 
 // --- particles ---------------------------------------------------------------
-// CParticlesNodeFx::vf14 (0x41A510) only does its work -- step the particles by
-// the frame time, build them for the camera, add them to the draw lists -- while
-// its particle system's +4 bit 1 is set, and clears that bit when done: once per
-// frame. The split frame's first walk is player 2's stamp walk into lists that
-// draw nothing, so helmet sparkles and torch flames vanished from both halves.
-// The later walks get the bit back and a zero time step (no double simulation).
+// CParticlesNodeFx::vf14 (0x41A510) steps its particle system by the frame time
+// and adds the system's atomics to the draw lists (FUN_0041E390, which also does
+// the frustum test) -- once per frame for most systems: it works only while the
+// system's +4 bit 1 is set and clears it when done; others (the magic potion's
+// aura on Asterix) use up the emission points the game hands them every frame
+// (+0x40). A second step in the same frame left player 2's half without the
+// helmets' sparkles, the potion's aura and the x10 bonuses' rays. Now the
+// frame's first walk -- player 2's stamp walk, whose lists draw nothing -- steps
+// every system that half sees, and each half's walk then only adds the same
+// atomics to its own lists (the particles are in world space and face whichever
+// camera draws them). A system not stepped yet this frame (out of player 2's
+// view) is stepped by player 1's walk as usual.
 const uintptr_t kParticlesVtbl = 0x622FCC;   // CParticlesNodeFx (11,19)
 const uintptr_t kParticlesWalk = 0x41A510;
+typedef char(__fastcall* AddToListsFn)(char* node, void* edx, void** lists);
+const AddToListsFn AddToLists = (AddToListsFn)0x41E390;
 CollectFn g_origParticlesWalk = nullptr;
 bool      g_inSplitFrame = false;
 bool      g_stampWalk = false;
-int       g_particlePass = 0;     // 1: player 1's walk (first real one), 2: player 2's
-char*     g_particleRedo[512];
-int       g_numParticleRedo = 0;
 
 void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt) {
 	char* ps = *(char**)(self + 0x48);
-	if (!g_inSplitFrame || !ps) { g_origParticlesWalk(self, edx, lists, dt); return; }
-	uint32_t* flags = (uint32_t*)(ps + 4);
-	if (g_stampWalk) return;   // lists that draw nothing: leave the frame's work for the real walks
-	if (!g_repeatWalk || g_particlePass == 1) {
-		if ((*flags & 2) && g_numParticleRedo < 512) g_particleRedo[g_numParticleRedo++] = self;
+	// Already stepped this frame (stamped by its visibility test), not hidden: add only.
+	if (!g_inSplitFrame || !ps || g_stampWalk || *(uint16_t*)(self + 0x14) != *(uint16_t*)kFrameId ||
+	    (*(uint16_t*)(self + 0x10) & 2)) {
 		g_origParticlesWalk(self, edx, lists, dt);
 		return;
 	}
-	for (int i = 0; i < g_numParticleRedo; i++) {
-		if (g_particleRedo[i] != self) continue;
-		char still[0x40];
-		memcpy(still, dt, sizeof(still));
-		*(float*)(still + 0xC) = 1e-5f;   // non-zero: a zero step skips the build entirely
-		*flags |= 2;
-		// Nodes with +0x10 bit 9 add themselves to the lists only if their visit
-		// stamp is not this frame's yet; player 1's walk has just set it.
-		uint16_t frame = *(uint16_t*)kFrameId;
-		*(uint16_t*)(self + 0x14) = frame > 1 ? (uint16_t)(frame - 1) : (uint16_t)0xFFFE;
-		g_origParticlesWalk(self, edx, lists, still);
-		return;
-	}
-	g_origParticlesWalk(self, edx, lists, dt);
+	AddToLists(self, nullptr, lists);
+	for (char* child = *(char**)(self + 0x18); child; child = *(char**)(child + 8))
+		((CollectFn)(*(void***)child)[14])(child, nullptr, lists, dt);
 }
 
 // --- viewport override ---------------------------------------------------------
@@ -222,11 +214,9 @@ void RenderSplitFrameImpl(char* view, void* dt);
 
 void RenderSplitFrame(char* view, void* dt) {
 	g_inSplitFrame = true;
-	g_numParticleRedo = 0;
 	RenderSplitFrameImpl(view, dt);
 	g_inSplitFrame = false;
 	g_repeatWalk = false;
-	g_particlePass = 0;
 }
 
 void RenderSplitFrameImpl(char* view, void* dt) {
@@ -344,9 +334,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	placeP1();
 	SyncCameras(view, nullptr);
 	LogFrustum("p1 walk", cam);
-	g_particlePass = 1;
 	collect(root, nullptr, (void**)(view + 0x1C), dt);
-	g_particlePass = 2;
 	SyncClones(*(void**)(view + 0x58), nullptr, dt);
 	ResetDirty(view, nullptr);
 	if (!(viewFlags & 0x10)) ClearCamera(renderer, nullptr, 0);
