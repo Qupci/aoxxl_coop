@@ -84,14 +84,44 @@ CollectFn g_origParticlesWalk = nullptr;
 bool      g_inSplitFrame = false;
 bool      g_stampWalk = false;
 
+// Systems stepped in this split frame. A system with +0x10 bit 9 is stepped
+// whether or not it is in view (and stamps itself only when it is): the x10
+// bonuses' yellow rays, stepped by player 2's stamp walk out of that view, were
+// then skipped by player 1's walk -- only the red ones showed.
+char*    g_stepped[2048];
+uint32_t g_steppedGen[2048];
+uint32_t g_splitGen = 0;
+
+bool Stepped(char* node) {
+	for (uint32_t h = ((uintptr_t)node >> 4) & 2047, k = 0; k < 2048; h = (h + 1) & 2047, k++) {
+		if (g_steppedGen[h] != g_splitGen) return false;
+		if (g_stepped[h] == node) return true;
+	}
+	return false;
+}
+
+void MarkStepped(char* node) {
+	for (uint32_t h = ((uintptr_t)node >> 4) & 2047, k = 0; k < 2048; h = (h + 1) & 2047, k++) {
+		if (g_steppedGen[h] != g_splitGen) { g_steppedGen[h] = g_splitGen; g_stepped[h] = node; return; }
+		if (g_stepped[h] == node) return;
+	}
+}
+
 void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt) {
 	char* ps = *(char**)(self + 0x48);
-	// Already stepped this frame (stamped by its visibility test), not hidden: add only.
-	if (!g_inSplitFrame || !ps || g_stampWalk || *(uint16_t*)(self + 0x14) != *(uint16_t*)kFrameId ||
-	    (*(uint16_t*)(self + 0x10) & 2)) {
+	if (!g_inSplitFrame || !ps || (*(uint16_t*)(self + 0x10) & 2)) {
 		g_origParticlesWalk(self, edx, lists, dt);
 		return;
 	}
+	if (!Stepped(self)) {
+		bool active = (*(uint32_t*)(ps + 4) & 2) != 0;
+		g_origParticlesWalk(self, edx, lists, dt);
+		// Stepped: every bit-9 system, the others when their visibility test passed.
+		if (active && ((*(uint16_t*)(self + 0x10) & 0x200) || *(uint16_t*)(self + 0x14) == *(uint16_t*)kFrameId))
+			MarkStepped(self);
+		return;
+	}
+	// Already stepped this frame: only into this walk's lists (with its frustum test).
 	AddToLists(self, nullptr, lists);
 	for (char* child = *(char**)(self + 0x18); child; child = *(char**)(child + 8))
 		((CollectFn)(*(void***)child)[14])(child, nullptr, lists, dt);
@@ -213,6 +243,7 @@ int SplitDebug() {
 void RenderSplitFrameImpl(char* view, void* dt);
 
 void RenderSplitFrame(char* view, void* dt) {
+	if (++g_splitGen == 0) g_splitGen = 1;
 	g_inSplitFrame = true;
 	RenderSplitFrameImpl(view, dt);
 	g_inSplitFrame = false;

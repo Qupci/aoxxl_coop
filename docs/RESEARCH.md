@@ -1083,3 +1083,8 @@ steps every system player 2 sees, and both real walks only add the stepped syste
 (+0x14) is this frame's; unstepped systems (seen by player 1 only) are stepped by player 1's walk.
 Repro: shine44 (-Level 4, both heroes at -720.4 10 -179.6) with XXL_SPLITDBG=2 (player 1's camera in
 both halves).
+- Follow-up: particle systems with +0x10 bit 9 (0x200) are stepped whether or not they are in view and
+  stamp themselves only when visible. The x10's yellow rays, stepped by player 2's stamp walk while out of
+  player 2's view, were then skipped by player 1's walk (its work bit already cleared): only the red rays
+  showed when teleporting there with split screen on. The split frame now tracks which systems were stepped
+  (pointer set, generation per split frame) instead of trusting the stamp.

@@ -1016,11 +1016,11 @@ const Step kShine25[] = {
 const Step kShine44[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 4),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
-	PLACEAT(3000, HERO_ASTERIX, -720.4f, 10.5f, -179.6f), PLACEAT(3000, HERO_OBELIX, -718.4f, 10.5f, -179.6f),
-	SHOT(5000, "shine44_1a"), SHOT(5300, "shine44_1b"), SHOT(5600, "shine44_1c"), SHOT(5900, "shine44_1d"),
-	POTION(6500),
-	SHOT(8500, "shine44_2"),
-	END(9000),
+	PLACEAT(2500, HERO_ASTERIX, -720.4f, 10.5f, -179.6f), PLACEAT(2500, HERO_OBELIX, -718.4f, 10.5f, -179.6f),
+	SHOT(5000, "shine44_1a"), SHOT(5300, "shine44_1b"), SHOT(5600, "shine44_1c"),
+	POTION(6000),
+	SHOT(8000, "shine44_2"),
+	END(8500),
 };
 
 // lifterwait (level 2): player 2's Obelix waits by sector 1's lifter
