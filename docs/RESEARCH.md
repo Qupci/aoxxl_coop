@@ -1122,9 +1122,12 @@ both halves).
 * LV2-6 plate (5.7 2.8 -389.2): its sequence also messages the trio (0x2000 fight timer) -> PlateForEither now
   uses GroupCommandsTrio (leader switches / companion orders) instead of "messages the trio at all".
 * Spy dialogue 0x5120 set off by the non-leader (non-leader within 25 of the walk target, leader > 6 away):
-  the leader is put on the spot before the walk (LV2-1 second spy: the path finding got stuck). Autotest spy21o.
+  the non-leader takes the lead for the dialogue (raw trio swap before 0x5120; given back on resume like group
+  actions), so the game brings the other hero in as the companion (0x48BA = companion AI order 13 to the
+  leader's dialogue spot, it walks in from off screen as in SP). Autotests spy21o (leader sets it off) /
+  spy21a (non-leader); these force the spies' gate, so the spy itself is not spawned in them.
 * LV5-9: the slide's agent (two talks: landing, slide end) stays spawned at the slide end; the launcher's landing
   zone (0x0988) sent it 0x5198 again -> talk 700 units away. CKHkClueMan::sendEvent hooked: 0x5198 ignored when
-  both heroes are > 150 from the spy's node and spot (co-op only). Not autotested (needs the slide state).
+  both heroes are > 250 from the spy's node and spot (150 broke the slide-end auto talk) (co-op only). Not autotested (needs the slide state).
 * LV5-8 lifter Romans partly missing while the previous section's Romans live: the Roman pool (CKGrpPoolSquad)
   has a fixed number of Roman objects from the level file; heap size does not change it.

@@ -657,14 +657,25 @@ const Step kPlate26[] = {
 // dialogue off, then waits by it while player 2's Obelix sets the second spy's
 // off: Asterix (leading) has to get there.
 const Step kSpy21O[] = {
-	MARK(0, "baseline"),
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
-	PLACEAT(2000, HERO_ASTERIX, -825.0f, 509.0f, -1062.4f), GLIDEAT(2500, HERO_ASTERIX, -815.0f, 509.0f, -1062.4f, 1500),
-	CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000), CINE_SKIP(30000),
-	PLACEAT(34000, HERO_ASTERIX, -817.82f, 508.0f, -1062.25f), PLACEAT(34000, HERO_OBELIX, -752.0f, 508.0f, -1012.0f),
-	GLIDEAT(35000, HERO_OBELIX, -746.46f, 507.8f, -1007.37f, 1000),
-	SHOT(38000, "spy21o_1"), SHOT(47000, "spy21o_2"),
-	END(64000),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	PLACEAT(2000, HERO_ASTERIX, -817.82f, 508.0f, -1062.25f), PLACEAT(2000, HERO_OBELIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(3000, HERO_OBELIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(4500, "spy21o_1"), SHOT(6000, "spy21o_2"), SHOT(8000, "spy21o_3"), SHOT(11000, "spy21o_4"),
+	END(40000),
+};
+
+// spy21a: the same, but player 1's Asterix (leading) sets the second spy off
+// while Obelix waits by the first: how the game brings the companion in.
+const Step kSpy21A[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	PLACEAT(2000, HERO_OBELIX, -817.82f, 508.0f, -1062.25f), PLACEAT(2000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(4500, "spy21a_1"), SHOT(6000, "spy21a_2"), SHOT(8000, "spy21a_3"), SHOT(11000, "spy21a_4"),
+	END(40000),
 };
 
 // mgun3a / mgun3n / mgun3o (-Level 3): sector 6's machinegun (-172.1 6.1
@@ -1841,6 +1852,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("plate3", kPlate3),
 	SCENARIO("plate26", kPlate26),
 	SCENARIO("spy21o", kSpy21O),
+	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
 	SCENARIO("mgun3n", kMgun3N),
 	SCENARIO("mgun3o", kMgun3O),

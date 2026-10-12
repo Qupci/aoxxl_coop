@@ -1205,7 +1205,7 @@ namespace {
 typedef int(__fastcall* ClueEventFn)(char* self, void* edx, unsigned ev, void* param);
 ClueEventFn g_origClueEvent = nullptr;
 const uintptr_t kClueManEvent = 0x4B82F0;
-const float     kSpyFar = 150.0f;
+const float     kSpyFar = 250.0f;   // the slide's end is ~200 from its agent; the relaunch was ~700
 
 int __fastcall ClueEventHook(char* self, void* edx, unsigned ev, void* param) {
 	Trio t = GetTrio();

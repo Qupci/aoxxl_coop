@@ -848,22 +848,28 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	// Set off by the player who is not leading (their hero at the spy, the
 	// leader far away), the leader would walk there by path finding -- and get
 	// stuck on the way more often than not (level 2 sector 1: the second spy,
-	// set off by Obelix with Asterix back at the first one). The leader is put
-	// on the spot at once instead, the way the game brings the companion along
-	// (0x48BA) when the leader sets a dialogue off.
+	// set off by Obelix with Asterix back at the first one). That hero leads
+	// for the dialogue instead, as if it had set the dialogue off in single
+	// player: it walks the few steps, and the game brings the other one in as
+	// the companion (0x48BA, AI order 13). The lead goes back afterwards.
 	Trio t = GetTrio();
 	int nl = CoopNonLeaderPlayer();
-	if (!t || nl < 0 || g.suspended) return;
-	Hero lead = t.GetHero(t.Leader()), other = t.GetHero(nl);
-	if (!lead || !other || g.held[t.Leader()]) return;
+	if (!t || nl < 0 || g.suspended || (char*)trio != t.raw()) return;
+	int lead = t.Leader();
+	Hero leader = t.GetHero(lead), other = t.GetHero(nl);
+	if (!leader || !other || g.held[lead] || g.held[nl]) return;
 	Vector3 to(spot[0], spot[1], spot[2]);
-	float dl = sqrtf((lead.Pos() - to).len2()), dn = sqrtf((other.Pos() - to).len2());
-	if (dl > 6.0f && dn < 25.0f) {
-		Vector3 dst = to;
-		dst.y += 0.5f;
-		SetHeroPosition(lead, dst);
-		Log("coop: %s set the dialogue off; %s (leading, %.0f units away) put on the spot (%.1f %.1f %.1f)",
-		    HeroName(nl), HeroName(t.Leader()), dl, dst.x, dst.y, dst.z);
+	float dl = sqrtf((leader.Pos() - to).len2()), dn = sqrtf((other.Pos() - to).len2());
+	if (dl > 6.0f && dn < 25.0f && dn < dl) {
+		uint8_t* tr = (uint8_t*)t.raw();
+		tr[0x2C] = (uint8_t)nl;
+		tr[0x2D] = (uint8_t)lead;
+		if (g.groupTookLead < 0) {
+			g.groupTookLead = nl;
+			g.groupPrevLeader = lead;
+		}
+		Log("coop: %s set the dialogue off; it leads for it (%s, %.0f units away, comes in as the companion)",
+		    HeroName(nl), HeroName(lead), dl);
 	}
 }
 
