@@ -812,7 +812,16 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	if (event == 0x5121) {
 		w.on = false;
 		void* to = cs ? *(void**)(cs + 0x34) : nullptr;
-		if (cs && g_trackBeforeSpy && to != g_trackBeforeSpy) {
+		uintptr_t toVt = to ? *(uintptr_t*)to : 0;
+		// Only a dialogue camera is replaced. A follow camera is the game's own
+		// choice: after the belly slide of level 2 the agent's dialogue returns to
+		// the area's follow camera, while the track from before the dialogue was
+		// the slide's start, which does not turn (right stick left/right dead).
+		bool dialogueCam = toVt == kFixTrackVtbl || toVt == kPlainCameraVtbl;
+		if (cs && g_trackBeforeSpy && to != g_trackBeforeSpy && !dialogueCam && to)
+			Log("coop: Roman agent's dialogue ended on camera track %p (vt %08X); kept (not a dialogue camera)", to,
+			    (unsigned)toVt);
+		if (cs && g_trackBeforeSpy && to != g_trackBeforeSpy && (dialogueCam || !to)) {
 			Log("coop: Roman agent's dialogue ended on camera track %p (vt %08X); back to %p (vt %08X)", to,
 			    to ? (unsigned)*(uintptr_t*)to : 0, g_trackBeforeSpy, (unsigned)*(uintptr_t*)g_trackBeforeSpy);
 			*(void**)(cs + 0x34) = g_trackBeforeSpy;

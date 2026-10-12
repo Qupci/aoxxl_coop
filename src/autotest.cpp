@@ -9,6 +9,7 @@
 #include "p2cam.h"
 #include "pads.h"
 #include "sound.h"
+#include "gamecam.h"
 #include "crash.h"
 
 #include <cmath>
@@ -1096,6 +1097,32 @@ const Step kP2Dir[] = {
 	END(8000),
 };
 
+// camjump (level 2): player 1 jumps, then player 2 jumps: neither camera
+// should rise with its hero (copycam / gamecam heights in the log).
+const Step kCamJump[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	P1(3000, PAD_A, 0, 0, "p1 jump"), P1(3300, 0, 0, 0, "p1 release"),
+	VPAD(5000, 1, PAD_A, 0, 0, "p2 jump"), VPAD(5300, 1, 0, 0, 0, "p2 release"),
+	END(7000),
+};
+
+// slide22 (level 2): the user's LV2-2 run -- dialogues at the start, the belly
+// slide, the Roman agent's dialogue at its end; then the right stick (player 2,
+// leading) must still turn the camera.
+const Step kSlide22[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -905.7f, 527.9f, -938.4f), PLACEAT(2000, HERO_OBELIX, -903.7f, 527.9f, -938.4f),
+	GLIDEAT(3000, HERO_ASTERIX, -911.0f, 528.2f, -913.4f, 2500),
+	CINE_SKIP(6000), CINE_SKIP(8000), CINE_SKIP(10000), CINE_SKIP(12000), CINE_SKIP(14000), CINE_SKIP(16000), CINE_SKIP(18000), CINE_SKIP(20000), CINE_SKIP(22000), CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000), CINE_SKIP(80000), CINE_SKIP(82000), CINE_SKIP(84000), CINE_SKIP(86000), CINE_SKIP(88000), CINE_SKIP(90000), CINE_SKIP(92000), CINE_SKIP(94000), CINE_SKIP(96000), CINE_SKIP(98000), CINE_SKIP(100000), CINE_SKIP(102000), CINE_SKIP(104000), CINE_SKIP(106000), CINE_SKIP(108000), CINE_SKIP(110000), 
+	GLIDEAT(31000, HERO_ASTERIX, -907.3f, 526.8f, -903.6f, 1500),
+	{ 112000, S_CAMDUMP, 0, 0, 0, 0, 0, "camera dump" }, SHOT(112100, "slide22_1"),
+	VPADR(112500, 1, 1.0f, 0.0f, "p2 turns camera"), SHOT(113500, "slide22_2"), VPADR(114000, 1, 0.0f, 0.0f, "p2 still"),
+	P1(114500, 0, 0, 0, "p1 idle"), { 115000, S_CAMDUMP, 0, 0, 0, 0, 0, "camera dump" },
+	END(116000),
+};
+
 // cam32 (-Level 3): sector 2's beach -- both heroes at 170.8 6.1 -214.9, then
 // Asterix walks (glides) to x 140 and back: which camera the game uses where.
 const Step kCam32[] = {
@@ -1822,6 +1849,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shine44", kShine44),
 	SCENARIO("cam32", kCam32),
 	SCENARIO("cam32o", kCam32O),
+	SCENARIO("slide22", kSlide22),
+	SCENARIO("camjump", kCamJump),
 	SCENARIO("p2dir", kP2Dir),
 	SCENARIO("cable33", kCable33),
 	SCENARIO("cam32s", kCam32S),
@@ -2103,6 +2132,9 @@ void LogTick(float t) {
 			float dx = cp[0] - cl[0], dz = cp[2] - cl[2];
 			line.Add(" | gamecam (%.1f %.1f %.1f) look (%.1f %.1f %.1f) yaw %.2f dist %.1f track vt %08X", cp[0], cp[1], cp[2],
 			         cl[0], cl[1], cl[2], atan2f(dz, dx), sqrtf(dx * dx + dz * dz), tr ? (unsigned)*(uintptr_t*)tr : 0);
+			float cm[16], cw[2];
+			if (GameCamView(CoopNonLeaderPlayer(), cm, cw))
+				line.Add(" | copycam (%.2f %.2f %.2f) at (%.2f %.2f %.2f)", cm[12], cm[13], cm[14], cm[8], cm[9], cm[10]);
 		}
 	}
 	if (at.watchTorch) {

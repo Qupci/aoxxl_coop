@@ -1110,3 +1110,10 @@ both halves).
   pass refreshed trio `+0x408`). Held heroes get the old follow camera (p2cam). ini `camera`, `split_fov`.
 * Autotests: cam32 / cam32o (beach trigger per player, right stick zoom), cam32s (switches), camfight,
   cable33 (user's LV3-3 spot: P2 gets the passive path pull camera, P1 the follow camera), launch48.
+* Round 27 follow-up: hero code writes camera wishes into the service (in the air: +0xC bits 11/12, many
+  `FUN_0044F520` calls with ECX = svc+0xC from 0x4966E0, 0x496EB0...), so the non-leader's Life tick now
+  runs with its copy swapped in (`GameCamBeginHeroTick`) -- P2's camera no longer rises with P2's jump.
+  The copy code asks `GameCamLiveHero()`, not trio+0x2C (sliced to the ticking hero).
+* LV2-2 slide end: classic track +8 bit 1 = right-stick turning allowed (the slide-start track 0x30B4 has it
+  off). The spy-dialogue camera fix (round 16) put the pre-dialogue track (the slide's) back at 0x5121 over
+  the game's follow camera; now only a dialogue camera (fix track / plain CKCamera) is replaced.

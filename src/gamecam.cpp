@@ -379,6 +379,44 @@ bool GameCamView(int hero, float m[16], float window[2]) {
 
 int GameCamLiveHero() { return g_active ? g_liveOwner : -1; }
 
+namespace {
+bool       g_heroSwapped = false;
+uint8_t    g_heroLiveSvc[kSrvSize];
+TrackBytes g_heroLiveTracks[3];
+int        g_heroNumTracks = 0;
+}
+
+void GameCamBeginHeroTick(int hero) {
+	g_heroSwapped = false;
+	char* svc = g_svc;
+	if (!g_active || g_inCopy || !svc || !g_copy.valid || g_copy.hero != hero || hero == g_liveOwner) return;
+	CKYellowPages* yp = YellowPages();
+	if (!yp || *(char**)((char*)yp + 0x68) != svc) return;
+	memcpy(g_heroLiveSvc, svc, kSrvSize);
+	g_heroNumTracks = 0;
+	for (int i = 0; i < g_copy.numTracks; i++) {
+		TrackBytes& tb = g_heroLiveTracks[g_heroNumTracks++];
+		tb = g_copy.tracks[i];
+		memcpy(tb.b, tb.track, tb.size);   // the game's bytes of the copy's tracks
+	}
+	memcpy(svc, g_copy.svc, kSrvSize);
+	LoadRefs(g_copy);
+	g_inCopy = true;
+	g_heroSwapped = true;
+}
+
+void GameCamEndHeroTick() {
+	if (!g_heroSwapped) return;
+	g_heroSwapped = false;
+	g_inCopy = false;
+	char* svc = g_svc;
+	memcpy(g_copy.svc, svc, kSrvSize);
+	SaveRefs(svc, g_copy);
+	memcpy(svc, g_heroLiveSvc, kSrvSize);
+	for (int i = 0; i < g_heroNumTracks; i++)
+		memcpy(g_heroLiveTracks[i].track, g_heroLiveTracks[i].b, g_heroLiveTracks[i].size);
+}
+
 const char* GameCamCopyState(int hero) {
 	return g_active && g_copy.valid && g_copy.hero == hero ? (const char*)g_copy.svc : nullptr;
 }

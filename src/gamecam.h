@@ -22,5 +22,10 @@ bool GameCamView(int hero, float m[16], float window[2]);
 // has the trio's leader byte sliced for the other hero's tick); -1 if the
 // copies are off.
 int GameCamLiveHero();
+// Around a hero's Life tick: hero code writes its camera wishes into the camera
+// service (in the air: don't follow the jump, +0xC bits 11/12...). For the hero
+// with the copy, the copy is the service for the length of its tick.
+void GameCamBeginHeroTick(int hero);
+void GameCamEndHeroTick();
 // The copy's service bytes (camera position +0x5B0, look-at +0x5BC), or nullptr.
 const char* GameCamCopyState(int hero);

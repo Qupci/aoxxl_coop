@@ -1,6 +1,7 @@
 #include "life.h"
 #include "autotest.h"
 #include "coop.h"
+#include "gamecam.h"
 #include "log.h"
 
 namespace {
@@ -35,7 +36,9 @@ int LifeTickCommon(LifeTickFn orig, void* self, void* edx, int arg) {
 
 	AutotestBeforeLifeTick(idx, hero);
 	CoopBeforeLifeTick(idx, hero);
+	GameCamBeginHeroTick(idx);
 	int r = orig(self, edx, arg);
+	GameCamEndHeroTick();
 	CoopAfterLifeTick(idx, hero);
 	AutotestAfterLifeTick(idx, hero);
 
