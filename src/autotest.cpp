@@ -642,6 +642,17 @@ const Step kPlate3[] = {
 	END(7500),
 };
 
+// plate26 (level 2): sector 6's plate at 5.7 2.8 -389.2 (its sequence also
+// sends the trio 0x2000) pressed by player 2's Obelix, not leading.
+const Step kPlate26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 5.7f, 3.5f, -400.0f), PLACEAT(2500, HERO_OBELIX, 5.7f, 3.5f, -389.2f),
+	{ 4500, S_PLATES, 0, 0, 0, 0, 0, "plates" },
+	SHOT(5000, "plate26_1"), SHOT(7000, "plate26_2"),
+	END(7500),
+};
+
 // mgun3a / mgun3n / mgun3o (-Level 3): sector 6's machinegun (-172.1 6.1
 // -196.7). a: the leader Asterix presses X at it; n: Asterix, Obelix leading
 // (trio 0x4801), presses X; o: player 2's Obelix (not leading) presses X.
@@ -1814,6 +1825,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("p2mirror", kP2Mirror),
 	SCENARIO("p2busy", kP2Busy),
 	SCENARIO("plate3", kPlate3),
+	SCENARIO("plate26", kPlate26),
 	SCENARIO("mgun3a", kMgun3A),
 	SCENARIO("mgun3n", kMgun3N),
 	SCENARIO("mgun3o", kMgun3O),

@@ -133,14 +133,16 @@ bool GroupCommandsTrio(unsigned ev);
 // the plate's +0x28 --, bit 0x40 by a pushed object) answer either player's
 // hero: ticked as usual when the leader is on it, otherwise with the
 // non-leading player's hero posing as the leader (level 3 sector 1's plate
-// stayed up under player 2's Obelix). Plates whose events (+0x30, +0x32) talk
-// to the trio -- the blue circles: "switch to Obelix, Asterix waits here" --
-// keep to the real leader, as above.
+// stayed up under player 2's Obelix). Plates whose events (+0x30, +0x32)
+// command the trio -- the blue circles: "switch to Obelix, Asterix waits here"
+// -- keep to the real leader, as above. Other trio messages do not count: level
+// 2 sector 6's plate (5.7 2.8 -389.2: a rolling stone, a camera sector) also
+// sends the trio 0x2000, "reset the fight mode timer".
 bool PlateForEither(char* plate) {
 	if (!(*(uint32_t*)(plate + 8) & 0x10)) return false;
 	unsigned evs[2] = { *(uint16_t*)(plate + 0x30), *(uint16_t*)(plate + 0x32) };
 	for (unsigned ev : evs)
-		if (GroupMessagesTrio(ev)) return false;
+		if (GroupCommandsTrio(ev)) return false;
 	return true;
 }
 
