@@ -845,6 +845,26 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	w.best = 1e30f;
 	const float* spot = (const float*)(w.param + 4);
 	Log("coop: Roman agent's dialogue: the leader walks to (%.1f %.1f %.1f)", spot[0], spot[1], spot[2]);
+	// Set off by the player who is not leading (their hero at the spy, the
+	// leader far away), the leader would walk there by path finding -- and get
+	// stuck on the way more often than not (level 2 sector 1: the second spy,
+	// set off by Obelix with Asterix back at the first one). The leader is put
+	// on the spot at once instead, the way the game brings the companion along
+	// (0x48BA) when the leader sets a dialogue off.
+	Trio t = GetTrio();
+	int nl = CoopNonLeaderPlayer();
+	if (!t || nl < 0 || g.suspended) return;
+	Hero lead = t.GetHero(t.Leader()), other = t.GetHero(nl);
+	if (!lead || !other || g.held[t.Leader()]) return;
+	Vector3 to(spot[0], spot[1], spot[2]);
+	float dl = sqrtf((lead.Pos() - to).len2()), dn = sqrtf((other.Pos() - to).len2());
+	if (dl > 6.0f && dn < 25.0f) {
+		Vector3 dst = to;
+		dst.y += 0.5f;
+		SetHeroPosition(lead, dst);
+		Log("coop: %s set the dialogue off; %s (leading, %.0f units away) put on the spot (%.1f %.1f %.1f)",
+		    HeroName(nl), HeroName(t.Leader()), dl, dst.x, dst.y, dst.z);
+	}
 }
 
 // A cutscene set off by one player far from the other (player 2's Obelix at the

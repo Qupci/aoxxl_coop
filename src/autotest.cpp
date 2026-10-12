@@ -653,6 +653,20 @@ const Step kPlate26[] = {
 	END(7500),
 };
 
+// spy21o (level 2): the user's softlock -- Asterix sets the first spy's
+// dialogue off, then waits by it while player 2's Obelix sets the second spy's
+// off: Asterix (leading) has to get there.
+const Step kSpy21O[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -825.0f, 509.0f, -1062.4f), GLIDEAT(2500, HERO_ASTERIX, -815.0f, 509.0f, -1062.4f, 1500),
+	CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000), CINE_SKIP(30000),
+	PLACEAT(34000, HERO_ASTERIX, -817.82f, 508.0f, -1062.25f), PLACEAT(34000, HERO_OBELIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(35000, HERO_OBELIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(38000, "spy21o_1"), SHOT(47000, "spy21o_2"),
+	END(64000),
+};
+
 // mgun3a / mgun3n / mgun3o (-Level 3): sector 6's machinegun (-172.1 6.1
 // -196.7). a: the leader Asterix presses X at it; n: Asterix, Obelix leading
 // (trio 0x4801), presses X; o: player 2's Obelix (not leading) presses X.
@@ -1826,6 +1840,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("p2busy", kP2Busy),
 	SCENARIO("plate3", kPlate3),
 	SCENARIO("plate26", kPlate26),
+	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("mgun3a", kMgun3A),
 	SCENARIO("mgun3n", kMgun3N),
 	SCENARIO("mgun3o", kMgun3O),
