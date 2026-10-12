@@ -1117,3 +1117,14 @@ both halves).
 * LV2-2 slide end: classic track +8 bit 1 = right-stick turning allowed (the slide-start track 0x30B4 has it
   off). The spy-dialogue camera fix (round 16) put the pre-dialogue track (the slide's) back at 0x5121 over
   the game's follow camera; now only a dialogue camera (fix track / plain CKCamera) is replaced.
+
+## Round 28 (2026-10-12)
+* LV2-6 plate (5.7 2.8 -389.2): its sequence also messages the trio (0x2000 fight timer) -> PlateForEither now
+  uses GroupCommandsTrio (leader switches / companion orders) instead of "messages the trio at all".
+* Spy dialogue 0x5120 set off by the non-leader (non-leader within 25 of the walk target, leader > 6 away):
+  the leader is put on the spot before the walk (LV2-1 second spy: the path finding got stuck). Autotest spy21o.
+* LV5-9: the slide's agent (two talks: landing, slide end) stays spawned at the slide end; the launcher's landing
+  zone (0x0988) sent it 0x5198 again -> talk 700 units away. CKHkClueMan::sendEvent hooked: 0x5198 ignored when
+  both heroes are > 150 from the spy's node and spot (co-op only). Not autotested (needs the slide state).
+* LV5-8 lifter Romans partly missing while the previous section's Romans live: the Roman pool (CKGrpPoolSquad)
+  has a fixed number of Roman objects from the level file; heap size does not change it.

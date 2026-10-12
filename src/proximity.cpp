@@ -1194,6 +1194,43 @@ long ProximityP2Beacons() { return g_p2Beacons; }
 long ProximitySlices() { return g_slices; }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
 
+namespace {
+// A spy far from both heroes ignores its "start the dialogue" event (0x5198).
+// Level 5 sector 9: the landing zone of the launcher (zone 0x0988) sends it to
+// the agent of the slide; after both of its talks -- the first by the landing,
+// the second at the slide's end -- the agent stays spawned at the slide's end
+// (its sector stops streaming while it is still there), so the next landing
+// started the slide's talk again 700 units away: the leader was sent walking
+// across the level. An unspawned spy ignores its events in single player.
+typedef int(__fastcall* ClueEventFn)(char* self, void* edx, unsigned ev, void* param);
+ClueEventFn g_origClueEvent = nullptr;
+const uintptr_t kClueManEvent = 0x4B82F0;
+const float     kSpyFar = 150.0f;
+
+int __fastcall ClueEventHook(char* self, void* edx, unsigned ev, void* param) {
+	Trio t = GetTrio();
+	if ((ev & 0xFFFF) == 0x5198 && t && CoopP2Joined()) {
+		Vector3 at, spot;
+		bool spawned = NodePos(*(void**)(self + 0x10), &at);
+		const float* p = (const float*)(self + 0x12C);
+		bool haveSpot = std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2]);
+		if (haveSpot) spot = Vector3(p[0], p[1], p[2]);
+		float best = 1e30f;
+		for (int h = 0; h < 2; h++) {
+			Hero hero = t.GetHero(h);
+			if (!hero) continue;
+			if (spawned) { float d = sqrtf((hero.Pos() - at).len2()); if (d < best) best = d; }
+			if (haveSpot) { float d = sqrtf((hero.Pos() - spot).len2()); if (d < best) best = d; }
+		}
+		if ((spawned || haveSpot) && best > kSpyFar) {
+			Log("proximity: spy %p told to start its talk %.0f units from the nearest hero; ignored", self, best);
+			return 1;
+		}
+	}
+	return g_origClueEvent(self, edx, ev, param);
+}
+} // namespace
+
 bool ProximityInstallHooks() {
 	bool ok = PatchVtableSlot(kBundleVtbl, kBundleTickSlot, kBundleTick,
 	                          (void*)BundleTickHook, (void**)&g_origBundleTick, "CKBundle::tick");
@@ -1212,6 +1249,8 @@ bool ProximityInstallHooks() {
 	                      (void**)&g_origCheckpoint, "CKGrpAsterixCheckpoint::update");
 	ok &= PatchVtableSlot(kEnemyLifeVtbl, kEnemyLifeSlot, kEnemyLifeTick, (void*)EnemyTickHook,
 	                      (void**)&g_origEnemyTick, "CKGrpEnemyLife::tick");
+	ok &= PatchVtableSlot(kClueManVtbl, 5, kClueManEvent, (void*)ClueEventHook, (void**)&g_origClueEvent,
+	                      "CKHkClueMan::sendEvent (far spies)");
 	ok &= PatchVtableSlot(kDetectVtbl, kDetectTickSlot, kDetectTick, (void*)DetectTickHook,
 	                      (void**)&g_origDetectTick, "CKSrvDetection::tick");
 	{
