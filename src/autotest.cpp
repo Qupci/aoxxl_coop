@@ -678,6 +678,25 @@ const Step kSpy21A[] = {
 	END(40000),
 };
 
+// beach12o (-Level 1): sector 2's beach Romans, player 2's Obelix (not
+// leading) next to them, Asterix away; then Obelix leads (0x4801).
+const Step kBeach12O[] = {
+	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
+	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
+	PLACEAT(8000, HERO_ASTERIX, -2.216f, -1.8f, 58.619f),
+	PLACEAT(11000, HERO_ASTERIX, 46.0f, 6.0f, 105.84f), GLIDEAT(11500, HERO_ASTERIX, 58.0f, 6.0f, 105.84f, 1500),
+	CINE_SKIP(14000), CINE_SKIP(15500), CINE_SKIP(17000), CINE_SKIP(18500), CINE_SKIP(20000), CINE_SKIP(21500), CINE_SKIP(23000), CINE_SKIP(24500), 
+	VPAD(27000, 1, PAD_START, 0, 0, "p2 start"), VPAD(27200, 1, 0, 0, 0, "p2 release"),
+	VPAD(27500, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(27600, 1, PAD_BACK | PAD_B, 0, 0, "p2 back+B (release)"), VPAD(27800, 1, 0, 0, 0, "p2 release"),
+	{ 27900, S_WATCHENEMIES, 0, 0, 0, -20.0f, -9.0f, "watch romans", 120.0f },
+	PLACEAT(28000, HERO_OBELIX, 18.73f, -3.3f, 115.24f),
+	GLIDEAT(28500, HERO_OBELIX, 6.09f, -5.6f, 115.86f, 1200), GLIDEAT(29800, HERO_OBELIX, -3.6f, -9.3f, 118.4f, 1000),
+	SHOT(32000, "beach12o_1"), SHOT(36000, "beach12o_2"),
+	{ 38000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	SHOT(41000, "beach12o_3"), SHOT(45000, "beach12o_4"),
+	END(46000),
+};
+
 // mgun3a / mgun3n / mgun3o (-Level 3): sector 6's machinegun (-172.1 6.1
 // -196.7). a: the leader Asterix presses X at it; n: Asterix, Obelix leading
 // (trio 0x4801), presses X; o: player 2's Obelix (not leading) presses X.
@@ -1851,6 +1870,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("p2busy", kP2Busy),
 	SCENARIO("plate3", kPlate3),
 	SCENARIO("plate26", kPlate26),
+	SCENARIO("beach12o", kBeach12O),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
