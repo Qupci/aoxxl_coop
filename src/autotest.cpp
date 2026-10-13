@@ -1075,6 +1075,27 @@ const Step kShop[] = {
 	END(11000),
 };
 
+// shopox (level 2): player 2's Obelix opens the merchant with X and presses X
+// through the merchant's words; the menu must stay up, B leaves; afterwards
+// each player's camera follows its own hero again.
+const Step kShopOX[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	VPAD(6500, 1, PAD_X, 0, 0, "p2 X"), VPAD(6700, 1, 0, 0, 0, "p2 release"),
+	VPAD(8000, 1, PAD_X, 0, 0, "p2 X"), VPAD(8200, 1, 0, 0, 0, "p2 release"),
+	VPAD(9500, 1, PAD_X, 0, 0, "p2 X"), VPAD(9700, 1, 0, 0, 0, "p2 release"),
+	SHOT(11000, "shopox_1"),
+	VPAD(12000, 1, PAD_B, 0, 0, "p2 B (back)"), VPAD(12200, 1, 0, 0, 0, "p2 release"),
+	VPAD(14000, 1, PAD_X, 0, 0, "p2 X"), VPAD(14200, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16200, 1, 0, 0, 0, "p2 release"),
+	SHOT(22000, "shopox_2"),
+	SHOT(31000, "shopox_3"),
+	END(32000),
+};
+
 // shopo (level 2): player 2's Obelix (not leading) opens the merchant with X.
 const Step kShopO[] = {
 	MARK(0, "baseline"),
@@ -2207,6 +2228,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("catapulta", kCatapultA),
 	SCENARIO("shop", kShop),
 	SCENARIO("shopo", kShopO),
+	SCENARIO("shopox", kShopOX),
 	SCENARIO("inputdump", kInputDump),
 	SCENARIO("combop2", kComboP2),
 	SCENARIO("combop1", kComboP1),

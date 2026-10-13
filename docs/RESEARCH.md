@@ -1283,3 +1283,15 @@ both halves).
   level start (P2 joins with Start), LB pass (first 3 spins a level, until one pass), mode roles, machines,
   lifter waiting (lifter 2/47 state 0 with +8 bit 0 and one hero on +0x50, hero +0x280, on ground).
   XXL_HINTLOG=1 logs geometry. Not autotested: the lifter and LB hints, Twister Fusion routing.
+* Merchant opened by the non-leader (round 35 follow-up): X there sends trio 0x48EF (the companion -- with the
+  trio sliced, the *leader* -- gets AI order 14 to the shop) and puts the opener in situation 0x0A; the shop's
+  camera follows the leader. Left the companion, P1's half showed the shop's / Obelix's camera afterwards and the
+  visit could end early. Now situation 0x0A started by the non-leader takes the lead like a Roman agent's talk
+  (lead returned on resume, trio 0x4800). The shop offers itself every frame to the leader within its +0x5C of
+  the merchant (FUN_004C1160: trio 0x5122 -> leader +0x3F0 |= 8). Shop state (+8 bits 0-2): 2 the merchant's
+  words, 3 the item menu; player 2's X/B is the menu's back (action 5) only in state 3 -- in state 2 X moves
+  the words on (Sekensor) and was also closing the menu. Autotest shopox.
+* Freeze on a sector change (xxl_coop.crash.log, LV2-2): the game thread hung in a DirectSound buffer Release
+  (CKSoundDictionary::reset -> FUN_0043C350 -> FUN_005F0ED0 -> FUN_005F3670) under the IndirectSound wrapper
+  (dsound.dll, XAudio2; its log reports an XAudio2 critical error / device stopped responding). No mod code on
+  that path.

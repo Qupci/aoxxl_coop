@@ -130,6 +130,9 @@ const int kCutsceneHoldFrames = 15;   // ~0.25 s
 const uint8_t kSituationGroupAction = 0x0D;
 // The walk to a Roman agent and the talk with him (X on the spy, or trio 0x5120).
 const uint8_t kSituationTalk = 0x09;
+// The walk into the merchant's shop (X at CKHkAsterixShop: trio 0x48EF sends
+// "the companion" there too, AI order 14; the shop's camera follows the leader).
+const uint8_t kSituationShop = 0x0A;
 const int     kOrderDialoguePlace = 13;   // the companion's AI order from trio 0x48BA
 
 const char* ModeName(uint8_t mode) {
@@ -1116,7 +1119,16 @@ static void ShopInputFromP2(const PadState& p, InputManager im, int n) {
 	if (left && !wasLeft) press |= 1u << 2;
 	if (right && !wasRight) press |= 1u << 3;
 	if (p.pressed & PAD_A) press |= 1u << 4;
-	if (p.pressed & (PAD_X | PAD_B)) press |= 1u << 5;
+	// Back (X or B, as the menu shows) only in the item menu (shop +8 bits 0-2 ==
+	// 3): during the merchant's words (state 2) X moves the words on (either
+	// player, shared.cpp) -- taken as "back" as well, it closed the menu as soon
+	// as it opened.
+	int state = -1;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16 && state <= 0; i++) {
+		char* sh = (char*)GetLvlObject(2, 172, i);
+		if (sh) state = *(uint8_t*)(sh + 8) & 7;
+	}
+	if ((p.pressed & (PAD_X | PAD_B)) && state == 3) press |= 1u << 5;
 	wasLeft = left;
 	wasRight = right;
 	char* input = im.raw();
@@ -2030,19 +2042,23 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			// the AI companion, which ended that state, and the dialogue never went
 			// on (level 3 sector 2).
 			bool startedTalk = sh && sitNow == kSituationTalk && g.sitBefore != kSituationTalk;
+			// Opening the merchant's shop (situation 0A). Left the companion, the
+			// shop's camera went to the other player's view and the leader's hero
+			// was sent to the shop as "the companion".
+			bool startedShop = sh && sitNow == kSituationShop && g.sitBefore != kSituationShop;
 			// Getting on a machine (X at a machinegun: trio 0x4809, mode 2) -- the
 			// trio's mode events act on the leader, and back as the companion the
 			// hero was made the AI companion of that mode, unable to shoot (level 3
 			// sector 6).
 			uint8_t modeNow = sh ? HeroMode(*F18(sh)) : 0;
 			bool startedMode = sh && HeroModePlayable(g.f18Before) && (modeNow == 1 || modeNow == 2);
-			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && (startedGroup || startedTalk || startedMode)) {
+			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && (startedGroup || startedTalk || startedShop || startedMode)) {
 				// It started a group action (a launcher, a lifter): that sequence
 				// asks the trio for its leader all along, outside this tick too --
 				// with the other hero still leading it kept putting that one on
 				// the activator's spot. The hero that started it leads from now.
 				Log("coop: %s started %s while not leading -- it leads until it is over", HeroName(g.slicedHero),
-				    startedTalk ? "a Roman agent's dialogue" : startedMode ? "a machine (mode change)" : "a group action");
+				    startedTalk ? "a Roman agent's dialogue" : startedShop ? "the merchant's shop" : startedMode ? "a machine (mode change)" : "a group action");
 				g.groupTookLead = g.slicedHero;
 				g.groupPrevLeader = g.savedLeader;
 			} else if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
