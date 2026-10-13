@@ -1295,3 +1295,12 @@ both halves).
   (CKSoundDictionary::reset -> FUN_0043C350 -> FUN_005F0ED0 -> FUN_005F3670) under the IndirectSound wrapper
   (dsound.dll, XAudio2; its log reports an XAudio2 critical error / device stopped responding). No mod code on
   that path.
+* Machine gun alone / joined (2026-10-14): 0x4809 no longer stages the non-leading player's hero as an idle AI
+  (so no AI order 7 for Obelix): Asterix uses the gun alone (mode 2) with co-op and the split screen on
+  (GunSolo; shared.cpp SHARED_GUN_SOLO routes the whole gun map to Asterix's player). Obelix's X within 6 of the
+  handles target (gun +0xD0 node: +4 -> matrix +0x80 place / +0x70 direction, as 0x4A05 answers; the AI's walk
+  ends ~4 units off it) joins: held as the game's companion with AI order 7 to that target -> trio 0x480A on
+  arrival (Obelix mode 2) -> suspended, one screen, SHARED_GUN (Obelix turns). Asterix's A (0x4806) ends it.
+  Only the boat still needs both heroes. A lead taken for the gun is given back when the solo use ends
+  (GiveBackLead). Autotest mgun33j. Hints: a new hint over a prompt already on screen (state 2) restarts the
+  prompt (state 0) so it slides in to the hint's place.

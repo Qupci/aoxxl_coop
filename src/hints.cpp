@@ -155,6 +155,11 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		}
 		g_shown[k] = 0;
 		g_longest = 0.0f;
+		// A new hint over a prompt already on screen (state 2: the gun's "Use"
+		// when Asterix takes it) keeps that prompt's place: shown afresh (state
+		// 0), it slides in to the hint's.
+		uint32_t& st = *(uint32_t*)(self + 0x24);
+		if (((st >> 21) & 3) != 0) st &= ~(3u << 21);
 	}
 	if (use) {
 		*slot = kHintStringId;
@@ -178,7 +183,9 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		// The text starts g_boxShift off the prompt's place with the 2.0 box.
 		float x = 0.95f - w - g_boxShift;
 		*(float*)(self + 0x428) = x;
-		if (((*(uint32_t*)(self + 0x24) >> 21) & 3) == 2) *(float*)(self + 0x42C) = *(float*)(self + 0x434) = x;
+		uint32_t state = (*(uint32_t*)(self + 0x24) >> 21) & 3;
+		if (state == 2) *(float*)(self + 0x42C) = *(float*)(self + 0x434) = x;
+		else if (state == 1) *(float*)(self + 0x42C) = x;   // sliding in: to the measured place
 	}
 	if (!use) PlateBack(self);
 	g_origInterfaceTick(self, edx, time);

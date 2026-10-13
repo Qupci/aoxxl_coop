@@ -42,6 +42,9 @@ static bool MachineMatesNear(Trio t);
 static void RefuseMachine(Trio t, int kind, int who);
 static void ShowJoinHint(Trio t);
 static void WatchLifterHint(Trio t);
+static bool GunSolo(Trio t);
+static void JoinGun(Trio t, const char* why);
+static void GiveBackLead(Trio t);
 
 namespace {
 
@@ -120,6 +123,9 @@ struct CoopState {
 	int      machineKind = 0;           // 1 boat, 2 machine gun (trio +0x3F4 bits 10-11)
 	DWORD    machineReqAt = 0;
 	bool     machineSending = false;
+	bool     gunSolo = false;           // Asterix on the machine gun, Obelix's player free (split screen on)
+	bool     gunJoinReq = false;        // Obelix's X at the gun's handles, served next frame
+	bool     gunJoining = false;        // ... being served: 0x4809's companion order is wanted
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -924,10 +930,12 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 	Trio t = GetTrio();
 	// Asterix's X at a machine (FUN_0049A080) with Obelix's player elsewhere.
 	int lo = ev & 0xFFFF;
-	if (t && t.raw() == (char*)trio && (lo == 0x4807 || lo == 0x4809) && g.p2Joined && !g.suspended &&
+	// (The boat only: Asterix takes the machine gun alone, and Obelix joins him
+	// at it if he likes -- JoinGun.)
+	if (t && t.raw() == (char*)trio && lo == 0x4807 && g.p2Joined && !g.suspended &&
 	    !g.machineSending && t.GetHero(HERO_ASTERIX) &&
 	    (*(uint32_t*)(t.GetHero(HERO_ASTERIX).raw() + 0x3EC) & 0x10) && !MachineMatesNear(t)) {
-		RefuseMachine(t, lo == 0x4809 ? 2 : 1, HERO_ASTERIX);
+		RefuseMachine(t, 1, HERO_ASTERIX);
 		return true;
 	}
 	if (t && t.raw() == (char*)trio && ProximityBossRunDropsWalk(ev & 0xFFFF)) {
@@ -1342,7 +1350,18 @@ void CoopFrame() {
 	// handing over to the next one does not flicker co-op on and off.
 	LogCutsceneSignals();
 	bool cinematic = g.cutsceneHold > 0;
-	bool scripted = !HeroModePlayable(h1.Flags18()) || !HeroModePlayable(h2.Flags18()) ||
+	// Asterix alone on the machine gun (mode 2, Obelix's player free): co-op and
+	// the split screen go on; one screen only once Obelix is at the gun too.
+	bool gunSolo = GunSolo(t);
+	if (gunSolo != g.gunSolo) {
+		g.gunSolo = gunSolo;
+		Log("coop: Asterix %s the machine gun on his own%s", gunSolo ? "is on" : "is off",
+		    gunSolo ? " -- co-op and the split screen go on" : "");
+		if (!gunSolo && HeroModePlayable(t.GetHero(HERO_ASTERIX).Flags18()) && !g.suspended) GiveBackLead(t);
+	}
+	if (g.gunJoinReq) JoinGun(t, "X at the handles");
+	bool scripted = (!HeroModePlayable(h1.Flags18()) && !(gunSolo && g.p1Hero == HERO_ASTERIX)) ||
+	                (!HeroModePlayable(h2.Flags18()) && !(gunSolo && g.p2Hero == HERO_ASTERIX)) ||
 	                h1.Busy() || h2.Busy() || groupAction || cinematic || shopping;
 	if (scripted != g.suspended) {
 		g.suspended = scripted;
@@ -1353,16 +1372,7 @@ void CoopFrame() {
 		CoopLogState(scripted ? "suspend" : "resume");
 		// A group action the non-leading player started is over: the lead goes
 		// back where it was (single player never hands it over for a launcher).
-		if (!scripted && g.groupTookLead >= 0) {
-			int took = g.groupTookLead, prev = g.groupPrevLeader;
-			g.groupTookLead = g.groupPrevLeader = -1;
-			if (t.Leader() == took && prev >= 0 && prev != took && !g.held[prev]) {
-				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
-				int ev = prev == HERO_ASTERIX ? 0x4800 : 0x4801;
-				Log("coop: %s's group action is over; %s leads again (trio event %04X)", HeroName(took), HeroName(prev), ev);
-				((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
-			}
-		}
+		if (!scripted) GiveBackLead(t);
 	}
 	{
 		CKYellowPages* yp = YellowPages();
@@ -1533,12 +1543,43 @@ TakeFn g_origTake = nullptr;
 // Obelix as the AI companion who walks to his place. In co-op Obelix's X at a
 // machine is a request too (served next frame, ServeMachineRequest); his swing
 // is held back.
+// The machine gun in use (trio +0x48, CKHkMachinegun) and Obelix's place at its
+// handles: the gun's 0x4A05 answer, gun +0xD0 (a node: +4 -> matrix, place
+// +0x80, direction +0x70), where 0x4809 sends the companion (AI order 7).
+const uintptr_t kMachinegunVtbl = 0x6265E0;
+static char* TrioGun(Trio t) {
+	char* gun = t ? *(char**)(t.raw() + 0x48) : nullptr;
+	return gun && *(uintptr_t*)gun == kMachinegunVtbl ? gun : nullptr;
+}
+static bool GunHandles(Trio t, Vector3* pos, Vector3* dir) {
+	char* gun = TrioGun(t);
+	char* spot = gun ? *(char**)(gun + 0xD0) : nullptr;
+	char* m = spot ? *(char**)(spot + 4) : nullptr;
+	if (!m) return false;
+	if (pos) *pos = *(Vector3*)(m + 0x80);
+	if (dir) *dir = *(Vector3*)(m + 0x70);
+	return true;
+}
+
 static void NoteMachineUse(char* hero) {
 	if (!g.p2Joined || g.suspended) return;
 	Trio t = GetTrio();
 	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
 	if (!o || hero != o.raw() || (g.p1Hero != HERO_OBELIX && g.p2Hero != HERO_OBELIX)) return;
 	uint32_t ec = *(uint32_t*)(hero + 0x3EC), f0 = *(uint32_t*)(hero + 0x3F0);
+	if (g.gunSolo && (ec & 0x10) && !g.held[HERO_OBELIX]) {
+		// Asterix is on the machine gun: X at its handles joins him there.
+		Vector3 spot;
+		bool known = GunHandles(t, &spot, nullptr);
+		// (The AI's walk ends at the handles about 4 units off that target.)
+		LogV("coop: Obelix's X with Asterix on the gun: handles target %s (%.1f %.1f %.1f), Obelix %.1f away",
+		     known ? "at" : "unknown", spot.x, spot.y, spot.z, known ? sqrtf((o.Pos() - spot).len2()) : -1.0f);
+		if (known && (o.Pos() - spot).len2() < 6.0f * 6.0f) {
+			*(uint32_t*)(hero + 0x3EC) &= ~0x10u;
+			g.gunJoinReq = true;
+		}
+		return;
+	}
 	if (!(ec & 0x10) || (ec & 0xC0000) || (f0 & 0x804129) || (*(uint32_t*)(hero + 0x384) & 0x200000)) return;
 	if (*(uint8_t*)(hero + 0x3E9) != 0) return;
 	char* tr = t.raw();
@@ -2144,6 +2185,50 @@ static void ServeMachineRequest(Trio t) {
 	g.machineSending = true;
 	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
 	g.machineSending = false;
+	if (kind == 2) JoinGun(t, "took the gun with Asterix");   // Obelix is at the gun too
+}
+
+// Asterix on the machine gun (mode 2) by himself: Obelix is a player's hero,
+// not in the gun's mode and not the game's.
+static bool GunSolo(Trio t) {
+	if (!g.p2Joined || !t || (g.p1Hero != HERO_OBELIX && g.p2Hero != HERO_OBELIX)) return false;
+	Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
+	return a && o && HeroMode(a.Flags18()) == 2 && HeroMode(o.Flags18()) != 2 && !g.held[HERO_OBELIX] && TrioGun(t);
+}
+
+// Obelix joins Asterix at the machine gun: the game's companion with the order
+// 0x4809 gives one (AI order 7 to the handles, gun +0xD0); once there the AI
+// sends trio 0x480A (Obelix in the gun's mode) -- one screen, Obelix's player
+// turns the gun (shared.cpp). He is his player's again when Asterix leaves the
+// gun (0x4806: orders back to 0).
+static void JoinGun(Trio t, const char* why) {
+	g.gunJoinReq = false;
+	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	Vector3 pos, dir;
+	if (!o || g.held[HERO_OBELIX] || !GunHandles(t, &pos, &dir)) return;
+	Hold(t, HERO_OBELIX, why);
+	uint8_t* ai = (uint8_t*)(o.raw() + 0x561);
+	if (*ai == 0xFF) *ai = 0;
+	o.SetOrder(AI_GOTO_BALLISTA);
+	o.AiTargetPos() = pos;
+	o.AiTargetDir() = dir;
+	g.lastOrder[HERO_OBELIX] = AI_GOTO_BALLISTA;
+	Log("coop: Obelix joins Asterix at the machine gun (%s): to the handles at (%.1f %.1f %.1f)", why, pos.x, pos.y,
+	    pos.z);
+}
+
+// A hero that took the lead for something it started (a group action, a talk,
+// the merchant, a machine) hands it back to the one who led before.
+static void GiveBackLead(Trio t) {
+	if (g.groupTookLead < 0 || !t) return;
+	int took = g.groupTookLead, prev = g.groupPrevLeader;
+	g.groupTookLead = g.groupPrevLeader = -1;
+	if (t.Leader() == took && prev >= 0 && prev != took && !g.held[prev]) {
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		int ev = prev == HERO_ASTERIX ? 0x4800 : 0x4801;
+		Log("coop: %s's group action is over; %s leads again (trio event %04X)", HeroName(took), HeroName(prev), ev);
+		((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
+	}
 }
 
 // Hint: at the start of a level, how player 2 joins (and leaves) -- for 10 s,
@@ -2236,6 +2321,10 @@ int CoopBeforeTrioEvent(int ev, void* caller) {
 	lastEvAt = now;
 	if (!IsModeOrSwitchEvent(ev) && !IsCompanionEvent(ev)) return 0;
 	if (g_eventDepth >= 8) return 0;
+	// The machine gun (0x4809) sends an idle AI companion to its handles (AI
+	// order 7). Obelix's player is left alone: Asterix uses the gun by himself
+	// until Obelix's player joins him there (JoinGun).
+	if (ev == 0x4809 && !g.gunJoining) return 0;
 
 	Trio t = GetTrio();
 	if (!t) return 0;

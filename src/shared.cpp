@@ -97,6 +97,11 @@ int Route(int map, uint32_t action) {
 		if (map == MAP_GUN) return action == 0 || action == 1 ? obe : ast;
 		if (map == MAP_TRIO) return ast;
 		return -1;
+	case SHARED_GUN_SOLO:
+		// Asterix alone on the gun (Obelix's player free, split screen on): all
+		// of it his -- the gun's own tick reads the game's values, which are
+		// player 1's even when Asterix is player 2's.
+		return map == MAP_GUN ? ast : -1;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
 		// Obelix steers (and the camera), Asterix jumps.
@@ -141,7 +146,7 @@ SharedMode DetectMode(Trio t) {
 	Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
 	if (!a || !o) return SHARED_NONE;
 	uint8_t ma = HeroMode(a.Flags18()), mo = HeroMode(o.Flags18());
-	if (ma == 2) return SHARED_GUN;
+	if (ma == 2) return mo == 2 ? SHARED_GUN : SHARED_GUN_SOLO;
 	if (ma == 1) return SHARED_BOAT;
 	if (mo == 3 && t.Leader() == HERO_OBELIX && HeroIsPlayerVariant(o.Flags18())) return SHARED_SLIDE;
 	return SHARED_NONE;
@@ -156,6 +161,10 @@ void ShowModeHint(SharedMode m) {
 	case SHARED_GUN:
 		swprintf(text, 96, L"Obelix (P%d): turn the gun\nAsterix (P%d): fire with %s", o + 1, a + 1, HintButtonName(a, HB_X));
 		break;
+	case SHARED_GUN_SOLO:
+		swprintf(text, 96, L"Obelix (P%d): %s at the gun's handles\nto turn it for Asterix", o + 1, HintButtonName(o, HB_X));
+		HintShow(HINT_MODE, text, 6000);
+		return;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
 		swprintf(text, 96, L"Obelix (P%d): steer and camera\nAsterix (P%d): jump with %s", o + 1, a + 1,
@@ -173,6 +182,7 @@ void ShowModeHint(SharedMode m) {
 const char* SharedModeName(SharedMode m) {
 	switch (m) {
 	case SHARED_GUN: return "machine gun";
+	case SHARED_GUN_SOLO: return "machine gun (Asterix alone)";
 	case SHARED_BOAT: return "boat";
 	case SHARED_SLIDE: return "belly slide";
 	case SHARED_FUSION: return "Twister Fusion";

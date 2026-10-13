@@ -954,6 +954,23 @@ const Step kMgun33O[] = {
 	SHOT(11200, "mgun33_3"),
 	END(13000),
 };
+// mgun33j (-Level 3): Asterix takes the LV3-3 gun alone (split screen stays,
+// player 1 turns and fires it), Obelix joins at the handles with X (one screen,
+// player 2 turns it), Asterix leaves with A (split screen back).
+const Step kMgun33J[] = {
+	MGUN33_SETUP,
+	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 280.0f, 31.92f, -326.0f),
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "mgun33j_solo"),
+	P1(8500, 0, -1.0f, 0, "p1 turns"), P1(9500, PAD_X, 0, 0, "p1 fires"), P1(9900, 0, 0, 0, "p1 release"),
+	PLACEAT(10000, HERO_OBELIX, 293.9f, 31.92f, -326.5f),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"), VPAD(11200, 1, 0, 0, 0, "p2 release"),
+	SHOT(13500, "mgun33j_joined"),
+	VPAD(14000, 1, 0, -1.0f, 0, "p2 turns"), VPAD(15000, 1, 0, 0, 0, "p2 release"),
+	P1(16000, PAD_A, 0, 0, "p1 A (leave)"), P1(16200, 0, 0, 0, "p1 release"),
+	SHOT(18500, "mgun33j_after"),
+	END(19500),
+};
 const Step kMgun33A[] = {
 	MGUN33_SETUP,
 	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 284.4f, 31.92f, -325.9f),
@@ -2219,6 +2236,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("mgun3o", kMgun3O),
 	SCENARIO("mgun33o", kMgun33O),
 	SCENARIO("mgun33a", kMgun33A),
+	SCENARIO("mgun33j", kMgun33J),
 	SCENARIO("boat49o", kBoat49O),
 	SCENARIO("boat49a", kBoat49A),
 	SCENARIO("hintjoin", kHintJoin),
