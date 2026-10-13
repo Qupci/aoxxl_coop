@@ -79,6 +79,17 @@ void LogKinds(char* self) {
 // a hint is laid out on one line of a wide box, then its words are moved onto
 // the hint's own lines ('\n'), right-aligned, and the prompt moved left by the
 // longest line.
+char*   g_plate = nullptr;         // the plate while a hint has it, and its own height and place
+float   g_plateY = 0.0f, g_plateH = 0.0f;
+
+void PlateBack(char* self) {
+	if (!g_plate) return;
+	if (g_plate != *(char**)(self + 0x140)) { g_plate = nullptr; return; }   // another level's interface
+	((float*)g_plate)[6] = g_plateY;
+	((float*)g_plate)[14] = g_plateH;
+	g_plate = nullptr;
+}
+
 void Relayout(char* t20) {
 	unsigned n = *(uint32_t*)(t20 + 0x2D4);
 	if (n == 0 || n > 64 || g_nLines < 2) return;
@@ -165,6 +176,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		*(float*)(self + 0x428) = x;
 		if (((*(uint32_t*)(self + 0x24) >> 21) & 3) == 2) *(float*)(self + 0x42C) = *(float*)(self + 0x434) = x;
 	}
+	if (!use) PlateBack(self);
 	g_origInterfaceTick(self, edx, time);
 	if (!use) return;
 	*(float*)(text + 0x28) = savedWidth;
@@ -198,10 +210,31 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	}
 	*slot = savedId;
 	if (((*cc >> 4) & 0xF) == kHintKind) *cc = (*cc & ~0xF0u) | (kPromptNone << 4);
-	// The button sprite (+0x140, the prompt's dark plate with the button) is
-	// sized for one word and its button means nothing here: hidden (vf17).
 	char* icon = *(char**)(self + 0x140);
-	if (icon) ((void(__fastcall*)(char*, void*))(*(void***)icon)[17])(icon, nullptr);
+	// The prompt's dark plate (+0x140, a CBillboard2d: +0x14 / +0x18 place, +0x34
+	// / +0x38 size, drawn from its right end, about 1.22 times +0x34 wide;
+	// its button sits past +0x34 off screen here) is sized for the hint's
+	// lines: as wide as the longest, a line's height (0.075) each, its middle
+	// moved down to theirs.
+	// The game carries the plate's height and place over from frame to frame:
+	// they are put back when the hint goes (PlateBack).
+	if (icon) {
+		float* f = (float*)icon;
+		if (g_plate != icon) { g_plate = icon; g_plateY = f[6]; g_plateH = f[14]; }
+		float w = (g_longest > 0.0f ? g_longest : 0.9f) / g_unitsPerScreen;
+		f[13] = (w + 0.02f) / 1.22f;
+		f[14] = g_plateH * g_nLines;
+		f[6] = g_plateY - 0.012f * (g_nLines - 1);
+	}
+	if (icon && getenv("XXL_HINTLOG")) {
+		static DWORD lastIconLog = 0;
+		if (GetTickCount() - lastIconLog > 2000) {
+			lastIconLog = GetTickCount();
+			float* f = (float*)icon;
+			Log("hints: plate %p vt %p: +14 %.3f +18 %.3f +1C %.3f +20 %.3f +24 %.3f +28 %.3f +2C %.3f +30 %.3f +34 %.3f +38 %.3f +3C %.3f +40 %.3f",
+			    icon, *(void**)icon, f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], f[13], f[14], f[15], f[16]);
+		}
+	}
 }
 
 // Keyboard keys: the game's keyboard device (CKInput +0x0C, 0x3FC bytes) keeps

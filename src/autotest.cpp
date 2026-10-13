@@ -1445,6 +1445,22 @@ const Step kSlide22[] = {
 	END(116000),
 };
 
+// slide22s (level 2): the LV2-2 belly slide in co-op: player 2 (Obelix) steers
+// it and turns the camera, player 1 (Asterix) jumps.
+const Step kSlide22S[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -905.7f, 527.9f, -938.4f), PLACEAT(2000, HERO_OBELIX, -903.7f, 527.9f, -938.4f),
+	GLIDEAT(3000, HERO_ASTERIX, -911.0f, 528.2f, -913.4f, 2500),
+	CINE_SKIP(6000), CINE_SKIP(8000), CINE_SKIP(10000), CINE_SKIP(12000), CINE_SKIP(14000), CINE_SKIP(16000), CINE_SKIP(18000), CINE_SKIP(20000), CINE_SKIP(22000), CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000),
+	GLIDEAT(31000, HERO_ASTERIX, -907.3f, 526.8f, -903.6f, 1500),
+	SHOT(36000, "slide22s_1"),
+	VPAD(38000, 1, 0, -1.0f, 0.0f, "p2 steers left"), SHOT(40000, "slide22s_2"), VPAD(41000, 1, 0, 0, 0, "p2 release"),
+	VPADR(41500, 1, 1.0f, 0.0f, "p2 turns camera"), SHOT(42500, "slide22s_3"), VPADR(43000, 1, 0.0f, 0.0f, "p2 still"),
+	P1(44000, PAD_A, 0, 0, "p1 jump"), SHOT(44300, "slide22s_4"), P1(44400, 0, 0, 0, "p1 release"),
+	END(47000),
+};
+
 // cam32 (-Level 3): sector 2's beach -- both heroes at 170.8 6.1 -214.9, then
 // Asterix walks (glides) to x 140 and back: which camera the game uses where.
 const Step kCam32[] = {
@@ -2202,6 +2218,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("cam32", kCam32),
 	SCENARIO("cam32o", kCam32O),
 	SCENARIO("slide22", kSlide22),
+	SCENARIO("slide22s", kSlide22S),
 	SCENARIO("camjump", kCamJump),
 	SCENARIO("p2dir", kP2Dir),
 	SCENARIO("cable33", kCable33),
