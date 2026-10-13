@@ -90,6 +90,10 @@ void LogAction(const char* view, uint32_t action, uint8_t v, void* caller) {
 // 1 = player 2, 2 = either (the larger value), -1 = leave it to the game.
 int Route(int map, uint32_t action) {
 	int ast = g.owner[HERO_ASTERIX], obe = g.owner[HERO_OBELIX];
+	// The merchant's words and menu: the shopper's alone (the other player plays
+	// on meanwhile -- an X of theirs must not click through it).
+	int shopper = CoopShopper();
+	if (shopper >= 0 && (map == MAP_SEKENSOR || map == MAP_MENU)) return g.owner[shopper];
 	if (map == MAP_SEKENSOR) return 2;   // dialogues: either player clicks on
 	switch (g.mode) {
 	case SHARED_GUN:

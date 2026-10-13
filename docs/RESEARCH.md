@@ -1304,3 +1304,12 @@ both halves).
   Only the boat still needs both heroes. A lead taken for the gun is given back when the solo use ends
   (GiveBackLead). Autotest mgun33j. Hints: a new hint over a prompt already on screen (state 2) restarts the
   prompt (state 0) so it slides in to the hint's place.
+* Merchant in split screen (2026-10-14): shopping no longer suspends co-op. The opener takes the lead (sit 0x0A,
+  as before) so the shop's camera is the game camera = the shopper's half; trio 0x48EF from the shop entrance
+  (caller 0x49BD4B) no longer stages the other player's hero (no AI order 14: it plays on). The HUD pass
+  (DrawHud, 2D camera renderer +0x14) gets the shopper's half as its viewport (its beginUpdate wrapped like the
+  main camera's): the merchant's words and menu (and the rest of the HUD) squeezed into that half; XXL_SHOPHUD=2
+  also doubles the HUD camera's vertical view window (experiment). Input: the menu map and the Sekensor answer
+  from the shopper's values only (player 2's menu presses now go into player 2's values). The lead is given
+  back when the shop closes. Autotests shopsplit (P2 shops), shopsplita (P1 shops; its synthetic P1 input
+  does not fill the menu's back binding, so it does not leave).

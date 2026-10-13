@@ -466,6 +466,28 @@ void EnsureBeginUpdateWrapped(RwCamera* cam) {
 	Log("split: wrapped beginUpdate of camera %p (was %p)", cam, (void*)g_origBeginUpdate);
 }
 
+// The HUD's own (2D) camera, renderer +0x14: while one player shops, the HUD --
+// the merchant's words and menu with it -- is drawn into that player's half.
+BeginUpdateFn g_origHudBegin = nullptr;
+void*         g_wrappedHud = nullptr;
+bool          g_hudVpActive = false;
+Viewport      g_hudVp = {};
+
+void* __cdecl HudBeginUpdateWrapper(void* camera) {
+	void* r = g_origHudBegin(camera);
+	if (r && g_hudVpActive && camera == g_wrappedHud) SetViewport(g_hudVp);
+	return r;
+}
+
+void EnsureHudWrapped(RwCamera* cam) {
+	if (!cam) return;
+	if (cam == g_wrappedHud && cam->beginUpdate == (void*)HudBeginUpdateWrapper) return;
+	g_origHudBegin = (BeginUpdateFn)cam->beginUpdate;
+	g_wrappedHud = cam;
+	cam->beginUpdate = (void*)HudBeginUpdateWrapper;
+	Log("split: wrapped beginUpdate of the HUD camera %p (was %p)", cam, (void*)g_origHudBegin);
+}
+
 // --- dummy draw lists ---------------------------------------------------------
 // Draw lists are intrusive (item+0x24 = next). The three HUD-layer lists are only
 // drawn at the very end, so player 1's walk has already filled them when player
@@ -729,7 +751,32 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	SetViewport({ 0, 0, w, h, 0.0f, 1.0f });
 	if (vertical) ClearRect(vp1.w, 0, vp2.x - vp1.w, h, 0xFF000000);
 	else          ClearRect(0, vp1.h, w, vp2.y - vp1.h, 0xFF000000);
+	int shopper = CoopShopper();
+	RwCamera* hud = *(RwCamera**)(renderer + 0x14);
+	float hudWindow[2] = {};
+	if (shopper >= 0 && hud) {
+		EnsureHudWrapped(hud);
+		g_hudVp = shopper == CoopP1Hero() ? vp1 : vp2;
+		g_hudVpActive = true;
+		static int mode = getenv("XXL_SHOPHUD") ? atoi(getenv("XXL_SHOPHUD")) : 1;
+		hudWindow[0] = hud->viewWindow[0];
+		hudWindow[1] = hud->viewWindow[1];
+		static bool logged = false;
+		if (!logged) {
+			logged = true;
+			Log("split: shop HUD in %s's half (HUD camera %p, view window %.3f %.3f, mode %d)", HeroName(shopper), hud,
+			    hudWindow[0], hudWindow[1], mode);
+		}
+		if (mode == 2) {   // experiment: same scale both ways
+			float wnd[2] = { hudWindow[0], hudWindow[1] * 2.0f };
+			RwCameraSetViewWindow(hud, wnd);
+		}
+	}
 	DrawHud(view, nullptr, dt);
+	if (g_hudVpActive) {
+		g_hudVpActive = false;
+		if (hud->viewWindow[1] != hudWindow[1]) RwCameraSetViewWindow(hud, hudWindow);
+	}
 	Present(renderer, nullptr);
 	*(uint32_t*)(view + 0x68) &= 0xFFFFFFC1;
 	InterlockedIncrement(&g_splitFrames);

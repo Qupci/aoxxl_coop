@@ -1113,6 +1113,44 @@ const Step kShopOX[] = {
 	END(32000),
 };
 
+// shopsplit (level 2): player 2's Obelix shops in his half while player 1's
+// Asterix runs and presses A / X (which must not reach the shop); player 2
+// browses with the stick, then leaves with B.
+const Step kShopSplit[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	VPAD(7500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(7700, 1, 0, 0, 0, "p2 release"),
+	SHOT(9500, "shopsplit_1"),
+	P1(10000, 0, 0, 1.0f, "p1 runs"), P1(10500, PAD_A, 0, 1.0f, "p1 jumps"), P1(10700, 0, 0, 1.0f, "p1 runs"),
+	P1(11500, PAD_X, 0, 1.0f, "p1 attacks"), P1(11700, 0, 0, 1.0f, "p1 runs"), SHOT(12000, "shopsplit_2"), P1(12500, 0, 0, 0, "p1 stops"),
+	VPAD(13000, 1, 0, 1.0f, 0, "p2 right"), VPAD(13300, 1, 0, 0, 0, "p2 release"),
+	SHOT(14000, "shopsplit_3"),
+	VPAD(15000, 1, PAD_B, 0, 0, "p2 B (back)"), VPAD(15200, 1, 0, 0, 0, "p2 release"),
+	VPAD(18000, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(18200, 1, 0, 0, 0, "p2 release"),
+	SHOT(24000, "shopsplit_4"),
+	END(25000),
+};
+
+// shopsplita (level 2): player 1's Asterix shops in his half while player 2's
+// Obelix runs and presses X; player 1 leaves with B.
+const Step kShopSplitA[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
+	VPAD(5000, 1, 0, 0, 1.0f, "p2 runs"), VPAD(6000, 1, PAD_X, 0, 1.0f, "p2 attacks"), VPAD(6200, 1, 0, 0, 1.0f, "p2 runs"),
+	P1(7500, PAD_X, 0, 0, "p1 X (words)"), P1(7700, 0, 0, 0, "p1 release"),
+	SHOT(9500, "shopsplita_1"), VPAD(9800, 1, 0, 0, 0, "p2 stops"),
+	P1(11000, PAD_B, 0, 0, "p1 B (back)"), P1(11200, 0, 0, 0, "p1 release"),
+	P1(14000, PAD_X, 0, 0, "p1 X (words)"), P1(14200, 0, 0, 0, "p1 release"),
+	SHOT(21000, "shopsplita_2"),
+	END(22000),
+};
+
 // shopo (level 2): player 2's Obelix (not leading) opens the merchant with X.
 const Step kShopO[] = {
 	MARK(0, "baseline"),
@@ -2247,6 +2285,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shop", kShop),
 	SCENARIO("shopo", kShopO),
 	SCENARIO("shopox", kShopOX),
+	SCENARIO("shopsplit", kShopSplit),
+	SCENARIO("shopsplita", kShopSplitA),
 	SCENARIO("inputdump", kInputDump),
 	SCENARIO("combop2", kComboP2),
 	SCENARIO("combop1", kComboP1),

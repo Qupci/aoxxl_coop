@@ -40,6 +40,7 @@ int  CoopNonLeaderPlayer();   // the player hero that is not the trio leader (-1
 int  CoopP2Pad();
 bool CoopSuspended();   // co-op paused for a scripted mode (ride, cinematic...)
 bool CoopOneScreen();   // co-op running, but on one screen for now (Twister Fusion)
+int  CoopShopper();      // the hero at the merchant while co-op goes on around it (-1: none)
 
 // Ask player 2 to leave (same as holding Back).
 void CoopRequestLeave(const char* why);

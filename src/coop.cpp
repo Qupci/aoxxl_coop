@@ -95,6 +95,7 @@ struct CoopState {
 
 	bool    suspended = false;
 	bool    shopping = false;            // a merchant's menu is open
+	int     shopper = -1;                // ... by this hero (the leader when it opened)
 	bool    oneScreen = false;           // Twister Fusion: co-op on, split screen off
 	bool    held[HERO_COUNT] = {};       // a player's hero the game has borrowed (scripted AI order)
 	uint8_t lastOrder[HERO_COUNT] = {};
@@ -425,6 +426,7 @@ int  CoopNonLeaderPlayer() {
 int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
+int  CoopShopper() { return g.p2Joined && g.shopping && !g.suspended ? g.shopper : -1; }
 const uint8_t* CoopP2Values() { return g.p2Joined && g.p2ValuesReady ? g.p2Values : nullptr; }
 bool CoopOneScreen() { return g.oneScreen; }
 // Player 2's input for the game camera (CKSrvCamera +0x580: an input view whose
@@ -1140,8 +1142,8 @@ static void ShopInputFromP2(const PadState& p, InputManager im, int n) {
 	wasLeft = left;
 	wasRight = right;
 	char* input = im.raw();
-	uint8_t* v = im.Values();
-	if (!press || !input || !v) return;
+	uint8_t* v = g.p2Values;   // the menu's input is answered from the shopper's values (shared.cpp)
+	if (!press || !input) return;
 	typedef unsigned(__fastcall* FindViewFn)(void* input, void* edx, const char* name);
 	unsigned idx = ((FindViewFn)0x437FF0)(input, nullptr, (const char*)0x64F28C) & 0xFF;
 	char** views = *(char***)(input + 0x40);
@@ -1337,6 +1339,14 @@ void CoopFrame() {
 		char* s = (char*)GetLvlObject(2, 172, i);
 		shopping = s && (*(uint8_t*)(s + 8) & 7) != 0;
 	}
+	if (shopping && !g.shopping) {
+		g.shopper = t.Leader();
+		Log("coop: %s is at the merchant -- in that player's half; the other player plays on", HeroName(g.shopper));
+	}
+	if (!shopping && g.shopping) {
+		Log("coop: %s is done at the merchant", HeroName(g.shopper));
+		if (!g.suspended) GiveBackLead(t);   // no suspension to resume from any more
+	}
 	g.shopping = shopping;
 	if (!g.suspended) TwisterNearness(t, h1, h2);
 	// The fused tornado is one: one screen while it lasts (the heroes stay the
@@ -1362,7 +1372,7 @@ void CoopFrame() {
 	if (g.gunJoinReq) JoinGun(t, "X at the handles");
 	bool scripted = (!HeroModePlayable(h1.Flags18()) && !(gunSolo && g.p1Hero == HERO_ASTERIX)) ||
 	                (!HeroModePlayable(h2.Flags18()) && !(gunSolo && g.p2Hero == HERO_ASTERIX)) ||
-	                h1.Busy() || h2.Busy() || groupAction || cinematic || shopping;
+	                h1.Busy() || h2.Busy() || groupAction || cinematic;
 	if (scripted != g.suspended) {
 		g.suspended = scripted;
 		Log("coop: %s (%s %s / %s %s%s%s%s)", scripted ? "suspended for a scripted mode" : "resumed",
@@ -2325,6 +2335,9 @@ int CoopBeforeTrioEvent(int ev, void* caller) {
 	// order 7). Obelix's player is left alone: Asterix uses the gun by himself
 	// until Obelix's player joins him there (JoinGun).
 	if (ev == 0x4809 && !g.gunJoining) return 0;
+	// Likewise the merchant (X at the shop, 0x49BD4B: trio 0x48EF sends the
+	// companion there too, AI order 14): the other player plays on meanwhile.
+	if (ev == 0x48EF && caller == (void*)0x49BD4B) return 0;
 
 	Trio t = GetTrio();
 	if (!t) return 0;
