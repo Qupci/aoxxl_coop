@@ -414,6 +414,39 @@ uint8_t* CoopP2CameraValues() {
 	return g.p2CamValues;
 }
 
+// Diagnostics: the user saw jump move from A to B mid-session (not reproduced
+// yet). Each binding's current source (binding +0xC -> +0x14) and the bindings
+// array itself are watched; a change is logged with the whole table.
+void WatchBindings() {
+	static char* lastArray = nullptr;
+	static char* lastSrc[256];
+	static int lastN = -1;
+	static DWORD lastCheck = 0;
+	DWORD now = GetTickCount();
+	if (now - lastCheck < 500) return;
+	lastCheck = now;
+	InputManager im = GetInputManager();
+	if (!im) return;
+	char* arr = *(char**)(im.raw() + 0x18);
+	int n = im.NumActions();
+	if (!arr || n <= 0 || n > 256) return;
+	bool changed = arr != lastArray || n != lastN;
+	int first = -1;
+	for (int i = 0; i < n; i++) {
+		char* src = *(char**)(arr + 0x20 * i + 0xC);
+		char* cur = src ? *(char**)(src + 0x14) : nullptr;
+		if (lastN == n && cur != lastSrc[i] && first < 0) first = i;
+		lastSrc[i] = cur;
+	}
+	if (lastN >= 0 && (changed || first >= 0)) {
+		Log("input: the game's bindings changed (array %p -> %p, %d actions%s, first changed source: action %d)",
+		    lastArray, arr, n, g.swapped ? ", player 2's copy swapped in!" : "", first);
+		TraceDumpBindings();
+	}
+	lastArray = arr;
+	lastN = n;
+}
+
 bool CoopHeroHeld(int idx) { return g.p2Joined && idx >= 0 && idx < HERO_COUNT && g.held[idx]; }
 
 void CoopRequestLeave(const char* why) {
@@ -690,6 +723,7 @@ struct SpyWalk {
 const uintptr_t kFixTrackVtbl = 0x6244EC, kPlainCameraVtbl = 0x6245BC;
 void* g_trackBeforeSpy = nullptr;
 static void WatchSpyCameras();
+void WatchBindings();
 
 static void WatchSpyWalk(Trio t, DWORD now) {
 	WatchSpyCameras();
@@ -1016,6 +1050,7 @@ void CoopFrame() {
 		static bool dumped = false;
 		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
 	}
+	WatchBindings();
 	if (!g.p2Joined) {
 		// Without player 2 the hero that is not leading is the AI companion. A
 		// save made during co-op stores player 2's hero in the player variant:
