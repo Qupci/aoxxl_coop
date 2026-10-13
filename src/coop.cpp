@@ -1877,7 +1877,8 @@ int CoopBeforeTrioEvent(int ev, void* caller) {
 	if (!g.p2Joined) {
 		static const bool logTrio = getenv("XXL_LOGTRIO") != nullptr;   // diagnostics: single player too
 		static int last = -1;
-		if (logTrio && (ev & 0xFFFF) != last && ((ev >> 8) & 0xFF) != 0x51) {
+		static const bool all = logTrio && getenv("XXL_LOGTRIO")[0] == '2';
+		if (logTrio && (ev & 0xFFFF) != last && (all || ((ev >> 8) & 0xFF) != 0x51)) {
 			last = ev & 0xFFFF;
 			Log("coop: (single player) trio event %04X from %p", ev & 0xFFFF, caller);
 		}

@@ -767,6 +767,34 @@ const Step kAnim2[] = {
 	END(8000),
 };
 
+// lbsp (-Level 4): single player, Romans by the level's start; player 1 presses
+// LB every 2 s (Obelix grabs, spins, whistles, passes). Writes to Obelix's +0x884
+// watched; XXL_LOGTRIO=1 for the trio events.
+#define LB_TAP(t) P1(t, PAD_LB, 0, 0, "p1 LB"), P1(t + 150, 0, 0, 0, "p1 release")
+const Step kLbSp[] = {
+	MARK(0, "baseline"),
+	PLACEAT(1000, HERO_ASTERIX, -299.16f, 1.2f, 89.27f), PLACEAT(1000, HERO_OBELIX, -297.0f, 1.2f, 89.27f),
+	{ 1500, S_WATCHRW, HERO_OBELIX, 0x884, 0, 0, 0, "who accesses obelix +884" },
+	SHOT(3500, "lbsp_1"),
+	LB_TAP(4000), LB_TAP(6000), SHOT(7000, "lbsp_2"), LB_TAP(8000), SHOT(9000, "lbsp_3"), LB_TAP(10000),
+	SHOT(11000, "lbsp_4"), LB_TAP(12000), LB_TAP(14000), SHOT(15000, "lbsp_5"), LB_TAP(16000), LB_TAP(18000),
+	SHOT(19000, "lbsp_6"),
+	END(20000),
+};
+
+// rbp2 (-Level 4): player 2's Obelix (not leading) presses RB by the level's
+// Romans, Asterix (leading, with Idefix) 25 units away: Idefix should go and
+// bite (AI order 6).
+#define RB2_TAP(t) VPAD(t, 1, PAD_RB, 0, 0, "p2 RB"), VPAD(t + 150, 1, 0, 0, 0, "p2 release")
+const Step kRbP2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1000, HERO_ASTERIX, -290.0f, 1.2f, 115.0f), PLACEAT(1000, HERO_OBELIX, -299.16f, 1.2f, 89.27f),
+	RB2_TAP(4000), RB2_TAP(6000), SHOT(6500, "rbp2_1"), RB2_TAP(8000), RB2_TAP(10000), SHOT(10500, "rbp2_2"), RB2_TAP(12000),
+	RB2_TAP(14000), RB2_TAP(15000), SHOT(15500, "rbp2_3"), RB2_TAP(17000), SHOT(17500, "rbp2_4"),
+	END(19000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1969,6 +1997,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shadow3s", kShadow3S),
 	SCENARIO("shadow29", kShadow29),
 	SCENARIO("anim2", kAnim2),
+	SCENARIO("lbsp", kLbSp),
+	SCENARIO("rbp2", kRbP2),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),

@@ -50,6 +50,42 @@ int __fastcall AsterixLifeTickHook(void* self, void* edx, int arg) {
 	return LifeTickCommon(g_origAsterixLifeTick, self, edx, arg);
 }
 
+// Idefix (CKHkIdefixLife, vtable 0x625DA0, tick 0x4AC560) answers the *leader's*
+// RB (hero +0x3EC bit 0x100, set for one frame by the hero's input processor on
+// the ground): his AI chooser (0x49EE80) sends him to bite an enemy near the
+// leader (AI order 6), his sound handler (0x4AA080) plays the "no" sound when
+// there is none. Player 2's RB, while not leading, went nowhere. When the
+// non-leading player's hero has RB this frame, Idefix's tick runs with that hero
+// as the trio's leader.
+const uintptr_t kIdefixLifeVtbl = 0x625DA0;
+const uintptr_t kIdefixLifeTick = 0x4AC560;
+LifeTickFn g_origIdefixLifeTick = nullptr;
+
+int __fastcall IdefixLifeTickHook(void* self, void* edx, int arg) {
+	int nl = CoopNonLeaderPlayer();
+	Trio t = GetTrio();
+	Hero h = (t && nl >= 0 && !CoopSuspended()) ? t.GetHero(nl) : Hero();
+	if (!h || !(*(uint32_t*)(h.raw() + 0x3EC) & 0x100) || CoopHeroHeld(nl))
+		return g_origIdefixLifeTick(self, edx, arg);
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t lead = tr[0x2C], comp = tr[0x2D];
+	tr[0x2C] = (uint8_t)nl;
+	tr[0x2D] = lead;
+	// Idefix's range gate (+0xBDC bit 1: the hero beyond +0xB80 -> no bite) is
+	// for the leader he follows; the other player calls him from anywhere.
+	Hero idefix = t.GetHero(HERO_IDEFIX);
+	uint32_t* gate = idefix ? (uint32_t*)(idefix.raw() + 0xBDC) : nullptr;
+	uint32_t gateBit = gate ? (*gate & 2) : 0;
+	if (gate) *gate &= ~2u;
+	*(uint32_t*)(tr + 0x3F4) &= ~1u;   // the trio's enemy list (vf62..) is built around the leader
+	Log("life: %s pressed RB (not leading): Idefix's tick with %s as the leader", HeroName(nl), HeroName(nl));
+	int r = g_origIdefixLifeTick(self, edx, arg);
+	if (gate) *gate |= gateBit;
+	if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = lead; tr[0x2D] = comp; }
+	*(uint32_t*)(tr + 0x3F4) &= ~1u;
+	return r;
+}
+
 int __fastcall ObelixLifeTickHook(void* self, void* edx, int arg) {
 	return LifeTickCommon(g_origObelixLifeTick, self, edx, arg);
 }
@@ -69,5 +105,7 @@ bool LifeInstallHooks() {
 	ok &= PatchVtableSlot(axl::kObelixLifeVtbl, axl::kLifeTickSlot, axl::kObelixLifeTick,
 	                      (void*)ObelixLifeTickHook, (void**)&g_origObelixLifeTick,
 	                      "CKHkObelixLife::tick");
+	ok &= PatchVtableSlot(kIdefixLifeVtbl, axl::kLifeTickSlot, kIdefixLifeTick, (void*)IdefixLifeTickHook,
+	                      (void**)&g_origIdefixLifeTick, "CKHkIdefixLife::tick");
 	return ok;
 }
