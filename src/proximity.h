@@ -17,6 +17,15 @@
 
 bool ProximityInstallHooks();
 
+// Boss runs (level 2 sector 10, level 3 sector 6): the zone that wakes the boss
+// disables the Tornado/Mole combos and walks the sidekick ahead along markers,
+// zone by zone. In co-op those walks are dropped (each player runs their own
+// hero) -- does trio event `ev` belong to such a run, flagged just now?
+bool ProximityBossRunDropsWalk(int ev);
+// A hero was put somewhere else: the detection service's last position for it
+// becomes `at`, so the jump does not cross any zone on the way.
+void ProximityForgetMove(void* heroNode, const float at[3]);
+
 // Whether hero `hero` has had an enemy within the trio's fight radius in the
 // last fight-ending delay (trio +0x404 s): the fight camera, per player.
 bool ProximityHeroFighting(int hero);

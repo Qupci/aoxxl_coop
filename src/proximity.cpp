@@ -918,6 +918,135 @@ bool ZoneMeansItsHero(unsigned ev) {
 	return false;
 }
 
+// Boss runs. Level 2 sector 10's rectangle #4 (group #20) and level 3 sector
+// 6's #46 (group #187) wake the boss, disable the Tornado and Mole combos
+// (trio 0x48EE, 0x48F1) and walk the sidekick to a marker; on level 3 the
+// sidekick's own rectangles along the way (#52, #53, enabled by the group) walk
+// it on to the next marker. In single player the AI Obelix runs ahead of the
+// player; in co-op that took player 2's Obelix away until the end of the path.
+// The run is the starting group and, following the zones it enables, every
+// group that walks the sidekick on; their marker walks are dropped in co-op.
+struct BossRun {
+	int      level = -1;
+	unsigned groups[16] = {};
+	int      ng = 0;
+	uint16_t walks[16] = {};
+	int      nw = 0;
+	DWORD    flaggedAt = 0;   // a run group's zone fired (its events come later in the frame)
+} g_bossRun;
+
+static bool IsMarkerWalk(unsigned m) { return m >= 0x4813 && m <= 0x4876; }
+
+struct EventTable {
+	char* es = nullptr;
+	unsigned n = 0;
+	uint8_t* tab = nullptr;
+	char** objs = nullptr;
+	uint16_t* msgs = nullptr;
+	bool Load() {
+		CKYellowPages* yp = YellowPages();
+		es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		if (!es) return false;
+		n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+		tab = *(uint8_t**)(es + 0xC);
+		objs = *(char***)(es + 0x10);
+		msgs = *(uint16_t**)(es + 0x14);
+		return tab && objs && msgs;
+	}
+	unsigned First(unsigned g) const {
+		unsigned first = 0;
+		for (unsigned k = 0; k < g; k++) first += tab[k * 3];
+		return first;
+	}
+	bool IsTrio(unsigned k) const { return objs[k] && *(uintptr_t*)objs[k] == 0x6256A0; }
+};
+
+static bool GroupStartsBossRun(const EventTable& et, unsigned g) {
+	if (g >= et.n) return false;
+	bool combos = false, walk = false;
+	for (unsigned k = et.First(g), e = k + et.tab[g * 3]; k < e; k++) {
+		if (!et.IsTrio(k)) continue;
+		if (et.msgs[k] == 0x48EE || et.msgs[k] == 0x48F1) combos = true;
+		if (IsMarkerWalk(et.msgs[k])) walk = true;
+	}
+	return combos && walk;
+}
+
+static void AddBossRunGroup(const EventTable& et, char* det, unsigned g, int depth) {
+	BossRun& r = g_bossRun;
+	for (int i = 0; i < r.ng; i++) if (r.groups[i] == g) return;
+	if (r.ng >= 16 || g >= et.n) return;
+	bool walk = false;
+	for (unsigned k = et.First(g), e = k + et.tab[g * 3]; k < e; k++)
+		if (et.IsTrio(k) && IsMarkerWalk(et.msgs[k])) walk = true;
+	if (!walk) return;
+	r.groups[r.ng++] = g;
+	for (unsigned k = et.First(g), e = k + et.tab[g * 3]; k < e; k++) {
+		if (et.IsTrio(k) && IsMarkerWalk(et.msgs[k]) && r.nw < 16) r.walks[r.nw++] = et.msgs[k];
+		// Detection service 0x14..0x18 + index: enable a test (box-enter, sphere-enter,
+		// plane-cross, box-level, sphere-level).
+		if (depth >= 8 || et.objs[k] != det) continue;
+		unsigned op = et.msgs[k] >> 8, idx = et.msgs[k] & 0xFF;
+		if (op < 0x14 || op > 0x18) continue;
+		static const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+		char* tests = *(char**)(det + bases[op - 0x14]);
+		unsigned cnt = *(uint16_t*)(det + bases[op - 0x14] + 4);
+		if (tests && idx < cnt) AddBossRunGroup(et, det, *(uint16_t*)(tests + idx * 8 + 6) >> 3, depth + 1);
+	}
+}
+
+static int CurrentLevel() {
+	CKYellowPages* yp = YellowPages();
+	return (yp && yp->gameManager) ? *(int*)((char*)yp->gameManager + ax::kGM_currentLevel) : -1;
+}
+
+// A zone event was flagged by the detection service (`det`) for hero `zh`.
+static void NoteBossRunZone(char* det, unsigned ev, int zh) {
+	if (!CoopP2Joined()) return;
+	EventTable et;
+	if (!et.Load()) return;
+	unsigned g = (ev & 0xFFFF) >> 3;
+	BossRun& r = g_bossRun;
+	if (r.level != CurrentLevel()) { r = BossRun(); r.level = CurrentLevel(); }
+	if (GroupStartsBossRun(et, g)) {
+		bool known = false;
+		for (int i = 0; i < r.ng; i++) if (r.groups[i] == g) known = true;
+		if (!known) {
+			r.ng = r.nw = 0;
+			AddBossRunGroup(et, det, g, 0);
+			char lb[512];
+			LineBuf l(lb);
+			l.Add("proximity: boss run from group %03X: groups", g);
+			for (int i = 0; i < r.ng; i++) l.Add(" %03X", r.groups[i]);
+			l.Add(", sidekick walks");
+			for (int i = 0; i < r.nw; i++) l.Add(" %04X", r.walks[i]);
+			Log("%s", lb);
+		}
+		if (zh >= 0) CoopNoteBossRun(zh);
+	}
+	for (int i = 0; i < r.ng; i++)
+		if (r.groups[i] == g) r.flaggedAt = GetTickCount();
+}
+
+bool BossRunDropsWalk(int ev) {
+	const BossRun& r = g_bossRun;
+	if (!CoopP2Joined() || !r.flaggedAt || GetTickCount() - r.flaggedAt > 500 || r.level != CurrentLevel()) return false;
+	for (int i = 0; i < r.nw; i++)
+		if (r.walks[i] == (uint16_t)ev) return true;
+	return false;
+}
+
+void ForgetMove(void* heroNode, const float at[3]) {
+	CKYellowPages* yp = YellowPages();
+	char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+	if (!det || *(uintptr_t*)det != 0x62504C || !heroNode) return;
+	char** nodes = *(char***)(det + 0x18);
+	float* prev = *(float**)(det + 0x1C);
+	unsigned n = *(uint16_t*)(det + 0x20);
+	for (unsigned i = 0; nodes && prev && i < n; i++)
+		if (nodes[i] == (char*)heroNode) memcpy(prev + 3 * i, at, 12);
+}
+
 bool LeverHeldBack(char* receiver, Trio t) {
 	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
 	int lead = t.Leader();
@@ -1222,6 +1351,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		int zh = ZoneEventHero(eventId & 0xFFFF);
 		if (zh >= 0) CoopNoteZoneHero(zh);
 		if (zh >= 0 && g_inSwappedPass && GroupCommandsTrio(eventId) && GroupPlaysCutscene(eventId)) CoopNoteStoryZone(zh);
+		NoteBossRunZone(g_tickingDet, eventId, zh);
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
 		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
 	}
@@ -1240,6 +1370,8 @@ long ProximitySwappedZones() { return g_swappedZones; }
 long ProximityP2Squads() { return g_p2Squads; }
 long ProximityP2Beacons() { return g_p2Beacons; }
 long ProximitySlices() { return g_slices; }
+bool ProximityBossRunDropsWalk(int ev) { return BossRunDropsWalk(ev); }
+void ProximityForgetMove(void* heroNode, const float at[3]) { ForgetMove(heroNode, at); }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
 
 namespace {

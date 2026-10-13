@@ -1150,3 +1150,12 @@ both halves).
 * A cutscene zone set off by the other hero brings the zone's own hero to it when the cutscene camera comes up
   and they are 40+ units apart (CoopNoteStoryZone; RegroupForCutscene alone skips it while the game holds a
   player hero, e.g. the walk to marker 22).
+* Boss runs (LV2-10, LV3-6): the waking zone's group disables the Tornado/Mole combos (trio 0x48EE/0x48F1) and
+  walks the sidekick to a marker (LV2 #4 group 0x014: 0x4829; LV3 #46 group 0x0BB: 0x4824, then Obelix's own
+  rectangles #52/#53 walk him on with 0x4825/0x4823; Asterix's #143 sends the boss 0x4C15 "move to other end" --
+  the LV3 machine only rolls once a hero runs past it). Autotest `bossscan` (S_BOSSSCAN) lists every group with a
+  marker walk on levels 2-6: only those two have the combo fingerprint. Co-op: the run's groups (start group plus,
+  through the detection-service enables 0x14..0x18+index, every group that walks the sidekick on) are collected
+  when the start fires; their marker walks are dropped (CoopDeferTrioEvent) within 500 ms of a run zone, and the
+  other player is put on the waker (the detection service's last position for it moved too, ProximityForgetMove,
+  so the jump crosses no zone). Autotests boss210, boss36.

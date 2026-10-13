@@ -14,6 +14,7 @@
 //    (only its leader in a player state), then player control is re-applied.
 
 #include "coop.h"
+#include "proximity.h"
 #include "detour.h"
 #include "klusters.h"
 #include "sound.h"
@@ -52,6 +53,7 @@ struct CoopState {
 	int     joinLeader = -1;        // the trio's leader when player 2 joined
 	int     storyZoneHero = -1;     // a cutscene zone bound to the other hero set off by this one
 	DWORD   storyZoneAt = 0;
+	int     bossRunHero = -1;       // woke a boss the heroes run from; the other player is brought along
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
@@ -589,6 +591,10 @@ void CoopNoteStoryZone(int heroIndex) {
 	g.storyZoneAt = GetTickCount();
 }
 
+void CoopNoteBossRun(int heroIndex) {
+	if (g.bossRunHero < 0) g.bossRunHero = heroIndex;
+}
+
 void CoopNoteZoneHero(int heroIndex) {
 	g_sec.zoneHero = heroIndex;
 	g_sec.zoneAt = GetTickCount();
@@ -827,6 +833,10 @@ static bool HeroFlying(Trio t) {
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
 	Trio t = GetTrio();
+	if (t && t.raw() == (char*)trio && ProximityBossRunDropsWalk(ev & 0xFFFF)) {
+		Log("coop: trio event %04X (the sidekick runs ahead from the boss) dropped: each player runs their own hero", ev & 0xFFFF);
+		return true;
+	}
 	if (!t || t.raw() != (char*)trio || !IsLeaderSwitch(ev) || !HeroFlying(t)) return false;
 	g_deferredSwitch = ev & 0xFFFF;
 	g_deferredSince = GetTickCount();
@@ -912,6 +922,30 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		Log("coop: %s set the dialogue off; it leads for it (%s, %.0f units away, comes in as the companion)",
 		    HeroName(nl), HeroName(lead), dl);
 	}
+}
+
+// A boss the heroes run from (level 2 sector 10, level 3 sector 6) was woken by
+// one player: the other is put next to them, so both start the run -- the other
+// could otherwise stay behind, outside the run's section.
+static void BringAlongForBossRun(Trio t) {
+	int by = g.bossRunHero;
+	g.bossRunHero = -1;
+	if (by < 0 || by >= HERO_COUNT || !g.p2Joined || !t) return;
+	int other = by == g.p1Hero ? g.p2Hero : g.p1Hero;
+	Hero h = t.GetHero(by), o = other >= 0 ? t.GetHero(other) : Hero();
+	if (!h || !o) return;
+	float apart = sqrtf((h.Pos() - o.Pos()).len2());
+	if (apart < 6.0f) return;
+	if (g.held[other]) {
+		Log("coop: %s woke the boss; %s is busy with the game (not brought along)", HeroName(by), HeroName(other));
+		return;
+	}
+	Vector3 to = h.Pos();
+	to.y += 1.0f;
+	SetHeroPosition(o, to);
+	ProximityForgetMove(o.hook->node, &to.x);
+	Log("coop: %s woke the boss %.0f units away from %s: %s brought along to (%.1f %.1f %.1f)", HeroName(by), apart,
+	    HeroName(other), HeroName(other), to.x, to.y, to.z);
 }
 
 // A cutscene set off by one player far from the other (player 2's Obelix at the
@@ -1230,6 +1264,7 @@ void CoopFrame() {
 			RegroupForCutscene(t, h1, h2);
 		}
 	}
+	BringAlongForBossRun(t);
 	WatchSpyWalk(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
 	// whatever mode the game put it -- whichever player it belongs to. Rides only

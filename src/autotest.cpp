@@ -21,7 +21,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -692,6 +692,25 @@ const Step kBoss210[] = {
 	GLIDEAT(17000, HERO_OBELIX, 1697.0f, -742.8f, -1210.5f, 4000),
 	SHOT(21500, "boss_5"), SHOT(24000, "boss_6"), SHOT(28000, "boss_7"), SHOT(33000, "boss_8"), SHOT(38000, "boss_9"),
 	END(40000),
+};
+
+// boss36 (-Level 3): sector 6's boss. Obelix crosses the rectangle that loads it
+// (-208.3 11.0 -199.2 -> -226), then drops onto #46 (-232.0 9.8 -173.9) that
+// wakes it; Asterix stays back by the loading rectangle.
+const Step kBoss36[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -205.0f, 11.5f, -202.0f), PLACEAT(3000, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	SECTORS(3500),
+	GLIDEAT(4000, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	SHOT(6000, "boss36_1"),
+	PLACEAT(8000, HERO_OBELIX, -232.0f, 16.0f, -173.9f),
+	SHOT(9500, "boss36_2"),
+	{ 11000, S_NEAROBJ, HERO_OBELIX, 177, 0, 12.0f, 0, "obelix away from the machine" },
+	{ 12500, S_NEAROBJ, HERO_OBELIX, 177, 0, 30.0f, 0, "obelix further away" },
+	{ 14000, S_NEAROBJ, HERO_OBELIX, 177, 0, 50.0f, 0, "obelix further away" },
+	SHOT(15000, "boss36_4"), SHOT(17000, "boss36_5"), SHOT(20000, "boss36_6"),
+	END(22000),
 };
 
 const Step kBeach12O[] = {
@@ -1735,6 +1754,9 @@ const Step kBorrow[] = {
 };
 
 // survey: log which group-action objects the level has, then leave.
+const Step kBossScan[] = {
+	MARK(0, "bossscan"), { 3000, S_BOSSSCAN, 0, 0, 0, 0, 0, "boss scan" }, END(3500),
+};
 const Step kSurvey[] = {
 	MARK(0, "survey"), { 0, S_DETECT, 0, 0, 0, 0, 0, "detect" }, SHOT(100, "survey"), END(300),
 };
@@ -1824,6 +1846,7 @@ struct Scenario { const char* name; const Step* steps; int count; };
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("survey", kSurvey),
+	SCENARIO("bossscan", kBossScan),
 	SCENARIO("lifter", kLifter),
 	SCENARIO("split1", kSplit1),
 	SCENARIO("split2", kSplit2),
@@ -1886,6 +1909,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("plate26", kPlate26),
 	SCENARIO("beach12o", kBeach12O),
 	SCENARIO("boss210", kBoss210),
+	SCENARIO("boss36", kBoss36),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
@@ -2716,6 +2740,58 @@ void RunStep(const Step& s) {
 				D::Dump(*(char**)(node + 0x18), 1);
 			} __except (EXCEPTION_EXECUTE_HANDLER) {
 				Log("autotest: (node tree unreadable)");
+			}
+		}
+		break;
+	}
+	case S_BOSSSCAN: {   // event groups that send a sidekick to a marker, the zones feeding them, the zones they enable
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+		if (!ev || !det || *(uintptr_t*)det != 0x62504C) { Log("autotest: bossscan: no services"); break; }
+		unsigned n = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
+		uint8_t* tab = *(uint8_t**)(ev + 0xC);
+		char** objs = *(char***)(ev + 0x10);
+		uint16_t* msgs = *(uint16_t**)(ev + 0x14);
+		static unsigned firstOf[4097]; if (n > 4096) n = 4096; firstOf[0] = 0;
+		for (unsigned g = 0; g < n; g++) firstOf[g + 1] = firstOf[g] + tab[g * 3];
+		const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+		const char* names[5] = { "box-enter", "sphere-enter", "plane-cross", "box-level", "sphere-level" };
+		auto dumpGroup = [&](unsigned g, const char* indent) {
+			for (unsigned k = firstOf[g]; k < firstOf[g + 1]; k++)
+				Log("autotest: %s  -> %p vt %08X msg %04X", indent, objs[k], objs[k] ? (unsigned)*(uintptr_t*)objs[k] : 0, msgs[k]);
+		};
+		auto feeders = [&](unsigned g, const char* indent) {
+			for (int li = 0; li < 5; li++) {
+				char* e = *(char**)(det + bases[li]);
+				unsigned cnt = *(uint16_t*)(det + bases[li] + 4);
+				for (unsigned i = 0; e && i < cnt; i++, e += 8)
+					if ((*(uint16_t*)(e + 6) >> 3) == g)
+						Log("autotest: %s  fed by %s %u (obj %u, flags %02X/%02X, event %04X)", indent, names[li], i,
+						    *(uint16_t*)(e + 2), (uint8_t)e[4], (uint8_t)e[5], *(uint16_t*)(e + 6));
+			}
+		};
+		for (unsigned g = 0; g < n; g++) {
+			bool walk = false;
+			for (unsigned k = firstOf[g]; k < firstOf[g + 1]; k++)
+				if (objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] >= 0x4813 && msgs[k] <= 0x4876) walk = true;
+			if (!walk) continue;
+			Log("autotest: bossscan: group %03X (#%u), mask %02X", g, g, tab[g * 3 + 1]);
+			dumpGroup(g, "");
+			feeders(g, "");
+			// Zones this group enables (detection service messages 0x14..0x18 + index): what they send.
+			for (unsigned k = firstOf[g]; k < firstOf[g + 1]; k++) {
+				if (objs[k] != det) continue;
+				unsigned op = msgs[k] >> 8, idx = msgs[k] & 0xFF;
+				if (op < 0x14 || op > 0x18) continue;
+				int li = op - 0x14;
+				char* e = *(char**)(det + bases[li]);
+				unsigned cnt = *(uint16_t*)(det + bases[li] + 4);
+				if (!e || idx >= cnt) continue;
+				e += idx * 8;
+				unsigned eg = *(uint16_t*)(e + 6) >> 3;
+				Log("autotest:     enables %s %u (obj %u, event %04X, group %03X):", names[li], idx, *(uint16_t*)(e + 2), *(uint16_t*)(e + 6), eg);
+				if (eg < n) dumpGroup(eg, "    ");
 			}
 		}
 		break;
