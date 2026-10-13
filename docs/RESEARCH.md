@@ -1225,3 +1225,7 @@ both halves).
   hit and ended the flight at once). Otherwise LB plays the other hero's "no" (sound bank +0x200, sound manager
   yp+0x18: 0x43C130 playing?, 0x43B730 start). Autotests pass22 (archer of LV2 sector 2 flies to Obelix, 0x4C06
   sent, lands stunned beside him), lb2. Diagnostics: XXL_PASSLOG (events to and flight of a passed Roman).
+* The whistle: the AI companion's step 5 (lifting the grabbed Roman, handler 0x492660) plays its sound bank +0x280
+  (Obelix sound 0x95, Asterix 0x9F) from the sound handler's step-change switch -- the "ready" whistle; the
+  player's spin (steps 0x0A-0x0C) never plays it. A co-op pass plays the thrower's +0x280 (user-confirmed).
+  XXL_LOGSOUNDS=1 logs every sound start from hero code (2: from anywhere); autotest lbwait (one LB, wait).

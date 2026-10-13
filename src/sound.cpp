@@ -340,6 +340,9 @@ int __fastcall SoundStartHook(char* self, void* edx, uint32_t* inst, float vol, 
 	uint32_t id = inst ? inst[0] : 0;
 	bool seen = false;
 	for (long i = 0; i < g_nSeen && !seen; i++) seen = g_seen[i].id == id && g_seen[i].from == from;
+	static const bool all = getenv("XXL_LOGSOUNDS") != nullptr;   // diagnostics: every start from hero code
+	if (all && (getenv("XXL_LOGSOUNDS")[0] == '2' || (from >= 0x490000 && from < 0x4B0000)))
+		Log("sound: start %08X from %p", id, (void*)from);
 	if (!seen && g_nSeen < 1024) {
 		g_seen[g_nSeen].id = id;
 		g_seen[g_nSeen].from = from;

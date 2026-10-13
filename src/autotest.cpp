@@ -838,6 +838,32 @@ const Step kLb2[] = {
 	END(6000),
 };
 
+// whistle22 (-Level 2): single player at the lone archer of sector 2: Asterix
+// stuns it, LB sends Obelix to grab and spin it; no LB for 5 s (the whistle),
+// then LB. XXL_LOGSOUNDS=2 logs every sound start.
+const Step kWhistle22[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -317.46f, 17.0f, -598.5f), PLACEAT(3000, HERO_OBELIX, -324.0f, 17.0f, -598.5f),
+	VPAD(3300, 1, PAD_BACK, 0, 0, "p2 holds back (leaves)"), VPAD(5000, 1, 0, 0, 0, "p2 release"),
+	SECTORS(3500),
+	{ 4500, S_NEAROBJ, HERO_ASTERIX, 95, 0, 1.6f, 0, "asterix by the archer" },
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5150, 0, 0, 0, "p1 release"),
+	P1(6000, 0, 0, -1.0f, "p1 back"), P1(6400, 0, 0, 0, "p1 stop"),
+	LB_TAP(6800), SHOT(8000, "whistle_1"), SHOT(10000, "whistle_2"), SHOT(12000, "whistle_3"), LB_TAP(13500), SHOT(14000, "whistle_4"),
+	END(16000),
+};
+
+// lbwait (-Level 4): single player by the level's Romans; one LB, then 6 s of
+// waiting (Obelix grabs, spins, whistles), then LB for the pass.
+const Step kLbWait[] = {
+	MARK(0, "baseline"),
+	PLACEAT(1000, HERO_ASTERIX, -299.16f, 1.2f, 89.27f), PLACEAT(1000, HERO_OBELIX, -297.0f, 1.2f, 89.27f),
+	LB_TAP(4000), SHOT(6000, "lbwait_1"), SHOT(8000, "lbwait_2"), LB_TAP(10000), SHOT(10500, "lbwait_3"),
+	LB_TAP(13000), SHOT(16000, "lbwait_4"), LB_TAP(19000),
+	END(22000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -2045,6 +2071,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("grab22", kGrab22),
 	SCENARIO("pass22", kPass22),
 	SCENARIO("lb2", kLb2),
+	SCENARIO("whistle22", kWhistle22),
+	SCENARIO("lbwait", kLbWait),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),

@@ -1794,7 +1794,8 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 // 0x0B lift, 0x0C spin, handler 0x492CF0; the Roman in state 3) passes it to the
 // other player with LB, as the companion does -- let go, 0x4C0F with the other
 // hero as the trio leader, the spin's throw step 0x0D; the Roman then ticks with
-// that hero as the leader until it lands (ProximityPassTo). LB with no Roman
+// that hero as the leader until it lands (ProximityPassTo), and the thrower
+// whistles (bank +0x280, the companion's "ready" whistle). LB with no Roman
 // spinning, or the other player too far: the other hero's "no".
 const float kPassRange = 30.0f;
 
@@ -1838,6 +1839,9 @@ static void WatchLbPass(int idx, Hero h) {
 	if (tr[0x2C] == (uint8_t)other) { tr[0x2C] = lead; tr[0x2D] = comp; }
 	*(uint32_t*)(h.raw() + 0x38C) = (*(uint32_t*)(h.raw() + 0x38C) & 0xFFC0FFFF) | 0xD0000;   // the spin's throw step
 	ProximityPassTo(roman, other);
+	// The whistle: the AI companion's lift of a grabbed Roman (its spin's step 5)
+	// plays sound bank +0x280; the player's own spin never reaches that step.
+	PlaySound(h, 0x280);
 	if (getenv("XXL_PASSWATCH")) {   // diagnostics: who changes the passed Roman's state
 		const void* w[1] = { roman + 0x21 };
 		WatchBytes(w, 1, 0, 0);
