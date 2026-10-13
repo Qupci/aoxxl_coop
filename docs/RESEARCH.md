@@ -1165,3 +1165,10 @@ both halves).
   split frame (P2 stamp, P1, P2), each walk took the angle between the players' cameras as a turn: per-walk log
   (XXL_SKYLOG=1, XXL_SKYFIX=0) jumped ~1.2 between the halves every frame with the cameras facing each other.
   Now the stamp walk skips the sky and each player's walk swaps in that player's copy of the state (sky2 autotest).
+* Shadows (CKSrvShadow objects, vtable 0x62520C, one per shadow): slot 26 (0x46F980, ret 0x10) places a shadow
+  once per frame from the shadow service's update (callers 0x470E19 / 0x470F0B, outside the render): culled and
+  faded by distance to the game camera (svc+0x5B0) and its matrix (2nd arg, pos +0x30) nudged ~0.27 units
+  towards that camera (service yp+0x88 +0x4C). The game camera follows the leader, so the non-leader's shadow
+  leaned towards the leader (XXL_SHADOWLOG=1 logs the heroes' offsets; XXL_SHADOWFIX=0 for the game's own). In
+  split screen each shadow is now placed with the player camera nearer to it (OtherViewMatrix vs svc+0x5B0).
+  Autotest shadow33 (LV3-3 room x 290.1 z -331.7; the user's coordinate had y/z swapped).

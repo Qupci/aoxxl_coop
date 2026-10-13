@@ -724,6 +724,28 @@ const Step kSky2[] = {
 	END(10000),
 };
 
+// shadow33 (-Level 3): sector 3's room (x 290.1, z -331.7); player 2's Obelix
+// (not leading) 8 units from Asterix; XXL_SHADOWFIX=0 for the game's own shadows.
+const Step kShadow33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 290.14f, 40.0f, -331.68f), PLACEAT(3000, HERO_OBELIX, 298.14f, 40.0f, -331.68f),
+	SECTORS(3500), SHOT(6000, "shadow_1"),
+	PLACEAT(6500, HERO_OBELIX, 290.14f, 40.0f, -323.68f), SHOT(9000, "shadow_2"),
+	END(9500),
+};
+
+// shadow3s (-Level 3): at the level's start with sector 1 unloaded (the shadows
+// show clearly there), player 2's Obelix 6 units from Asterix, then to his side.
+const Step kShadow3S[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	LOADSECTOR(2000, 4),
+	PLACEAT(4000, HERO_OBELIX, -5.7f, 0.0f, 36.0f), SHOT(6500, "shadow3s_1"),
+	PLACEAT(7000, HERO_OBELIX, -11.7f, 0.0f, 42.0f), SHOT(9500, "shadow3s_2"),
+	END(10000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1922,6 +1944,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("boss210", kBoss210),
 	SCENARIO("boss36", kBoss36),
 	SCENARIO("sky2", kSky2),
+	SCENARIO("shadow33", kShadow33),
+	SCENARIO("shadow3s", kShadow3S),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),

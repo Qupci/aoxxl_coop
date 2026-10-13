@@ -7,6 +7,7 @@
 #include "p2cam.h"
 
 #include <cmath>
+#include <intrin.h>
 #include <cstdlib>
 #include <cstring>
 
@@ -187,6 +188,67 @@ void __fastcall SkyWalkHook(char* self, void* edx, void** lists, void* dt) {
 		memcpy(st->data[1 - k], st->data[k], 0x24);
 		st->valid[1 - k] = true;
 	}
+}
+
+// --- shadows -------------------------------------------------------------------
+// Each shadow (CKSrvShadow objects, vtable 0x62520C) is placed once per frame by
+// its slot 26 (0x46F980), called from the shadow service's update (0x470E19,
+// 0x470F0B), not from the render: it is culled and faded by its distance to the
+// game camera (camera service +0x5B0) and nudged towards that camera (by the
+// service's +0x4C). The game camera follows the leader, so the non-leading
+// player's shadow leaned towards the leader's camera -- towards the leader. In
+// split screen each shadow is placed for the player camera nearer to it.
+const uintptr_t kShadowVtbl = 0x62520C;
+const uintptr_t kShadowUpdate = 0x46F980;
+const size_t    kShadowUpdateSlot = 26;
+typedef int(__fastcall* ShadowUpdateFn)(char* self, void* edx, void* a, void* b, void* c, void* d);
+ShadowUpdateFn g_origShadowUpdate = nullptr;
+
+bool WantSplit();
+
+int ShadowUpdateImpl(char* self, void* edx, void* a, void* b, void* c, void* d);
+
+int __fastcall ShadowUpdateHook(char* self, void* edx, void* a, void* b, void* c, void* d) {
+	int r = ShadowUpdateImpl(self, edx, a, b, c, d);
+	static const bool log = getenv("XXL_SHADOWLOG") != nullptr;   // diagnostics: the heroes' shadow offsets
+	static unsigned n[2] = {};
+	Trio t = log ? GetTrio() : Trio();
+	char* node = *(char**)(self + 0xC);
+	for (int i = 0; t && i < 2 && r == 0; i++) {
+		Hero h = t.GetHero(i);
+		if (!h || (char*)h.hook->node != node || (n[i]++ % 60) != 0) continue;
+		const float* g = *(const float**)(self + 0x10);
+		const float* o = (const float*)((char*)b + 0x30);
+		Hero other = t.GetHero(1 - i);
+		Vector3 to = other ? other.Pos() - h.Pos() : Vector3();
+		Log("split: %s's shadow (%s) offset (%.3f %.3f %.3f) from its ground point; the other hero is (%.1f %.1f) away",
+		    HeroName(i), t.Leader() == i ? "leader" : "not leading", o[0] - g[0], o[1] - g[1], o[2] - g[2], to.x, to.z);
+	}
+	return r;
+}
+
+int ShadowUpdateImpl(char* self, void* edx, void* a, void* b, void* c, void* d) {
+	static const bool off = getenv("XXL_SHADOWFIX") && getenv("XXL_SHADOWFIX")[0] == '0';   // diagnostics
+	char* node = *(char**)(self + 0xC);
+	char* fr = node ? *(char**)(node + 4) : nullptr;
+	CKYellowPages* yp = YellowPages();
+	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	float m[16];
+	if (off || !fr || !svc || !WantSplit() || !OtherViewMatrix(m))
+		return g_origShadowUpdate(self, edx, a, b, c, d);
+	const float* p = (const float*)(fr + 0x80);
+	float* cam = (float*)(svc + 0x5B0);
+	float dg = 0, dm = 0;
+	for (int i = 0; i < 3; i++) {
+		dg += (p[i] - cam[i]) * (p[i] - cam[i]);
+		dm += (p[i] - m[12 + i]) * (p[i] - m[12 + i]);
+	}
+	if (!(dm < dg)) return g_origShadowUpdate(self, edx, a, b, c, d);
+	float saved[3] = { cam[0], cam[1], cam[2] };
+	cam[0] = m[12]; cam[1] = m[13]; cam[2] = m[14];
+	int r = g_origShadowUpdate(self, edx, a, b, c, d);
+	cam[0] = saved[0]; cam[1] = saved[1]; cam[2] = saved[2];
+	return r;
 }
 
 // --- viewport override ---------------------------------------------------------
@@ -530,6 +592,8 @@ bool SplitInstallHooks() {
 	ok &= PatchVtableSlot(kParticlesVtbl, kWalkSlot, kParticlesWalk, (void*)ParticlesWalkHook,
 	                      (void**)&g_origParticlesWalk, "CParticlesNodeFx::walk");
 	ok &= PatchVtableSlot(kSkyVtbl, kWalkSlot, kSkyWalk, (void*)SkyWalkHook, (void**)&g_origSkyWalk, "CSkyNodeFx::walk");
+	ok &= PatchVtableSlot(kShadowVtbl, kShadowUpdateSlot, kShadowUpdate, (void*)ShadowUpdateHook,
+	                      (void**)&g_origShadowUpdate, "CKSrvShadow::update");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");
