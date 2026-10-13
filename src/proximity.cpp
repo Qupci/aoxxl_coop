@@ -1210,21 +1210,24 @@ const float     kSpyFar = 250.0f;   // the slide's end is ~200 from its agent; t
 int __fastcall ClueEventHook(char* self, void* edx, unsigned ev, void* param) {
 	Trio t = GetTrio();
 	if ((ev & 0xFFFF) == 0x5198 && t && CoopP2Joined()) {
-		Vector3 at, spot;
-		bool spawned = NodePos(*(void**)(self + 0x10), &at);
-		const float* p = (const float*)(self + 0x12C);
-		bool haveSpot = std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2]);
-		if (haveSpot) spot = Vector3(p[0], p[1], p[2]);
-		float best = 1e30f;
-		for (int h = 0; h < 2; h++) {
-			Hero hero = t.GetHero(h);
-			if (!hero) continue;
-			if (spawned) { float d = sqrtf((hero.Pos() - at).len2()); if (d < best) best = d; }
-			if (haveSpot) { float d = sqrtf((hero.Pos() - spot).len2()); if (d < best) best = d; }
-		}
-		if ((spawned || haveSpot) && best > kSpyFar) {
-			Log("proximity: spy %p told to start its talk %.0f units from the nearest hero; ignored", self, best);
-			return 1;
+		// The walk target 0x5198 sends the trio (0x5120 param +4): +0x108 for the
+		// second talk of a two-part spy (+0x14 bit 1 set, bit 3 clear), else +0xFC.
+		// Not the spy's node or spawn spot (+0x12C): the slide's end agents of
+		// levels 4 and 5 stand ~800 units from those.
+		uint8_t f = *(uint8_t*)(self + 0x14);
+		const float* p = (const float*)(self + (((f & 2) && !(f & 8)) ? 0x108 : 0xFC));
+		if (std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2])) {
+			Vector3 target(p[0], p[1], p[2]);
+			float best = 1e30f;
+			for (int h = 0; h < 2; h++) {
+				Hero hero = t.GetHero(h);
+				if (hero) { float d = sqrtf((hero.Pos() - target).len2()); if (d < best) best = d; }
+			}
+			if (best > kSpyFar) {
+				Log("proximity: spy %p told to start its talk at (%.1f %.1f %.1f), %.0f units from the nearest hero; ignored",
+				    self, target.x, target.y, target.z, best);
+				return 1;
+			}
 		}
 	}
 	return g_origClueEvent(self, edx, ev, param);
