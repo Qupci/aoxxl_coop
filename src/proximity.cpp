@@ -174,6 +174,54 @@ void TickPlate(int* life, void* dt, char* plate, Trio t) {
 	}
 }
 
+// Romans passed from one player to the other (LB): flying (state +0x21 == 4),
+// they tick with the receiver as the trio leader.
+struct Pass { char* roman; int receiver; int thrower; DWORD since; };
+Pass g_passes[4];
+
+int PassReceiver(char* hook) {
+	for (Pass& p : g_passes) {
+		if (!p.roman || p.roman != hook) continue;
+		bool flying = *(uint8_t*)(hook + 0x21) == 4;
+		static const bool passLog = getenv("XXL_PASSLOG") != nullptr;   // diagnostics: the flight, tick by tick
+		if (passLog) {
+			char* node = *(char**)(hook + 0x10);
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			const float* q = fr ? (const float*)(fr + 0x80) : nullptr;
+			Log("proximity: passed Roman %p state %d flags %08X aim %p at (%.1f %.1f %.1f)", hook, *(uint8_t*)(hook + 0x21),
+			    *(uint32_t*)(hook + 0x24), *(void**)(hook + 0x1A0), q ? q[0] : 0.0f, q ? q[1] : 0.0f, q ? q[2] : 0.0f);
+		}
+		if ((flying || GetTickCount() - p.since < 300) && GetTickCount() - p.since < 6000) return p.receiver;
+		{
+			char* node = *(char**)(hook + 0x10);
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			const float* q = fr ? (const float*)(fr + 0x80) : nullptr;
+			Log("proximity: passed Roman %p done (state %d) at (%.1f %.1f %.1f)", hook, *(uint8_t*)(hook + 0x21),
+			    q ? q[0] : 0.0f, q ? q[1] : 0.0f, q ? q[2] : 0.0f);
+		}
+		p.roman = nullptr;
+	}
+	return -1;
+}
+
+// Diagnostics (XXL_PASSLOG): events sent to a passed Roman, with the caller.
+typedef int(__fastcall* RomanSendFn)(char* self, void* edx, int ev, void* param);
+const uintptr_t kRomanVtbls[5] = { 0x627240, 0x62745C, 0x62756C, 0x627738, 0x627844 };
+const uintptr_t kRomanSends[5] = { 0x4DA3F0, 0x4DC840, 0x4DE8B0, 0x4E3F00, 0x4E5F90 };
+RomanSendFn g_origRomanSend[5] = {};
+
+int __fastcall RomanSendHook(char* self, void* edx, int ev, void* param) {
+	uintptr_t vt = *(uintptr_t*)self;
+	RomanSendFn orig = nullptr;
+	for (int i = 0; i < 5; i++) if (kRomanVtbls[i] == vt) orig = g_origRomanSend[i];
+	if (!orig) return 0;
+	for (Pass& p : g_passes)
+		if (p.roman == self && GetTickCount() - p.since < 3000 && (ev & 0xFFFF) != 0x4C01 && (ev & 0xFF00) != 0x0300)
+			Log("proximity: passed Roman %p gets event %04X (%p) from %p, state %d", self, ev & 0xFFFF, param,
+			    _ReturnAddress(), *(uint8_t*)(self + 0x21));
+	return orig(self, edx, ev, param);
+}
+
 void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const Vector3& pos1,
               const Vector3& pos2) {
 	TickFn tick = (TickFn)(*(void***)life)[17];
@@ -196,6 +244,17 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	int nearest = d2 < d1 ? p2 : p1;
 	uint8_t* tr = (uint8_t*)t.raw();
 	float range2 = kMaxRange2;
+	int passTo = hook ? PassReceiver(hook) : -1;
+	if (passTo >= 0) {
+		nearest = passTo;
+		range2 = 1e30f;
+		// Leaving the thrower's hands it touches the thrower, which -- with the
+		// receiver as the leader -- reads as a hit (+0x24 bit 0x80; the Roman's
+		// state chooser, Class_2_84::vf26, then drops the flight for state 2).
+		Hero th = t.GetHero(passTo == p1 ? p2 : p1);
+		if (th && *(uint8_t*)(hook + 0x21) == 4 && (at - th.Pos()).len2() < 3.0f * 3.0f)
+			*(uint32_t*)(hook + 0x24) &= ~0x80u;
+	}
 	if (hook && *(uintptr_t*)hook == kClueManVtbl) {
 		float r = *(const float*)(hook + 0x68);
 		if (std::isfinite(r) && r * r > range2) range2 = r * r;
@@ -1370,6 +1429,11 @@ long ProximitySwappedZones() { return g_swappedZones; }
 long ProximityP2Squads() { return g_p2Squads; }
 long ProximityP2Beacons() { return g_p2Beacons; }
 long ProximitySlices() { return g_slices; }
+void ProximityPassTo(char* roman, int receiver) {
+	Pass* slot = &g_passes[0];
+	for (Pass& p : g_passes) if (!p.roman || p.roman == roman) { slot = &p; break; }
+	slot->roman = roman; slot->receiver = receiver; slot->thrower = -1; slot->since = GetTickCount();
+}
 bool ProximityBossRunDropsWalk(int ev) { return BossRunDropsWalk(ev); }
 void ProximityForgetMove(void* heroNode, const float at[3]) { ForgetMove(heroNode, at); }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
@@ -1421,6 +1485,9 @@ int __fastcall ClueEventHook(char* self, void* edx, unsigned ev, void* param) {
 } // namespace
 
 bool ProximityInstallHooks() {
+	if (getenv("XXL_PASSLOG"))
+		for (int i = 0; i < 5; i++)
+			PatchVtableSlot(kRomanVtbls[i], 5, kRomanSends[i], (void*)RomanSendHook, (void**)&g_origRomanSend[i], "Roman::sendEvent (pass log)");
 	bool ok = PatchVtableSlot(kBundleVtbl, kBundleTickSlot, kBundleTick,
 	                          (void*)BundleTickHook, (void**)&g_origBundleTick, "CKBundle::tick");
 	ok &= PatchVtableSlot(kBonusPoolVtbl, kPoolUpdateSlot, kBonusPoolUpdate,

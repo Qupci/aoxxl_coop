@@ -14,6 +14,7 @@
 //    (only its leader in a player state), then player control is re-applied.
 
 #include "coop.h"
+#include "crash.h"
 #include "proximity.h"
 #include "detour.h"
 #include "klusters.h"
@@ -1781,6 +1782,70 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	if (heroIndex == g.p2Hero) P2CamBeginHeroTick();
 }
 
+// LB, the sidekick pass. In single player LB asks the AI companion to grab a
+// Roman and spin it (AI order 5, body state 0x492660); spinning, it throws it to
+// the leader when the leader presses LB again: FUN_00495F10 (let go) and Roman
+// event 0x4C0F with no parameter -- the Roman's state 4 (vtable slot 44,
+// 0x4D0D80) flies it to the trio leader's position (trio vf27), sending the trio
+// 0x4C06 just before it arrives; the receiver can hit it in the air (x3) or with
+// a Roman of its own (x10). With LB the companion that has nothing to grab says
+// "no" (its sound bank +0x200). In co-op both heroes are players: a player
+// spinning a Roman of their own (B on a stunned Roman: step +0x38E 0x0A grab,
+// 0x0B lift, 0x0C spin, handler 0x492CF0; the Roman in state 3) passes it to the
+// other player with LB, as the companion does -- let go, 0x4C0F with the other
+// hero as the trio leader, the spin's throw step 0x0D; the Roman then ticks with
+// that hero as the leader until it lands (ProximityPassTo). LB with no Roman
+// spinning, or the other player too far: the other hero's "no".
+const float kPassRange = 30.0f;
+
+static void PlaySound(Hero h, uint32_t bankOffset) {
+	CKYellowPages* yp = YellowPages();
+	char* sm = yp ? *(char**)((char*)yp + 0x18) : nullptr;
+	char* bank = h ? *(char**)(h.raw() + 0x374) : nullptr;
+	if (!sm || !bank) return;
+	char* entry = *(char**)(bank + 4) + bankOffset;
+	typedef char(__fastcall* PlayingFn)(char* sm, void* edx, char* entry);
+	typedef int(__fastcall* StartFn)(char* sm, void* edx, char* entry, float vol, float pitch, int a, int b, int c);
+	if (((PlayingFn)0x43C130)(sm, nullptr, entry)) return;
+	((StartFn)0x43B730)(sm, nullptr, entry, 1.0f, 1.0f, 0, 0, 0);
+}
+
+static void WatchLbPass(int idx, Hero h) {
+	if (!g.p2Joined || g.suspended || (idx != g.p1Hero && idx != g.p2Hero) || !h) return;
+	if (!(*(uint32_t*)(h.raw() + 0x3EC) & 0x80)) return;   // LB this frame (on the ground)
+	Trio t = GetTrio();
+	int other = idx == g.p1Hero ? g.p2Hero : g.p1Hero;
+	Hero o = t ? t.GetHero(other) : Hero();
+	if (!o) return;
+	char* roman = *(char**)(h.raw() + 0xF8);
+	uint8_t step = *(uint8_t*)(h.raw() + 0x38E) & 0x3F;
+	bool spinning = roman && step == 0x0C && *(uint8_t*)(roman + 0x21) == 3;
+	float apart = sqrtf((h.Pos() - o.Pos()).len2());
+	if (!spinning || apart > kPassRange || g.held[other] || !HeroModePlayable(o.Flags18())) {
+		Log("coop: %s pressed LB: %s", HeroName(idx), !spinning ? "no Roman spinning" : apart > kPassRange ?
+		    "the other player is too far" : "the other player is busy");
+		PlaySound(o, 0x200);
+		return;
+	}
+	typedef void(__fastcall* ThisFn)(char* self, void* edx);
+	typedef int(__fastcall* SendFn)(char* self, void* edx, int ev, void* param);
+	((ThisFn)0x495F10)(h.raw(), nullptr);   // let go
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t lead = tr[0x2C], comp = tr[0x2D];
+	tr[0x2C] = (uint8_t)other;
+	tr[0x2D] = (uint8_t)idx;
+	((SendFn)(*(void***)roman)[5])(roman, nullptr, 0x4C0F, nullptr);   // state 4: fly to the leader
+	if (tr[0x2C] == (uint8_t)other) { tr[0x2C] = lead; tr[0x2D] = comp; }
+	*(uint32_t*)(h.raw() + 0x38C) = (*(uint32_t*)(h.raw() + 0x38C) & 0xFFC0FFFF) | 0xD0000;   // the spin's throw step
+	ProximityPassTo(roman, other);
+	if (getenv("XXL_PASSWATCH")) {   // diagnostics: who changes the passed Roman's state
+		const void* w[1] = { roman + 0x21 };
+		WatchBytes(w, 1, 0, 0);
+	}
+	Log("coop: %s passes the Roman %p to %s (%.0f units away), state now %d", HeroName(idx), roman, HeroName(other), apart,
+	    *(uint8_t*)(roman + 0x21));
+}
+
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
 	P2CamEndHeroTick();
@@ -1833,12 +1898,14 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			}
 		}
 	}
-	if (!g.swapped) return;
-	InputManager im = GetInputManager();
-	if (im) *(uint8_t**)(im.raw() + 0x1C) = g.savedValues;
-	if (im && g.savedBindings) *(char**)(im.raw() + 0x18) = g.savedBindings;
-	g.savedBindings = nullptr;
-	g.swapped = false;
+	if (g.swapped) {
+		InputManager im = GetInputManager();
+		if (im) *(uint8_t**)(im.raw() + 0x1C) = g.savedValues;
+		if (im && g.savedBindings) *(char**)(im.raw() + 0x18) = g.savedBindings;
+		g.savedBindings = nullptr;
+		g.swapped = false;
+	}
+	WatchLbPass(heroIndex, hero);
 }
 
 // ---------------------------------------------------------------------------

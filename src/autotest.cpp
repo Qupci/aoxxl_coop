@@ -795,6 +795,49 @@ const Step kRbP2[] = {
 	END(19000),
 };
 
+// grab22 (-Level 2): sector 2's lone Roman (-317.5 16.5 -595.6; keep out of z
+// -591.1..-583.8): player 1's Asterix hits it once, grabs it (B held), spins,
+// lets go. The log has the target and its state (+0x21: 3 held, 4 flying).
+const Step kGrab22[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	PLACEAT(3000, HERO_ASTERIX, -317.46f, 17.0f, -598.5f), PLACEAT(3000, HERO_OBELIX, -322.0f, 17.0f, -600.0f),
+	SECTORS(3500),
+	{ 4500, S_NEAROBJ, HERO_ASTERIX, 95, 0, 1.6f, 0, "asterix by the roman (an archer)" },
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5150, 0, 0, 0, "p1 release"),
+	SHOT(5600, "grab22_1"),
+	P1(6000, PAD_B, 0, 0, "p1 B"), SHOT(6800, "grab22_2"), P1(7000, PAD_B, 1.0f, 0, "p1 B + right"), SHOT(8000, "grab22_3"),
+	P1(9000, PAD_B, 0, 0, "p1 B"), P1(9500, 0, 0, 0, "p1 release"), SHOT(10000, "grab22_4"),
+	END(12000),
+};
+
+// pass22 (-Level 2): the lone archer of sector 2; player 2's Obelix 8 units
+// away; player 1's Asterix hits it, grabs and spins it, presses LB: it should
+// fly to Obelix.
+const Step kPass22[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -317.46f, 17.0f, -598.5f), PLACEAT(3000, HERO_OBELIX, -326.0f, 17.0f, -598.5f),
+	SECTORS(3500),
+	{ 4500, S_NEAROBJ, HERO_ASTERIX, 95, 0, 1.6f, 0, "asterix by the archer" },
+	{ 4600, S_WATCHRW, HERO_ASTERIX, 0x21, 0, 4, 0, "archer state writes" },
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5150, 0, 0, 0, "p1 release"),
+	P1(6000, PAD_B, 0, 0, "p1 B"), SHOT(6900, "pass22_1"),
+	P1(7200, PAD_B | PAD_LB, 0, 0, "p1 B + LB"), P1(7350, PAD_B, 0, 0, "p1 B"),
+	SHOT(7500, "pass22_2"), SHOT(7800, "pass22_3"), SHOT(8200, "pass22_4"),
+	P1(8500, 0, 0, 0, "p1 release"),
+	SHOT(9500, "pass22_5"),
+	END(11000),
+};
+
+// lb2: player 2's Obelix presses LB with no Roman spinning: the other hero's "no".
+const Step kLb2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(3000, 1, PAD_LB, 0, 0, "p2 LB"), VPAD(3150, 1, 0, 0, 0, "p2 release"),
+	P1(4000, PAD_LB, 0, 0, "p1 LB"), P1(4150, 0, 0, 0, "p1 release"),
+	END(6000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1999,6 +2042,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("anim2", kAnim2),
 	SCENARIO("lbsp", kLbSp),
 	SCENARIO("rbp2", kRbP2),
+	SCENARIO("grab22", kGrab22),
+	SCENARIO("pass22", kPass22),
+	SCENARIO("lb2", kLb2),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
@@ -2188,6 +2234,8 @@ void LogTick(float t) {
 			*(uint8_t*)(h.raw() + 0x3E9), *(uint8_t*)(h.raw() + 0xE5),
 			*(uint8_t*)(h.raw() + 0x561), *(uint8_t*)(h.raw() + 0x135), *(uint8_t*)(h.raw() + 0x38E) & 0x3F,
 			h.Pos().x, h.Pos().y, h.Pos().z);
+		char* tgt = *(char**)(h.raw() + 0xF8);   // the enemy the hero is after / holding, and its state (+0x21)
+		if (tgt && !IsBadReadPtr(tgt, 0x24)) line.Add(" tgt %p st %d", tgt, *(uint8_t*)(tgt + 0x21));
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
 	{   // the button prompt (CKGrpMeca, game manager +0x18: owner +0x90; gm +0x5C bit 0, kind +0x68)
@@ -2686,6 +2734,24 @@ void RunStep(const Step& s) {
 			WatchBytes(w, 1, 0, 0);
 			Log("autotest: watching writes to Roman %p's height (%.1f), %.1f from %s", best, *(float*)(fr + 0x84), sqrtf(bd),
 			    HeroName(s.a));
+			break;
+		}
+		if (s.x == 4) {   // writes to byte +b of the archer (2,95) nearest the hero, with stacks
+			char* best = nullptr;
+			float bd = 1e9f;
+			for (unsigned i = 0, n = GetNumLvlClassInstances(2, 95); i < n; i++) {
+				char* e = (char*)GetLvlObject(2, 95, i);
+				char* node = e ? *(char**)(e + 0x10) : nullptr;
+				char* fr = node ? *(char**)(node + 4) : nullptr;
+				if (!fr) continue;
+				Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+				float d = (p - h.Pos()).len2();
+				if (d < bd) { bd = d; best = e; }
+			}
+			if (!best) break;
+			const void* w[1] = { best + s.b };
+			WatchBytes(w, 1, 0, 0);
+			Log("autotest: watching writes to archer %p +%X", best, s.b);
 			break;
 		}
 		if (s.x == 1) {   // writes only, with stacks

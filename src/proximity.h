@@ -25,6 +25,9 @@ bool ProximityBossRunDropsWalk(int ev);
 // A hero was put somewhere else: the detection service's last position for it
 // becomes `at`, so the jump does not cross any zone on the way.
 void ProximityForgetMove(void* heroNode, const float at[3]);
+// A Roman passed to hero `receiver` (LB): it ticks with that hero as the trio
+// leader while it flies (state 4).
+void ProximityPassTo(char* roman, int receiver);
 
 // Whether hero `hero` has had an enemy within the trio's fight radius in the
 // last fight-ending delay (trio +0x404 s): the fight camera, per player.
