@@ -940,6 +940,64 @@ const Step kMgun3O[] = {
 	END(10000),
 };
 
+// mgun33o / mgun33a (-Level 3): sector 3's machine gun (the user's spot, gun seat
+// 289.0 31.9 -326.1); player 2's Obelix (o) or player 1's Asterix (a) presses X
+// beside it, the other hero a few steps away.
+#define MGUN33_SETUP 	MARK(0, "baseline"), LOADSECTOR(200, 3), 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), 	PLACEAT(3000, HERO_ASTERIX, 284.4f, 31.92f, -325.9f), PLACEAT(3000, HERO_OBELIX, 289.3f, 31.92f, -325.6f), 	SECTORS(3500)
+const Step kMgun33O[] = {
+	MGUN33_SETUP,
+	SHOT(5000, "mgun33_1"),
+	VPAD(6000, 1, PAD_X, 0, 0, "p2 X"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "mgun33_2"),
+	VPAD(9000, 1, 0, -1.0f, 0, "p2 stick left"), VPAD(10500, 1, 0, 0, 0, "p2 release"),
+	P1(11000, PAD_X, 0, 0, "p1 X"), P1(11500, 0, 0, 0, "p1 release"),
+	SHOT(11200, "mgun33_3"),
+	END(13000),
+};
+const Step kMgun33A[] = {
+	MGUN33_SETUP,
+	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 284.4f, 31.92f, -325.9f),
+	SHOT(5000, "mgun33_1"),
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "mgun33_2"),
+	VPAD(9000, 1, 0, -1.0f, 0, "p2 stick left"), VPAD(10500, 1, 0, 0, 0, "p2 release"),
+	P1(11000, PAD_X, 0, 0, "p1 X"), P1(11500, 0, 0, 0, "p1 release"),
+	SHOT(11200, "mgun33_3"),
+	END(13000),
+};
+
+// boat49o / boat49a (-Level 4): sector 9's boat (the user's spot -165.4 6.0
+// -652.0); player 2's Obelix (o) or player 1's Asterix (a) presses X there, the
+// other hero beside; then player 2 steers left, player 1 presses A.
+#define BOAT49_SETUP 	MARK(0, "baseline"), LOADSECTOR(200, 9), 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), 	SECTORS(3500)
+const Step kBoat49O[] = {
+	BOAT49_SETUP,
+	PLACEAT(3000, HERO_OBELIX, -165.4f, 6.0f, -652.0f), PLACEAT(3000, HERO_ASTERIX, -162.0f, 6.0f, -650.0f),
+	SHOT(5000, "boat49_1"),
+	VPAD(6000, 1, PAD_X, 0, 0, "p2 X"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "boat49_2"),
+	VPAD(9000, 1, 0, -1.0f, 0.5f, "p2 stick left"), VPAD(11000, 1, 0, 0, 0, "p2 release"),
+	P1(11500, PAD_A, 0, 0, "p1 A"), P1(11700, 0, 0, 0, "p1 release"),
+	SHOT(11800, "boat49_3"),
+	END(14000),
+};
+const Step kBoat49A[] = {
+	BOAT49_SETUP,
+	PLACEAT(3000, HERO_ASTERIX, -165.4f, 6.0f, -652.0f), PLACEAT(3000, HERO_OBELIX, -162.0f, 6.0f, -650.0f),
+	SHOT(5000, "boat49_1"),
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "boat49_2"),
+	VPAD(9000, 1, 0, -1.0f, 0.5f, "p2 stick left"), VPAD(11000, 1, 0, 0, 0, "p2 release"),
+	P1(11500, PAD_A, 0, 0, "p1 A"), P1(11700, 0, 0, 0, "p1 release"),
+	SHOT(11800, "boat49_3"),
+	END(14000),
+};
+
+// hintjoin: the level-start hint (player 2 joins with Start), on screen.
+const Step kHintJoin[] = {
+	MARK(0, "baseline"), SHOT(1500, "hint_1"), SHOT(4000, "hint_2"), END(5000),
+};
+
 // spy3n (-Level 3): sector 2's Roman agent (176.4 6.2 -218.4); Obelix leads
 // (trio 0x4801) far away, player 1's Asterix talks to the agent with X, then
 // presses A now and then to go through the dialogue.
@@ -2106,6 +2164,11 @@ const Scenario kScenarios[] = {
 	SCENARIO("mgun3a", kMgun3A),
 	SCENARIO("mgun3n", kMgun3N),
 	SCENARIO("mgun3o", kMgun3O),
+	SCENARIO("mgun33o", kMgun33O),
+	SCENARIO("mgun33a", kMgun33A),
+	SCENARIO("boat49o", kBoat49O),
+	SCENARIO("boat49a", kBoat49A),
+	SCENARIO("hintjoin", kHintJoin),
 	SCENARIO("spy3n", kSpy3N),
 	SCENARIO("catapultp", kCatapultP),
 	SCENARIO("catapulta", kCatapultA),

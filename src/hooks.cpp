@@ -20,6 +20,8 @@
 #include "crash.h"
 #include "life.h"
 #include "log.h"
+#include "shared.h"
+#include "hints.h"
 
 namespace {
 
@@ -43,6 +45,8 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	StallRegisterGameThread();
 	AutotestFrame();
 	CoopFrame();
+	SharedFrame();
+	HintsFrame();
 }
 
 int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) {

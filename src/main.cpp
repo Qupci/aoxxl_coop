@@ -11,6 +11,8 @@
 #include "sound.h"
 #include "config.h"
 #include "log.h"
+#include "shared.h"
+#include "hints.h"
 #include "vtprofile.h"
 #include "render.h"
 #include "autotest.h"
@@ -117,6 +119,8 @@ DWORD WINAPI StartupThread(LPVOID) {
 	TraceInstallHooks();
 	KlusterInstallHooks();
 	SoundInstallHooks();
+	SharedInstallHooks();
+	HintsInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

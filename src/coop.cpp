@@ -28,6 +28,7 @@
 #include "padident.h"
 #include "p2cam.h"
 #include "pads.h"
+#include "hints.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -36,6 +37,11 @@
 #include <cstring>
 
 void StartAiCycle(int idx, const char* why);   // below: two ticks through the AI variant
+static void ServeMachineRequest(Trio t);       // below: Obelix's X at a machine
+static bool MachineMatesNear(Trio t);
+static void RefuseMachine(Trio t, int kind, int who);
+static void ShowJoinHint(Trio t);
+static void WatchLifterHint(Trio t);
 
 namespace {
 
@@ -102,6 +108,18 @@ struct CoopState {
 	int      pendingPad = -1;
 	uint32_t pendingFrame = 0;
 	bool     pendingEcho = false;
+
+	// Hints.
+	bool     joinHintPending = false;   // a level started: say how player 2 joins
+	int      spinHints = 0;             // "LB passes the Roman" shown this level
+	bool     spinning[HERO_COUNT] = {};
+	bool     passDone = false;          // a Roman was passed this session: no more pass hints
+
+	// Obelix's X at a machine (machine gun, boat), served next frame.
+	char*    machineReq = nullptr;
+	int      machineKind = 0;           // 1 boat, 2 machine gun (trio +0x3F4 bits 10-11)
+	DWORD    machineReqAt = 0;
+	bool     machineSending = false;
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -364,6 +382,8 @@ void TryJoin(Trio t) {
 		g.suspended = false;
 		Log("coop: player 2 joined on %s as %s (player 1 keeps %s)", PadName(pad),
 			HeroName(g.p2Hero), HeroName(g.p1Hero));
+		HintHide(HINT_JOIN);
+		g.joinHintPending = false;
 		CoopLogState("join");
 		return;
 	}
@@ -396,6 +416,7 @@ int  CoopNonLeaderPlayer() {
 int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
+const uint8_t* CoopP2Values() { return g.p2Joined && g.p2ValuesReady ? g.p2Values : nullptr; }
 bool CoopOneScreen() { return g.oneScreen; }
 // Player 2's input for the game camera (CKSrvCamera +0x580: an input view whose
 // actions 0-4 are the right stick up, down, right, left and its button -- the
@@ -898,6 +919,14 @@ static bool HeroFlying(Trio t) {
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
 	Trio t = GetTrio();
+	// Asterix's X at a machine (FUN_0049A080) with Obelix's player elsewhere.
+	int lo = ev & 0xFFFF;
+	if (t && t.raw() == (char*)trio && (lo == 0x4807 || lo == 0x4809) && g.p2Joined && !g.suspended &&
+	    !g.machineSending && t.GetHero(HERO_ASTERIX) &&
+	    (*(uint32_t*)(t.GetHero(HERO_ASTERIX).raw() + 0x3EC) & 0x10) && !MachineMatesNear(t)) {
+		RefuseMachine(t, lo == 0x4809 ? 2 : 1, HERO_ASTERIX);
+		return true;
+	}
 	if (t && t.raw() == (char*)trio && ProximityBossRunDropsWalk(ev & 0xFFFF)) {
 		Log("coop: trio event %04X (the sidekick runs ahead from the boss) dropped: each player runs their own hero", ev & 0xFFFF);
 		return true;
@@ -1140,6 +1169,9 @@ void CoopFrame() {
 		g_trackBeforeSpy = nullptr;   // the old level's camera tracks are gone
 		g.groupTookLead = g.groupPrevLeader = -1;
 		g_spyWalk.on = false;
+		g.joinHintPending = level > 0;
+		g.spinHints = 0;
+		g.machineReq = nullptr;
 		if (g.p2Joined) {
 			// The old hero objects are gone; there is nothing to hand back.
 			ForgetP2();
@@ -1189,6 +1221,7 @@ void CoopFrame() {
 				    HeroName(ci), f, *F18(c));
 			}
 		}
+		ShowJoinHint(t);
 		TryJoin(t);
 		return;
 	}
@@ -1331,6 +1364,8 @@ void CoopFrame() {
 		}
 	}
 	BringAlongForBossRun(t);
+	ServeMachineRequest(t);
+	WatchLifterHint(t);
 	WatchSpyWalk(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
 	// whatever mode the game put it -- whichever player it belongs to. Rides only
@@ -1478,12 +1513,39 @@ const uintptr_t kTakeHandler = 0x499CF0;
 const uint8_t   kTakePrologue[7] = { 0x6A, 0xFF, 0x68, 0x48, 0xD7, 0x61, 0x00 };
 TakeFn g_origTake = nullptr;
 
+// Machines (the machine gun, the boat). A machine's tick offers itself to the
+// trio leader in reach (trio 0x4A01 gun / 0x4901 boat: trio +0x48 = machine,
+// +0x3F4 bits 10-11 = 2 / 1); X takes it in FUN_0049A080 (called from here when
+// X is down, hero +0x3EC bit 0x10) -- for Asterix only (hero vtable +0x3C == 0):
+// trio 0x4809 (gun, mode 2) or 0x4807 (boat, mode 1), which act on Asterix with
+// Obelix as the AI companion who walks to his place. In co-op Obelix's X at a
+// machine is a request too (served next frame, ServeMachineRequest); his swing
+// is held back.
+static void NoteMachineUse(char* hero) {
+	if (!g.p2Joined || g.suspended) return;
+	Trio t = GetTrio();
+	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	if (!o || hero != o.raw() || (g.p1Hero != HERO_OBELIX && g.p2Hero != HERO_OBELIX)) return;
+	uint32_t ec = *(uint32_t*)(hero + 0x3EC), f0 = *(uint32_t*)(hero + 0x3F0);
+	if (!(ec & 0x10) || (ec & 0xC0000) || (f0 & 0x804129) || (*(uint32_t*)(hero + 0x384) & 0x200000)) return;
+	if (*(uint8_t*)(hero + 0x3E9) != 0) return;
+	char* tr = t.raw();
+	char* machine = *(char**)(tr + 0x48);
+	int kind = (*(uint32_t*)(tr + 0x3F4) >> 10) & 3;
+	if (!machine || (kind != 1 && kind != 2) || *(uint32_t*)(tr + 0x4C)) return;
+	*(uint32_t*)(hero + 0x3EC) &= ~0x10u;
+	g.machineReq = machine;
+	g.machineKind = kind;
+	g.machineReqAt = GetTickCount();
+}
+
 static void __fastcall TakeHook(char* hero, void* edx, int arg) {
 	if (g_torch.want) {
 		Trio t = GetTrio();
 		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
 		if (a && hero == a.raw()) *(uint32_t*)(hero + 0x3EC) |= 0x10;
 	}
+	NoteMachineUse(hero);
 	g_origTake(hero, edx, arg);
 }
 
@@ -1904,6 +1966,8 @@ static void WatchLbPass(int idx, Hero h) {
 	if (tr[0x2C] == (uint8_t)other) { tr[0x2C] = lead; tr[0x2D] = comp; }
 	*(uint32_t*)(h.raw() + 0x38C) = (*(uint32_t*)(h.raw() + 0x38C) & 0xFFC0FFFF) | 0xD0000;   // the spin's throw step
 	ProximityPassTo(roman, other);
+	g.passDone = true;
+	HintHide(HINT_PASS);
 	// The whistle: the AI companion's lift of a grabbed Roman (its spin's step 5)
 	// plays sound bank +0x280; the player's own spin never reaches that step.
 	PlaySound(h, 0x280);
@@ -1913,6 +1977,31 @@ static void WatchLbPass(int idx, Hero h) {
 	}
 	Log("coop: %s passes the Roman %p to %s (%.0f units away), state now %d", HeroName(idx), roman, HeroName(other), apart,
 	    *(uint8_t*)(roman + 0x21));
+}
+
+// Hint: while a player's hero spins a Roman (its grab-spin at step 0x0C, the
+// Roman held in state 3) with the other player in passing range, "LB passes
+// it" -- the first three spins of a level, until a Roman has been passed once.
+static void WatchSpinHint(int idx, Hero h) {
+	if (!g.p2Joined || g.suspended || (idx != g.p1Hero && idx != g.p2Hero) || !h) return;
+	char* roman = *(char**)(h.raw() + 0xF8);
+	bool spin = roman && (*(uint8_t*)(h.raw() + 0x38E) & 0x3F) == 0x0C && *(uint8_t*)(roman + 0x21) == 3;
+	bool started = spin && !g.spinning[idx];
+	bool ended = !spin && g.spinning[idx];
+	g.spinning[idx] = spin;
+	if (ended && !g.spinning[OtherHero(idx)]) HintHide(HINT_PASS);
+	if (!started || g.passDone || g.spinHints >= 3) return;
+	Trio t = GetTrio();
+	int other = idx == g.p1Hero ? g.p2Hero : g.p1Hero;
+	Hero o = t ? t.GetHero(other) : Hero();
+	if (!o || (h.Pos() - o.Pos()).len2() > kPassRange * kPassRange) return;
+	g.spinHints++;
+	int player = idx == g.p1Hero ? 0 : 1;
+	wchar_t text[96];
+	swprintf(text, 96, L"Player %d: %s passes the Roman to %s", player + 1, HintButtonName(player, HB_LB),
+	         other == HERO_ASTERIX ? L"Asterix" : L"Obelix");
+	HintShow(HINT_PASS, text, 8000);
+	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints, HeroName(idx));
 }
 
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
@@ -1975,6 +2064,108 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 		g.swapped = false;
 	}
 	WatchLbPass(heroIndex, hero);
+	WatchSpinHint(heroIndex, hero);
+}
+
+// A machine is taken with both heroes at it: the other one within 12 units
+// (4 up or down). Single player always has the companion at hand; in co-op the
+// other player may be anywhere, and the game would carry (boat) or walk (gun)
+// that hero over from wherever it is.
+static bool MachineMatesNear(Trio t) {
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	if (!a || !o) return false;
+	Vector3 d = a.Pos() - o.Pos();
+	return d.x * d.x + d.z * d.z < 12.0f * 12.0f && fabsf(d.y) < 4.0f;
+}
+
+static void RefuseMachine(Trio t, int kind, int who) {
+	PlaySound(t.GetHero(who), 0x200);
+	wchar_t text[96];
+	swprintf(text, 96, L"%s has to be at the %s too", OtherHero(who) == HERO_ASTERIX ? L"Asterix" : L"Obelix",
+	         kind == 2 ? L"machine gun" : L"boat");
+	HintShow(HINT_MACHINE, text, 4000);
+	Log("coop: %s's X at the %s refused: %s is not there", HeroName(who), kind == 2 ? "machine gun" : "boat",
+	    HeroName(OtherHero(who)));
+}
+
+// Obelix's X at a machine (NoteMachineUse): Asterix takes it from where Obelix
+// stands -- the machines are his (trio 0x4809 / 0x4807 act on Asterix) -- and
+// leads while it lasts, as when he presses X there himself; Obelix goes to his
+// place as the game's companion.
+static void ServeMachineRequest(Trio t) {
+	if (!g.machineReq) return;
+	char* machine = g.machineReq;
+	int kind = g.machineKind;
+	g.machineReq = nullptr;
+	if (!t || g.suspended || GetTickCount() - g.machineReqAt > 500) return;
+	Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
+	if (!a || !o) return;
+	uint8_t sit = Situation(a);   // standing, or swimming (0xFF) beside a boat
+	if (!MachineMatesNear(t) || sit == kSituationGroupAction || sit == kSituationTalk || g.held[HERO_ASTERIX] ||
+	    a.Busy() || !HeroModePlayable(a.Flags18())) {
+		RefuseMachine(t, kind, HERO_OBELIX);
+		return;
+	}
+	Vector3 dst = o.Pos();
+	a.Pos() = dst;
+	if (a.hook->node && a.hook->node->matrix) {
+		float* hp = (float*)((char*)a.hook->node->matrix + 0x40);
+		hp[0] = dst.x; hp[1] = dst.y; hp[2] = dst.z;
+	}
+	uint8_t* tr = (uint8_t*)t.raw();
+	if (tr[0x2C] != HERO_ASTERIX) {
+		g.groupTookLead = HERO_ASTERIX;
+		g.groupPrevLeader = tr[0x2C];
+		tr[0x2C] = HERO_ASTERIX;
+		tr[0x2D] = HERO_OBELIX;
+	}
+	*(char**)(tr + 0x48) = machine;
+	*(uint32_t*)(tr + 0x3F4) = (*(uint32_t*)(tr + 0x3F4) & ~0xC00u) | ((uint32_t)kind << 10) | 8u;
+	int ev = kind == 2 ? 0x4809 : 0x4807;
+	Log("coop: Obelix's X at the %s: Asterix takes it from Obelix's spot (%.1f %.1f %.1f), trio event %04X",
+	    kind == 2 ? "machine gun" : "boat", dst.x, dst.y, dst.z, ev);
+	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+	g.machineSending = true;
+	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
+	g.machineSending = false;
+}
+
+// Hint: at the start of a level, how player 2 joins (and leaves) -- for 10 s,
+// once play can start (no cutscene; level 1: once Obelix is found).
+static void ShowJoinHint(Trio t) {
+	if (!g.joinHintPending || !t || !CoopGameplayLive()) return;
+	const char* why = "";
+	if (!CoopAllowedNow(t, &why)) return;
+	g.joinHintPending = false;
+	wchar_t text[96];
+	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
+		swprintf(text, 96, L"Player 2: Start (keyboard: %s) joins or leaves co-op",
+		         HintKeyName(g_config.keys[CoopConfig::KEY_START]));
+	else
+		swprintf(text, 96, L"Player 2: press Start to join or leave co-op");
+	HintShow(HINT_JOIN, text, 10000);
+}
+
+// Hint: a lifter waiting at the bottom for the trio (CKHkLifter, 2/47: state
+// (+8 >> 1) & 3 == 0 with flag +8 bit 0) with one player's hero on its platform
+// (+0x50: the object under a hero's feet, hero +0x280, on the ground) -- in co-op
+// it waits for both (proximity.cpp).
+static void WatchLifterHint(Trio t) {
+	if (!g.p2Joined || g.suspended || !t) return;
+	Hero h[2] = { t.GetHero(HERO_ASTERIX), t.GetHero(HERO_OBELIX) };
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n && i < 32; i++) {
+		char* l = (char*)GetLvlObject(2, 47, i);
+		if (!l || ((*(uint32_t*)(l + 8) >> 1) & 3) != 0 || !(*(uint32_t*)(l + 8) & 1)) continue;
+		void* platform = *(void**)(l + 0x50);
+		bool on[2];
+		for (int k = 0; k < 2; k++)
+			on[k] = h[k] && platform && (*(uint32_t*)(h[k].raw() + 0x384) & 7) == 0 &&
+			        *(void**)(h[k].raw() + 0x280) == platform;
+		if (on[0] == on[1]) continue;
+		HintShow(HINT_LIFTER, on[0] ? L"The lifter waits for Obelix to go up" : L"The lifter waits for Asterix to go up",
+		         300);
+		return;
+	}
 }
 
 // ---------------------------------------------------------------------------
