@@ -1177,3 +1177,9 @@ both halves).
   -882.7, autotest shadow29). The split default now places each shadow for a camera straight above its ground
   point at the nearer player camera's distance: the nudge is (0, 0.3, 0) for every shadow, culling/fading keep
   the nearer camera's distance. XXL_SHADOWFIX=0 game / 1 nearer camera / 2 straight up (default).
+* Shadows, second follow-up: lifted straight up they showed above the feet (the game's nudge goes along the line
+  of sight, which does not move a shadow on screen for that camera). The shadow service (CKSrvShadow, found by
+  vtable 0x62520C in the yellow pages; tick slot 17 = 0x470A70, ret 4) builds one mesh of all shadow quads; in
+  split screen it now ticks again right before each half's DrawWorld with svc+0x5B0 = that half's camera eye and a
+  zero frame time (fades/smoothing advance only in the game's own tick). Log (XXL_SHADOWLOG, per walk): Obelix's
+  shadow nudged towards player 1's camera in walk 1 and player 2's in walk 2. XXL_SHADOWFIX=0: game's own.

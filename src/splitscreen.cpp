@@ -191,71 +191,79 @@ void __fastcall SkyWalkHook(char* self, void* edx, void** lists, void* dt) {
 }
 
 // --- shadows -------------------------------------------------------------------
-// Each shadow (CKSrvShadow objects, vtable 0x62520C) is placed once per frame by
-// its slot 26 (0x46F980), called from the shadow service's update (0x470E19,
-// 0x470F0B), not from the render: it is culled and faded by its distance to the
-// game camera (camera service +0x5B0) and nudged towards that camera (by the
-// service's +0x4C). The game camera follows the leader, so the non-leading
-// player's shadow leaned towards the leader's camera -- towards the leader. In
-// split screen each shadow is placed for the player camera nearer to it.
-const uintptr_t kShadowVtbl = 0x62520C;
+// The shadow service (CKSrvShadow, vtable 0x62520C, found in the yellow pages)
+// builds one mesh of all shadow quads in its tick (slot 17, 0x470A70, ret 4):
+// each shadow (slot 26 of its own vtable, 0x46F980, called from 0x470E19 /
+// 0x470F0B) is culled and faded by its distance to the game camera (camera
+// service +0x5B0) and nudged ~0.3 units towards it along the line of sight --
+// which does not move it on screen for that camera. The game camera follows the
+// leader: in the other half the non-leader's shadow slid towards the leader; a
+// nudge straight up instead showed the shadow above the feet. In split screen the
+// tick runs again before each half is drawn, with that half's camera position
+// and no frame time (fades and smoothing advance once, in the game's own tick).
+const uintptr_t kShadowSrvVtbl = 0x62520C;
+typedef void(__fastcall* ShadowTickFn)(char* self, void* edx, void* time);
+const ShadowTickFn ShadowTick = (ShadowTickFn)0x470A70;
 const uintptr_t kShadowUpdate = 0x46F980;
-const size_t    kShadowUpdateSlot = 26;
+const size_t    kShadowUpdateSlot = 26;   // of 0x62520C (the shadows' own vtable is 0x625268, slot 3)
 typedef int(__fastcall* ShadowUpdateFn)(char* self, void* edx, void* a, void* b, void* c, void* d);
 ShadowUpdateFn g_origShadowUpdate = nullptr;
 
-bool WantSplit();
+int ShadowMode() {   // XXL_SHADOWFIX (diagnostics): 0 the game's own shadows, 1 (default) each half's
+	static const int mode = getenv("XXL_SHADOWFIX") ? getenv("XXL_SHADOWFIX")[0] - '0' : 1;
+	return mode;
+}
 
-int ShadowUpdateImpl(char* self, void* edx, void* a, void* b, void* c, void* d);
+char* ShadowService() {
+	static char* cached = nullptr;
+	static void* cachedYp = nullptr;
+	CKYellowPages* yp = YellowPages();
+	if (!yp) return nullptr;
+	if (cachedYp == yp && cached && *(uintptr_t*)cached == kShadowSrvVtbl) return cached;
+	cached = nullptr;
+	cachedYp = yp;
+	for (int off = 0x10; off < 0xC0 && !cached; off += 4) {
+		char* o = *(char**)((char*)yp + off);
+		if (o && !IsBadReadPtr(o, 4) && *(uintptr_t*)o == kShadowSrvVtbl) cached = o;
+	}
+	return cached;
+}
 
+// Rebuilds the shadow mesh for a camera at `eye` (before a half is drawn).
+void ShadowsFor(const float eye[3], void* dt) {
+	if (ShadowMode() == 0 || !dt) return;
+	char* srv = ShadowService();
+	CKYellowPages* yp = YellowPages();
+	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	if (!srv || !svc) return;
+	float* cam = (float*)(svc + 0x5B0);
+	float saved[3] = { cam[0], cam[1], cam[2] };
+	cam[0] = eye[0]; cam[1] = eye[1]; cam[2] = eye[2];
+	uint8_t time[0x40];
+	memcpy(time, dt, sizeof(time));
+	*(float*)(time + 0xC) = 0.0f;
+	ShadowTick(srv, nullptr, time);
+	cam[0] = saved[0]; cam[1] = saved[1]; cam[2] = saved[2];
+}
+
+// Diagnostics (XXL_SHADOWLOG): the heroes' shadow offsets from their ground points.
 int __fastcall ShadowUpdateHook(char* self, void* edx, void* a, void* b, void* c, void* d) {
-	int r = ShadowUpdateImpl(self, edx, a, b, c, d);
-	static const bool log = getenv("XXL_SHADOWLOG") != nullptr;   // diagnostics: the heroes' shadow offsets
-	static unsigned n[2] = {};
-	Trio t = log ? GetTrio() : Trio();
+	int r = g_origShadowUpdate(self, edx, a, b, c, d);
+	static const bool log = getenv("XXL_SHADOWLOG") != nullptr;
+	if (!log) return r;
+	static unsigned n[2][3] = {};
+	Trio t = GetTrio();
 	char* node = *(char**)(self + 0xC);
 	for (int i = 0; t && i < 2 && r == 0; i++) {
 		Hero h = t.GetHero(i);
-		if (!h || (char*)h.hook->node != node || (n[i]++ % 60) != 0) continue;
+		if (!h || (char*)h.hook->node != node || (n[i][g_walkPlayer % 3]++ % 60) != 0) continue;
 		const float* g = *(const float**)(self + 0x10);
 		const float* o = (const float*)((char*)b + 0x30);
 		Hero other = t.GetHero(1 - i);
 		Vector3 to = other ? other.Pos() - h.Pos() : Vector3();
-		Log("split: %s's shadow (%s) offset (%.3f %.3f %.3f) from its ground point; the other hero is (%.1f %.1f) away",
-		    HeroName(i), t.Leader() == i ? "leader" : "not leading", o[0] - g[0], o[1] - g[1], o[2] - g[2], to.x, to.z);
+		Log("split: %s's shadow (%s, walk %d) offset (%.3f %.3f %.3f) from its ground point; the other hero is (%.1f %.1f) away",
+		    HeroName(i), t.Leader() == i ? "leader" : "not leading", g_walkPlayer, o[0] - g[0], o[1] - g[1], o[2] - g[2], to.x, to.z);
 	}
-	return r;
-}
-
-int ShadowUpdateImpl(char* self, void* edx, void* a, void* b, void* c, void* d) {
-	// XXL_SHADOWFIX (diagnostics): 0 the game's own, 1 the nearer player camera, 2 (default) straight up.
-	static const int mode = getenv("XXL_SHADOWFIX") ? getenv("XXL_SHADOWFIX")[0] - '0' : 2;
-	char* node = *(char**)(self + 0xC);
-	char* fr = node ? *(char**)(node + 4) : nullptr;
-	const float* ground = *(const float**)(self + 0x10);
-	CKYellowPages* yp = YellowPages();
-	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
-	float m[16];
-	if (mode == 0 || !fr || !ground || !svc || !WantSplit() || !OtherViewMatrix(m))
-		return g_origShadowUpdate(self, edx, a, b, c, d);
-	const float* p = (const float*)(fr + 0x80);
-	float* cam = (float*)(svc + 0x5B0);
-	float dg = 0, dm = 0;
-	for (int i = 0; i < 3; i++) {
-		dg += (p[i] - cam[i]) * (p[i] - cam[i]);
-		dm += (p[i] - m[12 + i]) * (p[i] - m[12 + i]);
-	}
-	float saved[3] = { cam[0], cam[1], cam[2] };
-	if (mode == 1) {
-		if (!(dm < dg)) return g_origShadowUpdate(self, edx, a, b, c, d);
-		cam[0] = m[12]; cam[1] = m[13]; cam[2] = m[14];
-	} else {
-		// The same distance (culling, fading) from a camera right above the shadow.
-		float dist = sqrtf(dm < dg ? dm : dg);
-		cam[0] = ground[0]; cam[1] = p[1] + dist; cam[2] = ground[2];
-	}
-	int r = g_origShadowUpdate(self, edx, a, b, c, d);
-	cam[0] = saved[0]; cam[1] = saved[1]; cam[2] = saved[2];
 	return r;
 }
 
@@ -527,6 +535,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	SyncClones(*(void**)(view + 0x58), nullptr, dt);
 	ResetDirty(view, nullptr);
 	if (!(viewFlags & 0x10)) ClearCamera(renderer, nullptr, 0);
+	g_walkPlayer = 1;
+	ShadowsFor(FrameLtm(cam) + 12, dt);
+	g_walkPlayer = 0;
 	g_vp = vp1; g_vpActive = true;
 	DrawWorld(view, nullptr, dt);
 	DrawEffects(view, nullptr, dt);
@@ -546,6 +557,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	g_walkPlayer = 0;
 	g_repeatWalk = false;
 	ResetDirty(view, nullptr);
+	g_walkPlayer = 2;
+	ShadowsFor(FrameLtm(cam) + 12, dt);
+	g_walkPlayer = 0;
 	g_vp = vp2; g_vpActive = true;
 	DrawWorld(view, nullptr, dt);
 	DrawEffects(view, nullptr, dt);
@@ -600,7 +614,7 @@ bool SplitInstallHooks() {
 	ok &= PatchVtableSlot(kParticlesVtbl, kWalkSlot, kParticlesWalk, (void*)ParticlesWalkHook,
 	                      (void**)&g_origParticlesWalk, "CParticlesNodeFx::walk");
 	ok &= PatchVtableSlot(kSkyVtbl, kWalkSlot, kSkyWalk, (void*)SkyWalkHook, (void**)&g_origSkyWalk, "CSkyNodeFx::walk");
-	ok &= PatchVtableSlot(kShadowVtbl, kShadowUpdateSlot, kShadowUpdate, (void*)ShadowUpdateHook,
+	ok &= PatchVtableSlot(kShadowSrvVtbl, kShadowUpdateSlot, kShadowUpdate, (void*)ShadowUpdateHook,
 	                      (void**)&g_origShadowUpdate, "CKSrvShadow::update");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
