@@ -713,6 +713,17 @@ const Step kBoss36[] = {
 	END(22000),
 };
 
+// sky2: player 2 turns their camera half around (right stick), then both
+// cameras hold still facing opposite ways; XXL_SKYLOG logs the sky's scroll.
+const Step kSky2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	SHOT(2500, "sky_1"),
+	VPADR(3000, 1, 1.0f, 0.0f, "p2 camera right"), VPADR(4600, 1, 0.0f, 0.0f, "p2 camera still"),
+	SHOT(5000, "sky_2"), SHOT(5300, "sky_3"), SHOT(8000, "sky_4"),
+	END(10000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1910,6 +1921,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("beach12o", kBeach12O),
 	SCENARIO("boss210", kBoss210),
 	SCENARIO("boss36", kBoss36),
+	SCENARIO("sky2", kSky2),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),

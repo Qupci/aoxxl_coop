@@ -1159,3 +1159,9 @@ both halves).
   when the start fires; their marker walks are dropped (CoopDeferTrioEvent) within 500 ms of a run zone, and the
   other player is put on the waker (the detection service's last position for it moved too, ProximityForgetMove,
   so the jump crosses no zone). Autotests boss210, boss36.
+* Sky spinning in split screen: CSkyNodeFx::vf14 (walk, 0x41AF50) scrolls the sky textures by the camera's turn
+  since its last walk (state on the node: last forward x/z +0x54/+0x58, last right +0x64/+0x68 with +0x10 bit 6,
+  last height +0x6C, scroll offsets +0x4C/+0x50/+0x5C/+0x60) plus a drift by frame time. Walked three times per
+  split frame (P2 stamp, P1, P2), each walk took the angle between the players' cameras as a turn: per-walk log
+  (XXL_SKYLOG=1, XXL_SKYFIX=0) jumped ~1.2 between the halves every frame with the cameras facing each other.
+  Now the stamp walk skips the sky and each player's walk swaps in that player's copy of the state (sky2 autotest).

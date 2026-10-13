@@ -128,6 +128,67 @@ void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt)
 		((CollectFn)(*(void***)child)[14])(child, nullptr, lists, dt);
 }
 
+// --- sky -----------------------------------------------------------------------
+// CSkyNodeFx::vf14 (0x41AF50) scrolls the sky's textures by how far the camera
+// turned since the sky's last walk: it keeps the camera's last forward (x, z at
+// +0x54/+0x58), right (+0x64/+0x68, with +0x10 bit 6 telling which axis),
+// height (+0x6C) and the four scroll offsets (+0x4C/+0x50/+0x5C/+0x60), and also
+// drifts them by the frame time. Walked once per player each split frame, every
+// walk saw the turn between the two players' cameras: facing each other, half a
+// turn per walk -- the sky spun. Each player now has their own copy of that state
+// (the stamp walk leaves the sky alone).
+const uintptr_t kSkyVtbl = 0x623020;   // CSkyNodeFx (11,25)
+const uintptr_t kSkyWalk = 0x41AF50;
+CollectFn g_origSkyWalk = nullptr;
+int       g_walkPlayer = 0;   // 1 / 2: whose walk the split frame is in
+
+struct SkyState { char* node; bool valid[2]; uint8_t flags[2]; uint8_t data[2][0x24]; };
+SkyState g_sky[8];
+
+void __fastcall SkyWalkHook(char* self, void* edx, void** lists, void* dt) {
+	if (!g_inSplitFrame) {
+		for (SkyState& st : g_sky) if (st.node == self) st.valid[0] = st.valid[1] = false;
+		g_origSkyWalk(self, edx, lists, dt);
+		return;
+	}
+	static const bool off = getenv("XXL_SKYFIX") && getenv("XXL_SKYFIX")[0] == '0';   // diagnostics: the game's own sky walks
+	static const bool log = getenv("XXL_SKYLOG") != nullptr;
+	static unsigned logN = 0;
+	bool logThis = log && (logN++ % 90) < 9;
+	if (off) {
+		g_origSkyWalk(self, edx, lists, dt);
+		if (logThis) {
+			const float* f = (const float*)(self + 0x4C);
+			Log("split: sky %p walk %d scroll %.3f %.3f %.3f %.3f", self, g_stampWalk ? 0 : g_walkPlayer, f[0], f[1], f[4], f[5]);
+		}
+		return;
+	}
+	if (g_stampWalk || g_walkPlayer < 1 || g_walkPlayer > 2) return;
+	SkyState* st = nullptr;
+	for (SkyState& s : g_sky) if (s.node == self) st = &s;
+	for (SkyState& s : g_sky) if (!st && !s.node) { st = &s; st->node = self; st->valid[0] = st->valid[1] = false; }
+	if (!st) { g_origSkyWalk(self, edx, lists, dt); return; }
+	int k = g_walkPlayer - 1;
+	if (st->valid[k]) {
+		self[0x10] = (char)((self[0x10] & ~0x40) | (st->flags[k] & 0x40));
+		memcpy(self + 0x4C, st->data[k], 0x24);
+	}
+	g_origSkyWalk(self, edx, lists, dt);
+	st->flags[k] = (uint8_t)self[0x10];
+	memcpy(st->data[k], self + 0x4C, 0x24);
+	st->valid[k] = true;
+	if (logThis) {
+		const float* f = (const float*)(self + 0x4C);
+		Log("split: sky %p walk %d scroll %.3f %.3f %.3f %.3f", self, g_walkPlayer, f[0], f[1], f[4], f[5]);
+	}
+	// The other player's copy starts from here (one jump at most, at split start).
+	if (!st->valid[1 - k]) {
+		st->flags[1 - k] = st->flags[k];
+		memcpy(st->data[1 - k], st->data[k], 0x24);
+		st->valid[1 - k] = true;
+	}
+}
+
 // --- viewport override ---------------------------------------------------------
 // RenderWare's D3D9 camera begin-update sets the viewport from the camera's
 // raster; the main camera's own beginUpdate pointer is wrapped so a half-screen
@@ -390,7 +451,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	placeP1();
 	SyncCameras(view, nullptr);
 	LogFrustum("p1 walk", cam);
+	g_walkPlayer = 1;
 	collect(root, nullptr, (void**)(view + 0x1C), dt);
+	g_walkPlayer = 0;
 	SyncClones(*(void**)(view + 0x58), nullptr, dt);
 	ResetDirty(view, nullptr);
 	if (!(viewFlags & 0x10)) ClearCamera(renderer, nullptr, 0);
@@ -408,7 +471,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	void* lists[kNumLists];
 	for (int i = 0; i < kNumLists; i++)
 		lists[i] = i >= kFirstHud ? (void*)&g_dummy : *(void**)(view + 0x1C + 4 * i);
+	g_walkPlayer = 2;
 	collect(root, nullptr, lists, dt);
+	g_walkPlayer = 0;
 	g_repeatWalk = false;
 	ResetDirty(view, nullptr);
 	g_vp = vp2; g_vpActive = true;
@@ -464,6 +529,7 @@ bool SplitInstallHooks() {
 	                      (void**)&g_origDynSphereWalk, "CKDynamicBoundingSphere::walk");
 	ok &= PatchVtableSlot(kParticlesVtbl, kWalkSlot, kParticlesWalk, (void*)ParticlesWalkHook,
 	                      (void**)&g_origParticlesWalk, "CParticlesNodeFx::walk");
+	ok &= PatchVtableSlot(kSkyVtbl, kWalkSlot, kSkyWalk, (void*)SkyWalkHook, (void**)&g_origSkyWalk, "CSkyNodeFx::walk");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");
