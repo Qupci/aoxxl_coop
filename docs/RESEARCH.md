@@ -1237,3 +1237,11 @@ both halves).
   both had force_level 2 then an Inspector jump to level 5 seconds later. Now any running level on preset 0 gets
   the game's choice (3 with a pad, 1 without); every level change logs "input: level N, controller preset P".
   Autotest preset0 (S_SETPRESET).
+* Snow in split screen (LV2 sector 1 camp): CFogBoxNodeFx (vtable 0x622F14) walk 0x416D10 copies the frame time
+  to +0x20 each walk and moves the particle groups its camera sees (others gathered at their group centre):
+  records +0x360 (7 floats), fades +0x35C (8 dwords), box fade +0x38C; modes +0x2D3 (1 = positions from the
+  absolute time, unaffected). Three walks per split frame moved the snow up to 3x. Now: no stamp-walk step;
+  player 1's walk steps; player 2's walk steps, then every particle player 1's walk changed is restored to that
+  walk's result (one step per particle per frame). User-confirmed visually (autotest fog21, XXL_FOGFIX=0 for
+  A/B); the XXL_FOGLOG position read (+0x360 [3..5]) did not show the motion -- that log is not trustworthy.
+  XXL_PARTLOG: particle systems called twice while "active" in one split frame (diagnostics).

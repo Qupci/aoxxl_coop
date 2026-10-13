@@ -870,6 +870,18 @@ const Step kPreset0[] = {
 	MARK(0, "baseline"), { 2000, S_SETPRESET, 0, 0, 0, 0, 0, "preset 0" }, END(5000),
 };
 
+// fog21: level 2's starting camp (snow, CFogBoxNodeFx): 6 s single player, then
+// player 2 joins (split screen); XXL_FOGLOG logs a snowflake, XXL_FOGFIX=0 the
+// game's own walks.
+const Step kFog21[] = {
+	MARK(0, "baseline"),
+	PLACEAT(500, HERO_ASTERIX, -815.0f, 509.0f, -1068.0f), PLACEAT(500, HERO_OBELIX, -817.0f, 509.0f, -1069.0f),
+	SHOT(3000, "fog_sp"),
+	VPAD(6000, 1, PAD_START, 0, 0, "p2 start"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
+	SHOT(9000, "fog_split"),
+	END(12000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -2080,6 +2092,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("whistle22", kWhistle22),
 	SCENARIO("lbwait", kLbWait),
 	SCENARIO("preset0", kPreset0),
+	SCENARIO("fog21", kFog21),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),

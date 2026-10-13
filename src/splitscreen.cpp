@@ -118,6 +118,18 @@ void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt)
 	}
 	if (!Stepped(self)) {
 		bool active = (*(uint32_t*)(ps + 4) & 2) != 0;
+		static const bool plog = getenv("XXL_PARTLOG") != nullptr;   // diagnostics: systems stepped twice in a frame
+		if (plog && active) {
+			static char* who[256]; static uint32_t gen[256]; static int seenTwice[256];
+			uint32_t h = ((uintptr_t)self >> 4) & 255;
+			if (who[h] == self && gen[h] == g_splitGen && !seenTwice[h]) {
+				seenTwice[h] = 1;
+				Log("split: particle system %p (flags %04X, stamp %d walk %d) stepped again in the same frame", self,
+				    *(uint16_t*)(self + 0x10), g_stampWalk, g_walkPlayer);
+			}
+			if (who[h] != self) seenTwice[h] = 0;
+			who[h] = self; gen[h] = g_splitGen;
+		}
 		g_origParticlesWalk(self, edx, lists, dt);
 		// Stepped: every bit-9 system, the others when their visibility test passed.
 		if (active && ((*(uint16_t*)(self + 0x10) & 0x200) || *(uint16_t*)(self + 0x14) == *(uint16_t*)kFrameId))
@@ -170,6 +182,106 @@ void AnimWalk(CollectFn orig, char* self, void* edx, void** lists, void* dt) {
 
 void __fastcall AnimNodeWalkHook(char* self, void* edx, void** lists, void* dt) { AnimWalk(g_origAnimNodeWalk, self, edx, lists, dt); }
 void __fastcall AnimCloneWalkHook(char* self, void* edx, void** lists, void* dt) { AnimWalk(g_origAnimCloneWalk, self, edx, lists, dt); }
+
+// --- fog boxes (snow) ---------------------------------------------------------------
+// CFogBoxNodeFx::vf14 (0x416D10) moves its particles by the frame time in its
+// walk (snow in level 2 sector 1's camp): each particle's record (+0x360, 7
+// floats: target, position, speed) and fade (+0x35C, 8 dwords), and the box's
+// fade (+0x38C) -- but only the particle groups its camera sees (the others are
+// gathered at their group's centre for that walk's mesh). Three walks per split
+// frame moved the snow up to three times as fast. Now the stamp walk leaves it
+// alone, player 1's walk moves what player 1 sees, player 2's what player 2
+// sees, and whatever player 1's walk moved is put back to how that walk left it
+// (each particle moves once a frame; in player 2's half the ones both see are
+// drawn a frame ahead).
+const uintptr_t kFogVtbl = 0x622F14;
+const uintptr_t kFogWalk = 0x416D10;
+CollectFn g_origFogWalk = nullptr;
+
+struct FogState {
+	char*    node = nullptr;
+	uint32_t gen = 0;          // the split frame of s0 / s1
+	unsigned n = 0, cap = 0;   // particles
+	uint8_t* s0 = nullptr;     // before player 1's walk: records then fades
+	uint8_t* s1 = nullptr;     // after it
+	float    fade0 = 0, fade1 = 0;
+};
+FogState g_fog[16];
+
+void __fastcall FogWalkHook(char* self, void* edx, void** lists, void* dt) {
+	static const bool off = getenv("XXL_FOGFIX") && getenv("XXL_FOGFIX")[0] == '0';   // diagnostics
+	static const bool log = getenv("XXL_FOGLOG") != nullptr;
+	if (log && (g_walkPlayer == 1 || !g_inSplitFrame)) {   // once a frame: the box's mean particle speed
+		static char* first = nullptr;
+		static DWORD seen = 0, lastT = 0;
+		static float prev[4096 * 3];
+		static unsigned prevN = 0, k = 0;
+		if (!first || GetTickCount() - seen > 2000) { first = self; prevN = 0; }
+		unsigned n = *(unsigned*)(self + 0x34) * *(unsigned*)(self + 0x44);
+		float* rec = *(float**)(self + 0x360);
+		if (self == first && rec && n && n <= 4096) {
+			seen = GetTickCount();
+			if ((k++ % 30) == 0) {
+				DWORD t = GetTickCount();
+				if (prevN == n && t > lastT) {
+					double sum = 0; unsigned moved = 0;
+					for (unsigned i = 0; i < n; i++) {
+						float dx = rec[i * 7 + 3] - prev[i * 3], dy = rec[i * 7 + 4] - prev[i * 3 + 1], dz = rec[i * 7 + 5] - prev[i * 3 + 2];
+						float d = sqrtf(dx * dx + dy * dy + dz * dz);
+						if (d > 0.0001f && d < 5.0f) { sum += d; moved++; }
+					}
+					Log("split: fog box %p: %u of %u particles moved, mean %.2f units/s (split %d)", self, moved, n,
+					    moved ? sum / moved / ((t - lastT) / 1000.0) : 0.0, g_inSplitFrame);
+				}
+				for (unsigned i = 0; i < n; i++) { prev[i * 3] = rec[i * 7 + 3]; prev[i * 3 + 1] = rec[i * 7 + 4]; prev[i * 3 + 2] = rec[i * 7 + 5]; }
+				prevN = n; lastT = t;
+			}
+		}
+	}
+	if (!g_inSplitFrame || off) { g_origFogWalk(self, edx, lists, dt); return; }
+	if (g_stampWalk) return;
+	unsigned n = *(unsigned*)(self + 0x34) * *(unsigned*)(self + 0x44);
+	uint8_t* recs = *(uint8_t**)(self + 0x360);
+	uint8_t* fades = *(uint8_t**)(self + 0x35C);
+	FogState* st = nullptr;
+	for (FogState& f : g_fog) if (f.node == self) st = &f;
+	for (FogState& f : g_fog) if (!st && !f.node) { st = &f; st->node = self; }
+	if (!st || !recs || !fades || n == 0 || n > 65536) { g_origFogWalk(self, edx, lists, dt); return; }
+	const unsigned rs = 28, fs = 32, per = rs + fs;
+	if (st->cap < n) {
+		free(st->s0); free(st->s1);
+		st->s0 = (uint8_t*)malloc((size_t)n * per);
+		st->s1 = (uint8_t*)malloc((size_t)n * per);
+		st->cap = st->s0 && st->s1 ? n : 0;
+		if (!st->cap) { g_origFogWalk(self, edx, lists, dt); return; }
+	}
+	float& fade = *(float*)(self + 0x38C);
+	if (g_walkPlayer == 1) {
+		memcpy(st->s0, recs, (size_t)n * rs);
+		memcpy(st->s0 + (size_t)n * rs, fades, (size_t)n * fs);
+		st->fade0 = fade;
+		g_origFogWalk(self, edx, lists, dt);
+		memcpy(st->s1, recs, (size_t)n * rs);
+		memcpy(st->s1 + (size_t)n * rs, fades, (size_t)n * fs);
+		st->fade1 = fade;
+		st->gen = g_splitGen;
+		st->n = n;
+		return;
+	}
+	g_origFogWalk(self, edx, lists, dt);
+	if (g_walkPlayer != 2 || st->gen != g_splitGen || st->n != n) return;
+	for (unsigned i = 0; i < n; i++) {
+		uint8_t* r0 = st->s0 + (size_t)i * rs;
+		uint8_t* r1 = st->s1 + (size_t)i * rs;
+		uint8_t* f0 = st->s0 + (size_t)n * rs + (size_t)i * fs;
+		uint8_t* f1 = st->s1 + (size_t)n * rs + (size_t)i * fs;
+		if (memcmp(r0, r1, rs) != 0 || memcmp(f0, f1, fs) != 0) {
+			memcpy(recs + (size_t)i * rs, r1, rs);
+			memcpy(fades + (size_t)i * fs, f1, fs);
+		}
+	}
+	if (st->fade0 != st->fade1) fade = st->fade1;
+}
 
 // --- sky -----------------------------------------------------------------------
 // CSkyNodeFx::vf14 (0x41AF50) scrolls the sky's textures by how far the camera
@@ -659,6 +771,7 @@ bool SplitInstallHooks() {
 	                      (void**)&g_origShadowUpdate, "CKSrvShadow::update");
 	ok &= PatchVtableSlot(kAnimNodeVtbl, kWalkSlot, kAnimNodeWalk, (void*)AnimNodeWalkHook, (void**)&g_origAnimNodeWalk, "CAnimatedNode::walk");
 	ok &= PatchVtableSlot(kAnimCloneVtbl, kWalkSlot, kAnimCloneWalk, (void*)AnimCloneWalkHook, (void**)&g_origAnimCloneWalk, "CAnimatedClone::walk");
+	ok &= PatchVtableSlot(kFogVtbl, kWalkSlot, kFogWalk, (void*)FogWalkHook, (void**)&g_origFogWalk, "CFogBoxNodeFx::walk");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");
