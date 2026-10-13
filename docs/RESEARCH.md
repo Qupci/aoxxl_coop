@@ -1229,3 +1229,11 @@ both halves).
   (Obelix sound 0x95, Asterix 0x9F) from the sound handler's step-change switch -- the "ready" whistle; the
   player's spin (steps 0x0A-0x0C) never plays it. A co-op pass plays the thrower's +0x280 (user-confirmed).
   XXL_LOGSOUNDS=1 logs every sound start from hero code (2: from anywhere); autotest lbwait (one LB, wait).
+* Pad layout changing mid-session (xxl_coop.pad_strange*.log): CKInput +0x64 = controller preset in use;
+  FUN_00438950 (thiscall(preset), ret 4) points every binding's source (+0xC -> +0x14 current, +4.. per preset)
+  at it. CKAsterixGameManager::vf10 picks it (state 6: FUN_00503AA0 -> 3 with a pad, 1 + "no controller"
+  without; state 1: FUN_00503B00 saved options); the options menu only sets 1. Preset 0 (X/B/Y shuffled, menus
+  on the left stick) was in use in both bad sessions until the return to the menu replayed the intro and set 3;
+  both had force_level 2 then an Inspector jump to level 5 seconds later. Now any running level on preset 0 gets
+  the game's choice (3 with a pad, 1 without); every level change logs "input: level N, controller preset P".
+  Autotest preset0 (S_SETPRESET).

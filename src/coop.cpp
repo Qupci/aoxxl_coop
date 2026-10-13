@@ -422,6 +422,36 @@ uint8_t* CoopP2CameraValues() {
 // Diagnostics: the user saw jump move from A to B mid-session (not reproduced
 // yet). Each binding's current source (binding +0xC -> +0x14) and the bindings
 // array itself are watched; a change is logged with the whole table.
+// The controller preset. CKInput (yellow pages +0x14) keeps the preset in use at
+// +0x64; FUN_00438950 (thiscall, the preset) points every binding at it. The game
+// picks it in CKAsterixGameManager::vf10 (with a pad the saved options -- preset 3
+// -- else the keyboard's, 1); before that it is 0, a layout with X/B/Y shuffled
+// and the menus on the left stick. Twice a session was played on preset 0 until
+// a return to the menu replayed the intro and set it -- both times after
+// force_level jumped from the title into level 2 and XXL Inspector jumped on to
+// level 5 seconds later (what skipped the game's choice is not certain). 0 is never
+// a preset the game picks for play: a level running on it gets the game's choice.
+static void WatchControllerPreset() {
+	static int lastLevel = -99;
+	static DWORD lastCheck = 0;
+	DWORD now = GetTickCount();
+	CKYellowPages* yp = YellowPages();
+	char* in = yp ? *(char**)((char*)yp + 0x14) : nullptr;
+	if (!in) return;
+	int preset = *(int*)(in + 0x64);
+	if (g.lastLevel != lastLevel) {
+		lastLevel = g.lastLevel;
+		Log("input: level %d, controller preset %d", g.lastLevel, preset);
+	}
+	if (g.lastLevel <= 0 || preset != 0 || now - lastCheck < 1000) return;
+	lastCheck = now;
+	typedef char(__fastcall* HasPadFn)(char* in, void* edx);
+	typedef void(__fastcall* SetPresetFn)(char* in, void* edx, int preset);
+	int want = ((HasPadFn)0x438AB0)(in, nullptr) ? 3 : 1;
+	((SetPresetFn)0x438950)(in, nullptr, want);
+	Log("input: level %d is running on the unset controller preset 0; preset %d set (the game's own choice)", g.lastLevel, want);
+}
+
 void WatchBindings() {
 	static char* lastArray = nullptr;
 	static char* lastSrc[256];
@@ -1109,6 +1139,7 @@ void CoopFrame() {
 		static bool dumped = false;
 		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
 	}
+	WatchControllerPreset();
 	WatchBindings();
 	if (!g.p2Joined) {
 		// Without player 2 the hero that is not leading is the AI companion. A

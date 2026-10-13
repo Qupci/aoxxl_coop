@@ -21,7 +21,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -862,6 +862,12 @@ const Step kLbWait[] = {
 	LB_TAP(4000), SHOT(6000, "lbwait_1"), SHOT(8000, "lbwait_2"), LB_TAP(10000), SHOT(10500, "lbwait_3"),
 	LB_TAP(13000), SHOT(16000, "lbwait_4"), LB_TAP(19000),
 	END(22000),
+};
+
+// preset0: the controller preset forced to 0 in play (the shuffled layout two
+// sessions ended up on); the mod should put the game's choice back.
+const Step kPreset0[] = {
+	MARK(0, "baseline"), { 2000, S_SETPRESET, 0, 0, 0, 0, 0, "preset 0" }, END(5000),
 };
 
 const Step kBeach12O[] = {
@@ -2073,6 +2079,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lb2", kLb2),
 	SCENARIO("whistle22", kWhistle22),
 	SCENARIO("lbwait", kLbWait),
+	SCENARIO("preset0", kPreset0),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
@@ -2925,6 +2932,15 @@ void RunStep(const Step& s) {
 				Log("autotest: (node tree unreadable)");
 			}
 		}
+		break;
+	}
+	case S_SETPRESET: {   // the game's controller preset a (CKInput +0x64 via FUN_00438950)
+		CKYellowPages* yp = YellowPages();
+		char* in = yp ? *(char**)((char*)yp + 0x14) : nullptr;
+		if (!in) break;
+		typedef void(__fastcall* SetPresetFn)(char* in, void* edx, int preset);
+		Log("autotest: controller preset %d -> %d", *(int*)(in + 0x64), s.a);
+		((SetPresetFn)0x438950)(in, nullptr, s.a);
 		break;
 	}
 	case S_BOSSSCAN: {   // event groups that send a sidekick to a marker, the zones feeding them, the zones they enable
