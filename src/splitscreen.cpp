@@ -85,6 +85,7 @@ const AddToListsFn AddToLists = (AddToListsFn)0x41E390;
 CollectFn g_origParticlesWalk = nullptr;
 bool      g_inSplitFrame = false;
 bool      g_stampWalk = false;
+int       g_walkPlayer = 0;   // 1 / 2: whose walk the split frame is in
 
 // Systems stepped in this split frame. A system with +0x10 bit 9 is stepped
 // whether or not it is in view (and stamps itself only when it is): the x10
@@ -129,6 +130,47 @@ void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt)
 		((CollectFn)(*(void***)child)[14])(child, nullptr, lists, dt);
 }
 
+// --- animation blends ------------------------------------------------------------
+// CAnimatedNode / CAnimatedClone walks (slot 14: 0x41DA30, 0x41D270) end in
+// FUN_0041DA70, which cross-fades a model from its previous animation into the
+// current one (+0x10 bits 7-8: blend mode; +0x48 the blend's clock, +0x44 its
+// length) by the frame time -- once per walk, and the bones' blend on top of the
+// last one. Three walks per split frame made every blend three times as fast:
+// heroes snapped between standing, walking and running. Only the frame's first
+// walk of a node blends; the later ones run with the blend mode off (the pose
+// from the first walk stays; bones, visibility and children as usual).
+const uintptr_t kAnimNodeVtbl  = 0x623128, kAnimNodeWalk  = 0x41DA30;   // CAnimatedNode (11,21)
+const uintptr_t kAnimCloneVtbl = 0x6230D4, kAnimCloneWalk = 0x41D270;   // CAnimatedClone (11,22)
+CollectFn g_origAnimNodeWalk = nullptr, g_origAnimCloneWalk = nullptr;
+
+void AnimWalk(CollectFn orig, char* self, void* edx, void** lists, void* dt) {
+	static const bool off = getenv("XXL_ANIMFIX") && getenv("XXL_ANIMFIX")[0] == '0';   // diagnostics
+	static const bool log = getenv("XXL_ANIMLOG") != nullptr;   // diagnostics: Asterix's blends, every walk
+	if (log) {
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+		uint16_t f = *(uint16_t*)(self + 0x10);
+		if (a && (char*)a.hook->node == self && (f & 0x180))
+			Log("split: Asterix blend mode %d clock %.3f of %.3f (walk %d%s, dt %.4f)", (f & 0x180) >> 7, *(float*)(self + 0x48),
+			    *(float*)(self + 0x44), g_walkPlayer, g_stampWalk ? " stamp" : "", *(float*)((char*)dt + 0xC));
+	}
+	if (!g_inSplitFrame || off) { orig(self, edx, lists, dt); return; }
+	char* key = self + 1;   // own entries in the stepped table (particle systems use the node pointer)
+	if (!Stepped(key)) {
+		MarkStepped(key);
+		orig(self, edx, lists, dt);
+		return;
+	}
+	uint16_t& flags = *(uint16_t*)(self + 0x10);
+	uint16_t blend = flags & 0x180;
+	flags &= ~0x180;
+	orig(self, edx, lists, dt);
+	flags = (uint16_t)((flags & ~0x180) | blend);
+}
+
+void __fastcall AnimNodeWalkHook(char* self, void* edx, void** lists, void* dt) { AnimWalk(g_origAnimNodeWalk, self, edx, lists, dt); }
+void __fastcall AnimCloneWalkHook(char* self, void* edx, void** lists, void* dt) { AnimWalk(g_origAnimCloneWalk, self, edx, lists, dt); }
+
 // --- sky -----------------------------------------------------------------------
 // CSkyNodeFx::vf14 (0x41AF50) scrolls the sky's textures by how far the camera
 // turned since the sky's last walk: it keeps the camera's last forward (x, z at
@@ -141,7 +183,6 @@ void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt)
 const uintptr_t kSkyVtbl = 0x623020;   // CSkyNodeFx (11,25)
 const uintptr_t kSkyWalk = 0x41AF50;
 CollectFn g_origSkyWalk = nullptr;
-int       g_walkPlayer = 0;   // 1 / 2: whose walk the split frame is in
 
 struct SkyState { char* node; bool valid[2]; uint8_t flags[2]; uint8_t data[2][0x24]; };
 SkyState g_sky[8];
@@ -616,6 +657,8 @@ bool SplitInstallHooks() {
 	ok &= PatchVtableSlot(kSkyVtbl, kWalkSlot, kSkyWalk, (void*)SkyWalkHook, (void**)&g_origSkyWalk, "CSkyNodeFx::walk");
 	ok &= PatchVtableSlot(kShadowSrvVtbl, kShadowUpdateSlot, kShadowUpdate, (void*)ShadowUpdateHook,
 	                      (void**)&g_origShadowUpdate, "CKSrvShadow::update");
+	ok &= PatchVtableSlot(kAnimNodeVtbl, kWalkSlot, kAnimNodeWalk, (void*)AnimNodeWalkHook, (void**)&g_origAnimNodeWalk, "CAnimatedNode::walk");
+	ok &= PatchVtableSlot(kAnimCloneVtbl, kWalkSlot, kAnimCloneWalk, (void*)AnimCloneWalkHook, (void**)&g_origAnimCloneWalk, "CAnimatedClone::walk");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");

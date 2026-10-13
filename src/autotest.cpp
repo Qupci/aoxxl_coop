@@ -757,6 +757,16 @@ const Step kShadow29[] = {
 	END(10500),
 };
 
+// anim2: player 1 taps forward with player 2 in (split screen); XXL_ANIMLOG logs
+// Asterix's animation blends per walk, XXL_ANIMFIX=0 the game's own.
+const Step kAnim2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	P1(3000, 0, 0.0f, 1.0f, "p1 forward"), P1(3300, 0, 0.0f, 0.0f, "p1 release"),
+	P1(5000, 0, 0.0f, 1.0f, "p1 forward"), P1(6500, 0, 0.0f, 0.0f, "p1 release"),
+	END(8000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1958,6 +1968,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shadow33", kShadow33),
 	SCENARIO("shadow3s", kShadow3S),
 	SCENARIO("shadow29", kShadow29),
+	SCENARIO("anim2", kAnim2),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
