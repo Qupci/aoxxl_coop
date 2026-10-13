@@ -1237,6 +1237,13 @@ both halves).
   both had force_level 2 then an Inspector jump to level 5 seconds later. Now any running level on preset 0 gets
   the game's choice (3 with a pad, 1 without); every level change logs "input: level N, controller preset P".
   Autotest preset0 (S_SETPRESET).
+* Third wrong-preset session (xxl_coop.pad_strange_newer.log): preset 1 (keyboard) from the first frame, which
+  came 5 s after the menu (normally <1 s) -- the game picked at boot (FUN_00503AA0 from vf10 state 6, called at
+  0x503AED) while FUN_00438AB0 saw no pad yet; force_level skips the title, the only place it looks again. Now
+  0x438950 is detoured: a choice of 1 made without a pad is remembered, and a level running on it gets 3 once
+  the game sees a pad (1 chosen with a pad -- the options' keyboard layout -- is left alone). Every call logs
+  "input: the game sets controller preset P (from caller; it sees a/no pad)". Autotest preset1 with
+  XXL_PRESETNOPAD=1 (the next choice counts as made without a pad).
 * Snow in split screen (LV2 sector 1 camp): CFogBoxNodeFx (vtable 0x622F14) walk 0x416D10 copies the frame time
   to +0x20 each walk and moves the particle groups its camera sees (others gathered at their group centre):
   records +0x360 (7 floats), fades +0x35C (8 dwords), box fade +0x38C; modes +0x2D3 (1 = positions from the
