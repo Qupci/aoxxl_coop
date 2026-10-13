@@ -871,6 +871,53 @@ bool GroupCommandsTrio(unsigned ev) {
 	return false;
 }
 
+// Does event `ev`'s group run a cutscene (a cinematic bloc, 8,9..8,28 /
+// CKSkyCinematicBloc, or the cinematic service among its targets)?
+bool GroupPlaysCutscene(unsigned ev) {
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return false;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return false;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++) {
+		uintptr_t vt = objs[first + k] ? *(uintptr_t*)objs[first + k] : 0;
+		if ((vt >= 0x624A7C && vt <= 0x624F48) || vt == 0x629B78 || vt == 0x624F90) return true;
+	}
+	return false;
+}
+
+// Does a hero zone whose group commands the trio mean the hero it is bound to?
+// Orders for the companion -- wait here (0x4802, 0x4849: level 4 sector 5's
+// blue circle), walk / run / teleport to a marker (the boats) -- do: set off by
+// the other hero they order that hero itself. A plain leader switch does not,
+// nor does a zone that starts a cutscene (level 2 sector 10's boss: #34 "switch
+// to Asterix", then #4 "Obelix walks to marker 22" and the boss's cutscene,
+// both bound to Asterix -- in single player the AI Asterix crosses them with
+// Obelix; in co-op player 2's Obelix could never start the boss).
+bool ZoneMeansItsHero(unsigned ev) {
+	if (!GroupCommandsTrio(ev) || GroupPlaysCutscene(ev)) return false;
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = *(char**)((char*)yp + 0x6C);
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	uint16_t* msgs = *(uint16_t**)(es + 0x14);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++) {
+		if (!objs[first + k] || *(uintptr_t*)objs[first + k] != 0x6256A0) continue;
+		unsigned m = msgs[first + k];
+		if (m == 0x4800 || m == 0x4801 || m == 0x48B7 || m == 0x48B8) continue;
+		if (m == 0x4802 || m == 0x4849 || (m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC)) return true;
+	}
+	return false;
+}
+
 bool LeverHeldBack(char* receiver, Trio t) {
 	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
 	int lead = t.Leader();
@@ -1085,11 +1132,11 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 			k++;
 			unsigned obj = *(uint16_t*)(e + 2);
 			bool keep = (obj == (unsigned)ia || obj == (unsigned)io) && !(l.level && !(e[5] & 1));
-			// Zones that switch the trio's leader ("switch to Asterix, Obelix waits there"
-			// -- level 4 sector 5's blue circle, bound to Asterix) mean the hero
-			// they are bound to: set off by the other one they softlocked.
+			// Zones that order the companion ("Obelix waits there" -- level 4
+			// sector 5's blue circle, bound to Asterix) mean the hero they are
+			// bound to: set off by the other one they softlocked (ZoneMeansItsHero).
 			static const bool zoneAll = getenv("XXL_ZONEALL") != nullptr;   // diagnostics: the unfiltered swapped pass
-			if (keep && !zoneAll && GroupCommandsTrio(*(uint16_t*)(e + 6))) keep = false;
+			if (keep && !zoneAll && ZoneMeansItsHero(*(uint16_t*)(e + 6))) keep = false;
 			if (keep && (e[4] & 1)) any = true;
 			else e[4] &= ~1;
 		}
@@ -1174,6 +1221,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
 		int zh = ZoneEventHero(eventId & 0xFFFF);
 		if (zh >= 0) CoopNoteZoneHero(zh);
+		if (zh >= 0 && g_inSwappedPass && GroupCommandsTrio(eventId) && GroupPlaysCutscene(eventId)) CoopNoteStoryZone(zh);
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
 		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
 	}

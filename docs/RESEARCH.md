@@ -1136,3 +1136,17 @@ both halves).
   so the slide-end agents of LV4-10 / LV5-9 looked 400+ units away and their talk was dropped.
 * Pad bindings: the user saw A/B and the menu's D-pad change mid-session (after an Inspector level jump);
   WatchBindings logs any change of the game's binding sources with the full table.
+
+## Round 30 (2026-10-13)
+
+* LV2-10 boss gate: rectangle #34 (1672.3 -738.8 -1210.9, group #147: trio 0x4800 + 0x4803, lights, enables #4)
+  starts the boss intro cutscene; #4 (1687.1 -739.6 -1210.9, group #20: boss 0x4C18/0x4C15, trio 0x4829 "sidekick
+  walks to marker 22", a CKManageEventCinematicBloc 0x501, ...). Both bound to Asterix, so the swapped detection
+  pass had to carry them for player 2's Obelix -- and the round-24/25 filter (any group that commands the trio)
+  dropped them. Filter now (ZoneMeansItsHero): only companion orders -- wait (0x4802, 0x4849) and marker
+  walk/run/teleport -- keep a zone to its own hero, and not when the group also runs a cutscene (cinematic bloc
+  vtables 0x624A7C..0x624F48, 0x629B78, CKSrvCinematic 0x624F90). Plain leader switches answer either hero.
+  Autotests: boss210 (both zones by Obelix), circle45 unchanged (LV4-5 circle 0x0528 still Asterix-only).
+* A cutscene zone set off by the other hero brings the zone's own hero to it when the cutscene camera comes up
+  and they are 40+ units apart (CoopNoteStoryZone; RegroupForCutscene alone skips it while the game holds a
+  player hero, e.g. the walk to marker 22).

@@ -50,6 +50,8 @@ struct CoopState {
 	bool    p2BackCombo = false;    // Back is held for a combo, not to leave
 	bool    cineRegrouped = false;  // RegroupForCutscene done for the current cutscene
 	int     joinLeader = -1;        // the trio's leader when player 2 joined
+	int     storyZoneHero = -1;     // a cutscene zone bound to the other hero set off by this one
+	DWORD   storyZoneAt = 0;
 
 	uint8_t p2Values[kP2ValuesSize] = {};
 	bool    p2ValuesReady = false;
@@ -582,6 +584,11 @@ struct SectorTrack {
 } g_sec;
 const float kFallBelow = 8.0f;   // units below where it left the streamed sector
 
+void CoopNoteStoryZone(int heroIndex) {
+	g.storyZoneHero = heroIndex;
+	g.storyZoneAt = GetTickCount();
+}
+
 void CoopNoteZoneHero(int heroIndex) {
 	g_sec.zoneHero = heroIndex;
 	g_sec.zoneAt = GetTickCount();
@@ -915,6 +922,23 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 	CKYellowPages* yp = YellowPages();
 	char* srv = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	// The cutscene's zone is bound to one hero and the other set it off (level 2's
+	// boss: Asterix's zone crossed by player 2's Obelix, who the game then walks
+	// to his marker): the zone's own hero is brought to the one that crossed it.
+	int story = g.storyZoneHero;
+	g.storyZoneHero = -1;
+	if (story >= 0 && story < HERO_COUNT && (int)(GetTickCount() - g.storyZoneAt) < 5000) {
+		int own = story == g.p1Hero ? g.p2Hero : g.p1Hero;
+		Hero by = t.GetHero(story), mine = own >= 0 ? t.GetHero(own) : Hero();
+		if (by && mine && !g.held[own] && (by.Pos() - mine.Pos()).len2() >= 40.0f * 40.0f) {
+			Vector3 to = by.Pos();
+			to.y += 1.0f;
+			SetHeroPosition(mine, to);
+			Log("coop: cutscene started by %s from %s's zone: %s brought to (%.1f %.1f %.1f)", HeroName(story),
+			    HeroName(own), HeroName(own), to.x, to.y, to.z);
+			return;
+		}
+	}
 	// A hero the game has borrowed stays where the game put it (seated in the
 	// cable car) -- except one sent to its place in a Roman agent's dialogue
 	// (trio 0x48BA, AI order 13): the talk waits for it to get there.

@@ -680,6 +680,20 @@ const Step kSpy21A[] = {
 
 // beach12o (-Level 1): sector 2's beach Romans, player 2's Obelix (not
 // leading) next to them, Asterix away; then Obelix leads (0x4801).
+// boss210 (-Level 2): sector 10's boss gate (rectangles #34 at 1672.3 and #4 at
+// 1687.1, both bound to Asterix) crossed by player 2's Obelix, Asterix 50 units back.
+const Step kBoss210[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1640.0f, -742.5f, -1210.1f), PLACEAT(3000, HERO_OBELIX, 1665.34f, -742.8f, -1210.13f),
+	SECTORS(3500), SHOT(4500, "boss_1"),
+	GLIDEAT(5000, HERO_OBELIX, 1695.0f, -742.8f, -1210.5f, 3000),
+	SHOT(8500, "boss_2"), SHOT(11000, "boss_3"), SHOT(14000, "boss_4"),
+	GLIDEAT(17000, HERO_OBELIX, 1697.0f, -742.8f, -1210.5f, 4000),
+	SHOT(21500, "boss_5"), SHOT(24000, "boss_6"), SHOT(28000, "boss_7"), SHOT(33000, "boss_8"), SHOT(38000, "boss_9"),
+	END(40000),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1871,6 +1885,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("plate3", kPlate3),
 	SCENARIO("plate26", kPlate26),
 	SCENARIO("beach12o", kBeach12O),
+	SCENARIO("boss210", kBoss210),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),

@@ -33,6 +33,7 @@ bool CoopP2Joined();
 int  CoopP2Hero();
 int  CoopP1Hero();
 void CoopNoteZoneHero(int heroIndex);
+void CoopNoteStoryZone(int heroIndex);   // a zone bound to the other hero started a cutscene for this one
 void CoopTorchCheat(bool give);   // fire for Asterix from the nearest brazier, or thrown away   // a trigger zone fired for this hero (sector attribution)
 int  CoopNonLeaderPlayer();   // the player hero that is not the trio leader (-1 if none)
 int  CoopP2Pad();
