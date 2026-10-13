@@ -7,6 +7,7 @@
 #include "pads.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cwchar>
 
@@ -34,8 +35,13 @@ int  g_nHints = 0;
 wchar_t g_shown[96];             // what the lookup answers for kHintStringId
 bool g_showing = false;
 bool g_loggedKinds = false;
-float g_textWidth = 0.0f;        // the shown hint's width (a share of the screen)
-float g_savedX = 0.0f;
+wchar_t g_source[96];            // the hint being shown, as given
+int     g_nLines = 1;
+unsigned g_lineWord[8];          // the first word of each line
+float   g_longest = 0.0f;        // its longest line's width (a share of the screen)
+float   g_lineDir = 1.0f;        // XXL_HINTDIR=-1: lines go up
+float   g_unitsPerScreen = 1.75f; // text layout units across the screen (XXL_HINTUNITS)
+float   g_boxShift = -0.39f;      // where the text starts, from the prompt's place (XXL_HINTSHIFT)
 
 const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (id == kHintStringId) return g_shown;
@@ -65,19 +71,81 @@ void LogKinds(char* self) {
 	}
 }
 
+// The prompt's text object (+0x15C) is laid out from +0x20 (FUN_0042E590:
+// words split at spaces, +0x2D4 count, +0x2D8 pointers; FUN_0042EF80: lines of a
+// box +0x28 wide, a share of the screen, each word's place at +0x3C8 + 8i, x / y)
+// and the interface puts it at +0x428 (where it slides to; +0x42C / +0x434 its
+// target and place while shown, state +0x24 bits 21-22 == 2). Sized for "Use":
+// a hint is laid out on one line of a wide box, then its words are moved onto
+// the hint's own lines ('\n'), right-aligned, and the prompt moved left by the
+// longest line.
+void Relayout(char* t20) {
+	unsigned n = *(uint32_t*)(t20 + 0x2D4);
+	if (n == 0 || n > 64 || g_nLines < 2) return;
+	float* pos = (float*)(t20 + 0x3C8);
+	CKYellowPages* yp = YellowPages();
+	char* screen = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	float scale = screen ? *(float*)(screen + 4) * 0.75f : 0.75f;
+	typedef float(__cdecl* WidthFn)(void* font, const wchar_t* word, uint32_t size);
+	void* font = *(void**)(t20 + 0x660);
+	if (!font) return;
+	float x0[64], x1[64];
+	for (unsigned i = 0; i < n; i++) {
+		x0[i] = pos[2 * i];
+		x1[i] = x0[i] + scale * ((WidthFn)0x5FDAB0)(font, *(const wchar_t**)(t20 + 0x2D8 + 4 * i), *(uint32_t*)(t20 + 0x664));
+	}
+	float start[8], width[8], longest = 0.0f;
+	for (int l = 0; l < g_nLines; l++) {
+		unsigned f = g_lineWord[l], e = l + 1 < g_nLines ? g_lineWord[l + 1] : n;
+		if (f >= n || e <= f) { start[l] = 0; width[l] = 0; continue; }
+		start[l] = x0[f];
+		width[l] = x1[e - 1 < n ? e - 1 : n - 1] - x0[f];
+		if (width[l] > longest) longest = width[l];
+	}
+	float y0 = pos[1];
+	float step = *(float*)(t20 + 0x664) * (1.0f + *(float*)(t20 + 0x6A8));
+	for (int l = 0; l < g_nLines; l++) {
+		unsigned f = g_lineWord[l], e = l + 1 < g_nLines ? g_lineWord[l + 1] : n;
+		for (unsigned i = f; i < e && i < n; i++) {
+			pos[2 * i] = (x0[i] - start[l]) + (longest - width[l]);
+			pos[2 * i + 1] = y0 - step * l * g_lineDir;
+		}
+	}
+	g_longest = longest;
+}
+
 void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	const Hint* h = Current();
 	uint32_t* cc = gm ? (uint32_t*)(gm + 0xCC) : nullptr;
-	bool use = h && cc && ((*cc >> 4) & 0xF) == kPromptNone;
+	char* text = *(char**)(self + 0x15C);
+	bool use = h && cc && text && ((*cc >> 4) & 0xF) == kPromptNone;
 	if (cc && getenv("XXL_HINTLOG")) LogKinds(self);
 	uint32_t* slot = (uint32_t*)(self + 0x1A4 + kHintKind * 4);
 	uint32_t savedId = *slot;
+	if (use && wcscmp(g_source, h->text) != 0) {
+		// A new hint: its lines become one ('\n' -> ' '), the first word of each
+		// line noted.
+		wcsncpy(g_source, h->text, 95);
+		g_source[95] = 0;
+		g_nLines = 1;
+		g_lineWord[0] = 0;
+		unsigned words = 0, k = 0;
+		for (const wchar_t* c = g_source; *c && k < 95; c++) {
+			if (*c == L'\n') {
+				if (g_nLines < 8) g_lineWord[g_nLines++] = words + 1;
+				g_shown[k++] = L' ';
+				words++;
+			} else {
+				if (*c == L' ') words++;
+				g_shown[k++] = *c;
+			}
+		}
+		g_shown[k] = 0;
+		g_longest = 0.0f;
+	}
 	if (use) {
-		if (wcscmp(g_shown, h->text) != 0) g_textWidth = 0.0f;
-		wcsncpy(g_shown, h->text, 95);
-		g_shown[95] = 0;
 		*slot = kHintStringId;
 		*cc = (*cc & ~0xF0u) | (kHintKind << 4);
 	}
@@ -87,54 +155,53 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		Log("hints: %s%s%s", use ? "showing \"" : "hint gone", use ? a : "", use ? "\"" : "");
 		g_showing = use;
 	}
-	// The prompt's text (the object at +0x15C, laid out from +0x20 by
-	// FUN_0042E590 / FUN_0042EF80) is one line of a box +0x28 wide (a share of
-	// the screen; the prompt also slides in by it): sized for "Use", a hint's
-	// words past it were dropped. A hint gets a wider box.
-	char* text = *(char**)(self + 0x15C);
 	float savedWidth = text ? *(float*)(text + 0x28) : 0.0f;
-	if (use && text) {
-		static bool logged = false;
-		if (!logged) {
-			logged = true;
-			Log("hints: prompt text box %.3f x %.3f", *(float*)(text + 0x28), *(float*)(text + 0x2C));
-		}
-		// ... and the prompt's place on screen (+0x428, where it slides to;
-		// +0x42C / +0x434 its target and position while shown, state +0x24
-		// bits 21-22 == 2) moves left by the width it needs.
-		float w = g_textWidth > 0.0f ? g_textWidth : 0.5f;
-		float x = 1.0f - 1.15f * w - 0.04f;   // the drawn line runs a little wider than measured
-		if (x < 0.02f) x = 0.02f;
-		if (x > *(float*)(self + 0x428)) x = *(float*)(self + 0x428);
-		*(float*)(text + 0x28) = 1.0f - x;
-		g_savedX = *(float*)(self + 0x428);
+	float savedX = *(float*)(self + 0x428);
+	if (use) {
+		*(float*)(text + 0x28) = 2.0f;   // one line
+		float w = (g_longest > 0.0f ? g_longest : 0.9f) / g_unitsPerScreen;
+		// The text starts g_boxShift off the prompt's place with the 2.0 box.
+		float x = 0.97f - w - g_boxShift;
 		*(float*)(self + 0x428) = x;
 		if (((*(uint32_t*)(self + 0x24) >> 21) & 3) == 2) *(float*)(self + 0x42C) = *(float*)(self + 0x434) = x;
 	}
 	g_origInterfaceTick(self, edx, time);
-	if (use && text) {
-		*(float*)(text + 0x28) = savedWidth;
-		*(float*)(self + 0x428) = g_savedX;
-		// The width of the words just laid out (as the interface measures them:
-		// FUN_005FDAB0(font, word, size) + spacing, text +0x20 fields).
-		char* t20 = text + 0x20;
-		typedef float(__cdecl* WidthFn)(void* font, const wchar_t* word, uint32_t size);
+	if (!use) return;
+	*(float*)(text + 0x28) = savedWidth;
+	*(float*)(self + 0x428) = savedX;
+	char* t20 = text + 0x20;
+	if (g_nLines >= 2) {
+		Relayout(t20);
+	} else {   // one line: its width for the placement
 		unsigned n = *(uint32_t*)(t20 + 0x2D4);
+		float* pos = (float*)(t20 + 0x3C8);
+		CKYellowPages* y2 = YellowPages();
+		char* screen = y2 ? *(char**)((char*)y2 + 0x34) : nullptr;
+		float scale = screen ? *(float*)(screen + 4) * 0.75f : 0.75f;
+		typedef float(__cdecl* WidthFn)(void* font, const wchar_t* word, uint32_t size);
 		void* font = *(void**)(t20 + 0x660);
-		float sum = 0.0f;
-		for (unsigned i = 0; font && i < n && i < 64; i++)
-			sum += ((WidthFn)0x5FDAB0)(font, *(const wchar_t**)(t20 + 0x2D8 + 4 * i), *(uint32_t*)(t20 + 0x664)) +
-			       *(float*)(t20 + 0x668);
-		if (sum > 0.0f) g_textWidth = sum;
+		if (n && n <= 64 && font) {
+			float first = pos[0];
+			g_longest = pos[2 * (n - 1)] - first +
+			            scale * ((WidthFn)0x5FDAB0)(font, *(const wchar_t**)(t20 + 0x2D8 + 4 * (n - 1)), *(uint32_t*)(t20 + 0x664));
+			for (unsigned i = 0; i < n; i++) pos[2 * i] -= first;
+		}
 	}
-	if (use) {
-		*slot = savedId;
-		if (((*cc >> 4) & 0xF) == kHintKind) *cc = (*cc & ~0xF0u) | (kPromptNone << 4);
-		// The button sprite (+0x140, the prompt's dark plate with the button) is
-		// sized for one word and its button means nothing here: hidden (vf17).
-		char* icon = *(char**)(self + 0x140);
-		if (icon) ((void(__fastcall*)(char*, void*))(*(void***)icon)[17])(icon, nullptr);
+	static DWORD lastLog = 0;
+	if (getenv("XXL_HINTLOG") && GetTickCount() - lastLog > 1000) {
+		lastLog = GetTickCount();
+		float* pos = (float*)(t20 + 0x3C8);
+		Log("hints: words %u lines %d longest %.3f, word 0 at %.3f %.3f, last at %.3f %.3f, size %.3f spacing %.3f, state %d",
+		    *(uint32_t*)(t20 + 0x2D4), g_nLines, g_longest, pos[0], pos[1],
+		    pos[2 * (*(uint32_t*)(t20 + 0x2D4) - 1)], pos[2 * (*(uint32_t*)(t20 + 0x2D4) - 1) + 1],
+		    *(float*)(t20 + 0x664), *(float*)(t20 + 0x6A8), (*(uint32_t*)(self + 0x24) >> 21) & 3);
 	}
+	*slot = savedId;
+	if (((*cc >> 4) & 0xF) == kHintKind) *cc = (*cc & ~0xF0u) | (kPromptNone << 4);
+	// The button sprite (+0x140, the prompt's dark plate with the button) is
+	// sized for one word and its button means nothing here: hidden (vf17).
+	char* icon = *(char**)(self + 0x140);
+	if (icon) ((void(__fastcall*)(char*, void*))(*(void***)icon)[17])(icon, nullptr);
 }
 
 // Keyboard keys: the game's keyboard device (CKInput +0x0C, 0x3FC bytes) keeps
@@ -240,6 +307,13 @@ bool HintShown(int key) {
 
 void HintsFrame() {
 	DWORD now = GetTickCount();
+	static bool env = false;
+	if (!env) {
+		env = true;
+		if (getenv("XXL_HINTDIR")) g_lineDir = (float)atof(getenv("XXL_HINTDIR"));
+		if (getenv("XXL_HINTUNITS")) g_unitsPerScreen = (float)atof(getenv("XXL_HINTUNITS"));
+		if (getenv("XXL_HINTSHIFT")) g_boxShift = (float)atof(getenv("XXL_HINTSHIFT"));
+	}
 	for (int i = 0; i < g_nHints;)
 		if ((int)(g_hints[i].until - now) <= 0) g_hints[i] = g_hints[--g_nHints];
 		else i++;

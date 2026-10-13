@@ -1998,7 +1998,7 @@ static void WatchSpinHint(int idx, Hero h) {
 	g.spinHints++;
 	int player = idx == g.p1Hero ? 0 : 1;
 	wchar_t text[96];
-	swprintf(text, 96, L"Player %d: %s passes the Roman to %s", player + 1, HintButtonName(player, HB_LB),
+	swprintf(text, 96, L"Player %d: %s passes\nthe Roman to %s", player + 1, HintButtonName(player, HB_LB),
 	         other == HERO_ASTERIX ? L"Asterix" : L"Obelix");
 	HintShow(HINT_PASS, text, 8000);
 	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints, HeroName(idx));
@@ -2081,7 +2081,7 @@ static bool MachineMatesNear(Trio t) {
 static void RefuseMachine(Trio t, int kind, int who) {
 	PlaySound(t.GetHero(who), 0x200);
 	wchar_t text[96];
-	swprintf(text, 96, L"%s has to be at the %s too", OtherHero(who) == HERO_ASTERIX ? L"Asterix" : L"Obelix",
+	swprintf(text, 96, L"%s has to be\nat the %s too", OtherHero(who) == HERO_ASTERIX ? L"Asterix" : L"Obelix",
 	         kind == 2 ? L"machine gun" : L"boat");
 	HintShow(HINT_MACHINE, text, 4000);
 	Log("coop: %s's X at the %s refused: %s is not there", HeroName(who), kind == 2 ? "machine gun" : "boat",
@@ -2139,10 +2139,10 @@ static void ShowJoinHint(Trio t) {
 	g.joinHintPending = false;
 	wchar_t text[96];
 	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
-		swprintf(text, 96, L"Player 2: Start (keyboard: %s) joins or leaves co-op",
+		swprintf(text, 96, L"Player 2: press Start to join co-op\n(keyboard: %s), again to leave",
 		         HintKeyName(g_config.keys[CoopConfig::KEY_START]));
 	else
-		swprintf(text, 96, L"Player 2: press Start to join or leave co-op");
+		swprintf(text, 96, L"Player 2: press Start to join co-op\nand again to leave");
 	HintShow(HINT_JOIN, text, 10000);
 }
 
@@ -2162,7 +2162,7 @@ static void WatchLifterHint(Trio t) {
 			on[k] = h[k] && platform && (*(uint32_t*)(h[k].raw() + 0x384) & 7) == 0 &&
 			        *(void**)(h[k].raw() + 0x280) == platform;
 		if (on[0] == on[1]) continue;
-		HintShow(HINT_LIFTER, on[0] ? L"The lifter waits for Obelix to go up" : L"The lifter waits for Asterix to go up",
+		HintShow(HINT_LIFTER, on[0] ? L"The lifter waits for Obelix\nto go up" : L"The lifter waits for Asterix\nto go up",
 		         300);
 		return;
 	}

@@ -154,15 +154,15 @@ void ShowModeHint(SharedMode m) {
 	wchar_t text[96];
 	switch (m) {
 	case SHARED_GUN:
-		swprintf(text, 96, L"Obelix (P%d) turns the gun, Asterix (P%d) fires: %s", o + 1, a + 1, HintButtonName(a, HB_X));
+		swprintf(text, 96, L"Obelix (P%d): turn the gun\nAsterix (P%d): fire with %s", o + 1, a + 1, HintButtonName(a, HB_X));
 		break;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
-		swprintf(text, 96, L"Obelix (P%d) steers and moves the camera, Asterix (P%d) jumps: %s", o + 1, a + 1,
+		swprintf(text, 96, L"Obelix (P%d): steer and camera\nAsterix (P%d): jump with %s", o + 1, a + 1,
 		         HintButtonName(a, HB_A));
 		break;
 	default:
-		swprintf(text, 96, L"Asterix (P%d) forward / back, Obelix (P%d) left / right and camera", a + 1, o + 1);
+		swprintf(text, 96, L"Asterix (P%d): forward and back\nObelix (P%d): left, right and camera", a + 1, o + 1);
 		break;
 	}
 	HintShow(HINT_MODE, text, m == SHARED_FUSION ? 5000 : 10000);
