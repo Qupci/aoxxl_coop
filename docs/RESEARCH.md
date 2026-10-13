@@ -1172,3 +1172,8 @@ both halves).
   leaned towards the leader (XXL_SHADOWLOG=1 logs the heroes' offsets; XXL_SHADOWFIX=0 for the game's own). In
   split screen each shadow is now placed with the player camera nearer to it (OtherViewMatrix vs svc+0x5B0).
   Autotest shadow33 (LV3-3 room x 290.1 z -331.7; the user's coordinate had y/z swapped).
+* Shadows, follow-up: one shadow placement serves both halves, so any sideways nudge looks pulled towards
+  someone in the other view (the user saw it with the nearer-camera rule too, LV2-9 white floor 1516.3 -640.5
+  -882.7, autotest shadow29). The split default now places each shadow for a camera straight above its ground
+  point at the nearer player camera's distance: the nudge is (0, 0.3, 0) for every shadow, culling/fading keep
+  the nearer camera's distance. XXL_SHADOWFIX=0 game / 1 nearer camera / 2 straight up (default).

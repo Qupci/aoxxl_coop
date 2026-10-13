@@ -228,13 +228,15 @@ int __fastcall ShadowUpdateHook(char* self, void* edx, void* a, void* b, void* c
 }
 
 int ShadowUpdateImpl(char* self, void* edx, void* a, void* b, void* c, void* d) {
-	static const bool off = getenv("XXL_SHADOWFIX") && getenv("XXL_SHADOWFIX")[0] == '0';   // diagnostics
+	// XXL_SHADOWFIX (diagnostics): 0 the game's own, 1 the nearer player camera, 2 (default) straight up.
+	static const int mode = getenv("XXL_SHADOWFIX") ? getenv("XXL_SHADOWFIX")[0] - '0' : 2;
 	char* node = *(char**)(self + 0xC);
 	char* fr = node ? *(char**)(node + 4) : nullptr;
+	const float* ground = *(const float**)(self + 0x10);
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
 	float m[16];
-	if (off || !fr || !svc || !WantSplit() || !OtherViewMatrix(m))
+	if (mode == 0 || !fr || !ground || !svc || !WantSplit() || !OtherViewMatrix(m))
 		return g_origShadowUpdate(self, edx, a, b, c, d);
 	const float* p = (const float*)(fr + 0x80);
 	float* cam = (float*)(svc + 0x5B0);
@@ -243,9 +245,15 @@ int ShadowUpdateImpl(char* self, void* edx, void* a, void* b, void* c, void* d) 
 		dg += (p[i] - cam[i]) * (p[i] - cam[i]);
 		dm += (p[i] - m[12 + i]) * (p[i] - m[12 + i]);
 	}
-	if (!(dm < dg)) return g_origShadowUpdate(self, edx, a, b, c, d);
 	float saved[3] = { cam[0], cam[1], cam[2] };
-	cam[0] = m[12]; cam[1] = m[13]; cam[2] = m[14];
+	if (mode == 1) {
+		if (!(dm < dg)) return g_origShadowUpdate(self, edx, a, b, c, d);
+		cam[0] = m[12]; cam[1] = m[13]; cam[2] = m[14];
+	} else {
+		// The same distance (culling, fading) from a camera right above the shadow.
+		float dist = sqrtf(dm < dg ? dm : dg);
+		cam[0] = ground[0]; cam[1] = p[1] + dist; cam[2] = ground[2];
+	}
 	int r = g_origShadowUpdate(self, edx, a, b, c, d);
 	cam[0] = saved[0]; cam[1] = saved[1]; cam[2] = saved[2];
 	return r;

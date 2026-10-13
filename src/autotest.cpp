@@ -746,6 +746,17 @@ const Step kShadow3S[] = {
 	END(10000),
 };
 
+// shadow29 (-Level 2): sector 9's white floor (1516.3 -640.5 -882.7), player 2's
+// Obelix 5 units from Asterix, then the other side; XXL_SHADOWFIX 0/1/2.
+const Step kShadow29[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 9),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1516.26f, -640.0f, -882.72f), PLACEAT(3000, HERO_OBELIX, 1521.26f, -640.0f, -882.72f),
+	SECTORS(3500), SHOT(6500, "shadow29_1"),
+	PLACEAT(7000, HERO_OBELIX, 1516.26f, -640.0f, -877.72f), SHOT(10000, "shadow29_2"),
+	END(10500),
+};
+
 const Step kBeach12O[] = {
 	MARK(0, "baseline"), CINE_SKIP(300), CINE_SKIP(1500), CINE_SKIP(3000), CINE_SKIP(5000), CINE_SKIP(7000),
 	P1(400, PAD_A, 0, 0, "p1 A"), P1(550, 0, 0, 0, "p1 release"), P1(1200, PAD_A, 0, 0, "p1 A"), P1(1350, 0, 0, 0, "p1 release"), P1(2200, PAD_A, 0, 0, "p1 A"), P1(2350, 0, 0, 0, "p1 release"), P1(3400, PAD_A, 0, 0, "p1 A"), P1(3550, 0, 0, 0, "p1 release"), P1(4600, PAD_A, 0, 0, "p1 A"), P1(4750, 0, 0, 0, "p1 release"), P1(6000, PAD_A, 0, 0, "p1 A"), P1(6150, 0, 0, 0, "p1 release"), 
@@ -1946,6 +1957,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("sky2", kSky2),
 	SCENARIO("shadow33", kShadow33),
 	SCENARIO("shadow3s", kShadow3S),
+	SCENARIO("shadow29", kShadow29),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
 	SCENARIO("mgun3a", kMgun3A),
