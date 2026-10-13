@@ -1221,7 +1221,13 @@ int __fastcall ClueEventHook(char* self, void* edx, unsigned ev, void* param) {
 			float best = 1e30f;
 			for (int h = 0; h < 2; h++) {
 				Hero hero = t.GetHero(h);
-				if (hero) { float d = sqrtf((hero.Pos() - target).len2()); if (d < best) best = d; }
+				if (!hero) continue;
+				// Where the hero is drawn: during a ride (the belly slide) +kHero_pos
+				// stays where the ride began while the node moves with it.
+				Vector3 at = hero.Pos();
+				NodePos(hero.hook->node, &at);
+				float d = sqrtf((at - target).len2());
+				if (d < best) best = d;
 			}
 			if (best > kSpyFar) {
 				Log("proximity: spy %p told to start its talk at (%.1f %.1f %.1f), %.0f units from the nearest hero; ignored",

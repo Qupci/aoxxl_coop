@@ -1131,3 +1131,8 @@ both halves).
   both heroes are > 250 from the spy's node and spot (150 broke the slide-end auto talk) (co-op only). Not autotested (needs the slide state).
 * LV5-8 lifter Romans partly missing while the previous section's Romans live: the Roman pool (CKGrpPoolSquad)
   has a fixed number of Roman objects from the level file; heap size does not change it.
+* Far-spy check, follow-up: measured from the talk's walk target (+0xFC, or +0x108 for a two-part spy's second
+  talk) and from the heroes' node (LTM) positions -- during the belly slide +kHero_pos stays at the slide's start,
+  so the slide-end agents of LV4-10 / LV5-9 looked 400+ units away and their talk was dropped.
+* Pad bindings: the user saw A/B and the menu's D-pad change mid-session (after an Inspector level jump);
+  WatchBindings logs any change of the game's binding sources with the full table.
