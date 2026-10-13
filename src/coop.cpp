@@ -29,6 +29,7 @@
 #include "p2cam.h"
 #include "pads.h"
 
+#include <intrin.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -424,13 +425,40 @@ uint8_t* CoopP2CameraValues() {
 // array itself are watched; a change is logged with the whole table.
 // The controller preset. CKInput (yellow pages +0x14) keeps the preset in use at
 // +0x64; FUN_00438950 (thiscall, the preset) points every binding at it. The game
-// picks it in CKAsterixGameManager::vf10 (with a pad the saved options -- preset 3
-// -- else the keyboard's, 1); before that it is 0, a layout with X/B/Y shuffled
-// and the menus on the left stick. Twice a session was played on preset 0 until
-// a return to the menu replayed the intro and set it -- both times after
-// force_level jumped from the title into level 2 and XXL Inspector jumped on to
-// level 5 seconds later (what skipped the game's choice is not certain). 0 is never
-// a preset the game picks for play: a level running on it gets the game's choice.
+// picks it in CKAsterixGameManager::vf10 and FUN_00503AA0: 3 (the pad layout) if
+// it sees a pad (FUN_00438AB0), else 1 (the keyboard's). The saved options
+// (FUN_00503B00) set 1 and then the player's own buttons, or 0 (X/B/Y shuffled,
+// menus on the left stick). The game only looks again when the title replays.
+// Three sessions were played on a wrong preset until a return to the menu set 3:
+// twice on 0, once on 1 chosen while the game saw no pad yet (a slow start: the
+// first frame 5 s after the menu came up; force_level skips the title, where the
+// game would have looked again). So a level running on 0 gets the game's choice,
+// and a level running on 1 that the game chose without a pad gets 3 once the game
+// sees one (what the title does next time). 1 chosen with a pad (the options'
+// keyboard layout) is left alone. XXL_PRESETNOPAD=1 (autotest preset1): the
+// game's next choice counts as made without a pad.
+typedef void(__fastcall* SetPresetFn)(char* in, void* edx, int preset);
+typedef char(__fastcall* HasPadFn)(char* in, void* edx);
+const uintptr_t kSetPreset = 0x438950;
+const uint8_t   kSetPresetPrologue[6] = { 0x55, 0x8B, 0x6C, 0x24, 0x08, 0x56 };
+SetPresetFn g_origSetPreset = nullptr;
+bool g_presetWithoutPad = false;   // the game's last choice was 1, made while it saw no pad
+
+static bool GameSeesPad(char* in) { return ((HasPadFn)0x438AB0)(in, nullptr) != 0; }
+
+static void SetPreset(char* in, int preset) {
+	(g_origSetPreset ? g_origSetPreset : (SetPresetFn)kSetPreset)(in, nullptr, preset);
+}
+
+static void __fastcall SetPresetHook(char* in, void* edx, int preset) {
+	static bool fakeNoPad = getenv("XXL_PRESETNOPAD") && atoi(getenv("XXL_PRESETNOPAD"));
+	bool pad = GameSeesPad(in) && !fakeNoPad;
+	g_presetWithoutPad = preset == 1 && !pad;
+	Log("input: the game sets controller preset %d (from %p; it sees %s)", preset, _ReturnAddress(),
+	    pad ? "a pad" : "no pad");
+	g_origSetPreset(in, edx, preset);
+}
+
 static void WatchControllerPreset() {
 	static int lastLevel = -99;
 	static DWORD lastCheck = 0;
@@ -443,12 +471,18 @@ static void WatchControllerPreset() {
 		lastLevel = g.lastLevel;
 		Log("input: level %d, controller preset %d", g.lastLevel, preset);
 	}
-	if (g.lastLevel <= 0 || preset != 0 || now - lastCheck < 1000) return;
+	if (g.lastLevel <= 0 || now - lastCheck < 1000) return;
 	lastCheck = now;
-	typedef char(__fastcall* HasPadFn)(char* in, void* edx);
-	typedef void(__fastcall* SetPresetFn)(char* in, void* edx, int preset);
-	int want = ((HasPadFn)0x438AB0)(in, nullptr) ? 3 : 1;
-	((SetPresetFn)0x438950)(in, nullptr, want);
+	if (preset == 1 && g_presetWithoutPad && GameSeesPad(in)) {
+		SetPreset(in, 3);
+		g_presetWithoutPad = false;
+		Log("input: level %d is running on the keyboard preset 1, which the game chose while it saw no pad; it "
+		    "sees one now -- preset 3 set (the game's choice with a pad)", g.lastLevel);
+		return;
+	}
+	if (preset != 0) return;
+	int want = GameSeesPad(in) ? 3 : 1;
+	SetPreset(in, want);
 	Log("input: level %d is running on the unset controller preset 0; preset %d set (the game's own choice)", g.lastLevel, want);
 }
 
@@ -2104,7 +2138,10 @@ void CoopInit() {
 	InstallDetour(kFuseCheck, (void*)FuseHook, (void**)&g_origFuse, kFuseCheckPrologue, sizeof(kFuseCheckPrologue),
 	              "Twister Fusion check (both players)");
 	InstallDetour(kChooseAttack, (void*)ChooseAttackHook, (void**)&g_origChooseAttack, kChooseAttackPrologue,
-	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");	PadsInit();
+	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");
+	InstallDetour(kSetPreset, (void*)SetPresetHook, (void**)&g_origSetPreset, kSetPresetPrologue,
+	              sizeof(kSetPresetPrologue), "controller preset (picked without a pad)");
+	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");
 }

@@ -870,6 +870,13 @@ const Step kPreset0[] = {
 	MARK(0, "baseline"), { 2000, S_SETPRESET, 0, 0, 0, 0, 0, "preset 0" }, END(5000),
 };
 
+// preset1 (with XXL_PRESETNOPAD=1): the keyboard preset 1 set as if the game had
+// seen no pad (the slow start of xxl_coop.pad_strange_newer.log); the mod should
+// set 3 within a second.
+const Step kPreset1[] = {
+	MARK(0, "baseline"), { 2000, S_SETPRESET, 1, 0, 0, 0, 0, "preset 1" }, END(5000),
+};
+
 // fog21: level 2's starting camp (snow, CFogBoxNodeFx): 6 s single player, then
 // player 2 joins (split screen); XXL_FOGLOG logs a snowflake, XXL_FOGFIX=0 the
 // game's own walks.
@@ -2092,6 +2099,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("whistle22", kWhistle22),
 	SCENARIO("lbwait", kLbWait),
 	SCENARIO("preset0", kPreset0),
+	SCENARIO("preset1", kPreset1),
 	SCENARIO("fog21", kFog21),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
