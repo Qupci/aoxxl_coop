@@ -1252,3 +1252,34 @@ both halves).
   walk's result (one step per particle per frame). User-confirmed visually (autotest fog21, XXL_FOGFIX=0 for
   A/B); the XXL_FOGLOG position read (+0x360 [3..5]) did not show the motion -- that log is not trustworthy.
   XXL_PARTLOG: particle systems called twice while "active" in one split frame (diagnostics).
+
+## Round 35 (2026-10-13): shared modes, machines for Obelix, hints, dialogue for pad 2
+
+* Every control read goes through InputView_GetAction (0x4358B0, thiscall(view, action), ret 4): value =
+  CKInput.values[view+8 remap[action]], view = an 0x10-byte entry of a named input map (CKInput +0x40 maps,
+  +0x5C name hashes, +0x38 count; FUN_00437FF0(name) -> index). Maps: "Astérix Trio" 0x64D05C (heroes),
+  "Astérix Baliste" 0x64F550 (machine gun: 0/1 turn = values 36/37, 2 fire = 38 X held), "Astérix Bateau"
+  0x650F7C (boat: 0-3 stick = 39-42, 4 jump = 43 A held), "Camera" 0x64713C (46-50), "Sekensor" 0x64743C
+  (dialogue text: 0 advance = 45, X edge), menus 0x64F28C. shared.cpp detours it: in a shared mode each (map,
+  action) is answered from the owning player's values (gun: Obelix turns, Asterix fires/leaves (A = trio
+  0x4806 via FUN_0049A3C0); boat / belly slide: Obelix steers + camera, Asterix A; Twister Fusion: Asterix
+  stick up/down, Obelix left/right + camera); Sekensor takes either player's. XXL_ACTIONLOG=1 logs every
+  (caller, map, action) once and routed answers. Autotests mgun33o/a (LV3-3 gun 289.0 31.9 -326.1),
+  boat49o/a (LV4-9 -165.4 6.0 -652.0), slide22s (LV2-2), spy3p (P2 clicks through a dialogue).
+* Machines: their tick offers them to the leader in reach (trio 0x4A01 gun / 0x4901 boat: trio +0x48 =
+  machine, +0x3F4 bits 10-11 = 2/1); X runs FUN_0049A080 (from FUN_00499CF0 when +0x3EC bit 0x10), which only
+  works for Asterix (hero vtable +0x3C == 0) -> trio 0x4809 (gun: Asterix mode 2, companion AI order 7 to
+  its place, then 0x480A) / 0x4807 (boat, mode 1). Hero +0x3EC bits: 8 A, 0x10 X, 0x20 B, 0x40 Y, 0x80 LB,
+  0x100 RB. Co-op: Obelix's X at an offered machine is held back (no swing) and served next frame: Asterix is
+  put on Obelix's spot, made the leader (lead returned on resume) and the trio gets the same event. Both
+  heroes must be within 12 units (4 vertical) for either hero's X; else the "no" sound and a hint.
+* Hints (hints.cpp): the HUD prompt (CKHkInterfaceInGame 2/132, tick vtable 0x6285F0 slot 18; kind gm +0xCC
+  bits 4-7, 0xE none; strings [interface +0x1A4 + kind*4] via the loc lookup FUN_00411780, detoured for id
+  0x3F00C0DE). Text object +0x15C (laid out from +0x20: words +0x2D4/+0x2D8, box width +0x28, height +0x2C,
+  word places +0x3C8 + 8i, FUN_0042EF80); a hint is laid out on one line of a 2.0-wide box, then its words are
+  moved onto the hint's own '\n' lines, right-aligned; units: the screen's width = the aspect (yp+0x34 -> +4).
+  The prompt goes to +0x428 (target +0x42C, place +0x434, state +0x24 bits 21-22). Plate +0x140 (CBillboard2d,
+  drawn from +0x14 leftwards by +0x34, +0x38 high, height/y carried over by the game -> restored). Hints:
+  level start (P2 joins with Start), LB pass (first 3 spins a level, until one pass), mode roles, machines,
+  lifter waiting (lifter 2/47 state 0 with +8 bit 0 and one hero on +0x50, hero +0x280, on ground).
+  XXL_HINTLOG=1 logs geometry. Not autotested: the lifter and LB hints, Twister Fusion routing.

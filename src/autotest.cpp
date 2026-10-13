@@ -1001,6 +1001,22 @@ const Step kHintJoin[] = {
 // spy3n (-Level 3): sector 2's Roman agent (176.4 6.2 -218.4); Obelix leads
 // (trio 0x4801) far away, player 1's Asterix talks to the agent with X, then
 // presses A now and then to go through the dialogue.
+// spy3p (-Level 3): the same agent; player 1's Asterix starts the talk, player 2
+// clicks through the dialogue with X.
+const Step kSpy3P[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 176.43f, 6.7f, -218.37f), PLACEAT(3000, HERO_OBELIX, 179.0f, 6.7f, -216.0f),
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "spy3p_1"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X"), VPAD(10200, 1, 0, 0, 0, "p2 r"), VPAD(13000, 1, PAD_X, 0, 0, "p2 X"), VPAD(13200, 1, 0, 0, 0, "p2 r"),
+	SHOT(14500, "spy3p_2"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16200, 1, 0, 0, 0, "p2 r"), VPAD(19000, 1, PAD_X, 0, 0, "p2 X"), VPAD(19200, 1, 0, 0, 0, "p2 r"),
+	VPAD(22000, 1, PAD_X, 0, 0, "p2 X"), VPAD(22200, 1, 0, 0, 0, "p2 r"), VPAD(25000, 1, PAD_X, 0, 0, "p2 X"), VPAD(25200, 1, 0, 0, 0, "p2 r"),
+	SHOT(27000, "spy3p_3"),
+	END(30000),
+};
+
 const Step kSpy3N[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 2),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -2186,6 +2202,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("boat49a", kBoat49A),
 	SCENARIO("hintjoin", kHintJoin),
 	SCENARIO("spy3n", kSpy3N),
+	SCENARIO("spy3p", kSpy3P),
 	SCENARIO("catapultp", kCatapultP),
 	SCENARIO("catapulta", kCatapultA),
 	SCENARIO("shop", kShop),

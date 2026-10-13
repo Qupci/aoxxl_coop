@@ -169,10 +169,14 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	float savedWidth = text ? *(float*)(text + 0x28) : 0.0f;
 	float savedX = *(float*)(self + 0x428);
 	if (use) {
+		// Text layout units: the screen's width is the aspect ratio (yellow
+		// pages +0x34 -> +4: 1.778 at 16:9).
+		char* screen = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+		if (screen && *(float*)(screen + 4) > 0.5f && !getenv("XXL_HINTUNITS")) g_unitsPerScreen = *(float*)(screen + 4);
 		*(float*)(text + 0x28) = 2.0f;   // one line
 		float w = (g_longest > 0.0f ? g_longest : 0.9f) / g_unitsPerScreen;
 		// The text starts g_boxShift off the prompt's place with the 2.0 box.
-		float x = 0.97f - w - g_boxShift;
+		float x = 0.95f - w - g_boxShift;
 		*(float*)(self + 0x428) = x;
 		if (((*(uint32_t*)(self + 0x24) >> 21) & 3) == 2) *(float*)(self + 0x42C) = *(float*)(self + 0x434) = x;
 	}
@@ -203,6 +207,8 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	if (getenv("XXL_HINTLOG") && GetTickCount() - lastLog > 1000) {
 		lastLog = GetTickCount();
 		float* pos = (float*)(t20 + 0x3C8);
+		char* screen0 = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+		Log("hints: screen scale %.3f (yellow pages +0x34 -> +4)", screen0 ? *(float*)(screen0 + 4) : -1.0f);
 		Log("hints: words %u lines %d longest %.3f, word 0 at %.3f %.3f, last at %.3f %.3f, size %.3f spacing %.3f, state %d",
 		    *(uint32_t*)(t20 + 0x2D4), g_nLines, g_longest, pos[0], pos[1],
 		    pos[2 * (*(uint32_t*)(t20 + 0x2D4) - 1)], pos[2 * (*(uint32_t*)(t20 + 0x2D4) - 1) + 1],
@@ -211,19 +217,22 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	*slot = savedId;
 	if (((*cc >> 4) & 0xF) == kHintKind) *cc = (*cc & ~0xF0u) | (kPromptNone << 4);
 	char* icon = *(char**)(self + 0x140);
-	// The prompt's dark plate (+0x140, a CBillboard2d: +0x14 / +0x18 place, +0x34
-	// / +0x38 size, drawn from its right end, about 1.22 times +0x34 wide;
-	// its button sits past +0x34 off screen here) is sized for the hint's
-	// lines: as wide as the longest, a line's height (0.075) each, its middle
-	// moved down to theirs.
-	// The game carries the plate's height and place over from frame to frame:
-	// they are put back when the hint goes (PlateBack).
+	// The prompt's dark plate (+0x140, a CBillboard2d) is drawn from its place
+	// (+0x14 / +0x18) leftwards by +0x34, +0x38 high; the game puts it at the
+	// text's place (sized for one word, its button past +0x34). For a hint it
+	// covers the hint's lines: its right end just past the text's (which starts
+	// g_boxShift off the text's place), as wide as the longest line, a line's
+	// height each, its middle moved down to theirs. The game carries its height
+	// and place over from frame to frame: put back when the hint goes
+	// (PlateBack).
 	if (icon) {
 		float* f = (float*)icon;
 		if (g_plate != icon) { g_plate = icon; g_plateY = f[6]; g_plateH = f[14]; }
+		const float m = 0.02f;
 		float w = (g_longest > 0.0f ? g_longest : 0.9f) / g_unitsPerScreen;
-		f[13] = (w + 0.02f) / 1.22f;
-		f[14] = g_plateH * g_nLines;
+		f[5] = *(float*)(text + 0x14) + g_boxShift + w + m;
+		f[13] = w + 2.0f * m;
+		f[14] = g_plateH * g_nLines + 0.015f;
 		f[6] = g_plateY - 0.012f * (g_nLines - 1);
 	}
 	if (icon && getenv("XXL_HINTLOG")) {
