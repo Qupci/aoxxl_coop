@@ -59,6 +59,7 @@ struct CamCopy {
 	TrackBytes tracks[3];        // the tracks it uses (+0x34 next, +0x38 current, +0x3C previous)
 	int        numTracks = 0;
 	bool       haveView = false;
+	float      planes[3] = {};   // the copy's near, far and fog planes after its tick
 	float      m[16];
 	float      window[2];
 };
@@ -121,7 +122,7 @@ void LoadRefs(const CamCopy& c) {
 struct Extras {
 	float modelling[16];
 	float window[2];
-	float nearP, farP;
+	float nearP, farP, fogP;
 	float node[2][3];
 };
 // The service's camera object (+0x1C) has the frame the tick places; the view
@@ -140,6 +141,7 @@ void SaveExtras(char* svc, RwCamera* obj, Extras& e) {
 	e.window[1] = cam->viewWindow[1];
 	e.nearP = cam->nearPlane;
 	e.farP = cam->farPlane;
+	e.fogP = cam->fogPlane;
 	for (int i = 0; i < 2; i++) {
 		float* p = NodePos(svc, 0x5D0 + 4 * i);
 		if (p) memcpy(e.node[i], p, sizeof(e.node[i]));
@@ -152,6 +154,7 @@ void RestoreExtras(char* svc, RwCamera* obj, Extras& e) {
 		((SetViewWindowFn)axr::kRwCameraSetViewWindow)(cam, e.window);
 	if (cam->nearPlane != e.nearP) ((SetClipFn)axr::kRwCameraSetNearClip)(cam, e.nearP);
 	if (cam->farPlane != e.farP) ((SetClipFn)axr::kRwCameraSetFarClip)(cam, e.farP);
+	cam->fogPlane = e.fogP;
 	for (int i = 0; i < 2; i++) {
 		float* p = NodePos(svc, 0x5D0 + 4 * i);
 		if (p) memcpy(p, e.node[i], sizeof(e.node[i]));
@@ -292,6 +295,12 @@ void TickCopy(char* svc, void* frame, int hero) {
 		memcpy(g_copy.m, Modelling(cam), sizeof(g_copy.m));
 		g_copy.window[0] = MainCamera()->viewWindow[0];
 		g_copy.window[1] = MainCamera()->viewWindow[1];
+		// Its clip and fog planes too: the merchant's camera pushes the game
+		// camera's far / fog planes out (60 / 48 -> 100 / 80), which took the
+		// fog from the other player's half.
+		g_copy.planes[0] = MainCamera()->nearPlane;
+		g_copy.planes[1] = MainCamera()->farPlane;
+		g_copy.planes[2] = MainCamera()->fogPlane;
 		bool finite = true;
 		for (int i = 0; i < 16; i++) finite &= i == 3 || std::isfinite(g_copy.m[i]);
 		finite &= g_copy.window[0] > 0.01f && g_copy.window[1] > 0.01f && g_copy.window[0] < 100.0f && g_copy.window[1] < 100.0f;
@@ -378,6 +387,12 @@ bool GameCamView(int hero, float m[16], float window[2]) {
 }
 
 int GameCamLiveHero() { return g_active ? g_liveOwner : -1; }
+
+bool GameCamPlanes(int hero, float planes[3]) {
+	if (!g_active || !g_copy.valid || !g_copy.haveView || g_copy.hero != hero || g_copy.planes[1] <= 0.0f) return false;
+	memcpy(planes, g_copy.planes, sizeof(g_copy.planes));
+	return true;
+}
 
 namespace {
 bool       g_heroSwapped = false;

@@ -1313,3 +1313,16 @@ both halves).
   from the shopper's values only (player 2's menu presses now go into player 2's values). The lead is given
   back when the shop closes. Autotests shopsplit (P2 shops), shopsplita (P1 shops; its synthetic P1 input
   does not fill the menu's back binding, so it does not leave).
+* Merchant follow-ups (2026-10-14): (1) the world's pause FUN_004FFCD0 (thiscall gm, 1 = on; every Life of the
+  enemy groups gets +4 bit 1, skipped by the bundle tick; also used by spies) is skipped while a merchant opens in
+  co-op (detour). gm +0x5C bit 26 = shop HUD mode (in-game interface FUN_00515830 hides the normal HUD; blocks
+  the pause menu). (2) The merchant's camera pushes the game camera's far / fog planes out (60/48 -> 100/80):
+  camera copy now records its own near/far/fog (RwCamera +0x80/+0x84/+0x88) after its tick (GameCamPlanes) and
+  each split half uses its player's. (3) Shop HUD in the shopper's half (XXL_SHOPHUD 1 squeezed, 2 half size,
+  3 default): HUD camera (renderer +0x14) viewport = the half, view window y doubled (half size, centred band);
+  2D managers at yellow pages +0x34 -> +0x34 / +0x38 (CScene2d: +4 first child, +0x10 next, +0xC count) and
+  +0x3C (CMenuManager): elements (CBillboard2d 0x6235C0 ... CText2d 0x623B6C; +5 bit 2 = shown, +0x14/+0x18
+  place, +0x34/+0x38 size; containers' child lists at +0x24/+0x28) near the HUD's top moved up / bottom down by
+  half a HUD, full-width bars twice as high; the HUD's 3D models (life shields, helmet) follow the HUD camera's
+  frame, moved down along its up axis by 0.5 (2D elements ignore the frame; RwCameraSetViewOffset has no
+  effect on either). Restored after the HUD draw. Autotests shopsplit / shopsplita.

@@ -1602,6 +1602,35 @@ static void NoteMachineUse(char* hero) {
 	g.machineReqAt = GetTickCount();
 }
 
+// The world's pause (FUN_004FFCD0, thiscall on the game manager, 1 = on): every
+// Life of the enemy groups gets its "paused" bit (+4 bit 1, skipped by the
+// bundle tick) -- set by the merchant's opening (and a spy's talk), cleared when
+// it closes. In co-op the merchant is one player's: the other plays on, so the
+// world goes on too.
+typedef void(__fastcall* FreezeFn)(char* gm, void* edx, int on);
+const uintptr_t kFreezeWorld = 0x4FFCD0;
+const uint8_t   kFreezePrologue[5] = { 0x53, 0x8B, 0x5C, 0x24, 0x08 };
+FreezeFn g_origFreeze = nullptr;
+
+static bool MerchantOpening() {
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
+		char* sh = (char*)GetLvlObject(2, 172, i);
+		if (sh && (*(uint8_t*)(sh + 8) & 7) != 0) return true;
+	}
+	Trio t = GetTrio();
+	for (int i = 0; t && i < 2; i++)
+		if (Situation(t.GetHero(i)) == kSituationShop) return true;
+	return false;
+}
+
+static void __fastcall FreezeWorldHook(char* gm, void* edx, int on) {
+	if (on && g.p2Joined && !g.suspended && MerchantOpening()) {
+		Log("coop: the merchant's pause of the world skipped -- the other player plays on");
+		return;
+	}
+	g_origFreeze(gm, edx, on);
+}
+
 static void __fastcall TakeHook(char* hero, void* edx, int arg) {
 	if (g_torch.want) {
 		Trio t = GetTrio();
@@ -2448,6 +2477,8 @@ void CoopInit() {
 	              "Twister Fusion check (both players)");
 	InstallDetour(kChooseAttack, (void*)ChooseAttackHook, (void**)&g_origChooseAttack, kChooseAttackPrologue,
 	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");
+	InstallDetour(kFreezeWorld, (void*)FreezeWorldHook, (void**)&g_origFreeze, kFreezePrologue,
+	              sizeof(kFreezePrologue), "world pause (not for the merchant in co-op)");
 	InstallDetour(kSetPreset, (void*)SetPresetHook, (void**)&g_origSetPreset, kSetPresetPrologue,
 	              sizeof(kSetPresetPrologue), "controller preset (picked without a pad)");
 	PadsInit();

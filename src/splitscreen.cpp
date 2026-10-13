@@ -5,6 +5,7 @@
 #include "render.h"
 #include "trio.h"
 #include "p2cam.h"
+#include "gamecam.h"
 
 #include <cmath>
 #include <intrin.h>
@@ -488,6 +489,131 @@ void EnsureHudWrapped(RwCamera* cam) {
 	Log("split: wrapped beginUpdate of the HUD camera %p (was %p)", cam, (void*)g_origHudBegin);
 }
 
+// Diagnostics (XXL_HUDLOG): the merchant's 2D screen -- the screen list (yellow
+// pages +0x34 -> +0x3C: +4 first, +0x10 next, +0xC count), index at the shop
+// interface (2/144) +0x20 -- and its 2D children, by vtable.
+const char* Kind2d(char* p) {
+	uintptr_t vt = p && !IsBadReadPtr(p, 4) ? *(uintptr_t*)p : 0;
+	switch (vt) {
+	case 0x6235C0: return "billboard";
+	case 0x623710: return "billboard button";
+	case 0x6237E4: return "billboard list";
+	case 0x62390C: return "text button";
+	case 0x623978: return "container";
+	case 0x623A98: return "message box";
+	case 0x623B3C: return "scene";
+	case 0x623B6C: return "text";
+	default: return nullptr;
+	}
+}
+// A 2D element: +5 bit 2 shown; containers (and scenes) keep child lists at
+// +0x24 / +0x28 (list +4 first, children linked through +0x10).
+void Dump2d(char* p, int depth) {
+	const char* kind = Kind2d(p);
+	float* f = (float*)p;
+	Log("split: shop 2d %*s%s %p vt %p %s | %.3f %.3f %.3f %.3f | %.3f %.3f %.3f %.3f", depth * 2, "", kind ? kind : "?", p,
+	    *(void**)p, (*(uint8_t*)(p + 5) & 2) ? "shown" : "hidden", f[5], f[6], f[7], f[8], f[13], f[14], f[15], f[16]);
+	if (!kind || depth > 5) return;
+	if (*(uintptr_t*)p == 0x623B3C) {   // a scene: +4 first child, +0xC count
+		int k = 0;
+		for (char* c = *(char**)(p + 4); c && k < 80 && Kind2d(c); c = *(char**)(c + 0x10), k++) Dump2d(c, depth + 1);
+		return;
+	}
+	for (int o = 0x24; o <= 0x28; o += 4) {
+		char* list = *(char**)(p + o);
+		if (!list || IsBadReadPtr(list, 8)) continue;
+		int k = 0;
+		for (char* c = *(char**)(list + 4); c && k < 60 && Kind2d(c); c = *(char**)(c + 0x10), k++) Dump2d(c, depth + 1);
+	}
+}
+// The shop's HUD at half size in the shopper's half (the HUD camera's vertical
+// view window doubled: the HUD fills a band in the middle of the half), pushed
+// out to the half's edges: every 2D element of the 2D managers (yellow pages
+// +0x34 -> +0x34 / +0x38 / +0x3C) in the HUD's upper half moves up by half its
+// height, every one in the lower half down, and a full-screen billboard (the
+// merchant's letterbox) gets twice the height -- for the HUD draw only.
+struct Moved { float* y; float y0; float* h; float h0; };
+Moved g_moved[256];
+int   g_nMoved = 0;
+void SpreadTree(char* p, int depth) {
+	const char* kind = Kind2d(p);
+	if (!kind || depth > 6 || g_nMoved >= 256) return;
+	uintptr_t vt = *(uintptr_t*)p;
+	if (vt == 0x623B3C) {
+		int k = 0;
+		for (char* c = *(char**)(p + 4); c && k < 80 && Kind2d(c); c = *(char**)(c + 0x10), k++) SpreadTree(c, depth + 1);
+		return;
+	}
+	if (vt == 0x623978) {
+		for (int o = 0x24; o <= 0x28; o += 4) {
+			char* list = *(char**)(p + o);
+			if (!list || IsBadReadPtr(list, 8)) continue;
+			int k = 0;
+			for (char* c = *(char**)(list + 4); c && k < 60 && Kind2d(c); c = *(char**)(c + 0x10), k++) SpreadTree(c, depth + 1);
+		}
+		return;
+	}
+	if (!(*(uint8_t*)(p + 5) & 2)) return;   // not shown (+5 bit 2: shown, set by vf16, cleared by vf17)
+	float* f = (float*)p;
+	Moved& m = g_moved[g_nMoved++];
+	m.y = &f[6]; m.y0 = f[6]; m.h = nullptr;
+	// Full-width billboards: a full-screen one twice as high; the letterbox bars
+	// (1.0 x 0.2, centred on the HUD's top and bottom edges) twice as high too,
+	// so the half of each that stays on screen keeps single player's thickness.
+	// 2D elements are placed by the HUD camera's view window only (its frame,
+	// moved for the HUD's 3D life shields and helmet, does not move them): in the
+	// half-size band (HUD y points up) what sits near the top moves up half a
+	// HUD, what sits near the bottom down half a HUD, to the half's edges; the
+	// middle -- the item shown on the merchant's board -- stays over the board.
+	bool wide = vt == 0x6235C0 && f[13] >= 0.99f;
+	if (wide && (f[14] >= 0.99f || f[6] <= 0.01f || f[6] >= 0.99f)) { m.h = &f[14]; m.h0 = f[14]; f[14] *= 2.0f; }
+	if (f[6] > 0.75f) f[6] += 0.5f;
+	else if (f[6] < 0.25f) f[6] -= 0.5f;
+}
+void SpreadShopHud() {
+	g_nMoved = 0;
+	CKYellowPages* yp = YellowPages();
+	char* a = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	for (int off = 0x34; a && off <= 0x3C; off += 4) {
+		char* m = *(char**)(a + off);
+		if (!m || IsBadReadPtr(m, 0x10)) continue;
+		int k = 0;
+		for (char* c = *(char**)(m + 4); c && k < 64 && Kind2d(c); c = *(char**)(c + 0x10), k++) SpreadTree(c, 0);
+	}
+}
+void UnspreadShopHud() {
+	for (int i = g_nMoved - 1; i >= 0; i--) {
+		*g_moved[i].y = g_moved[i].y0;
+		if (g_moved[i].h) *g_moved[i].h = g_moved[i].h0;
+	}
+	g_nMoved = 0;
+}
+
+int ShopHudMode() {
+	static int mode = getenv("XXL_SHOPHUD") ? atoi(getenv("XXL_SHOPHUD")) : 3;   // 1 squeezed, 2 half size, 3 spread
+	return mode;
+}
+
+void DumpShopScreen() {
+	static DWORD last = 0;
+	if (GetTickCount() - last < 4000) return;
+	last = GetTickCount();
+	CKYellowPages* yp = YellowPages();
+	char* a = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	char* mgr = a ? *(char**)(a + 0x3C) : nullptr;
+	(void)mgr;
+	for (int off = 0x04; a && off < 0x80; off += 4) {
+		char* m = *(char**)(a + off);
+		if (!m || IsBadReadPtr(m, 0x10)) continue;
+		char* first = *(char**)(m + 4);
+		if (!Kind2d(first)) continue;
+		Log("split: shop 2d manager at yellow pages +0x34 -> +%02X: %p vt %p", off, m, *(void**)m);
+		int k = 0;
+		for (char* scr = first; scr && k < 64 && Kind2d(scr); scr = *(char**)(scr + 0x10), k++) Dump2d(scr, 0);
+	}
+}
+
+
 // --- dummy draw lists ---------------------------------------------------------
 // Draw lists are intrusive (item+0x24 = next). The three HUD-layer lists are only
 // drawn at the very end, so player 1's walk has already filled them when player
@@ -594,8 +720,32 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 		vp2 = { 0, half + gap, w, h - half - gap, 0.0f, 1.0f };
 	}
 
+	if (getenv("XXL_PLANELOG")) {   // diagnostics: the game camera's clip and fog planes as they change
+		static float ln = -1, lf = -1, lg = -1;
+		if (cam->nearPlane != ln || cam->farPlane != lf || cam->fogPlane != lg) {
+			ln = cam->nearPlane; lf = cam->farPlane; lg = cam->fogPlane;
+			Log("split: game camera planes near %.2f far %.1f fog %.1f", ln, lf, lg);
+		}
+	}
+	// The shop's HUD elements pushed out to the shopper's half's edges before
+	// anything is walked (their draw data is built from their places on the way).
+	if (CoopShopper() >= 0 && ShopHudMode() == 3) SpreadShopHud();
 	// 1. Camera sync, exactly as the game does it, then remember the game's camera.
 	SyncCameras(view, nullptr);
+
+	// Clip and fog planes: the game camera's are the leader's; the other player's
+	// half gets its own camera copy's (the merchant pushes the game camera's far /
+	// fog planes out, which took the fog from the other half).
+	const float livePlanes[3] = { cam->nearPlane, cam->farPlane, cam->fogPlane };
+	auto usePlanes = [&](const float pl[3]) {
+		if (cam->nearPlane != pl[0]) ((void*(__cdecl*)(RwCamera*, float))axr::kRwCameraSetNearClip)(cam, pl[0]);
+		if (cam->farPlane != pl[1]) ((void*(__cdecl*)(RwCamera*, float))axr::kRwCameraSetFarClip)(cam, pl[1]);
+		cam->fogPlane = pl[2];
+	};
+	auto planesFor = [&](int hero) {
+		float pl[3];
+		usePlanes(GameCamPlanes(hero, pl) ? pl : livePlanes);
+	};
 
 	SavedCamera p1cam;
 	memcpy(p1cam.modelling, FrameModelling(cam), sizeof(p1cam.modelling));
@@ -661,6 +811,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	bool p2Leads = t && t.Leader() == CoopP2Hero() && g_config.gameCamera;
 	auto placeP2 = [&] {
 		RwCameraSetViewWindow(cam, half2);
+		planesFor(CoopP2Hero());
 		if (own2) {
 			memcpy(FrameModelling(cam), m2, sizeof(m2));
 			memcpy(FrameLtm(cam), m2, sizeof(m2));
@@ -679,6 +830,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	bool own1 = P1CamMatrix(m1);
 	auto placeP1 = [&] {
 		RwCameraSetViewWindow(cam, half1);
+		planesFor(CoopP1Hero());
 		if (own1) {
 			memcpy(FrameModelling(cam), m1, sizeof(m1));
 			memcpy(FrameLtm(cam), m1, sizeof(m1));
@@ -743,6 +895,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	// 5. Back to the game's own camera, so everything after the render (sound,
 	//    game logic, next frame's camera service) sees what it expects.
 	RwCameraSetViewWindow(cam, p1cam.window);
+	usePlanes(livePlanes);
 	memcpy(FrameModelling(cam), p1cam.modelling, sizeof(p1cam.modelling));
 	memcpy(FrameLtm(cam), p1cam.ltm, sizeof(p1cam.ltm));
 	SyncCameras(view, nullptr);
@@ -754,11 +907,14 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	int shopper = CoopShopper();
 	RwCamera* hud = *(RwCamera**)(renderer + 0x14);
 	float hudWindow[2] = {};
+	float hudOffset[3] = {};
+	float hudModel[3] = {};
+	bool movedOffset = false;
 	if (shopper >= 0 && hud) {
 		EnsureHudWrapped(hud);
 		g_hudVp = shopper == CoopP1Hero() ? vp1 : vp2;
 		g_hudVpActive = true;
-		static int mode = getenv("XXL_SHOPHUD") ? atoi(getenv("XXL_SHOPHUD")) : 1;
+		const int mode = ShopHudMode();
 		hudWindow[0] = hud->viewWindow[0];
 		hudWindow[1] = hud->viewWindow[1];
 		static bool logged = false;
@@ -767,15 +923,45 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 			Log("split: shop HUD in %s's half (HUD camera %p, view window %.3f %.3f, mode %d)", HeroName(shopper), hud,
 			    hudWindow[0], hudWindow[1], mode);
 		}
-		if (mode == 2) {   // experiment: same scale both ways
+		if (mode >= 2) {   // half size, same scale both ways
 			float wnd[2] = { hudWindow[0], hudWindow[1] * 2.0f };
 			RwCameraSetViewWindow(hud, wnd);
 		}
+		if (mode == 3) {   // ... the HUD's 3D models (life shields, helmet) to the half's top: the camera's frame moved down
+			static float dy = getenv("XXL_HUDOFF") ? (float)atof(getenv("XXL_HUDOFF")) : -0.5f;
+			float* lt = FrameLtm(hud);
+			float* md = FrameModelling(hud);
+			memcpy(hudOffset, lt + 12, sizeof(hudOffset));
+			memcpy(hudModel, md + 12, sizeof(hudModel));
+			for (int i = 0; i < 3; i++) { lt[12 + i] += dy * lt[4 + i]; md[12 + i] += dy * lt[4 + i]; }
+			movedOffset = true;
+		}
+	}
+	if (shopper >= 0 && getenv("XXL_HUDLOG")) DumpShopScreen();
+	if (false) {
+		static DWORD last = 0;
+		if (GetTickCount() - last > 3000) {
+			last = GetTickCount();
+			for (int l = kFirstHud; l < kNumLists; l++) {
+				int k = 0;
+				for (char* it = *(char**)(view + 0x1C + 4 * l); it && k < 64; it = *(char**)(it + 0x24), k++) {
+					float* f = (float*)it;
+					Log("split: HUD list %d item %p vt %p: %.3f %.3f %.3f %.3f | %.3f %.3f %.3f %.3f | %08X %08X", l, it,
+					    *(void**)it, f[5], f[6], f[7], f[8], f[13], f[14], f[15], f[16], *(uint32_t*)(it + 0x10),
+					    *(uint32_t*)(it + 0x3C));
+				}
+			}
+		}
 	}
 	DrawHud(view, nullptr, dt);
+	UnspreadShopHud();
 	if (g_hudVpActive) {
 		g_hudVpActive = false;
 		if (hud->viewWindow[1] != hudWindow[1]) RwCameraSetViewWindow(hud, hudWindow);
+		if (movedOffset) {
+			memcpy(FrameLtm(hud) + 12, hudOffset, sizeof(hudOffset));
+			memcpy(FrameModelling(hud) + 12, hudModel, sizeof(hudModel));
+		}
 	}
 	Present(renderer, nullptr);
 	*(uint32_t*)(view + 0x68) &= 0xFFFFFFC1;
@@ -808,8 +994,7 @@ long SplitFrames() { return g_splitFrames; }
 
 bool SplitInstallHooks() {
 	bool ok = PatchVtableSlot(kGraphicVtbl, kGraphicTickSlot, kGraphicTick,
-	                          (void*)GraphicTickHook, (void**)&g_origGraphicTick, "CKGraphic::render");
-	ok &= PatchVtableSlot(kDynSphereVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
+	                          (void*)GraphicTickHook, (void**)&g_origGraphicTick, "CKGraphic::render");	ok &= PatchVtableSlot(kDynSphereVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&g_origDynSphereWalk, "CKDynamicBoundingSphere::walk");
 	ok &= PatchVtableSlot(kParticlesVtbl, kWalkSlot, kParticlesWalk, (void*)ParticlesWalkHook,
 	                      (void**)&g_origParticlesWalk, "CParticlesNodeFx::walk");

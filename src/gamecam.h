@@ -22,6 +22,8 @@ bool GameCamView(int hero, float m[16], float window[2]);
 // has the trio's leader byte sliced for the other hero's tick); -1 if the
 // copies are off.
 int GameCamLiveHero();
+// The copy's clip and fog planes for `hero` (near, far, fog), as its tick left them.
+bool GameCamPlanes(int hero, float planes[3]);
 // Around a hero's Life tick: hero code writes its camera wishes into the camera
 // service (in the air: don't follow the jump, +0xC bits 11/12...). For the hero
 // with the copy, the copy is the service for the length of its tick.
