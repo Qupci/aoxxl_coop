@@ -135,8 +135,6 @@ struct CoopState {
 	bool     dyingLeads = false;        // ... and has been given the lead
 	uint8_t  hpBeforeTick = 0;
 	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
-	float    yBeforeTick[HERO_COUNT] = {};   // the hero's height before its tick (HoldOffPartner)
-	DWORD    jumpedAt[HERO_COUNT] = {};      // its player last pressed jump
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -2016,7 +2014,6 @@ static void TorchBeforeTick(int heroIndex, Hero hero) {
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	TorchBeforeTick(heroIndex, hero);
 	g.indivPrev = IndivEnter(heroIndex);   // this hero's health and combo bar in the game's place
-	if (heroIndex >= 0 && heroIndex < HERO_COUNT) g.yBeforeTick[heroIndex] = hero.Pos().y;
 	g.hpBeforeTick = (uint8_t)Health();
 	if (!g.p2Joined || g.suspended) return;
 	if (heroIndex != g.p1Hero && heroIndex != g.p2Hero) return;
@@ -2215,8 +2212,6 @@ static void WatchSpinHint(int idx, Hero h) {
 	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints, HeroName(idx));
 }
 
-void HoldOffPartner(int idx, Hero h);
-
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
 	P2CamEndHeroTick();
@@ -2287,40 +2282,9 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 		NoteDeath(heroIndex, "in its own tick");
 		LeadTheDeath();
 	}
-	HoldOffPartner(heroIndex, hero);
 	IndivAfterFallenTick(heroIndex);
 	IndivLeave(g.indivPrev);
 	g.indivPrev = -1;
-}
-
-// Two player heroes walking into each other: the mover slides along the
-// other's collision sphere, its move direction tilting upward (hero +0x94, the
-// frame's vertical step), and the taller one rose onto the other and fell off
-// -- an "automatic jump". In single player the hero run into is the AI
-// companion, which just blocks. Rising while overlapping the other hero on the
-// same level, without its player pressing jump, is undone: it stays blocked.
-void HoldOffPartner(int idx, Hero h) {
-	if (!g.p2Joined || g.suspended || (idx != g.p1Hero && idx != g.p2Hero) || !h) return;
-	Trio t = GetTrio();
-	Hero o = t ? t.GetHero(OtherHero(idx)) : Hero();
-	if (!o || !HeroIsPlayerVariant(*F18(h)) || !HeroIsPlayerVariant(*F18(o))) return;
-	DWORD now = GetTickCount();
-	if (*(uint32_t*)(h.raw() + 0x3EC) & 8) g.jumpedAt[idx] = now;   // A this frame
-	if (g.jumpedAt[idx] && now - g.jumpedAt[idx] < 1500) return;
-	float y0 = g.yBeforeTick[idx];
-	Vector3 p = h.Pos();
-	if (p.y <= y0 + 0.001f) return;
-	Vector3 d = p - o.Pos();
-	if (d.x * d.x + d.z * d.z > 2.2f * 2.2f || fabsf(y0 - o.Pos().y) > 0.6f) return;
-	p.y = y0;
-	h.Pos() = p;
-	if (h.hook->node && h.hook->node->matrix) ((float*)((char*)h.hook->node->matrix + 0x40))[1] = y0;
-	*(float*)(h.raw() + 0x94) = 0.0f;
-	static DWORD logged = 0;
-	if (now - logged > 5000) {
-		logged = now;
-		Log("coop: %s ran into %s -- kept on the ground (no climbing onto each other)", HeroName(idx), HeroName(OtherHero(idx)));
-	}
 }
 
 // Hits reach a hero through its sendEvent (CKHkAsterix / CKHkObelix vtable slot
@@ -2336,7 +2300,34 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 	if (IndivDropEvent(idx, event)) return 1;   // no more hits for a fallen hero
 	int prev = IndivEnter(idx);                 // its own health and combo bar
 	int before = Health();
+	// Two heroes touching: contact event 0x0300 (a list: +0 next, +4 the pair of
+	// collision volumes, each one's owner at +0x20). Touched by a player's hero,
+	// a hero is pushed aside and, running into it, hops out of the way
+	// (FUN_0049CDF0, vertical speed 12) -- the AI sidekick dodging the player;
+	// touched by the AI sidekick, the player's hero just stops. Two players'
+	// heroes both took the sidekick's part: the "automatic jump". For the length
+	// of the handler the other hero passes for the sidekick (+0x18 bit 0), so
+	// each of them gets the player's part.
+	Hero bumped;
+	uint8_t bumpedF18 = 0;
+	if ((event & 0xFFFF) == 0x0300 && g.p2Joined && idx >= 0 && param && HeroIsPlayerVariant(*F18(t.GetHero(idx)))) {
+		Hero other = t.GetHero(OtherHero(idx));
+		int n = 0;
+		bool touching = false;
+		for (char** node = (char**)param; node && n < 32 && !touching; node = (char**)node[0], n++) {
+			char** pair = node[1] && !IsBadReadPtr(node[1], 8) ? (char**)node[1] : nullptr;
+			if (!pair) break;
+			for (int k = 0; k < 2; k++)
+				if (pair[k] && !IsBadReadPtr(pair[k], 0x24) && *(char**)(pair[k] + 0x20) == other.raw()) touching = true;
+		}
+		if (touching && other && HeroIsPlayerVariant(*F18(other))) {
+			bumped = other;
+			bumpedF18 = *F18(other);
+			*F18(other) = (uint8_t)(bumpedF18 | 1);
+		}
+	}
 	int r = g_origHeroSendEvent(hero, edx, event, param);
+	if (bumped) *F18(bumped) = bumpedF18;
 	if (before > 0 && Health() == 0 && g.p2Joined && idx >= 0) {
 		char how[32];
 		sprintf(how, "hero event %04X", event & 0xFFFF);

@@ -1290,9 +1290,49 @@ const Step kBump2[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	{ 2000, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 4.0f, 0, "asterix in front of obelix" },
-	{ 2100, S_WATCHRW, HERO_OBELIX, 0, 0, 6, 0, "obelix height rise" },
+	{ 2300, S_HEROFIELDS, HERO_ASTERIX, 1, 0, 0, 0, "dump asterix" },
 	VPAD(5000, 1, 0, 0, 1.0f, "p2 forward"),
 	SHOT(6500, "bump2_1"),
+	VPAD(8000, 1, 0, 0, 0, "p2 stop"),
+	END(9000),
+};
+
+// bump2i: bump2 with Idefix sent 20 units away first (is the hop over the dog?).
+const Step kBump2I[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 4.0f, 0, "asterix in front of obelix" },
+	{ 2200, S_NEXTTO, HERO_IDEFIX, HERO_OBELIX, 0, -20.0f, 0, "idefix away" },
+	{ 2300, S_WATCHRW, HERO_OBELIX, 0, 0, 7, 0, "obelix vertical speed" },
+	{ 4800, S_NEXTTO, HERO_IDEFIX, HERO_OBELIX, 0, -20.0f, 0, "idefix away" },
+	VPAD(5000, 1, 0, 0, 1.0f, "p2 forward"),
+	SHOT(6500, "bump2i_1"),
+	VPAD(8000, 1, 0, 0, 0, "p2 stop"),
+	END(9000),
+};
+
+// bump2l / bump2w: bump2i with Obelix leading (0x4801); w: and Asterix told to
+// wait (0x4802, the game's AI companion).
+const Step kBump2L[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 2000, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 4.0f, 0, "asterix in front of obelix" },
+	{ 2200, S_NEXTTO, HERO_IDEFIX, HERO_OBELIX, 0, -20.0f, 0, "idefix away" },
+	{ 4800, S_NEXTTO, HERO_IDEFIX, HERO_OBELIX, 0, -20.0f, 0, "idefix away" },
+	VPAD(5000, 1, 0, 0, 1.0f, "p2 forward"),
+	VPAD(8000, 1, 0, 0, 0, "p2 stop"),
+	END(9000),
+};
+const Step kBump2W[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 1700, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion wait" },
+	{ 2000, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 4.0f, 0, "asterix in front of obelix" },
+	{ 2200, S_NEXTTO, HERO_IDEFIX, HERO_OBELIX, 0, -20.0f, 0, "idefix away" },
+	{ 4800, S_NEXTTO, HERO_IDEFIX, HERO_OBELIX, 0, -20.0f, 0, "idefix away" },
+	VPAD(5000, 1, 0, 0, 1.0f, "p2 forward"),
 	VPAD(8000, 1, 0, 0, 0, "p2 stop"),
 	END(9000),
 };
@@ -1302,6 +1342,7 @@ const Step kBump1[] = {
 	MARK(0, "baseline"),
 	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
 	{ 1500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion wait" },
+	{ 2300, S_HEROFIELDS, HERO_ASTERIX, 1, 0, 0, 0, "dump asterix" },
 	PLACEAT(2000, HERO_ASTERIX, -851.6f, 508.0f, -1072.2f),
 	P1(2500, 0, 0, 1.0f, "p1 forward"),
 	SHOT(3500, "bump1_1"),
@@ -2474,6 +2515,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("down2a", kDown2A),
 	SCENARIO("hud2", kHud2),
 	SCENARIO("bump2", kBump2),
+	SCENARIO("bump2i", kBump2I),
+	SCENARIO("bump2l", kBump2L),
+	SCENARIO("bump2w", kBump2W),
 	SCENARIO("bump1", kBump1),
 	SCENARIO("huddiff", kHudDiff),
 	SCENARIO("combo2", kCombo2),
@@ -2737,8 +2781,8 @@ void LogTick(float t) {
 			h.Pos().x, h.Pos().y, h.Pos().z);
 		if (getenv("XXL_MOVELOG")) {   // movement fields
 			const float* f = (const float*)h.raw();
-			line.Add(" mv 7C %.2f 8C %.2f 94 %.2f 230 %.2f 240 %.2f 260 %d", f[0x7C / 4], f[0x8C / 4], f[0x94 / 4], f[0x230 / 4],
-			         f[0x240 / 4], *(int*)(h.raw() + 0x260));
+			line.Add(" mv 8C %.2f 94 %.2f gn %.2f %.2f %.2f 2E4 %.2f %.2f %.2f 284 %p 5BC %p", f[0x8C / 4], f[0x94 / 4], f[0x288 / 4],
+			         f[0x28C / 4], f[0x290 / 4], f[0x2E4 / 4], f[0x2E8 / 4], f[0x2EC / 4], *(void**)(h.raw() + 0x284), *(void**)(h.raw() + 0x5BC));
 		}
 		{   // what it stands on (+0x280) and the on-ground bits (+0x384)
 			char* gr = *(char**)(h.raw() + 0x280);
@@ -3232,6 +3276,11 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		if (s.x == 7) {   // the hero's vertical speed (+0xA8) rising: a jump's impulse, with stacks
+			WatchFloatRise((const float*)(h.raw() + 0xA8));
+			Log("autotest: watching %s's vertical speed rise", HeroName(s.a));
+			break;
+		}
 		if (s.x == 6) {   // the hero's height rising (a jump starting), with stacks
 			WatchFloatRise(&h.Pos().y);
 			Log("autotest: watching %s's height rise", HeroName(s.a));
@@ -3592,6 +3641,25 @@ void RunStep(const Step& s) {
 	case S_P2LOOK:P2CamLookToward(Vector3(s.x, s.y, s.z)); Log("autotest: player 2's camera turned"); break;
 	case S_HEROFIELDS: {   // movement parameters of both heroes: +0x300..+0x33C and +0x84 speed, +0x388
 		Trio t = GetTrio();
+		if (s.b == 1) {   // b = 1: hero a's whole object (dwords) and its collision volumes
+			Hero hero = t ? t.GetHero(s.a) : Hero();
+			if (!hero) break;
+			for (int o = 0; o < 0xD00; o += 0x20) {
+				const uint32_t* d = (const uint32_t*)(hero.raw() + o);
+				Log("dump %s +%03X: %08X %08X %08X %08X %08X %08X %08X %08X", HeroName(s.a), o, d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]);
+			}
+			const int vols[] = { 0x228, 0xB84, 0xB88, 0xC18, 0xC1C };
+			for (int vo : vols) {
+				char* v = *(char**)(hero.raw() + vo);
+				if (!v || IsBadReadPtr(v, 0x40)) continue;
+				for (int o = 0; o < 0x40; o += 0x20) {
+					const uint32_t* d = (const uint32_t*)(v + o);
+					Log("dump %s vol+%03X +%02X: %08X %08X %08X %08X %08X %08X %08X %08X", HeroName(s.a), vo, o, d[0], d[1], d[2], d[3], d[4],
+					    d[5], d[6], d[7]);
+				}
+			}
+			break;
+		}
 		for (int h = 0; t && h < 2; h++) {
 			Hero hero = t.GetHero(h);
 			if (!hero) continue;
