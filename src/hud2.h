@@ -17,6 +17,8 @@
 
 struct RwCamera;
 
+bool Hud2InstallHooks();
+
 // Around the game's interface tick (hints.cpp): player 1's "health changed"
 // flag, then player 2's copy ticked.
 void Hud2BeforeInterfaceTick(char* itf);

@@ -1372,3 +1372,15 @@ both halves).
   the models' screen x negated (mirrored to the right edge). The interface writes modelling matrices only; LTMs are
   recomputed from modelling x parent LTM when a copy is applied. Helmet counter moved to the top middle for the
   game's pass. Player 1's HUD flag 0x4000 = player 1's own stats changed. Back hold no longer leaves (individual).
+- Round 43 (user test of the P2 HUD): FUN_0051B550 (which shield models show, from the health; also run by the game
+  manager's FUN_005154A0 and the interface's vf15) now runs with the HUD owner's stats (detour; vf15 slot patched).
+  FUN_005154A0 (gm, on its HUD toggles -- a hero going down) sets the health part to state 0 and shows the models
+  (pause menu); outside the pause menu nothing hid them: shields hidden whenever the part is in state 0 and gm +0x5C
+  bit 20 is clear. P2's particle nodes (+0xA4 chips, combo sparkles) finish in the HUD walk: captured back into
+  P2's copy after its pass (they had stayed emitting, flags 0x02D1). P2's shields shifted as a block (the last one
+  rightmost, first to go) instead of mirrored; combo column mirrored. x3/x10 sign (+0x3A0 sliding to +0x31C from
+  1.01) drawn rising off the top instead.
+- Heroes walking into each other: no contact event between two heroes; the mover's frame vertical step (+0x94)
+  tilts up sliding along the other hero's sphere (the taller Obelix rose onto Asterix). In single player the AI
+  companion just blocks. Rising within 2.2 of the other hero on the same level without a jump press (+0x3EC bit 8,
+  1.5 s grace) is undone after the tick (HoldOffPartner). Autotests bump2 (co-op), bump1 (single player).

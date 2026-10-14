@@ -14,6 +14,7 @@
 #include "shared.h"
 #include "hints.h"
 #include "individual.h"
+#include "hud2.h"
 #include "vtprofile.h"
 #include "render.h"
 #include "autotest.h"
@@ -123,6 +124,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	SharedInstallHooks();
 	HintsInstallHooks();
 	IndivInstallHooks();
+	Hud2InstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

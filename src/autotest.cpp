@@ -1284,6 +1284,31 @@ const Step kHud2[] = {
 	END(14500),
 };
 
+// bump2 (level 2): player 2's Obelix walks into player 1's Asterix standing
+// 4 units in front of him (the user: heroes walking into each other jump).
+const Step kBump2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 4.0f, 0, "asterix in front of obelix" },
+	{ 2100, S_WATCHRW, HERO_OBELIX, 0, 0, 6, 0, "obelix height rise" },
+	VPAD(5000, 1, 0, 0, 1.0f, "p2 forward"),
+	SHOT(6500, "bump2_1"),
+	VPAD(8000, 1, 0, 0, 0, "p2 stop"),
+	END(9000),
+};
+
+// bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
+const Step kBump1[] = {
+	MARK(0, "baseline"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 1500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion wait" },
+	PLACEAT(2000, HERO_ASTERIX, -851.6f, 508.0f, -1072.2f),
+	P1(2500, 0, 0, 1.0f, "p1 forward"),
+	SHOT(3500, "bump1_1"),
+	P1(5000, 0, 0, 0, "p1 stop"),
+	END(6000),
+};
+
 // pit26o (-Level 2): sector 6's big death pit; player 2's Obelix (not leading)
 // jumps in (the user's spot 92.5 2.2 -390.4 towards x 96), Asterix stays on the
 // ground. Whose death does the game show?
@@ -2448,6 +2473,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("hit2o", kHit2O),
 	SCENARIO("down2a", kDown2A),
 	SCENARIO("hud2", kHud2),
+	SCENARIO("bump2", kBump2),
+	SCENARIO("bump1", kBump1),
 	SCENARIO("huddiff", kHudDiff),
 	SCENARIO("combo2", kCombo2),
 	SCENARIO("pit26b", kPit26B),
@@ -2708,6 +2735,15 @@ void LogTick(float t) {
 			*(uint8_t*)(h.raw() + 0x3E9), *(uint8_t*)(h.raw() + 0xE5),
 			*(uint8_t*)(h.raw() + 0x561), *(uint8_t*)(h.raw() + 0x135), *(uint8_t*)(h.raw() + 0x38E) & 0x3F,
 			h.Pos().x, h.Pos().y, h.Pos().z);
+		if (getenv("XXL_MOVELOG")) {   // movement fields
+			const float* f = (const float*)h.raw();
+			line.Add(" mv 7C %.2f 8C %.2f 94 %.2f 230 %.2f 240 %.2f 260 %d", f[0x7C / 4], f[0x8C / 4], f[0x94 / 4], f[0x230 / 4],
+			         f[0x240 / 4], *(int*)(h.raw() + 0x260));
+		}
+		{   // what it stands on (+0x280) and the on-ground bits (+0x384)
+			char* gr = *(char**)(h.raw() + 0x280);
+			line.Add(" gr %p/%p %02X", gr, gr && !IsBadReadPtr(gr, 4) ? *(void**)gr : nullptr, *(uint8_t*)(h.raw() + 0x384));
+		}
 		char* tgt = *(char**)(h.raw() + 0xF8);   // the enemy the hero is after / holding, and its state (+0x21)
 		if (tgt && !IsBadReadPtr(tgt, 0x24)) line.Add(" tgt %p st %d", tgt, *(uint8_t*)(tgt + 0x21));
 	}
@@ -3196,6 +3232,11 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		if (s.x == 6) {   // the hero's height rising (a jump starting), with stacks
+			WatchFloatRise(&h.Pos().y);
+			Log("autotest: watching %s's height rise", HeroName(s.a));
+			break;
+		}
 		if (s.x == 2) {   // teleports of the hero (x jumps by more than 10)
 			WatchFloatJump(&h.Pos().x);
 			Log("autotest: watching %s's teleports", HeroName(s.a));
@@ -3266,7 +3307,13 @@ void RunStep(const Step& s) {
 		Hero h = t ? t.GetHero(s.a) : Hero(), o = t ? t.GetHero(s.b) : Hero();
 		if (!h || !o) break;
 		Vector3 p = o.Pos();
-		p.x += 1.5f;
+		if (s.x != 0.0f) {   // x units in front of hero b (its facing)
+			Vector3 d = o.Dir();
+			p.x += d.x * s.x;
+			p.z += d.z * s.x;
+		} else {
+			p.x += 1.5f;
+		}
 		p.y += 0.3f;
 		h.Pos() = p;
 		if (h.hook->node && h.hook->node->matrix) {

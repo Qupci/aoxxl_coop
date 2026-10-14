@@ -1,6 +1,7 @@
 #include "hud2.h"
 #include "coop.h"
 #include "config.h"
+#include "detour.h"
 #include "individual.h"
 #include "kal.h"
 #include "log.h"
@@ -46,13 +47,14 @@ struct State {
 	HudState s1, s2;           // player 1's (the game's) and player 2's
 	int      lastHp[2] = { -1, -1 }, lastShields[2] = { -1, -1 };
 	// Render: what was moved or hidden for a pass.
-	struct Moved { char* p; float v; } moved2d[8];
+	struct Moved { char* p; float x, y; } moved2d[8];
 	int      nMoved2d = 0;
 	struct MovedFrame { float* f; float lt[3], md[3]; } movedFrames[4];
 	int      nMovedFrames = 0;
 	struct Hidden { char* node; uint32_t f10; } hidden[64];
 	int      nHidden = 0;
 	bool     p2Pass = false;
+	bool     inP2Tick = false;         // player 2's copy is being ticked
 	bool     loggedP2 = false;
 } g;
 
@@ -166,7 +168,51 @@ void MoveAlong(float* frame, const float* right, float d, bool remember) {
 	for (int k = 0; k < 3; k++) lt[k] += d * right[k];
 }
 
+// The interface's own health readers outside its tick: FUN_0051B550 (which
+// shield models show, from the health; thiscall, no args) is also run by the
+// game manager's tick through FUN_005154A0 (pause menu, cutscenes) and the
+// interface's vf15 -- where the health in the game's place is the standing
+// hero's. The HUD's owner's instead.
+int HudOwner() {
+	if (g.inP2Tick) return CoopP2Hero();
+	int shopper = CoopShopper();
+	return shopper >= 0 ? shopper : CoopP1Hero();
+}
+typedef void(__fastcall* VoidFn)(char* self, void* edx);
+VoidFn g_origShieldsShown = nullptr, g_origItfVf15 = nullptr;
+const uint8_t kShieldsShownPrologue[8] = { 0x83, 0xEC, 0x10, 0xA1, 0xF4, 0x21, 0x66, 0x00 };
+void __fastcall ShieldsShownHook(char* self, void* edx) {
+	int prev = IndivEnter(HudOwner());
+	g_origShieldsShown(self, edx);
+	IndivLeave(prev);
+}
+void __fastcall ItfVf15Hook(char* self, void* edx) {
+	int prev = IndivEnter(HudOwner());
+	g_origItfVf15(self, edx);
+	IndivLeave(prev);
+}
+
+// The health part's hidden state (+0x24 bits 4-5 == 0) with shield models
+// still showing: FUN_005154A0 (the game manager's, on its HUD toggles -- a
+// hero going down) puts the part in that state and shows the models for the
+// pause menu; outside the pause menu nothing hides them again, and a fallen
+// hero's HUD stayed up for good. Hidden, as the part's own hiding leaves them.
+void HideIdleShields(char* itf) {
+	char* gm = GM();
+	if (!gm || (*(uint32_t*)(gm + 0x5C) & 0x100000) || (*(uint32_t*)(itf + 0x24) & 0x30)) return;
+	for (int i = 0; i < 30; i++)
+		if (char* n = ElemPtr(itf, i)) *(uint32_t*)(n + 0x10) |= 2;
+}
+
 } // namespace
+
+bool Hud2InstallHooks() {
+	bool ok = InstallDetour(0x51B550, (void*)ShieldsShownHook, (void**)&g_origShieldsShown, kShieldsShownPrologue,
+	                        sizeof(kShieldsShownPrologue), "HUD shields shown (the HUD owner's health)");
+	ok &= PatchVtableSlot(0x6285F0, 15, 0x5162A0, (void*)ItfVf15Hook, (void**)&g_origItfVf15,
+	                      "CKHkInterfaceInGame::vf15 (the HUD owner's health)");
+	return ok;
+}
 
 void Hud2BeforeInterfaceTick(char* itf) {
 	(void)itf;
@@ -188,7 +234,19 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 		g.s2.valid = false;
 		g.lastHp[1] = g.lastShields[1] = -1;
 	}
+	HideIdleShields(itf);   // player 1's
 	Capture(itf, g.s1);
+	static const bool posLog = getenv("XXL_HUDPOS") != nullptr;
+	static DWORD lastP1 = 0;
+	if (posLog && GetTickCount() - lastP1 > 1000) {
+		lastP1 = GetTickCount();
+		char vis[40] = {};
+		for (int i = 0; i < 30; i++) vis[i] = ElemPtr(itf, i) && !(*(uint16_t*)(ElemPtr(itf, i) + 0x10) & 2) ? '1' : '0';
+		int hp = -1, sh = -1;
+		IndivStats(CoopP1Hero(), &hp, &sh);
+		Log("hud2: p1 bits %08X 270 %u 274 %u/%u (p1 hp %d) shown %s", *(uint32_t*)(itf + 0x24), *(uint32_t*)(itf + 0x270),
+		    *(uint8_t*)(itf + 0x274), *(uint8_t*)(itf + 0x275), hp, vis);
+	}
 	if (!g.s2.valid) {
 		g.s2 = g.s1;
 		Log("hud2: player 2's HUD (health, combo bar) set up from the interface %p", itf);
@@ -200,6 +258,7 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 	if (StatsChanged(1, CoopP2Hero())) f |= 0x4000;
 	if (CoopP2ShowsHud()) f |= 0x1000000;
 	int prev = IndivEnter(CoopP2Hero());
+	g.inP2Tick = true;
 	if (!(f & 0x100000)) {
 		kHealthPart(itf, nullptr, time);
 		if (!(f & 0x10000000)) {
@@ -207,6 +266,8 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 			kComboGlowPart(itf, nullptr, time);
 		}
 	}
+	g.inP2Tick = false;
+	HideIdleShields(itf);   // player 2's
 	IndivLeave(prev);
 	f = (f & ~kShowFlags) | (saved & kShowFlags);
 	Capture(itf, g.s2);
@@ -224,24 +285,42 @@ void Hud2BeginP1(RwCamera* hud) {
 	float* plate = *(float**)(itf + 0x134);
 	if (!plate) return;
 	float dx = 0.5f - (plate[5] - plate[13] * 0.5f);
-	const int o2d[] = { 0x134, 0x13C, 0x150, 0x154, 0x158 };
-	for (int o : o2d) {
+	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);   // right +0, up +4
+	auto move2d = [&](int o, float ddx, float ddy) {
 		char* e = *(char**)(itf + o);
-		if (!e || g.nMoved2d >= 8) continue;
-		g.moved2d[g.nMoved2d++] = { e, ((float*)e)[5] };
-		((float*)e)[5] += dx;
-	}
-	const float* right = (const float*)((char*)*(void**)((char*)hud + 4) + 0x50);
-	const int o3d[] = { 0xA8, 0x130 };
-	for (int o : o3d) {
+		if (!e || g.nMoved2d >= 8) return;
+		float* f = (float*)e;
+		g.moved2d[g.nMoved2d++] = { e, f[5], f[6] };
+		f[5] += ddx;
+		f[6] += ddy;
+	};
+	auto move3d = [&](int o, float ddx, float ddy) {
 		char* n = *(char**)(itf + o);
-		if (!n || IsBadReadPtr(n, 8)) continue;
-		if (float* fr = FrameOf(n)) MoveAlong(fr, right, -dx, true);   // screen x is minus the camera's
-	}
+		float* fr = n && !IsBadReadPtr(n, 8) ? FrameOf(n) : nullptr;
+		if (!fr) return;
+		MoveAlong(fr, cl, -ddx, true);   // screen x is minus the camera's
+		MoveAlong(fr, cl + 4, ddy, false);
+	};
+	const int helmet2d[] = { 0x134, 0x150, 0x154 };
+	for (int o : helmet2d) move2d(o, dx, 0.0f);
+	move3d(0xA8, dx, 0.0f);
+	// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01, off the right
+	// edge, to +0x31C and back) goes up off the top instead, like the helmets.
+	float shown = *(float*)(itf + 0x31C), cur = *(float*)(itf + 0x3A0);
+	float off = cur - shown;
+	float p = 1.01f - shown > 0.01f ? off / (1.01f - shown) : 0.0f;
+	if (p < 0.0f) p = 0.0f;
+	if (p > 1.0f) p = 1.0f;
+	move2d(0x13C, dx - off, p * 0.5f);
+	move2d(0x158, dx - off, p * 0.5f);
+	move3d(0x130, dx - off, p * 0.5f);
 }
 
 void Hud2EndP1() {
-	for (int i = 0; i < g.nMoved2d; i++) ((float*)g.moved2d[i].p)[5] = g.moved2d[i].v;
+	for (int i = 0; i < g.nMoved2d; i++) {
+		((float*)g.moved2d[i].p)[5] = g.moved2d[i].x;
+		((float*)g.moved2d[i].p)[6] = g.moved2d[i].y;
+	}
 	for (int i = 0; i < g.nMovedFrames; i++) {
 		State::MovedFrame& m = g.movedFrames[i];
 		memcpy((char*)m.f + 0x80, m.lt, sizeof(m.lt));
@@ -270,16 +349,31 @@ bool Hud2BeginP2(RwCamera* hud) {
 		g.hidden[g.nHidden++] = { n, *(uint32_t*)(n + 0x10) };
 		*(uint32_t*)(n + 0x10) |= 2;
 	}
-	// Mirrored to the right edge: each model's screen x (minus its x along
-	// the HUD camera's right axis) negated.
+	// To the right edge (a model's screen x is minus its x along the HUD
+	// camera's right axis): the shields as a block, in their own order (the
+	// last one still the first to go), so its last shield is where player 1's
+	// first is, mirrored; the sparkles with them; the combo bar's column
+	// mirrored.
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);
+	auto camX = [&](float* fr) {
+		float* lt = (float*)((char*)fr + 0x80);
+		return (lt[0] - cl[12]) * cl[0] + (lt[1] - cl[13]) * cl[1] + (lt[2] - cl[14]) * cl[2];
+	};
+	int hp = 0, shields = 3;
+	IndivStats(CoopP2Hero(), &hp, &shields);
+	if (shields < 1) shields = 1;
+	if (shields > 6) shields = 6;
+	char* first = ElemPtr(itf, 0);
+	char* last = ElemPtr(itf, (shields - 1) * 5);
+	float* ff = first ? FrameOf(first) : nullptr;
+	float* fl = last ? FrameOf(last) : nullptr;
+	float shieldShift = ff && fl ? -(camX(ff) + camX(fl)) : 0.0f;
 	for (int i = 0; i < kNumP2Elems; i++) {
 		char* n = ElemPtr(itf, i);
 		float* fr = n ? FrameOf(n) : nullptr;
 		if (!fr) continue;
-		float* lt = (float*)((char*)fr + 0x80);
-		float x = (lt[0] - cl[12]) * cl[0] + (lt[1] - cl[13]) * cl[1] + (lt[2] - cl[14]) * cl[2];
-		MoveAlong(fr, cl, -2.0f * x, false);
+		bool shieldPart = i <= 30;   // the 30 shield models and their sparkles (+0xA4)
+		MoveAlong(fr, cl, shieldPart ? shieldShift : -2.0f * camX(fr), false);
 	}
 	g.p2Pass = true;
 	static const bool posLog = getenv("XXL_HUDPOS") != nullptr;
@@ -308,6 +402,9 @@ bool Hud2BeginP2(RwCamera* hud) {
 
 void Hud2EndP2() {
 	if (!g.p2Pass) return;
+	// What the pass did to player 2's models stays theirs: a finished
+	// particle burst (shield chips, combo sparkles) stops only in the walk.
+	Capture(g.itf, g.s2);
 	for (int i = 0; i < g.nHidden; i++) *(uint32_t*)(g.hidden[i].node + 0x10) = g.hidden[i].f10;
 	g.nHidden = 0;
 	Apply(g.itf, g.s1);

@@ -129,7 +129,8 @@ LONG CALLBACK WatchHandler(EXCEPTION_POINTERS* ep) {
 		float now = *(const float*)g_watchAddr[0];
 		float d = now - g_watchLast;
 		g_watchLast = now;
-		if ((d > 10.0f || d < -10.0f) && InterlockedIncrement(&g_watchHits) < 50) {
+		float lim = g_watchJump == 2 ? 0.02f : 10.0f;   // 2: any rise (a jump starting)
+		if ((d > lim || (g_watchJump == 1 && d < -lim)) && InterlockedIncrement(&g_watchHits) < 50) {
 			char where[96];
 			Describe(eip, where, sizeof(where));
 			Log("watch: %p jumped by %.1f to %.1f, by the instruction before %s", g_watchAddr[0], d, now, where);
@@ -204,6 +205,11 @@ void WatchFloatJump(const float* addr) {
 	g_watchReads = 0;
 	g_watchJump = 1;
 	g_watchPending = 1;
+}
+
+void WatchFloatRise(const float* addr) {
+	WatchFloatJump(addr);
+	g_watchJump = 2;
 }
 
 void LogBacktrace(const char* tag, uintptr_t esp) { LogStack(tag, esp); }

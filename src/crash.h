@@ -22,5 +22,6 @@ void WatchBytes(const void* const* addrs, int n, uintptr_t ignoreLo, uintptr_t i
 void WatchBytesRW(const void* addr);
 // Writes that change the float at `addr` by more than 10 (teleports), with stacks.
 void WatchFloatJump(const float* addr);
+void WatchFloatRise(const float* addr);   // every write that raises it by more than 0.02
 // Game-code return addresses found on the stack from `esp` up.
 void LogBacktrace(const char* tag, uintptr_t esp);
