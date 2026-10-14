@@ -29,6 +29,7 @@
 #include "p2cam.h"
 #include "pads.h"
 #include "hints.h"
+#include "individual.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -133,6 +134,7 @@ struct CoopState {
 	int      dying = -1;
 	bool     dyingLeads = false;        // ... and has been given the lead
 	uint8_t  hpBeforeTick = 0;
+	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -328,24 +330,42 @@ void LeadTheDeath() {
 	Trio t = GetTrio();
 	if (!t) return;
 	g.dyingLeads = true;
-	if (t.Leader() == g.dying) return;
-	Hero h = t.GetHero(g.dying), lead = t.GetHero(t.Leader());
-	if (!h || !lead) return;
-	// The switch handler refuses a dead leader (+0x390 bit 2) and a target that
-	// is not the AI companion (+0x18 bit 0).
-	uint8_t deadBit = *(uint8_t*)(lead.raw() + 0x390) & 4;
-	*(uint8_t*)(lead.raw() + 0x390) &= ~4;
-	// The handler moves both heroes one Life state along (leader -> AI, target
-	// -> player), so they go in as a player leader and an AI target.
-	if (HeroModePlayable(*F18(h))) *F18(h) = HeroAiVariant(*F18(h));
-	if (HeroModePlayable(*F18(lead))) *F18(lead) = HeroPlayerVariant(*F18(lead));
-	t.SwitchTo(g.dying);
-	*(uint8_t*)(lead.raw() + 0x390) |= deadBit;
+	if (t.Leader() != g.dying) CoopGiveLead(g.dying, "the death is its");
 	int other = OtherHero(g.dying);
 	Hero o = t.GetHero(other);
 	if (o && HeroModePlayable(*F18(o))) *F18(o) = HeroAiVariant(*F18(o));
-	Log("coop: %s leads for the death (leader now %s)", HeroName(g.dying), HeroName(t.Leader()));
 }
+
+} // namespace
+
+void CoopGiveLead(int idx, const char* why) {
+	Trio t = GetTrio();
+	if (!t || g.sliced || t.Leader() == idx) return;
+	Hero h = t.GetHero(idx), lead = t.GetHero(t.Leader());
+	if (!h || !lead) return;
+	// The switch handler refuses a dead leader (+0x390 bit 2) and a target that
+	// is not the AI companion (+0x18 bit 0); it moves both heroes one Life state
+	// along (leader -> AI, target -> player), so they go in as a player leader
+	// and an AI target.
+	uint8_t deadBit = *(uint8_t*)(lead.raw() + 0x390) & 4;
+	*(uint8_t*)(lead.raw() + 0x390) &= ~4;
+	if (HeroModePlayable(*F18(h))) *F18(h) = HeroAiVariant(*F18(h));
+	if (HeroModePlayable(*F18(lead))) *F18(lead) = HeroPlayerVariant(*F18(lead));
+	int was = t.Leader();
+	t.SwitchTo(idx);
+	*(uint8_t*)(lead.raw() + 0x390) |= deadBit;
+	Log("coop: %s takes the lead from %s (%s) -- leader now %s", HeroName(idx), HeroName(was), why, HeroName(t.Leader()));
+}
+
+float CoopHoldTime(int player, int action) {
+	if (action < 0 || action >= 256) return 0.0f;
+	if (player == 1) return g.p2Joined ? g.p2HoldTime[action] : 0.0f;
+	InputManager im = GetInputManager();
+	if (!im || action >= im.NumActions()) return 0.0f;
+	return *(float*)(im.Binding(action) + 0x18);
+}
+
+namespace {
 
 // Hand player 2's hero back to the game: make player 1's hero the trio leader
 // again if a switch moved leadership, then put player 2's hero on AI, following.
@@ -1240,6 +1260,7 @@ void CoopFrame() {
 
 	PadsPoll();
 	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
+	IndivFrame();
 	SendDeferredSwitch();
 	TracePotionFrame();
 	SoundSetP2Listener();
@@ -1446,7 +1467,8 @@ void CoopFrame() {
 	}
 	bool scripted = g.dying >= 0 || (!HeroModePlayable(h1.Flags18()) && !(gunSolo && g.p1Hero == HERO_ASTERIX)) ||
 	                (!HeroModePlayable(h2.Flags18()) && !(gunSolo && g.p2Hero == HERO_ASTERIX)) ||
-	                h1.Busy() || h2.Busy() || groupAction || cinematic;
+	                (h1.Busy() && !IndivFallen(g.p1Hero)) || (h2.Busy() && !IndivFallen(g.p2Hero)) || groupAction ||
+	                cinematic;
 	if (scripted != g.suspended) {
 		g.suspended = scripted;
 		Log("coop: %s (%s %s / %s %s%s%s%s)", scripted ? "suspended for a scripted mode" : "resumed",
@@ -1807,7 +1829,8 @@ static void TrackTwisters(Trio t) {
 
 static char __fastcall ChooseAttackHook(char* hero, void* edx, int current) {
 	char next = g_origChooseAttack(hero, edx, current);
-	if (!g.p2Joined || g.suspended || next == 9 || next == 10) return next;
+	// Individual heroes: each Twister is its own (its own combo bar).
+	if (!g.p2Joined || g.suspended || next == 9 || next == 10 || IndivActive()) return next;
 	Trio t = GetTrio();
 	if (!t) return next;
 	int me = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
@@ -1980,6 +2003,7 @@ static void TorchBeforeTick(int heroIndex, Hero hero) {
 
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	TorchBeforeTick(heroIndex, hero);
+	g.indivPrev = IndivEnter(heroIndex);   // this hero's health and combo bar in the game's place
 	g.hpBeforeTick = (uint8_t)Health();
 	if (!g.p2Joined || g.suspended) return;
 	if (heroIndex != g.p1Hero && heroIndex != g.p2Hero) return;
@@ -2243,10 +2267,14 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	}
 	WatchLbPass(heroIndex, hero);
 	WatchSpinHint(heroIndex, hero);
-	if (g.hpBeforeTick > 0 && Health() == 0 && (heroIndex == g.p1Hero || heroIndex == g.p2Hero)) {
+	if (g.hpBeforeTick > 0 && Health() == 0 && (heroIndex == g.p1Hero || heroIndex == g.p2Hero) &&
+	    !IndivHeroDown(heroIndex, "in its own tick")) {
 		NoteDeath(heroIndex, "in its own tick");
 		LeadTheDeath();
 	}
+	IndivAfterFallenTick(heroIndex);
+	IndivLeave(g.indivPrev);
+	g.indivPrev = -1;
 }
 
 // Hits reach a hero through its sendEvent (CKHkAsterix / CKHkObelix vtable slot
@@ -2255,17 +2283,20 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 typedef int(__fastcall* HeroSendEventFn)(char* hero, void* edx, int event, void* param);
 HeroSendEventFn g_origHeroSendEvent = nullptr, g_origHeroSendEvent2 = nullptr;   // the same function
 int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) {
+	Trio t = GetTrio();
+	int idx = -1;
+	for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
+		if (t.GetHero(i).raw() == hero) idx = i;
+	if (IndivDropEvent(idx, event)) return 1;   // no more hits for a fallen hero
+	int prev = IndivEnter(idx);                 // its own health and combo bar
 	int before = Health();
 	int r = g_origHeroSendEvent(hero, edx, event, param);
-	if (before > 0 && Health() == 0 && g.p2Joined) {
-		Trio t = GetTrio();
-		for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
-			if (t.GetHero(i).raw() == hero) {
-				char how[32];
-				sprintf(how, "hero event %04X", event & 0xFFFF);
-				NoteDeath(i, how);
-			}
+	if (before > 0 && Health() == 0 && g.p2Joined && idx >= 0) {
+		char how[32];
+		sprintf(how, "hero event %04X", event & 0xFFFF);
+		if (!IndivHeroDown(idx, how)) NoteDeath(idx, how);
 	}
+	IndivLeave(prev);
 	return r;
 }
 
@@ -2557,7 +2588,8 @@ void CoopAfterTrioEvent(int ev, int cookie) {
 		for (int idx : both) {
 			Hero h = t.GetHero(idx);
 			uint8_t sit = h ? Situation(h) : 0xFF;
-			if (h && idx != t.Leader() && !g.held[idx] && sit != 0x00 && sit != 0xFF) StartAiCycle(idx, "lost the lead");
+			if (h && idx != t.Leader() && !g.held[idx] && sit != 0x00 && sit != 0xFF && !IndivFallen(idx))
+				StartAiCycle(idx, "lost the lead");
 		}
 	}
 	if (!g.suspended && g_eventDepth == 0) {

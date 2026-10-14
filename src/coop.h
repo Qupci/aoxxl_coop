@@ -41,6 +41,11 @@ int  CoopP2Pad();
 bool CoopSuspended();   // co-op paused for a scripted mode (ride, cinematic...)
 bool CoopOneScreen();   // co-op running, but on one screen for now (Twister Fusion)
 int  CoopShopper();      // the hero at the merchant while co-op goes on around it (-1: none)
+// Gives hero `idx` the trio's lead the game's way (switch event), as a player's
+// hero (individual heroes: a leader that went down).
+void CoopGiveLead(int idx, const char* why);
+// How long player `player` (0 = player 1) has held action `action` (seconds; 0 = not held).
+float CoopHoldTime(int player, int action);
 
 // Ask player 2 to leave (same as holding Back).
 void CoopRequestLeave(const char* why);

@@ -13,6 +13,7 @@
 #include "log.h"
 #include "shared.h"
 #include "hints.h"
+#include "individual.h"
 #include "vtprofile.h"
 #include "render.h"
 #include "autotest.h"
@@ -121,6 +122,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	SoundInstallHooks();
 	SharedInstallHooks();
 	HintsInstallHooks();
+	IndivInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

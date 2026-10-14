@@ -28,9 +28,10 @@ enum HintKey {
 	HINT_MODE,          // a shared mode: who does what
 	HINT_MACHINE,       // a machine needs both heroes
 	HINT_LIFTER,        // a lifter waits for both heroes
+	HINT_REVIVE,        // a fallen hero: how to revive it, the revive under way
 };
 
-enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_COUNT };
+enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_COUNT };
 // The name of `b` on player `player`'s (0 = player 1, 1 = player 2) controller:
 // the pad button, or the keyboard key it is on.
 const wchar_t* HintButtonName(int player, HintButton b);

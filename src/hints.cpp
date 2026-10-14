@@ -36,6 +36,7 @@ wchar_t g_shown[96];             // what the lookup answers for kHintStringId
 bool g_showing = false;
 bool g_loggedKinds = false;
 wchar_t g_source[96];            // the hint being shown, as given
+int     g_sourceKey = 0;          // ... and its key
 int     g_nLines = 1;
 unsigned g_lineWord[8];          // the first word of each line
 float   g_longest = 0.0f;        // its longest line's width (a share of the screen)
@@ -138,6 +139,8 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	if (use && wcscmp(g_source, h->text) != 0) {
 		// A new hint: its lines become one ('\n' -> ' '), the first word of each
 		// line noted.
+		bool sameKey = g_showing && g_sourceKey == h->key;   // the same hint, updated (a progress bar)
+		g_sourceKey = h->key;
 		wcsncpy(g_source, h->text, 95);
 		g_source[95] = 0;
 		g_nLines = 1;
@@ -159,7 +162,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		// when Asterix takes it) keeps that prompt's place: shown afresh (state
 		// 0), it slides in to the hint's.
 		uint32_t& st = *(uint32_t*)(self + 0x24);
-		if (((st >> 21) & 3) != 0) st &= ~(3u << 21);
+		if (((st >> 21) & 3) != 0 && !sameKey) st &= ~(3u << 21);
 	}
 	if (use) {
 		*slot = kHintStringId;
@@ -287,18 +290,18 @@ void KeyName(int vk, wchar_t* out, int n) {
 } // namespace
 
 const wchar_t* HintButtonName(int player, HintButton b) {
-	static const wchar_t* const kPad[HB_COUNT] = { L"A", L"X", L"LB", L"Start", L"Back" };
+	static const wchar_t* const kPad[HB_COUNT] = { L"A", L"X", L"LB", L"Start", L"Back", L"B" };
 	static wchar_t buf[HB_COUNT][2][32];
 	if (b < 0 || b >= HB_COUNT) return L"?";
 	if (player == 1) {
 		if (CoopP2Pad() != kKeyboardPad) return kPad[b];
 		static const int kKey[HB_COUNT] = { CoopConfig::KEY_JUMP, CoopConfig::KEY_ATTACK, CoopConfig::KEY_LB,
-		                                    CoopConfig::KEY_START, CoopConfig::KEY_BACK };
+		                                    CoopConfig::KEY_START, CoopConfig::KEY_BACK, CoopConfig::KEY_GRAB };
 		KeyName(g_config.keys[kKey[b]], buf[b][1], 32);
 		return buf[b][1];
 	}
 	// Player 1: the device the game's binding for that button reads.
-	static const int kAction[HB_COUNT] = { 4, 5, 8, 15, 12 };
+	static const int kAction[HB_COUNT] = { 4, 5, 8, 15, 12, 6 };
 	InputManager im = GetInputManager();
 	char* in = im ? im.raw() : nullptr;
 	if (!in || kAction[b] >= im.NumActions()) return kPad[b];

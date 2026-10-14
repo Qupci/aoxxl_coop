@@ -11,6 +11,7 @@
 #include "sound.h"
 #include "gamecam.h"
 #include "crash.h"
+#include "individual.h"
 
 #include <cmath>
 #include <intrin.h>
@@ -21,7 +22,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -1161,6 +1162,73 @@ const Step kHit2O[] = {
 	{ 1600, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix at a roman" },
 	SHOT(6000, "hit2o_1"), SHOT(9000, "hit2o_2"), SHOT(14000, "hit2o_3"),
 	END(20000),
+};
+
+// down2a (level 2, individual heroes): player 1's Asterix (leading) at one
+// point of health beside a Roman goes down; the lead passes to Obelix, the game
+// goes on; player 2's Obelix comes over and holds B for 10 s: Asterix is back.
+const Step kDown2A[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_POKE8, -10, 0x50, 0, 1, 0, "asterix health 1" },
+	{ 1600, S_ENEMY, HERO_ASTERIX, 0, 0, 0, 0, "asterix at a roman" },
+	SHOT(5000, "down2a_1"), SHOT(7000, "down2a_2"),
+	{ 8000, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 0, 0, "obelix to asterix" },
+	VPAD(8500, 1, PAD_B, 0, 0, "p2 holds B"),
+	SHOT(13000, "down2a_3"),
+	VPAD(19500, 1, 0, 0, 0, "p2 release"),
+	SHOT(20500, "down2a_4"),
+	VPAD(21000, 1, 0, 0, 1, "p2 up"), P1(21000, 0, 0, 1, "p1 up"),
+	SHOT(22500, "down2a_5"),
+	END(23000),
+};
+
+// pit26b (-Level 2, individual heroes): Obelix falls into the pit (down),
+// then Asterix too: both down is the game over, the respawn gives both their
+// health back.
+const Step kPit26B[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 88.0f, 2.2f, -390.4f), PLACEAT(3000, HERO_OBELIX, 92.5f, 2.2f, -390.4f),
+	GLIDEAT(4500, HERO_OBELIX, 97.0f, 2.2f, -390.4f, 400),
+	SHOT(7000, "pit26b_1"),
+	GLIDEAT(8000, HERO_ASTERIX, 97.0f, 2.2f, -390.4f, 600),
+	SHOT(10000, "pit26b_2"), SHOT(18000, "pit26b_3"),
+	VPAD(19000, 1, 0, 0, 1, "p2 up"), P1(19000, 0, 0, 1, "p1 up"),
+	SHOT(20500, "pit26b_4"),
+	END(21000),
+};
+
+// rejoin2 (level 2, individual heroes): player 2's Obelix at 3 points leaves
+// and comes back: still 3 points.
+const Step kRejoin2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_POKE8, -11, 0x50, 0, 3, 0, "obelix health 3" },
+	VPAD(2500, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(2700, 1, 0, 0, 0, "p2 release"),
+	VPAD(5000, 1, PAD_START, 0, 0, "p2 start (rejoin)"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	SHOT(7000, "rejoin2_1"),
+	END(8000),
+};
+
+// combo2 (level 2, individual heroes): player 2's Obelix hits Romans; only
+// his combo bar fills.
+const Step kCombo2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix at a roman" },
+	VPAD(2000, 1, PAD_X, 0, 0, "p2 X"), VPAD(2150, 1, 0, 0, 0, "p2 release"),
+	VPAD(2500, 1, PAD_X, 0, 0, "p2 X"), VPAD(2650, 1, 0, 0, 0, "p2 release"),
+	VPAD(3000, 1, PAD_X, 0, 0, "p2 X"), VPAD(3150, 1, 0, 0, 0, "p2 release"),
+	VPAD(3500, 1, PAD_X, 0, 0, "p2 X"), VPAD(3650, 1, 0, 0, 0, "p2 release"),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"), VPAD(4650, 1, 0, 0, 0, "p2 release"),
+	{ 5000, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix at a roman" },
+	VPAD(5500, 1, PAD_X, 0, 0, "p2 X"), VPAD(5650, 1, 0, 0, 0, "p2 release"),
+	VPAD(6000, 1, PAD_X, 0, 0, "p2 X"), VPAD(6150, 1, 0, 0, 0, "p2 release"),
+	VPAD(6500, 1, PAD_X, 0, 0, "p2 X"), VPAD(6650, 1, 0, 0, 0, "p2 release"),
+	SHOT(7000, "combo2_1"),
+	END(12000),
 };
 
 // pit26o (-Level 2): sector 6's big death pit; player 2's Obelix (not leading)
@@ -2325,6 +2393,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopsplita", kShopSplitA),
 	SCENARIO("pit26o", kPit26O),
 	SCENARIO("hit2o", kHit2O),
+	SCENARIO("down2a", kDown2A),
+	SCENARIO("combo2", kCombo2),
+	SCENARIO("pit26b", kPit26B),
+	SCENARIO("rejoin2", kRejoin2),
 	SCENARIO("pit26a", kPit26A),
 	SCENARIO("inputdump", kInputDump),
 	SCENARIO("combop2", kComboP2),
@@ -2517,6 +2589,11 @@ void LogTick(float t) {
 		Hero a = tr.GetHero(HERO_ASTERIX), o = tr.GetHero(HERO_OBELIX);
 		if (cb) line.Add(" | hp=%d/%d dead=%d%d", *(uint8_t*)(cb + 0x50), *(uint8_t*)(cb + 0x51),
 		                 a ? (*(uint8_t*)(a.raw() + 0x390) >> 2) & 1 : 9, o ? (*(uint8_t*)(o.raw() + 0x390) >> 2) & 1 : 9);
+		int hp[2], sh[2], hits[2];
+		float gauge[2];
+		if (IndivStats(HERO_ASTERIX, &hp[0], &sh[0], &hits[0], &gauge[0]) && IndivStats(HERO_OBELIX, &hp[1], &sh[1], &hits[1], &gauge[1]))
+			line.Add(" | indiv A %d/%d hits %d gauge %.1f, O %d/%d hits %d gauge %.1f", hp[0], sh[0], hits[0], gauge[0], hp[1], sh[1],
+			         hits[1], gauge[1]);
 	}
 	{   // the button prompt (CKGrpMeca, game manager +0x18: owner +0x90; gm +0x5C bit 0, kind +0x68)
 		// and the trio's machine offer (+0x48, +0x3F4 bit 8)
@@ -3054,6 +3131,21 @@ void RunStep(const Step& s) {
 		Log("autotest: watching every access to %s +%03X", HeroName(s.a), s.b);
 		break;
 	}
+	case S_NEXTTO: {   // hero a put 1.5 units beside hero b
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero(), o = t ? t.GetHero(s.b) : Hero();
+		if (!h || !o) break;
+		Vector3 p = o.Pos();
+		p.x += 1.5f;
+		p.y += 0.3f;
+		h.Pos() = p;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* m = (float*)((char*)h.hook->node->matrix + 0x40);
+			m[0] = p.x; m[1] = p.y; m[2] = p.z;
+		}
+		Log("autotest: %s put beside %s at (%.1f %.1f %.1f)", HeroName(s.a), HeroName(s.b), p.x, p.y, p.z);
+		break;
+	}
 	case S_PLATES: {
 		unsigned n = GetNumLvlClassInstances(2, 21);
 		Log("autotest: %u pressure stones (blue circles)", n);
@@ -3067,6 +3159,19 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_POKE8: {   // hero a, byte offset b, value x (a = -1: the game manager's +0x40 block)
+		if (s.a <= -10) {   // hero -10 - a's own stats (individual heroes): byte +b of the +0x40 block
+			int hero = -10 - s.a;
+			int prev = IndivEnter(hero);
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+			if (cb) {
+				Log("autotest: %s's +0x40 block +%03X %02X -> %02X", HeroName(hero), s.b, *(uint8_t*)(cb + s.b), (int)s.x);
+				*(uint8_t*)(cb + s.b) = (uint8_t)(int)s.x;
+			}
+			IndivLeave(prev);
+			break;
+		}
 		if (s.a < 0) {
 			CKYellowPages* yp = YellowPages();
 			char* gm = yp ? (char*)yp->gameManager : nullptr;

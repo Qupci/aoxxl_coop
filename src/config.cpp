@@ -73,6 +73,7 @@ void CoopConfig::Load(const char* iniPath) {
 	}
 
 	safeSequence = ReadBool("coop", "safe_sequence", safeSequence, full);
+	individual = ReadBool("coop", "individual_heroes", individual, full);
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
 	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
 	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
@@ -105,7 +106,7 @@ void CoopConfig::Load(const char* iniPath) {
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d",
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
-		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs);
+		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual);
 }
