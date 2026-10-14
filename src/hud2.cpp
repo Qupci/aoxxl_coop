@@ -60,6 +60,9 @@ struct State {
 	int      nHidden = 0;
 	bool     p2Pass = false;
 	bool     inP2Tick = false;         // player 2's copy is being ticked
+	float*   mirrorCam = nullptr;      // the HUD camera's LTM / modelling, right axis turned for the pass
+	float*   mirrorCamModelling = nullptr;
+	void**   renderStateSlot = nullptr;   // engine +0x20 while the mirrored render state function is in
 	bool     loggedP2 = false;
 } g;
 
@@ -207,6 +210,13 @@ void HideIdleShields(char* itf) {
 	if (!gm || (*(uint32_t*)(gm + 0x5C) & 0x100000) || (*(uint32_t*)(itf + 0x24) & 0x30)) return;
 	for (int i = 0; i < 30; i++)
 		if (char* n = ElemPtr(itf, i)) *(uint32_t*)(n + 0x10) |= 2;
+}
+
+typedef int(__cdecl* RenderStateFn)(int state, int value);
+RenderStateFn g_origRenderState = nullptr;
+int __cdecl MirroredRenderState(int state, int value) {
+	if (state == 0x14 && (value == 2 || value == 3)) value = 5 - value;
+	return g_origRenderState(state, value);
 }
 
 } // namespace
@@ -358,21 +368,24 @@ bool Hud2BeginP2(RwCamera* hud) {
 		g.hidden[g.nHidden++] = { n, *(uint32_t*)(n + 0x10) };
 		*(uint32_t*)(n + 0x10) |= 2;
 	}
-	// Mirrored -- player 1's HUD seen in a mirror: each model's screen x (minus
-	// its x along the HUD camera's right axis, the camera on the HUD's middle)
-	// negated: the first shield at the right edge, more of them leftwards, the
-	// last (the first to go) leftmost, the combo bar at the right edge. Only the
-	// places: the models themselves (symmetric shields) are drawn as they are --
-	// a mirrored camera turns their faces away, and the game's draw sets the
-	// culling itself.
+	// Mirrored -- player 1's HUD seen in a mirror, models and all: the first
+	// shield at the right edge, more of them leftwards, the last (the first to
+	// go) leftmost, each shield eaten from its left, the combo bar at the right
+	// edge. The HUD camera (on the HUD's middle) has its right axis turned round
+	// for the pass. That turns every face round too: the draw lists set the
+	// culling themselves (rwRENDERSTATECULLMODE 0x14, through the engine's
+	// render state function at engine +0x20), so for the pass that function is
+	// one that swaps "cull back" (2) and "cull front" (3).
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);
-	for (int i = 0; i < kNumP2Elems; i++) {
-		char* n = ElemPtr(itf, i);
-		float* fr = n ? FrameOf(n) : nullptr;
-		if (!fr) continue;
-		float* lt = (float*)((char*)fr + 0x80);
-		float x = (lt[0] - cl[12]) * cl[0] + (lt[1] - cl[13]) * cl[1] + (lt[2] - cl[14]) * cl[2];
-		MoveAlong(fr, cl, -2.0f * x, false);
+	float* cm = (float*)((char*)*(void**)((char*)hud + 4) + 0x10);
+	g.mirrorCam = cl;
+	g.mirrorCamModelling = cm;
+	for (int k = 0; k < 3; k++) { cl[k] = -cl[k]; cm[k] = -cm[k]; }
+	char* engine = *(char**)0x66885C;
+	if (engine) {
+		g.renderStateSlot = (void**)(engine + 0x20);
+		g_origRenderState = (RenderStateFn)*g.renderStateSlot;
+		*g.renderStateSlot = (void*)MirroredRenderState;
 	}
 	g.p2Pass = true;
 	static const bool posLog = getenv("XXL_HUDPOS") != nullptr;
@@ -401,6 +414,15 @@ bool Hud2BeginP2(RwCamera* hud) {
 
 void Hud2EndP2() {
 	if (!g.p2Pass) return;
+	if (g.renderStateSlot) {
+		*g.renderStateSlot = (void*)g_origRenderState;
+		g.renderStateSlot = nullptr;
+		g_origRenderState(0x14, 2);   // as FUN_00414210 leaves it
+	}
+	if (g.mirrorCam) {
+		for (int k = 0; k < 3; k++) { g.mirrorCam[k] = -g.mirrorCam[k]; g.mirrorCamModelling[k] = -g.mirrorCamModelling[k]; }
+		g.mirrorCam = g.mirrorCamModelling = nullptr;
+	}
 	// What the pass did to player 2's models stays theirs: a finished
 	// particle burst (shield chips, combo sparkles) stops only in the walk.
 	Capture(g.itf, g.s2);

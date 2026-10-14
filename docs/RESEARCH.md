@@ -1404,3 +1404,7 @@ both halves).
   layout mirrored (models placed at negated screen x, drawn as they are) -- a mirrored HUD camera showed the shields'
   back faces whatever the cull render state (0x14) was set to: the game's draw sets culling itself. Autotests
   shield2o (LV2-1 shield), revshield (-Level 2: pit, revive, then a shield given the bonus's way, S_GIVE).
+- Round 46: P2's HUD fully mirrored (each shield eaten from its left). The HUD draw lists set the cull mode
+  themselves (CAnimationManager vf14/21/28/35/42/49 call the engine's render state function, engine +0x20, with
+  0x14 = 1/2/3), so for P2's pass the HUD camera's right axis is negated and engine +0x20 temporarily points at a
+  wrapper that swaps cull back (2) / cull front (3); restored (and cull back set) after the pass.
