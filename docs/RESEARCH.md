@@ -1384,3 +1384,10 @@ both halves).
   tilts up sliding along the other hero's sphere (the taller Obelix rose onto Asterix). In single player the AI
   companion just blocks. Rising within 2.2 of the other hero on the same level without a jump press (+0x3EC bit 8,
   1.5 s grace) is undone after the tick (HoldOffPartner). Autotests bump2 (co-op), bump1 (single player).
+- Round 44 -- the "automatic jump" (supersedes the HoldOffPartner note above, which is removed: it left the jump
+  animation and sank heroes into raised ground): hero contact event 0x0300 (list +0 next, +4 volume pair, owner at
+  volume +0x20). Touched by a player-driven hero (+0x18 bit 0 clear), a hero is pushed aside and, moving into it,
+  hops out of the way: FUN_0049CDF0 sets vertical speed +0xA8 = 12 (call at 0x48C32E) -- the AI sidekick dodging
+  the player; touched by the sidekick, the player's hero gets neither (blocked). Two players' heroes both took the
+  sidekick's part. Fix: while a hero handles a contact with the other player hero, that hero's +0x18 bit 0 is set
+  (passes for the sidekick). Found with a rise watch on +0xA8 (autotest S_WATCHRW x=7). Not Idefix (bump2i).
