@@ -1,6 +1,7 @@
 #include "config.h"
 #include "proximity.h"
 #include "coop.h"
+#include "individual.h"
 #include "detour.h"
 #include "klusters.h"
 #include "log.h"
@@ -15,6 +16,10 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+// A hero the game has borrowed (scripted order), or one that is down
+// (individual heroes): objects deal with the other hero, the real leader.
+static bool HeroOut(int idx) { return CoopHeroHeld(idx) || IndivFallen(idx); }
 
 namespace {
 
@@ -154,7 +159,7 @@ void TickPlate(int* life, void* dt, char* plate, Trio t) {
 	int nl = CoopNonLeaderPlayer();
 	typedef int(__fastcall* GroundFn)(void* trio, void* edx);
 	GroundFn ground = (GroundFn)(*(void***)t.raw())[29];
-	if (nl < 0 || CoopHeroHeld(nl) || ground(t.raw(), nullptr) == *(int*)(plate + 0x28)) {
+	if (nl < 0 || HeroOut(nl) || ground(t.raw(), nullptr) == *(int*)(plate + 0x28)) {
 		tick(life, nullptr, dt);
 		return;
 	}
@@ -286,7 +291,7 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 	Hero h1 = t ? t.GetHero(p1) : Hero(), h2 = t ? t.GetHero(p2) : Hero();
 	// A hero the game has borrowed for a scripted order (Asterix riding the cable
 	// car Obelix pulls) is not a player's: objects see the real leader.
-	if (!CoopP2Joined() || CoopSuspended() || !h1 || !h2 || CoopHeroHeld(p1) || CoopHeroHeld(p2)) {
+	if (!CoopP2Joined() || CoopSuspended() || !h1 || !h2 || HeroOut(p1) || HeroOut(p2)) {
 		g_origBundleTick(bundle, edx, dt);
 		return;
 	}
@@ -505,7 +510,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 	int nl = CoopNonLeaderPlayer();
 	char* grp = *(char**)(life + 0x0C);
 	Hero lead = t ? t.GetHero(t.Leader()) : Hero(), other = t && nl >= 0 ? t.GetHero(nl) : Hero();
-	if (!grp || !lead || !other || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(nl)) {
+	if (!grp || !lead || !other || !CoopP2Joined() || CoopSuspended() || HeroOut(nl)) {
 		g_origEnemyTick(life, edx, dt);
 		return;
 	}
@@ -578,7 +583,7 @@ void __fastcall CheckpointHook(char* self, void* edx, int arg) {
 	g_origCheckpoint(self, edx, arg);
 	Trio t = GetTrio();
 	int nl = CoopNonLeaderPlayer();
-	if (!t || nl < 0 || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(nl)) return;
+	if (!t || nl < 0 || !CoopP2Joined() || CoopSuspended() || HeroOut(nl)) return;
 	uint8_t* tr = (uint8_t*)t.raw();
 	uint8_t leader = tr[0x2C], companion = tr[0x2D];
 	tr[0x2C] = (uint8_t)nl;
@@ -613,7 +618,7 @@ void __fastcall FightHook(char* trio, void* edx, void* time) {
 	float now = time ? *(float*)((char*)time + 4) : 0.0f;
 	float& last = *(float*)(trio + 0x408);
 	bool nlFound = false;
-	if (t && trio == t.raw() && nl >= 0 && CoopP2Joined() && !CoopSuspended() && !CoopHeroHeld(nl)) {
+	if (t && trio == t.raw() && nl >= 0 && CoopP2Joined() && !CoopSuspended() && !HeroOut(nl)) {
 		uint8_t* tr = (uint8_t*)trio;
 		uint8_t leader = tr[0x2C], companion = tr[0x2D];
 		bool wasOn = (*(uint32_t*)(tr + 0x3F4) & 0x40) != 0;
@@ -677,7 +682,7 @@ void AttractToPlayer2(char* pool) {
 	Trio t = GetTrio();
 	int nl = CoopNonLeaderPlayer();
 	Hero h2 = t && nl >= 0 ? t.GetHero(nl) : Hero();
-	if (!h2 || !CoopP2Joined() || CoopSuspended() || CoopHeroHeld(nl)) return;
+	if (!h2 || !CoopP2Joined() || CoopSuspended() || HeroOut(nl)) return;
 	typedef char(__fastcall* BoolFn)(void* self, void* edx);
 	typedef void(__fastcall* AttractFn)(void* self, void* edx, void* hero, int zero);
 	if (!P2MayCollect(pool, t, h2)) return;
@@ -731,7 +736,7 @@ void __cdecl BeaconCheck(char* pool, char* bonus, char* frame) {
 	Trio t = GetTrio();
 	int nl = CoopNonLeaderPlayer();
 	Hero h2 = t && nl >= 0 ? t.GetHero(nl) : Hero();
-	if (!h2 || CoopHeroHeld(nl) || !P2MayCollect(pool, t, h2)) return;
+	if (!h2 || HeroOut(nl) || !P2MayCollect(pool, t, h2)) return;
 	Vector3 p = h2.Pos();
 	float dx = b[0] - p.x, dy = b[1] - p.y, dz = b[2] - p.z;
 	if (dx * dx + dy * dy + dz * dz <= r2) {
@@ -1127,7 +1132,7 @@ int DispatchAs(char* receiver, int event, void* list, MaskOf maskOf) {
 	if (!t || !CoopP2Joined() || CoopSuspended()) return send(receiver, nullptr, event, list);
 	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
 	Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
-	if (!h1 || !h2 || CoopHeroHeld(p1) || CoopHeroHeld(p2)) return send(receiver, nullptr, event, list);
+	if (!h1 || !h2 || HeroOut(p1) || HeroOut(p2)) return send(receiver, nullptr, event, list);
 	if (receiver == h1.raw()) return SendAs(receiver, event, list, t, p1, p2, p2);
 	if (receiver == h2.raw()) return SendAs(receiver, event, list, t, p2, p1, p2);
 
@@ -1293,7 +1298,7 @@ int NodeIndex(char* det, Hero h) {
 void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 	Trio t = GetTrio();
 	bool coop = t && CoopP2Joined() && !CoopSuspended() && *(uint8_t*)(det + 0x2A) &&
-	            !CoopHeroHeld(HERO_ASTERIX) && !CoopHeroHeld(HERO_OBELIX);
+	            !HeroOut(HERO_ASTERIX) && !HeroOut(HERO_OBELIX);
 	int ia = coop ? NodeIndex(det, t.GetHero(HERO_ASTERIX)) : -1;
 	int io = coop ? NodeIndex(det, t.GetHero(HERO_OBELIX)) : -1;
 	g_tickingDet = det;

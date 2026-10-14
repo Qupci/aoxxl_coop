@@ -571,10 +571,14 @@ static void SetPreset(char* in, int preset) {
 	(g_origSetPreset ? g_origSetPreset : (SetPresetFn)kSetPreset)(in, nullptr, preset);
 }
 
+// Any preset choice the hook saw (the boot choice can come before the hook is in).
+static bool g_presetSeen = false;
+
 static void __fastcall SetPresetHook(char* in, void* edx, int preset) {
 	static bool fakeNoPad = getenv("XXL_PRESETNOPAD") && atoi(getenv("XXL_PRESETNOPAD"));
 	bool pad = GameSeesPad(in) && !fakeNoPad;
 	g_presetWithoutPad = preset == 1 && !pad;
+	g_presetSeen = true;
 	Log("input: the game sets controller preset %d (from %p; it sees %s)", preset, _ReturnAddress(),
 	    pad ? "a pad" : "no pad");
 	g_origSetPreset(in, edx, preset);
@@ -594,11 +598,13 @@ static void WatchControllerPreset() {
 	}
 	if (g.lastLevel <= 0 || now - lastCheck < 1000) return;
 	lastCheck = now;
-	if (preset == 1 && g_presetWithoutPad && GameSeesPad(in)) {
+	if (preset == 1 && (g_presetWithoutPad || !g_presetSeen) && GameSeesPad(in)) {
 		SetPreset(in, 3);
+		Log("input: level %d is running on the keyboard preset 1, which the game chose %s; it sees a pad now -- "
+		    "preset 3 set (the game's choice with a pad)", g.lastLevel,
+		    g_presetWithoutPad ? "while it saw no pad" : "before the mod could see it (at boot)");
 		g_presetWithoutPad = false;
-		Log("input: level %d is running on the keyboard preset 1, which the game chose while it saw no pad; it "
-		    "sees one now -- preset 3 set (the game's choice with a pad)", g.lastLevel);
+		g_presetSeen = true;
 		return;
 	}
 	if (preset != 0) return;

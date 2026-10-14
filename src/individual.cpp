@@ -26,7 +26,7 @@ struct Stats {
 struct SafeSpot { Vector3 pos; DWORD at = 0; };
 const int kSafeSpots = 8;
 
-const float kReviveSeconds = 10.0f;
+const float kReviveSeconds = 8.0f;
 const float kReviveRange = 3.0f;      // horizontally
 const float kReviveHeight = 2.5f;
 
@@ -179,11 +179,19 @@ void ShowDownHint(int down) {
 	HintShow(HINT_REVIVE, text, 8000);
 }
 
+// The HUD's health shows again and is read afresh (game manager +0x5C bit
+// 0x4000, as the game's heal sets it).
+void RefreshHud() {
+	char* gm = GM();
+	if (gm) *(uint32_t*)(gm + 0x5C) |= 0x4000;
+}
+
 void Revive(int idx, Hero h, const char* how) {
 	Stats& s = Current(idx);
-	int hp = s.shields * 5 < 5 ? s.shields * 5 : 5;   // one shield back
-	s.hp = (uint8_t)(hp > 0 ? hp : 5);
+	int hp = (s.shields * 5 + 1) / 2;   // half the health back (1.5 of 3 shields)
+	s.hp = (uint8_t)(hp > 0 ? hp : 1);
 	Commit(idx);
+	RefreshHud();
 	Raise(h);
 	g.fallen[idx] = false;
 	g.revive[idx] = 0;
@@ -205,6 +213,7 @@ void Respawned() {
 		if (h) Raise(h);
 	}
 	HintHide(HINT_REVIVE);
+	RefreshHud();
 	Log("indiv: respawn -- both heroes at health %d, %d shields", s.hp, s.shields);
 }
 
@@ -328,7 +337,9 @@ char __fastcall AddShieldHook(char* gm, void* edx, int arg) {
 bool IndivActive() { return g.active; }
 
 int IndivEnter(int hero) {
-	if (!g.active || (hero != HERO_ASTERIX && hero != HERO_OBELIX)) return -1;
+	// Game over: one health for both again (0, then what the respawn gives) --
+	// a hero ticking with its own 0 after the respawn would die once more.
+	if (!g.active || g.gameOver || (hero != HERO_ASTERIX && hero != HERO_OBELIX)) return -1;
 	int prev = g.ctx;
 	Use(hero);
 	return prev;
@@ -434,12 +445,12 @@ void IndivFrame() {
 
 	int lead = t.Leader();
 	if (lead != HERO_ASTERIX && lead != HERO_OBELIX) return;
-	Use(StandingOr(lead));   // the game manager, the HUD and the rest see the leader's (standing)
 	char* cb = CB();
-	if (g.gameOver) {
+	if (g.gameOver) {   // the game's values are everyone's until the respawn
 		if (cb && *(uint8_t*)(cb + 0x50) > 0) Respawned();
 		return;
 	}
+	Use(StandingOr(lead));   // the game manager, the HUD and the rest see the leader's (standing)
 	RunDownCombo(Other(lead));
 
 	// The lead stays with a hero still standing.

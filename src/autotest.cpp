@@ -1199,6 +1199,21 @@ const Step kPit26B[] = {
 	END(21000),
 };
 
+// pit26c: as pit26b, Asterix first (the lead goes to Obelix, who then falls
+// too; the respawn gives the lead back to Asterix).
+const Step kPit26C[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 88.0f, 2.2f, -390.4f), PLACEAT(3000, HERO_ASTERIX, 92.5f, 2.2f, -390.4f),
+	GLIDEAT(4500, HERO_ASTERIX, 97.0f, 2.2f, -390.4f, 400),
+	SHOT(7000, "pit26c_1"),
+	GLIDEAT(8000, HERO_OBELIX, 97.0f, 2.2f, -390.4f, 600),
+	SHOT(10000, "pit26c_2"), SHOT(18000, "pit26c_3"),
+	VPAD(19000, 1, 0, 0, 1, "p2 up"), P1(19000, 0, 0, 1, "p1 up"),
+	SHOT(20500, "pit26c_4"),
+	END(21000),
+};
+
 // rejoin2 (level 2, individual heroes): player 2's Obelix at 3 points leaves
 // and comes back: still 3 points.
 const Step kRejoin2[] = {
@@ -2414,6 +2429,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("hud2", kHud2),
 	SCENARIO("combo2", kCombo2),
 	SCENARIO("pit26b", kPit26B),
+	SCENARIO("pit26c", kPit26C),
 	SCENARIO("rejoin2", kRejoin2),
 	SCENARIO("pit26a", kPit26A),
 	SCENARIO("inputdump", kInputDump),

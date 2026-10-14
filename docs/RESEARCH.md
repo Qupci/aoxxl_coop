@@ -1349,3 +1349,8 @@ both halves).
   gm +0x2FD cleared after its tick, 0x03xx events dropped, excluded from the "busy" suspension; revive = partner within
   3 units holding grab (binding +0x18 hold time; P2: p2HoldTime[6]) 10 s, or a sector change. Pit: laid on the newest
   safe spot >= 0.7 s old. Font of the HUD prompt has no '|', '#', '%', '>', '~' (has '=', '-', '*', 'o', '+', ':').
+- Round 41 fixes: during a game over the per-hero swap stops (IndivEnter no-op) -- the respawn wrote 15 into one
+  hero's place, a later swap put the other's 0 back and the game killed it again (slide, user log). Revive 8 s, half
+  the health ((shields*5+1)/2), gm +0x5C |= 0x4000 so the HUD reads it again. Fallen heroes count as "out" for all
+  proximity slicing (HeroOut): Romans/lions no longer get them as their leader (down2a: 22 hits -> 0). Preset 1 the
+  hook never saw being chosen (boot pick before the ASI's hooks) with a pad visible -> 3.
