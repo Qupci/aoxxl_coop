@@ -1452,3 +1452,13 @@ both halves).
   them on a purchase, the game's reset vf16 does too), trio 0x5124 (natural end); the merchant won't reopen until
   the shopper is out of situation 0x0A. Autotests shopsplit (P1 moves; log line "controls back on"), shopspy (menu
   open, state 3, closed by the dialogue, no crash, no leftover legends).
+- Round 54: merchant states (handlers at shop +0x1A8, this = shop +0x1A4, (code 0 tick / 1 enter / 2 exit, x)):
+  0 idle (FUN_004C1160), 1 walk up (enter: world pause FUN_004FFCD0(gm, 1), gm+0x5C |= 0x4000000, shop camera), 2 the
+  merchant's words (exit shows the menu pieces), 3 menu (enter FUN_004BFAD0: bindings group 0 off + values zeroed,
+  group 1 on; exit FUN_004C0200 back), 4 goodbye words, 5 leaving (FUN_004C1B90: enter restores the camera; exit
+  unpauses and clears gm+0x5C 0x4000000; its tick goes to 0 and sends trio 0x5124). gm+0x5C 0x4000000 = at the
+  merchant: the game manager's tick shows (FUN_00515830) / takes down (FUN_00515A30) the shop's screen (bars) on
+  its edges, mirrored in bit 0x8000000. User: a shop closed in states 1-2 left the bars after the agent's dialogue
+  -> the forced close also runs state 5's exit. User: P1 paused for a moment when P2's menu came up (the zeroed
+  values, a frame before the re-enable) -> the menu's call at 0x4BFB1B skips "group 0 off" while P2 shops
+  (the per-frame re-enable stays as a fallback). Autotests shopspyw (state 1), shopspy, shopsplit(a).

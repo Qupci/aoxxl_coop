@@ -1475,6 +1475,21 @@ const Step kShopSpy[] = {
 	END(24000),
 };
 
+// shopspyw (level 2): shopspy with the merchant still talking (state 2, before
+// his menu): after the agent's dialogue no shop screen (bars) may be left.
+const Step kShopSpyW[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(6000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(6500, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(9500, "shopspyw_1"), SHOT(22000, "shopspyw_2"), SHOT(26000, "shopspyw_3"),
+	END(28000),
+};
+
 // spyonly (level 2): shopspy without the merchant (what the agent's dialogue
 // shows by itself).
 const Step kSpyOnly[] = {
@@ -2704,6 +2719,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("hudorder", kHudOrder),
 	SCENARIO("shopspy", kShopSpy),
 	SCENARIO("spyonly", kSpyOnly),
+	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("req410", kReq410),

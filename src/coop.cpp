@@ -135,6 +135,7 @@ struct CoopState {
 	bool     dyingLeads = false;        // ... and has been given the lead
 	uint8_t  hpBeforeTick = 0;
 	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
+	int      shopCloseCheck = 0;        // frames until the forced close's result is logged
 	bool     shopForcedClosed = false;  // the merchant closed for the other player's dialogue (until the shopper is out)
 } g;
 
@@ -575,6 +576,21 @@ static void SetPreset(char* in, int preset) {
 }
 
 // Any preset choice the hook saw (the boot choice can come before the hook is in).
+// The merchant's menu, when it comes up (FUN_004BFAD0), turns the gameplay
+// bindings off (FUN_00437F10(CKInput, 0, 0), which also zeroes their values) --
+// player 1's controls. With player 2 at the merchant they stay on: that call
+// site (0x4BFB1B) comes here.
+const uintptr_t kShopMenuInputOff = 0x4BFB1B;
+const uint8_t   kShopMenuInputOffBytes[5] = { 0xE8, 0xF0, 0x83, 0xF7, 0xFF };
+
+static int __fastcall ShopMenuInputOff(char* in, void* edx, int group, int on) {
+	if (group == 0 && !on && g.p2Joined && g.shopping && g.shopper == g.p2Hero) {
+		Log("coop: the merchant's menu is player 2's -- player 1's controls stay on");
+		return 1;
+	}
+	return ((int(__fastcall*)(char*, void*, int, int))0x437F10)(in, edx, group, on);
+}
+
 static bool g_presetSeen = false;
 
 static void __fastcall SetPresetHook(char* in, void* edx, int preset) {
@@ -1086,9 +1102,17 @@ void CloseShopFor(const char* why) {
 		((void(__fastcall*)(char*, void*, int))0x4C1040)(sh, nullptr, 0);
 		// its menu's pieces (item, price, legends: +0x28..+0x34) hidden, as its reset does
 		((void(__fastcall*)(char*, void*, int))0x4BF670)(sh, nullptr, 0);
+		// and the leaving state's exit (state 5, FUN_004C1B90(2, x), thiscall ret 8),
+		// which the natural end goes through: the world unpaused and the game manager's
+		// "at the merchant" bit (+0x5C 0x4000000: the shop's screen, bars) cleared
+		((char(__fastcall*)(char*, void*, int, int))0x4C1B90)(*(char**)(sh + 0x1A4), nullptr, 2, 0);
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (gm) Log("coop: the merchant closed: game manager +0x5C now %08X", *(unsigned*)(gm + 0x5C));
 		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 		((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x5124, nullptr);
 		g.shopForcedClosed = true;
+		g.shopCloseCheck = 3;
 	}
 }
 
@@ -1481,6 +1505,11 @@ void CoopFrame() {
 	if (shopping && !g.shopping) {
 		g.shopper = t.Leader();
 		Log("coop: %s is at the merchant -- in that player's half; the other player plays on", HeroName(g.shopper));
+	}
+	if (g.shopCloseCheck > 0 && --g.shopCloseCheck == 0) {
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (gm) Log("coop: after the merchant's forced close: game manager +0x5C %08X", *(unsigned*)(gm + 0x5C));
 	}
 	if (g.shopForcedClosed && !shopping && Situation(h1) != kSituationShop && Situation(h2) != kSituationShop)
 		g.shopForcedClosed = false;
@@ -2724,6 +2753,8 @@ void CoopInit() {
 	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");
 	InstallDetour(kFreezeWorld, (void*)FreezeWorldHook, (void**)&g_origFreeze, kFreezePrologue,
 	              sizeof(kFreezePrologue), "world pause (not for the merchant in co-op)");
+	PatchCallSite(kShopMenuInputOff, kShopMenuInputOffBytes, sizeof(kShopMenuInputOffBytes), (void*)ShopMenuInputOff,
+	              "merchant's menu input (player 1's controls on while player 2 shops)");
 	InstallDetour(kSetPreset, (void*)SetPresetHook, (void**)&g_origSetPreset, kSetPresetPrologue,
 	              sizeof(kSetPresetPrologue), "controller preset (picked without a pad)");
 	PatchVtableSlot(0x625A8C, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent,
