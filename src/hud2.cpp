@@ -46,6 +46,11 @@ struct State {
 	char*    itf = nullptr;
 	HudState s1, s2;           // player 1's (the game's) and player 2's
 	int      lastHp[2] = { -1, -1 }, lastShields[2] = { -1, -1 };
+	// A health change waiting for that player's HUD to show it: the health part
+	// takes the flag (game manager +0x5C bit 0x4000) only in its hidden state --
+	// a change while it slides away is shown once it is hidden (as the game's
+	// own flag stays up for it).
+	bool     pending[2] = {};
 	// Render: what was moved or hidden for a pass.
 	struct Moved { char* p; float x, y; } moved2d[8];
 	int      nMoved2d = 0;
@@ -221,8 +226,8 @@ void Hud2BeforeInterfaceTick(char* itf) {
 	// goes up for either hero's).
 	char* gm = GM();
 	if (!gm) return;
-	bool mine = StatsChanged(0, CoopP1Hero());
-	*(uint32_t*)(gm + 0x5C) = (*(uint32_t*)(gm + 0x5C) & ~0x4000u) | (mine ? 0x4000u : 0u);
+	if (StatsChanged(0, CoopP1Hero())) g.pending[0] = true;
+	*(uint32_t*)(gm + 0x5C) = (*(uint32_t*)(gm + 0x5C) & ~0x4000u) | (g.pending[0] ? 0x4000u : 0u);
 }
 
 void Hud2AfterInterfaceTick(char* itf, void* time) {
@@ -235,6 +240,8 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 		g.lastHp[1] = g.lastShields[1] = -1;
 	}
 	HideIdleShields(itf);   // player 1's
+	// Player 1's change shown (the health part took the flag)?
+	if (g.pending[0] && !(*(uint32_t*)(gm + 0x5C) & 0x4000)) g.pending[0] = false;
 	Capture(itf, g.s1);
 	static const bool posLog = getenv("XXL_HUDPOS") != nullptr;
 	static DWORD lastP1 = 0;
@@ -255,7 +262,8 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 	uint32_t& f = *(uint32_t*)(gm + 0x5C);
 	uint32_t saved = f;
 	f &= ~kShowFlags;
-	if (StatsChanged(1, CoopP2Hero())) f |= 0x4000;
+	if (StatsChanged(1, CoopP2Hero())) g.pending[1] = true;
+	if (g.pending[1]) f |= 0x4000;
 	if (CoopP2ShowsHud()) f |= 0x1000000;
 	int prev = IndivEnter(CoopP2Hero());
 	g.inP2Tick = true;
@@ -267,6 +275,7 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 		}
 	}
 	g.inP2Tick = false;
+	if (g.pending[1] && !(f & 0x4000)) g.pending[1] = false;   // shown
 	HideIdleShields(itf);   // player 2's
 	IndivLeave(prev);
 	f = (f & ~kShowFlags) | (saved & kShowFlags);
@@ -349,31 +358,21 @@ bool Hud2BeginP2(RwCamera* hud) {
 		g.hidden[g.nHidden++] = { n, *(uint32_t*)(n + 0x10) };
 		*(uint32_t*)(n + 0x10) |= 2;
 	}
-	// To the right edge (a model's screen x is minus its x along the HUD
-	// camera's right axis): the shields as a block, in their own order (the
-	// last one still the first to go), so its last shield is where player 1's
-	// first is, mirrored; the sparkles with them; the combo bar's column
-	// mirrored.
+	// Mirrored -- player 1's HUD seen in a mirror: each model's screen x (minus
+	// its x along the HUD camera's right axis, the camera on the HUD's middle)
+	// negated: the first shield at the right edge, more of them leftwards, the
+	// last (the first to go) leftmost, the combo bar at the right edge. Only the
+	// places: the models themselves (symmetric shields) are drawn as they are --
+	// a mirrored camera turns their faces away, and the game's draw sets the
+	// culling itself.
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);
-	auto camX = [&](float* fr) {
-		float* lt = (float*)((char*)fr + 0x80);
-		return (lt[0] - cl[12]) * cl[0] + (lt[1] - cl[13]) * cl[1] + (lt[2] - cl[14]) * cl[2];
-	};
-	int hp = 0, shields = 3;
-	IndivStats(CoopP2Hero(), &hp, &shields);
-	if (shields < 1) shields = 1;
-	if (shields > 6) shields = 6;
-	char* first = ElemPtr(itf, 0);
-	char* last = ElemPtr(itf, (shields - 1) * 5);
-	float* ff = first ? FrameOf(first) : nullptr;
-	float* fl = last ? FrameOf(last) : nullptr;
-	float shieldShift = ff && fl ? -(camX(ff) + camX(fl)) : 0.0f;
 	for (int i = 0; i < kNumP2Elems; i++) {
 		char* n = ElemPtr(itf, i);
 		float* fr = n ? FrameOf(n) : nullptr;
 		if (!fr) continue;
-		bool shieldPart = i <= 30;   // the 30 shield models and their sparkles (+0xA4)
-		MoveAlong(fr, cl, shieldPart ? shieldShift : -2.0f * camX(fr), false);
+		float* lt = (float*)((char*)fr + 0x80);
+		float x = (lt[0] - cl[12]) * cl[0] + (lt[1] - cl[13]) * cl[1] + (lt[2] - cl[14]) * cl[2];
+		MoveAlong(fr, cl, -2.0f * x, false);
 	}
 	g.p2Pass = true;
 	static const bool posLog = getenv("XXL_HUDPOS") != nullptr;

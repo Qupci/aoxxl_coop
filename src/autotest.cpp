@@ -23,7 +23,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -1337,6 +1337,41 @@ const Step kBump2W[] = {
 	END(9000),
 };
 
+// shield2o (level 2, individual heroes): player 2's Obelix picks up the shield
+// bonus at -807.3 512.0 -1044.9 (the user's): his fourth shield, not Asterix's.
+const Step kShield2O[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_OBELIX, -807.3f, 512.5f, -1044.9f, 1500),
+	SHOT(4500, "shield2o_1"),
+	SHOT(6000, "shield2o_2"),
+	VPAD(7000, 1, PAD_BACK, 0, 0, "p2 back"),
+	SHOT(8000, "shield2o_3"),
+	VPAD(8500, 1, 0, 0, 0, "p2 release"),
+	END(9000),
+};
+
+// revshield (-Level 2, individual heroes): Asterix (player 1) falls into the
+// LV2-6 pit (laid on the planks), Obelix revives him (no Romans about), then he
+// gets a shield as the bonus gives it: player 1's HUD shows his own health.
+const Step kRevShield[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 88.0f, 2.2f, -390.4f), PLACEAT(3000, HERO_ASTERIX, 92.5f, 2.2f, -390.4f),
+	GLIDEAT(4500, HERO_ASTERIX, 97.0f, 2.2f, -390.4f, 400),
+	PLACEAT(7000, HERO_OBELIX, 90.5f, 2.2f, -390.4f),
+	VPAD(7500, 1, PAD_B, 0, 0, "p2 holds B"),
+	SHOT(12000, "revshield_0"),
+	VPAD(17000, 1, 0, 0, 0, "p2 release"),
+	SHOT(17500, "revshield_1"),
+	{ 19000, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" },
+	SHOT(20000, "revshield_2"),
+	SHOT(22000, "revshield_3"),
+	{ 23000, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	SHOT(24500, "revshield_4"),
+	END(25000),
+};
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -2516,6 +2551,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("hud2", kHud2),
 	SCENARIO("bump2", kBump2),
 	SCENARIO("bump2i", kBump2I),
+	SCENARIO("shield2o", kShield2O),
+	SCENARIO("revshield", kRevShield),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),
 	SCENARIO("bump1", kBump1),
@@ -4177,6 +4214,20 @@ void RunStep(const Step& s) {
 	case S_PROBE:
 		at.probe = s.a != 0;
 		break;
+	case S_GIVE: {   // hero a gets a shield (b = 1) or x health points (b = 0), as a bonus gives them
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (!gm) break;
+		typedef char(__fastcall* GmFn)(char* gm, void* edx, int arg);
+		int prev = IndivEnter(s.a);
+		if (s.b == 1) ((GmFn)0x507210)(gm, nullptr, 5);
+		else ((GmFn)0x4BB260)(gm, nullptr, (int)s.x);
+		char* cb = *(char**)(gm + 0x40);
+		Log("autotest: %s given %s -- health %d, %d shields", HeroName(s.a), s.b == 1 ? "a shield" : "health", *(uint8_t*)(cb + 0x50),
+		    *(uint8_t*)(cb + 0x51));
+		IndivLeave(prev);
+		break;
+	}
 	case S_HUDDIFF:
 		HudDiffStart();
 		break;

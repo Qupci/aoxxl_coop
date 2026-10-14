@@ -35,6 +35,7 @@ struct State {
 	int      level = -2;
 	Stats    st[2];
 	int      ctx = -1;                 // whose stats are in the game's place (-1: the game's own)
+	int      depth = 0;                // IndivEnter scopes open (a hero's tick, event, pickup...)
 	bool     fallen[2] = {};
 	float    revive[2] = {};           // seconds the other player has held the grab button by it
 	bool     gameOver = false;
@@ -222,6 +223,7 @@ void Activate(Trio t) {
 	if (!Read(s)) return;
 	g.st[0] = g.st[1] = s;
 	g.ctx = t.Leader() == HERO_OBELIX ? HERO_OBELIX : HERO_ASTERIX;
+	g.depth = 0;
 	g.active = true;
 	g.gameOver = false;
 	memset(g.fallen, 0, sizeof(g.fallen));
@@ -303,7 +305,28 @@ const uintptr_t kHeal = 0x4BB260, kAddShield = 0x507210;
 const uint8_t   kGmPrologue[7] = { 0x56, 0x8B, 0x71, 0x40, 0x8A, 0x46, 0x50 };
 GmFn g_origHeal = nullptr, g_origAddShield = nullptr;
 
+// A bonus collected: CKHkBasicBonus's tick hands it to its pool's vf40
+// (CKGrpAsterixBonusPool 0x506E90, thiscall(pool, hero), ret 4) with the hero
+// it flew to; the pool applies it (heal, shield, helmets...). That hero's stats.
+int g_collector = -1;
+typedef void(__fastcall* CollectFn)(char* pool, void* edx, char* hero);
+CollectFn g_origCollect = nullptr;
+void __fastcall CollectHook(char* pool, void* edx, char* hero) {
+	Trio t = GetTrio();
+	int who = -1;
+	for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
+		if (t.GetHero(i).raw() == hero) who = i;
+	int prevCollector = g_collector;
+	g_collector = who;
+	int prev = IndivEnter(who);
+	g_origCollect(pool, edx, hero);
+	IndivLeave(prev);
+	g_collector = prevCollector;
+}
+
 int Picker() {
+	if (g_collector >= 0) return g_collector;
+	if (g.depth > 0) return g.ctx;   // inside one hero's business: that hero's
 	Trio t = GetTrio();
 	int l = t ? t.Leader() : -1;
 	return l == HERO_ASTERIX || l == HERO_OBELIX ? l : -1;
@@ -342,6 +365,8 @@ int IndivEnter(int hero) {
 	if (!g.active || g.gameOver || (hero != HERO_ASTERIX && hero != HERO_OBELIX)) return -1;
 	int prev = g.ctx;
 	Use(hero);
+	if (prev < 0) prev = hero;   // a scope is open either way (IndivLeave closes it)
+	g.depth++;
 	return prev;
 }
 
@@ -353,6 +378,7 @@ static int StandingOr(int idx) {
 
 void IndivLeave(int prev) {
 	if (!g.active || prev < 0) return;
+	if (g.depth > 0) g.depth--;
 	Use(StandingOr(prev));
 }
 
@@ -514,6 +540,8 @@ void IndivFrame() {
 bool IndivInstallHooks() {
 	bool ok = InstallDetour(kHeal, (void*)HealHook, (void**)&g_origHeal, kGmPrologue, sizeof(kGmPrologue),
 	                        "heal (individual heroes)");
+	ok &= PatchVtableSlot(0x62808C, 40, 0x506E90, (void*)CollectHook, (void**)&g_origCollect,
+	                      "CKGrpAsterixBonusPool::vf40 (a bonus collected: the collector's stats)");
 	ok &= InstallDetour(kAddShield, (void*)AddShieldHook, (void**)&g_origAddShield, kGmPrologue, sizeof(kGmPrologue),
 	                    "add a shield (individual heroes)");
 	return ok;

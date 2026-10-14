@@ -1395,3 +1395,12 @@ both halves).
   the *moving* sidekick takes nothing. Touched by a *waiting* sidekick (AI state +0x561 == 3 or 9) it is pushed back
   (blocked) without the hop (bVar6 = 0). Now the other hero passes for a waiting sidekick (+0x18 bit 0 and +0x561 = 3)
   for the length of the handler: both solid, the runner pushes the other along, no hop, no lift (bump2/bump2i).
+- Round 45 (individual heroes, user test): bonuses are applied by the pool's vf40 (CKGrpAsterixBonusPool 0x506E90,
+  thiscall(pool, hero), ret 4 -- CKHkBasicBonus's tick passes the hero it flew to); the mod had credited the trio
+  leader (a shield picked up by P2 went to Asterix). vf40 is wrapped with the collector's stats; the heal / add-shield
+  hooks keep the current hero inside any IndivEnter scope (leader only as a fallback). The health part takes the
+  "health changed" flag only in its hidden state (a change while it slides away waits for it): each player's flag is
+  now kept pending until that player's HUD takes it (P1's HUD missed changes right after a revive). P2's HUD: the
+  layout mirrored (models placed at negated screen x, drawn as they are) -- a mirrored HUD camera showed the shields'
+  back faces whatever the cull render state (0x14) was set to: the game's draw sets culling itself. Autotests
+  shield2o (LV2-1 shield), revshield (-Level 2: pit, revive, then a shield given the bonus's way, S_GIVE).
