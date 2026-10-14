@@ -1484,9 +1484,9 @@ const Step kShopSpyW[] = {
 	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
 	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
 	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
-	PLACEAT(6000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
-	GLIDEAT(6500, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
-	SHOT(9500, "shopspyw_1"), SHOT(22000, "shopspyw_2"), SHOT(26000, "shopspyw_3"),
+	PLACEAT(8500, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(9000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(12000, "shopspyw_1"), SHOT(22000, "shopspyw_2"), SHOT(26000, "shopspyw_3"),
 	END(28000),
 };
 

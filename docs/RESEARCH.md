@@ -1462,3 +1462,11 @@ both halves).
   -> the forced close also runs state 5's exit. User: P1 paused for a moment when P2's menu came up (the zeroed
   values, a frame before the re-enable) -> the menu's call at 0x4BFB1B skips "group 0 off" while P2 shops
   (the per-frame re-enable stays as a fallback). Autotests shopspyw (state 1), shopspy, shopsplit(a).
+- Round 55: user: shop closed while the merchant talks (state 2) still left bars and the merchant open after the
+  agent's dialogue. The bars are the shop's own: +0x38/+0x3C (top/bottom), slid in by FUN_004BF980 in state 1, out
+  in state 5 and only then hidden (vf 0x44); shop+8 bit 0x40 = sliding; shop vf19 hides both at once. The merchant's
+  pose (+8 bits 3-5; FUN_004C0ED0(pose, dt): 0 rest, 1/4 talking, 3 leaving) stays the talking one while +0x1CA bit
+  0x20 (talking, set by state 2's enter) is set and his line plays (speech service yp+0x84: vf 0x68 play, 0x6C stop,
+  FUN_0046F590 done). Forced close now: stop the line, clear 0x20, state 0, menu pieces off, state 5's exit, vf19,
+  pose 0. FUN_00515830/FUN_00515A30 (gm tick, gm+0x5C bit 26 edges, mirror bit 27, bit 28 = HUD hidden) only
+  hide/restore the HUD. Autotest shopspyw (state 2 now): state 0, pose 0, bars flag off.

@@ -135,6 +135,7 @@ struct CoopState {
 	bool     dyingLeads = false;        // ... and has been given the lead
 	uint8_t  hpBeforeTick = 0;
 	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
+	char*    closedShop = nullptr;
 	int      shopCloseCheck = 0;        // frames until the forced close's result is logged
 	bool     shopForcedClosed = false;  // the merchant closed for the other player's dialogue (until the shopper is out)
 } g;
@@ -1099,6 +1100,15 @@ void CloseShopFor(const char* why) {
 		char* sh = (char*)GetLvlObject(2, 172, i);
 		if (!sh || (*(uint8_t*)(sh + 8) & 7) == 0) continue;
 		Log("coop: %s closes the merchant's shop (%s was in state %d)", why, HeroName(g.shopper), *(uint8_t*)(sh + 8) & 7);
+		// His words cut first, as his goodbye does (speech service yp +0x84, vf 0x6C),
+		// and his "talking" bit (+0x1CA 0x20) off: while both hold, his pose stays the
+		// talking one (open, leaning out) whatever pose state 0 asks for.
+		{
+			CKYellowPages* yp = YellowPages();
+			char* speech = yp ? *(char**)((char*)yp + 0x84) : nullptr;
+			if (speech) ((void(__fastcall*)(char*, void*))(*(void***)speech)[0x6C / 4])(speech, nullptr);
+			*(uint8_t*)(sh + 0x1CA) &= ~0x20;
+		}
 		((void(__fastcall*)(char*, void*, int))0x4C1040)(sh, nullptr, 0);
 		// its menu's pieces (item, price, legends: +0x28..+0x34) hidden, as its reset does
 		((void(__fastcall*)(char*, void*, int))0x4BF670)(sh, nullptr, 0);
@@ -1106,6 +1116,10 @@ void CloseShopFor(const char* why) {
 		// which the natural end goes through: the world unpaused and the game manager's
 		// "at the merchant" bit (+0x5C 0x4000000: the shop's screen, bars) cleared
 		((char(__fastcall*)(char*, void*, int, int))0x4C1B90)(*(char**)(sh + 0x1A4), nullptr, 2, 0);
+		// his bars (+0x38, +0x3C: slid in by state 1, out by state 5) gone at once: vf19
+		((void(__fastcall*)(char*, void*))(*(void***)sh)[19])(sh, nullptr);
+		// back in his rest pose (FUN_004C0ED0(anim, dt), thiscall ret 8; anim 0)
+		((void(__fastcall*)(char*, void*, int, float))0x4C0ED0)(sh, nullptr, 0, 0.0f);
 		CKYellowPages* yp = YellowPages();
 		char* gm = yp ? (char*)yp->gameManager : nullptr;
 		if (gm) Log("coop: the merchant closed: game manager +0x5C now %08X", *(unsigned*)(gm + 0x5C));
@@ -1113,6 +1127,7 @@ void CloseShopFor(const char* why) {
 		((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x5124, nullptr);
 		g.shopForcedClosed = true;
 		g.shopCloseCheck = 3;
+		g.closedShop = sh;
 	}
 }
 
@@ -1509,7 +1524,9 @@ void CoopFrame() {
 	if (g.shopCloseCheck > 0 && --g.shopCloseCheck == 0) {
 		CKYellowPages* yp = YellowPages();
 		char* gm = yp ? (char*)yp->gameManager : nullptr;
-		if (gm) Log("coop: after the merchant's forced close: game manager +0x5C %08X", *(unsigned*)(gm + 0x5C));
+		char* sh = g.closedShop;
+		if (gm && sh) Log("coop: after the merchant's forced close: game manager +0x5C %08X; shop state %d pose %d flags %02X/%02X",
+			*(unsigned*)(gm + 0x5C), *(uint8_t*)(sh + 8) & 7, (*(uint8_t*)(sh + 8) >> 3) & 7, *(uint8_t*)(sh + 8) & 0xC0, *(uint8_t*)(sh + 0x1CA));
 	}
 	if (g.shopForcedClosed && !shopping && Situation(h1) != kSituationShop && Situation(h2) != kSituationShop)
 		g.shopForcedClosed = false;
