@@ -127,6 +127,12 @@ struct CoopState {
 	bool     gunSolo = false;           // Asterix on the machine gun, Obelix's player free (split screen on)
 	bool     gunJoinReq = false;        // Obelix's X at the gun's handles, served next frame
 	bool     gunJoining = false;        // ... being served: 0x4809's companion order is wanted
+
+	// Death (shared health at 0): the hero that took the last point; it leads
+	// for the death, the other hero is the AI companion until the respawn.
+	int      dying = -1;
+	bool     dyingLeads = false;        // ... and has been given the lead
+	uint8_t  hpBeforeTick = 0;
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -157,11 +163,25 @@ int OtherHero(int idx) { return idx == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX
 
 uint8_t* F18(Hero h) { return (uint8_t*)(h.raw() + 0x18); }
 
+// The heroes' shared health: game manager +0x40 -> +0x50 (points, 5 a shield),
+// +0x51 (shields, 3 to 6).
+uint8_t* HealthPtr() {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+	return cb ? (uint8_t*)(cb + 0x50) : nullptr;
+}
+int Health() {
+	uint8_t* hp = HealthPtr();
+	return hp ? *hp : -1;
+}
+
 // Puts hero `idx` into the player variant of its current mode if that mode is a
 // playable one (normal or swimming). Scripted modes are left to the game.
 bool EnforcePlayer(Trio t, int idx) {
 	Hero h = t.GetHero(idx);
 	if (!h || (idx >= 0 && idx < HERO_COUNT && (g.held[idx] || g.aiCycle[idx] > 0))) return false;
+	if (g.dying >= 0 && idx != g.dying) return false;   // the survivor watches the death as the AI companion
 	uint8_t f = *F18(h);
 	if (!HeroModePlayable(f) || HeroIsPlayerVariant(f)) return false;
 	*F18(h) = HeroPlayerVariant(f);
@@ -275,7 +295,56 @@ void ForgetP2() {
 	g.p2ValuesReady = false;
 	g.suspended = false;
 	g.shopping = false;
+	g.dying = -1;
+	g.dyingLeads = false;
 	for (int i = 0; i < HERO_COUNT; i++) g.held[i] = false;
+}
+
+// Death. Every player-driven hero with the health at 0 (hero +0x390 bit 2, from
+// Hero_PreLifeTick) goes into situation 0x0E, the death, whose cutscene follows
+// the trio's leader. In single player only the leader is player-driven, and an
+// AI companion that loses the last point (a death pit: FUN_0049D610) first takes
+// the lead with trio 0x4800/0x4801 -- the death is shown on the hero that died.
+// In co-op the hero that took the last point is noted (its own tick, or a hit
+// through its sendEvent), the other hero becomes the AI companion before it can
+// tick into its own death, and the dying hero gets the lead the game's way.
+void NoteDeath(int idx, const char* how) {
+	if (!g.p2Joined || g.suspended || g.dying >= 0 || (idx != HERO_ASTERIX && idx != HERO_OBELIX)) return;
+	Trio t = GetTrio();
+	if (!t) return;
+	g.dying = idx;
+	g.dyingLeads = false;
+	int other = OtherHero(idx);
+	Hero o = t.GetHero(other);
+	if (o && HeroModePlayable(*F18(o))) *F18(o) = HeroAiVariant(*F18(o));
+	Log("coop: %s lost the last point of health (%s) -- the death is %s's; %s is the AI companion meanwhile",
+	    HeroName(idx), how, HeroName(idx), HeroName(other));
+}
+
+// Gives the dying hero the lead (outside any sliced tick: the trio's bytes are
+// the real ones).
+void LeadTheDeath() {
+	if (g.dying < 0 || g.dyingLeads || g.sliced) return;
+	Trio t = GetTrio();
+	if (!t) return;
+	g.dyingLeads = true;
+	if (t.Leader() == g.dying) return;
+	Hero h = t.GetHero(g.dying), lead = t.GetHero(t.Leader());
+	if (!h || !lead) return;
+	// The switch handler refuses a dead leader (+0x390 bit 2) and a target that
+	// is not the AI companion (+0x18 bit 0).
+	uint8_t deadBit = *(uint8_t*)(lead.raw() + 0x390) & 4;
+	*(uint8_t*)(lead.raw() + 0x390) &= ~4;
+	// The handler moves both heroes one Life state along (leader -> AI, target
+	// -> player), so they go in as a player leader and an AI target.
+	if (HeroModePlayable(*F18(h))) *F18(h) = HeroAiVariant(*F18(h));
+	if (HeroModePlayable(*F18(lead))) *F18(lead) = HeroPlayerVariant(*F18(lead));
+	t.SwitchTo(g.dying);
+	*(uint8_t*)(lead.raw() + 0x390) |= deadBit;
+	int other = OtherHero(g.dying);
+	Hero o = t.GetHero(other);
+	if (o && HeroModePlayable(*F18(o))) *F18(o) = HeroAiVariant(*F18(o));
+	Log("coop: %s leads for the death (leader now %s)", HeroName(g.dying), HeroName(t.Leader()));
 }
 
 // Hand player 2's hero back to the game: make player 1's hero the trio leader
@@ -1370,7 +1439,12 @@ void CoopFrame() {
 		if (!gunSolo && HeroModePlayable(t.GetHero(HERO_ASTERIX).Flags18()) && !g.suspended) GiveBackLead(t);
 	}
 	if (g.gunJoinReq) JoinGun(t, "X at the handles");
-	bool scripted = (!HeroModePlayable(h1.Flags18()) && !(gunSolo && g.p1Hero == HERO_ASTERIX)) ||
+	if (g.dying >= 0 && Health() > 0) {
+		Log("coop: health back (%d) -- %s's death is over", Health(), HeroName(g.dying));
+		g.dying = -1;
+		g.dyingLeads = false;
+	}
+	bool scripted = g.dying >= 0 || (!HeroModePlayable(h1.Flags18()) && !(gunSolo && g.p1Hero == HERO_ASTERIX)) ||
 	                (!HeroModePlayable(h2.Flags18()) && !(gunSolo && g.p2Hero == HERO_ASTERIX)) ||
 	                h1.Busy() || h2.Busy() || groupAction || cinematic;
 	if (scripted != g.suspended) {
@@ -1906,8 +1980,16 @@ static void TorchBeforeTick(int heroIndex, Hero hero) {
 
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	TorchBeforeTick(heroIndex, hero);
+	g.hpBeforeTick = (uint8_t)Health();
 	if (!g.p2Joined || g.suspended) return;
 	if (heroIndex != g.p1Hero && heroIndex != g.p2Hero) return;
+	if (g.dying >= 0) {
+		LeadTheDeath();
+		if (heroIndex != g.dying) {
+			if (HeroModePlayable(*F18(hero))) *F18(hero) = HeroAiVariant(*F18(hero));
+			return;
+		}
+	}
 
 	// The Life reads the control bits first thing in its tick, so this is the
 	// moment they have to be right.
@@ -2161,6 +2243,30 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	}
 	WatchLbPass(heroIndex, hero);
 	WatchSpinHint(heroIndex, hero);
+	if (g.hpBeforeTick > 0 && Health() == 0 && (heroIndex == g.p1Hero || heroIndex == g.p2Hero)) {
+		NoteDeath(heroIndex, "in its own tick");
+		LeadTheDeath();
+	}
+}
+
+// Hits reach a hero through its sendEvent (CKHkAsterix / CKHkObelix vtable slot
+// 5, shared 0x48BC70; damage FUN_00495FA0): the one whose event took the health
+// to 0 is the one that died.
+typedef int(__fastcall* HeroSendEventFn)(char* hero, void* edx, int event, void* param);
+HeroSendEventFn g_origHeroSendEvent = nullptr, g_origHeroSendEvent2 = nullptr;   // the same function
+int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) {
+	int before = Health();
+	int r = g_origHeroSendEvent(hero, edx, event, param);
+	if (before > 0 && Health() == 0 && g.p2Joined) {
+		Trio t = GetTrio();
+		for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
+			if (t.GetHero(i).raw() == hero) {
+				char how[32];
+				sprintf(how, "hero event %04X", event & 0xFFFF);
+				NoteDeath(i, how);
+			}
+	}
+	return r;
 }
 
 // A machine is taken with both heroes at it: the other one within 12 units
@@ -2481,6 +2587,9 @@ void CoopInit() {
 	              sizeof(kFreezePrologue), "world pause (not for the merchant in co-op)");
 	InstallDetour(kSetPreset, (void*)SetPresetHook, (void**)&g_origSetPreset, kSetPresetPrologue,
 	              sizeof(kSetPresetPrologue), "controller preset (picked without a pad)");
+	PatchVtableSlot(0x625A8C, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent,
+	                "CKHkAsterix::sendEvent (who died)");
+	PatchVtableSlot(0x625BB0, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent2, "CKHkObelix::sendEvent (who died)");
 	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");

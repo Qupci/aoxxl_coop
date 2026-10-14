@@ -1151,6 +1151,42 @@ const Step kShopSplitA[] = {
 	END(22000),
 };
 
+// hit2o (level 2): the health down to one point, player 2's Obelix (not
+// leading) next to a Roman, standing still: the Roman's hit kills him -- the
+// death must be Obelix's.
+const Step kHit2O[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_POKE8, -1, 0x50, 0, 1, 0, "health 1" },
+	{ 1600, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix at a roman" },
+	SHOT(6000, "hit2o_1"), SHOT(9000, "hit2o_2"), SHOT(14000, "hit2o_3"),
+	END(20000),
+};
+
+// pit26o (-Level 2): sector 6's big death pit; player 2's Obelix (not leading)
+// jumps in (the user's spot 92.5 2.2 -390.4 towards x 96), Asterix stays on the
+// ground. Whose death does the game show?
+const Step kPit26O[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 88.0f, 2.2f, -390.4f), PLACEAT(3000, HERO_OBELIX, 92.5f, 2.2f, -390.4f),
+	SHOT(4000, "pit26o_0"),
+	GLIDEAT(4500, HERO_OBELIX, 97.0f, 2.2f, -390.4f, 400),
+	SHOT(5500, "pit26o_1"), SHOT(7000, "pit26o_2"), SHOT(9000, "pit26o_3"), SHOT(12000, "pit26o_4"),
+	SHOT(16000, "pit26o_5"),
+	END(18000),
+};
+const Step kPit26A[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 88.0f, 2.2f, -390.4f), PLACEAT(3000, HERO_ASTERIX, 92.5f, 2.2f, -390.4f),
+	SHOT(4000, "pit26a_0"),
+	GLIDEAT(4500, HERO_ASTERIX, 97.0f, 2.2f, -390.4f, 400),
+	SHOT(5500, "pit26a_1"), SHOT(7000, "pit26a_2"), SHOT(9000, "pit26a_3"), SHOT(12000, "pit26a_4"),
+	SHOT(16000, "pit26a_5"),
+	END(18000),
+};
+
 // shopo (level 2): player 2's Obelix (not leading) opens the merchant with X.
 const Step kShopO[] = {
 	MARK(0, "baseline"),
@@ -2287,6 +2323,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopox", kShopOX),
 	SCENARIO("shopsplit", kShopSplit),
 	SCENARIO("shopsplita", kShopSplitA),
+	SCENARIO("pit26o", kPit26O),
+	SCENARIO("hit2o", kHit2O),
+	SCENARIO("pit26a", kPit26A),
 	SCENARIO("inputdump", kInputDump),
 	SCENARIO("combop2", kComboP2),
 	SCENARIO("combop1", kComboP1),
@@ -2471,6 +2510,14 @@ void LogTick(float t) {
 		if (tgt && !IsBadReadPtr(tgt, 0x24)) line.Add(" tgt %p st %d", tgt, *(uint8_t*)(tgt + 0x21));
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
+	{   // shared health (game manager +0x40 -> +0x50 points, +0x51 shields) and each hero's dead bit (+0x390 bit 2)
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+		Hero a = tr.GetHero(HERO_ASTERIX), o = tr.GetHero(HERO_OBELIX);
+		if (cb) line.Add(" | hp=%d/%d dead=%d%d", *(uint8_t*)(cb + 0x50), *(uint8_t*)(cb + 0x51),
+		                 a ? (*(uint8_t*)(a.raw() + 0x390) >> 2) & 1 : 9, o ? (*(uint8_t*)(o.raw() + 0x390) >> 2) & 1 : 9);
+	}
 	{   // the button prompt (CKGrpMeca, game manager +0x18: owner +0x90; gm +0x5C bit 0, kind +0x68)
 		// and the trio's machine offer (+0x48, +0x3F4 bit 8)
 		CKYellowPages* yp = YellowPages();
@@ -2987,6 +3034,16 @@ void RunStep(const Step& s) {
 			Log("autotest: watching writes to archer %p +%X", best, s.b);
 			break;
 		}
+		if (s.x == 5) {   // writes to the shared health (game manager +0x40 -> +0x50) and to hero a's +b, with stacks
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+			if (!cb) break;
+			const void* w[2] = { cb + 0x50, h.raw() + s.b };
+			WatchBytes(w, 2, 0, 0);
+			Log("autotest: watching writes to the health and %s +%03X", HeroName(s.a), s.b);
+			break;
+		}
 		if (s.x == 1) {   // writes only, with stacks
 			const void* w[1] = { h.raw() + s.b };
 			WatchBytes(w, 1, 0, 0);
@@ -3009,7 +3066,17 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
-	case S_POKE8: {   // hero a, byte offset b, value x
+	case S_POKE8: {   // hero a, byte offset b, value x (a = -1: the game manager's +0x40 block)
+		if (s.a < 0) {
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+			if (cb) {
+				Log("autotest: game manager block +%03X %02X -> %02X", s.b, *(uint8_t*)(cb + s.b), (int)s.x);
+				*(uint8_t*)(cb + s.b) = (uint8_t)(int)s.x;
+			}
+			break;
+		}
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
