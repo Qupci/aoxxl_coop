@@ -1427,3 +1427,7 @@ both halves).
   FUN_00503B00, done flag game manager +0x5BC); xxl_coop.its_back.log: none at boot, so the mod's preset 3 was a
   default table (face buttons A0+0F..12 instead of 0E/10/0F/11). Now FUN_00503B00 is run first if +0x5BC is 0
   (safe in a level: tested by forcing it).
+- Round 50: a HUD shown second left its shield look on the other's (user screenshots, either order): FUN_0051B550
+  also sets each shield's paleness -- the alpha byte (+7) of the colours in the shield node's list (node +0x1C:
+  item +4 next, +0xC colour; 0x50 empty, 0xFF otherwise) -- shared by both HUDs. Now part of each player's copy
+  (autotest hudorder: P1's HUD by a heal, P2's by Back, both orders).

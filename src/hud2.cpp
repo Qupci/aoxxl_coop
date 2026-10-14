@@ -34,6 +34,11 @@ struct Elem {
 	uint32_t f10 = 0, f20 = 0, atom4 = 0;
 	uint8_t  anim[0x10] = {};
 	float    frame[32] = {};   // frame +0x10..+0x8F: modelling and LTM matrices
+	// The shield's paleness (an empty one): FUN_0051B550 sets the alpha byte (+7)
+	// of each colour in the node's list (+0x1C: item +4 next, +0xC the colour) --
+	// 0x50 empty, 0xFF otherwise; one HUD's update left its paleness on the other's.
+	uint8_t  alpha[4] = {};
+	uint8_t  nAlpha = 0;
 };
 struct HudState {
 	bool     valid = false;
@@ -107,6 +112,13 @@ void Capture(char* itf, HudState& s) {
 		}
 		if (vt == kVtAnimNode) memcpy(e.anim, n + 0x30, sizeof(e.anim));
 		if (float* f = FrameOf(n)) memcpy(e.frame, (char*)f + 0x10, sizeof(e.frame));
+		e.nAlpha = 0;
+		if (vt == kVtNode)
+			for (char* it = *(char**)(n + 0x1C); it && e.nAlpha < 4 && !IsBadReadPtr(it, 0x10); it = *(char**)(it + 4)) {
+				char* c = *(char**)(it + 0xC);
+				if (!c || IsBadReadPtr(c, 8)) break;
+				e.alpha[e.nAlpha++] = *(uint8_t*)(c + 7);
+			}
 	}
 	s.valid = true;
 }
@@ -146,6 +158,14 @@ void Apply(char* itf, const HudState& s) {
 			if (at && !IsBadReadPtr(at, 8)) *(uint32_t*)(at + 4) = e.atom4;
 		}
 		if (vt == kVtAnimNode) memcpy(n + 0x30, e.anim, sizeof(e.anim));
+		if (vt == kVtNode) {
+			int k = 0;
+			for (char* it = *(char**)(n + 0x1C); it && k < e.nAlpha && !IsBadReadPtr(it, 0x10); it = *(char**)(it + 4)) {
+				char* c = *(char**)(it + 0xC);
+				if (!c || IsBadReadPtr(c, 8)) break;
+				*(uint8_t*)(c + 7) = e.alpha[k++];
+			}
+		}
 		if (float* f = FrameOf(n)) {
 			memcpy((char*)f + 0x10, e.frame, sizeof(e.frame));
 			SyncLtm(f);

@@ -1438,6 +1438,23 @@ const Step kReq410[] = {
 	END(20500),
 };
 
+// hudorder (level 2, individual heroes): Asterix at 7, Obelix at 12; player 1's
+// HUD button then player 2's Back while it shows; later the other way round.
+// Each HUD must show its own hero's health.
+const Step kHudOrder[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_POKE8, -10, 0x50, 0, 7, 0, "asterix health 7" },
+	{ 1500, S_POKE8, -11, 0x50, 0, 12, 0, "obelix health 12" },
+	{ 10000, S_GIVE, HERO_ASTERIX, 0, 0, 1, 0, "asterix +1 (player 1's HUD)" },
+	VPAD(10500, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(10800, 1, 0, 0, 0, "p2 release"),
+	SHOT(11500, "hudorder_1"),
+	VPAD(20000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(20300, 1, 0, 0, 0, "p2 release"),
+	{ 20500, S_GIVE, HERO_ASTERIX, 0, 0, 1, 0, "asterix +1 (player 1's HUD)" },
+	SHOT(21500, "hudorder_2"),
+	END(22000),
+};
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -2622,6 +2639,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("combofull2", kComboFull2),
 	SCENARIO("shields6", kShields6),
 	SCENARIO("shieldfull", kShieldFull),
+	SCENARIO("hudorder", kHudOrder),
 	SCENARIO("req410", kReq410),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),
