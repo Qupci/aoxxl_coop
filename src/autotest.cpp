@@ -1372,6 +1372,18 @@ const Step kRevShield[] = {
 	END(25000),
 };
 
+// combofull2 (level 2, individual heroes): player 2's combo bar filled ("Combo"
+// on it, the right way round in player 2's mirrored HUD).
+const Step kComboFull2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix combo bar full" },
+	SHOT(2600, "combofull2_1"), SHOT(3200, "combofull2_2"), SHOT(4000, "combofull2_3"),
+	{ 5000, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix combo bar full" },
+	SHOT(5800, "combofull2_4"),
+	END(6500),
+};
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -2553,6 +2565,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("bump2i", kBump2I),
 	SCENARIO("shield2o", kShield2O),
 	SCENARIO("revshield", kRevShield),
+	SCENARIO("combofull2", kComboFull2),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),
 	SCENARIO("bump1", kBump1),
@@ -4220,7 +4233,12 @@ void RunStep(const Step& s) {
 		if (!gm) break;
 		typedef char(__fastcall* GmFn)(char* gm, void* edx, int arg);
 		int prev = IndivEnter(s.a);
-		if (s.b == 1) ((GmFn)0x507210)(gm, nullptr, 5);
+		if (s.b == 2) {   // the combo bar filled the game's way: the hero's "a hit landed" event (0x4C0E), 40 times
+			Trio t = GetTrio();
+			Hero h = t ? t.GetHero(s.a) : Hero();
+			typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+			for (int k = 0; h && k < 40; k++) ((SendFn)(*(void***)h.raw())[5])(h.raw(), nullptr, 0x4C0E, nullptr);
+		} else if (s.b == 1) ((GmFn)0x507210)(gm, nullptr, 5);
 		else ((GmFn)0x4BB260)(gm, nullptr, (int)s.x);
 		char* cb = *(char**)(gm + 0x40);
 		Log("autotest: %s given %s -- health %d, %d shields", HeroName(s.a), s.b == 1 ? "a shield" : "health", *(uint8_t*)(cb + 0x50),

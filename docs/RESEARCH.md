@@ -1408,3 +1408,9 @@ both halves).
   themselves (CAnimationManager vf14/21/28/35/42/49 call the engine's render state function, engine +0x20, with
   0x14 = 1/2/3), so for P2's pass the HUD camera's right axis is negated and engine +0x20 temporarily points at a
   wrapper that swaps cull back (2) / cull front (3); restored (and cull back set) after the pass.
+- Round 47: the mirrored P2 HUD showed the combo bar's "Combo" word mirrored. Shields and the combo bar are in
+  the same HUD draw list (0) -- tested by swapping the cull mode per list -- so P2's HUD is two passes: health
+  (mirrored camera, cull swapped) and combo bar (mirrored camera, each combo model's frame turned round on its own:
+  mirrored twice, normal winding, the game's culling). P2's copy is captured after un-hiding the other part's
+  models. Autotest combofull2 (S_GIVE b=2 sends the hero 0x4C0E x40) fills the stats but not the bar's full look
+  (also P1's) -- the user checks the word in play.

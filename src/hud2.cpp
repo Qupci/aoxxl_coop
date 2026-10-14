@@ -63,6 +63,8 @@ struct State {
 	float*   mirrorCam = nullptr;      // the HUD camera's LTM / modelling, right axis turned for the pass
 	float*   mirrorCamModelling = nullptr;
 	void**   renderStateSlot = nullptr;   // engine +0x20 while the mirrored render state function is in
+	float*   flipped[8] = {};          // frames turned round on their own for the pass (the combo bar's)
+	int      nFlipped = 0;
 	bool     loggedP2 = false;
 } g;
 
@@ -214,8 +216,9 @@ void HideIdleShields(char* itf) {
 
 typedef int(__cdecl* RenderStateFn)(int state, int value);
 RenderStateFn g_origRenderState = nullptr;
+bool g_swapCull = true;   // the health part's pass only
 int __cdecl MirroredRenderState(int state, int value) {
-	if (state == 0x14 && (value == 2 || value == 3)) value = 5 - value;
+	if (g_swapCull && state == 0x14 && (value == 2 || value == 3)) value = 5 - value;
 	return g_origRenderState(state, value);
 }
 
@@ -348,21 +351,24 @@ void Hud2EndP1() {
 	g.nMoved2d = g.nMovedFrames = 0;
 }
 
-bool Hud2BeginP2(RwCamera* hud) {
+bool Hud2BeginP2(RwCamera* hud, int part) {
 	g.p2Pass = false;
 	g.nHidden = 0;
 	char* itf = g.itf;
 	if (!On() || !hud || !itf || !g.s2.valid || itf != (char*)GetLvlObject(2, 132, 0)) return false;
-	// Anything of player 2's to show?
+	// Part 0: the health (shields, sparkles: elements 0-30); part 1: the combo
+	// bar (31-). The shields and the combo bar are in the same draw list (0),
+	// and each needs its own culling (below), so each is a pass of its own.
+	int from = part == 0 ? 0 : 31, to = part == 0 ? 31 : kNumP2Elems;
 	bool any = false;
-	for (int i = 0; i < kNumP2Elems && !any; i++) any = ElemPtr(itf, i) && !(g.s2.e[i].f10 & 2);
+	for (int i = from; i < to && !any; i++) any = ElemPtr(itf, i) && !(g.s2.e[i].f10 & 2);
 	if (!any) return false;
 	Capture(itf, g.s1);
 	Apply(itf, g.s2);
 	// Every other model of the interface hidden for this pass.
 	for (int o = 4; o < 0x170; o += 4) {
 		bool mine = false;
-		for (int i = 0; i < kNumP2Elems; i++) mine |= kP2Elems[i] == o;
+		for (int i = from; i < to; i++) mine |= kP2Elems[i] == o;
 		char* n = *(char**)(itf + o);
 		if (mine || !n || IsBadReadPtr(n, 0x14) || !IsNodeVt(*(uintptr_t*)n) || g.nHidden >= 64) continue;
 		g.hidden[g.nHidden++] = { n, *(uint32_t*)(n + 0x10) };
@@ -381,6 +387,20 @@ bool Hud2BeginP2(RwCamera* hud) {
 	g.mirrorCam = cl;
 	g.mirrorCamModelling = cm;
 	for (int k = 0; k < 3; k++) { cl[k] = -cl[k]; cm[k] = -cm[k]; }
+	// The combo bar's models (+0xB4..+0xCC) turned round on their own as well:
+	// mirrored twice they read the right way ("Combo" on the full bar), in
+	// their mirrored place.
+	g.nFlipped = 0;
+	g_swapCull = part == 0;   // the combo bar, mirrored twice, keeps the game's culling
+	for (int i = 31; part == 1 && i < kNumP2Elems && g.nFlipped < 8; i++) {
+		char* n = ElemPtr(itf, i);
+		float* fr = n ? FrameOf(n) : nullptr;
+		if (!fr || *(uintptr_t*)n == kVtParticles) continue;
+		float* lt = (float*)((char*)fr + 0x50);
+		float* md = (float*)((char*)fr + 0x10);
+		for (int k = 0; k < 3; k++) { lt[k] = -lt[k]; md[k] = -md[k]; }
+		g.flipped[g.nFlipped++] = fr;
+	}
 	char* engine = *(char**)0x66885C;
 	if (engine) {
 		g.renderStateSlot = (void**)(engine + 0x20);
@@ -414,6 +434,12 @@ bool Hud2BeginP2(RwCamera* hud) {
 
 void Hud2EndP2() {
 	if (!g.p2Pass) return;
+	for (int i = 0; i < g.nFlipped; i++) {
+		float* lt = (float*)((char*)g.flipped[i] + 0x50);
+		float* md = (float*)((char*)g.flipped[i] + 0x10);
+		for (int k = 0; k < 3; k++) { lt[k] = -lt[k]; md[k] = -md[k]; }
+	}
+	g.nFlipped = 0;
 	if (g.renderStateSlot) {
 		*g.renderStateSlot = (void*)g_origRenderState;
 		g.renderStateSlot = nullptr;
@@ -425,9 +451,9 @@ void Hud2EndP2() {
 	}
 	// What the pass did to player 2's models stays theirs: a finished
 	// particle burst (shield chips, combo sparkles) stops only in the walk.
-	Capture(g.itf, g.s2);
 	for (int i = 0; i < g.nHidden; i++) *(uint32_t*)(g.hidden[i].node + 0x10) = g.hidden[i].f10;
 	g.nHidden = 0;
+	Capture(g.itf, g.s2);   // after the un-hiding: the other part's models are player 2's too
 	Apply(g.itf, g.s1);
 	g.p2Pass = false;
 }

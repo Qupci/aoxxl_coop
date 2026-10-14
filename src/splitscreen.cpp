@@ -985,7 +985,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	DrawHud(view, nullptr, dt);
 	UnspreadShopHud();
 	Hud2EndP1();
-	if (Hud2BeginP2(hud)) {
+	for (int part = 0; part < 2; part++) if (Hud2BeginP2(hud, part)) {
 		// Individual heroes: player 2's health and combo bar, a HUD pass of its
 		// own -- the HUD lists collected again (no stepping: a repeat walk),
 		// drawn as FUN_00414070 draws them, without the 2D layer.
