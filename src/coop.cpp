@@ -135,6 +135,7 @@ struct CoopState {
 	bool     dyingLeads = false;        // ... and has been given the lead
 	uint8_t  hpBeforeTick = 0;
 	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
+	bool     shopForcedClosed = false;  // the merchant closed for the other player's dialogue (until the shopper is out)
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -1070,6 +1071,27 @@ static void SendDeferredSwitch() {
 	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
 }
 
+// One player at the merchant, the other sets off a Roman agent's dialogue: the
+// dialogue ran with the shop's menu still up -- its camera, its input, its
+// "world pause" skipped -- and crashed on A (xxl_coop.shop+spy.log). The visit
+// ends first, as the shop ends it itself after the goodbye (state 4): state 0
+// (FUN_004C1040, thiscall(shop, state): the state's exit and entry), then trio
+// 0x5124 ("done": the shopper's situation 0x0A ends).
+void CloseShopFor(const char* why) {
+	Trio t = GetTrio();
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); t && i < n && i < 16; i++) {
+		char* sh = (char*)GetLvlObject(2, 172, i);
+		if (!sh || (*(uint8_t*)(sh + 8) & 7) == 0) continue;
+		Log("coop: %s closes the merchant's shop (%s was in state %d)", why, HeroName(g.shopper), *(uint8_t*)(sh + 8) & 7);
+		((void(__fastcall*)(char*, void*, int))0x4C1040)(sh, nullptr, 0);
+		// its menu's pieces (item, price, legends: +0x28..+0x34) hidden, as its reset does
+		((void(__fastcall*)(char*, void*, int))0x4BF670)(sh, nullptr, 0);
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x5124, nullptr);
+		g.shopForcedClosed = true;
+	}
+}
+
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	SpyWalk& w = g_spyWalk;
 	event &= 0xFFFF;
@@ -1101,6 +1123,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		uintptr_t vt = cur ? *(uintptr_t*)cur : 0;
 		if (!g_trackBeforeSpy && cur && vt != kFixTrackVtbl && vt != kPlainCameraVtbl) g_trackBeforeSpy = cur;
 	}
+	if (event == 0x5120 && g.p2Joined && g.shopping) CloseShopFor("a Roman agent's dialogue");
 	if (event != 0x5120 || !param || w.resending || !g.p2Joined) return;
 	memcpy(w.param, param, sizeof(w.param));
 	w.trio = trio;
@@ -1459,11 +1482,26 @@ void CoopFrame() {
 		g.shopper = t.Leader();
 		Log("coop: %s is at the merchant -- in that player's half; the other player plays on", HeroName(g.shopper));
 	}
+	if (g.shopForcedClosed && !shopping && Situation(h1) != kSituationShop && Situation(h2) != kSituationShop)
+		g.shopForcedClosed = false;
 	if (!shopping && g.shopping) {
 		Log("coop: %s is done at the merchant", HeroName(g.shopper));
 		if (!g.suspended) GiveBackLead(t);   // no suspension to resume from any more
 	}
 	g.shopping = shopping;
+	// The shop's menu turns the gameplay bindings off (FUN_00437F10, thiscall(CKInput,
+	// group, on), ret 8: group 0 gameplay, group 1 menus) -- player 1's controls,
+	// which come from those bindings (player 2's are the mod's own values). With
+	// player 2 at the merchant, player 1's are back on (its menu still answers
+	// player 2 alone: shared.cpp).
+	if (shopping && g.p2Joined && g.shopper == g.p2Hero) {
+		InputManager im = GetInputManager();
+		if (im && im.Binding(0) && !*(uint8_t*)(im.Binding(0) + 4)) {
+			((void(__fastcall*)(char*, void*, int, int))0x437F10)(im.raw(), nullptr, 0, 1);
+			static int s_told;
+			if (s_told++ < 8) Log("coop: player 1's controls back on during player 2's shopping");
+		}
+	}
 	if (!g.suspended) TwisterNearness(t, h1, h2);
 	// The fused tornado is one: one screen while it lasts (the heroes stay the
 	// players' -- made the AI companion, the partner's Twister ended at once).
@@ -1735,6 +1773,7 @@ const uint8_t   kFreezePrologue[5] = { 0x53, 0x8B, 0x5C, 0x24, 0x08 };
 FreezeFn g_origFreeze = nullptr;
 
 static bool MerchantOpening() {
+	if (g.shopForcedClosed) return false;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
 		char* sh = (char*)GetLvlObject(2, 172, i);
 		if (sh && (*(uint8_t*)(sh + 8) & 7) != 0) return true;

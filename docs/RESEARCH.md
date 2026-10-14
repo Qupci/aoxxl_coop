@@ -1442,3 +1442,13 @@ both halves).
   +0x22C..+0x234) unless +0x38C bit 0x4000 -- not set in the Twister for either hero; the Twister picks Romans up
   before they touch it in vanilla levels. In co-op the push is now undone for a hero in the Twister (attack state
   +0x135 == 10). Not reproducible in vanilla levels: user to check in the modded level.
+
+- Round 53: merchant (user, LV2-1). (a) P1's Asterix froze while P2's Obelix was in the shop's item menu: the menu
+  turns the gameplay bindings off (FUN_00437F10(CKInput, 0, 0), thiscall, ret 8; group 0 gameplay, 1 menus; binding
+  +4 = active) -- P1's controls; P2's are the mod's own values, so only P1 was hit. While P2 shops, group 0 is put back
+  on each frame. (b) The other player setting off a Roman agent's dialogue (trio 0x5120) with the shop open crashed:
+  the shop is now closed first -- FUN_004C1040(shop, 0) (state machine, handlers at shop +0x1A8, +0x1AD current),
+  FUN_004BF670(shop, 0) (hides the menu's pieces +0x28..+0x34: vf 0x40 show / 0x44 hide; the menu tick only hides
+  them on a purchase, the game's reset vf16 does too), trio 0x5124 (natural end); the merchant won't reopen until
+  the shopper is out of situation 0x0A. Autotests shopsplit (P1 moves; log line "controls back on"), shopspy (menu
+  open, state 3, closed by the dialogue, no crash, no leftover legends).

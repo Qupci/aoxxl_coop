@@ -1456,6 +1456,38 @@ const Step kHudOrder[] = {
 };
 
 
+// shopspy (level 2): player 2's Obelix at the merchant (item menu), player 1's
+// Asterix sets off the second spy: the shop closes first; then player 1's A.
+const Step kShopSpy[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	VPAD(7500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(7700, 1, 0, 0, 0, "p2 release"),
+	SHOT(12000, "shopspy_1"),
+	PLACEAT(14000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(14500, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(17000, "shopspy_2"),
+	P1(19000, PAD_A, 0, 0, "p1 A"), P1(19200, 0, 0, 0, "p1 release"),
+	SHOT(21000, "shopspy_3"),
+	END(24000),
+};
+
+// spyonly (level 2): shopspy without the merchant (what the agent's dialogue
+// shows by itself).
+const Step kSpyOnly[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	PLACEAT(10000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(10500, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(13000, "spyonly_1"), SHOT(14500, "spyonly_2"), SHOT(17000, "spyonly_3"),
+	END(19000),
+};
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -2670,6 +2702,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shields6", kShields6),
 	SCENARIO("shieldfull", kShieldFull),
 	SCENARIO("hudorder", kHudOrder),
+	SCENARIO("shopspy", kShopSpy),
+	SCENARIO("spyonly", kSpyOnly),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("req410", kReq410),
