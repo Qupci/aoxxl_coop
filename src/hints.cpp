@@ -2,6 +2,7 @@
 #include "coop.h"
 #include "config.h"
 #include "detour.h"
+#include "individual.h"
 #include "inputmgr.h"
 #include "log.h"
 #include "pads.h"
@@ -191,7 +192,13 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		else if (state == 1) *(float*)(self + 0x42C) = x;   // sliding in: to the measured place
 	}
 	if (!use) PlateBack(self);
-	g_origInterfaceTick(self, edx, time);
+	{
+		// Individual heroes: the HUD (top left, player 1's half) is player 1's
+		// hero's health, shields and combo bar.
+		int prev = IndivEnter(CoopP1Hero());
+		g_origInterfaceTick(self, edx, time);
+		IndivLeave(prev);
+	}
 	if (!use) return;
 	*(float*)(text + 0x28) = savedWidth;
 	*(float*)(self + 0x428) = savedX;

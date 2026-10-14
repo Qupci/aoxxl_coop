@@ -1326,3 +1326,26 @@ both halves).
   half a HUD, full-width bars twice as high; the HUD's 3D models (life shields, helmet) follow the HUD camera's
   frame, moved down along its up axis by 0.5 (2D elements ignore the frame; RwCameraSetViewOffset has no
   effect on either). Restored after the HUD draw. Autotests shopsplit / shopsplita.
+
+## Round 40 (Oct 14): death focus, individual heroes
+
+- **Health** = game manager +0x40 -> +0x50 (points, 5 a shield), +0x51 (shields 3..6; a respawn, gm vf13, sets 3).
+  Heal FUN_004BB260 / add shield FUN_00507210 (thiscall gm, ret 4; bonus pool types 5 / 4; merchant FUN_004BFC50
+  writes directly). Hero_PreLifeTick sets hero +0x390 bit 2 ("dead"; trio.h's `Busy()`) from health == 0; the
+  situation chooser then always picks 0x0E (death, handler 0x49C720: at the end of the animation with no health it
+  sets gm +0x2FD = game over). The chooser never leaves 0x0E by itself: revive = exit handler (mode 2) + +0x3E9 = 0xFF.
+  The **game manager's tick** (FUN_00504080) with health 0 starts the death sequence (FUN_005008D0: latch gm +0x188,
+  level event group gm +0x166 -> death cutscene bars, gm +0x5C bit 20) and the reload (FUN_00407120 when +0x2FD).
+- **Death pit**: FUN_0049D610 (hero tick) on ground with flags +0x2A bit 2 takes all health; an *AI* companion then
+  sends trio 0x4800/0x4801 (it leads, so the death shows on it). Ground: hero +0x280, CGround vt 0x624258,
+  CDynamicGround vt 0x6241BC; on the ground = +0x384 & 7 == 0.
+- **Hits**: hero sendEvent (CKHkAsterix/CKHkObelix vtable slot 5, shared 0x48BC70), class 0x03xx -> FUN_00495FA0.
+  Event 0x4C0E (a hit landed) fills the **combo bar**: gm +0xB0 hits, +0xB4, +0xA8 decay timer (reset from gm +0x9C),
+  full (cb +0x10 bit 0x4000) -> gauge gm +0xA4 (max +0xA0), +0xC4, level gm +0xCC bits 9-10; runs down in the gm tick.
+- Co-op death focus: the hero whose tick / event took the last point gets the lead (CoopGiveLead), the other is AI.
+- Individual heroes (individual.cpp): per-hero copies of the above swapped in around each hero's Life tick, its
+  sendEvent, heal/shield pickups (trio leader byte = picker), the in-game interface tick (player 1's hero); default =
+  the leader, or the standing hero (StandingOr) so the gm tick never sees a fallen hero's 0. Fallen hero: own 0x0E,
+  gm +0x2FD cleared after its tick, 0x03xx events dropped, excluded from the "busy" suspension; revive = partner within
+  3 units holding grab (binding +0x18 hold time; P2: p2HoldTime[6]) 10 s, or a sector change. Pit: laid on the newest
+  safe spot >= 0.7 s old. Font of the HUD prompt has no '|', '#', '%', '>', '~' (has '=', '-', '*', 'o', '+', ':').

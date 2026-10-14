@@ -1231,6 +1231,23 @@ const Step kCombo2[] = {
 	END(12000),
 };
 
+// hud2 (level 2): the HUD in split screen -- Obelix hits a Roman (the combo bar
+// shows), player 1's Back shows the whole HUD.
+const Step kHud2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_POKE8, -10, 0x50, 0, 7, 0, "asterix health 7" },
+	{ 1600, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix at a roman" },
+	VPAD(2000, 1, PAD_X, 0, 0, "p2 X"), VPAD(2150, 1, 0, 0, 0, "p2 release"),
+	VPAD(2500, 1, PAD_X, 0, 0, "p2 X"), VPAD(2650, 1, 0, 0, 0, "p2 release"),
+	SHOT(3000, "hud2_1"),
+	P1(4000, PAD_BACK, 0, 0, "p1 back"), P1(4300, 0, 0, 0, "p1 release"),
+	SHOT(4600, "hud2_2"),
+	VPAD(6000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(6300, 1, 0, 0, 0, "p2 release"),
+	SHOT(6600, "hud2_3"),
+	END(7500),
+};
+
 // pit26o (-Level 2): sector 6's big death pit; player 2's Obelix (not leading)
 // jumps in (the user's spot 92.5 2.2 -390.4 towards x 96), Asterix stays on the
 // ground. Whose death does the game show?
@@ -2394,6 +2411,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("pit26o", kPit26O),
 	SCENARIO("hit2o", kHit2O),
 	SCENARIO("down2a", kDown2A),
+	SCENARIO("hud2", kHud2),
 	SCENARIO("combo2", kCombo2),
 	SCENARIO("pit26b", kPit26B),
 	SCENARIO("rejoin2", kRejoin2),
