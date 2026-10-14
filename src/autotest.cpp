@@ -1455,6 +1455,7 @@ const Step kHudOrder[] = {
 	END(22000),
 };
 
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -1535,6 +1536,35 @@ const Step kComboP2[] = {
 	SHOT(10500, "combo_club"),
 	END(14000),
 };
+// twistroman (level 2): player 2's Obelix in the Twister runs into Romans (the
+// user: he stumbles on them, Asterix does not).
+const Step kTwistRoman[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_ENEMY, HERO_OBELIX, 2, 0, 0, 0, "obelix 6 from a roman" },
+	VPAD(2000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(2100, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (combo cheat)"),
+	VPAD(2300, 1, 0, 0, 0, "p2 release"),
+	TAP_P2(3000, PAD_A, "p2 A"), TAP_P2(3650, PAD_X, "p2 X"), TAP_P2(3760, PAD_B, "p2 B"), TAP_P2(3870, PAD_Y, "p2 Y"),
+	VPAD(4200, 1, 0, 0, 1.0f, "p2 forward"),
+	SHOT(5000, "twistroman_1"), SHOT(6000, "twistroman_2"),
+	VPAD(8000, 1, 0, 0, 0, "p2 stop"),
+	END(9000),
+};
+// twistromana: the same with player 1's Asterix (P1 combo 4 = Twister).
+const Step kTwistRomanA[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
+	VPAD(2000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(2100, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (combo cheat)"),
+	VPAD(2300, 1, 0, 0, 0, "p2 release"),
+	{ 2500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix combo bar full" },
+	{ 3000, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	P1(4200, 0, 0, 1.0f, "p1 forward"),
+	SHOT(5000, "twistromana_1"), SHOT(6000, "twistromana_2"),
+	P1(8000, 0, 0, 0, "p1 stop"),
+	END(9000),
+};
+
 const Step kComboP1[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -2640,6 +2670,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shields6", kShields6),
 	SCENARIO("shieldfull", kShieldFull),
 	SCENARIO("hudorder", kHudOrder),
+	SCENARIO("twistroman", kTwistRoman),
+	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("req410", kReq410),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),
@@ -2906,6 +2938,7 @@ void LogTick(float t) {
 			h.Pos().x, h.Pos().y, h.Pos().z);
 		if (getenv("XXL_MOVELOG")) {   // movement fields
 			const float* f = (const float*)h.raw();
+			line.Add(" 38C %08X 22C %.2f %.2f", *(uint32_t*)(h.raw() + 0x38C), f[0x22C / 4], f[0x234 / 4]);
 			line.Add(" mv 8C %.2f 94 %.2f gn %.2f %.2f %.2f 2E4 %.2f %.2f %.2f 284 %p 5BC %p", f[0x8C / 4], f[0x94 / 4], f[0x288 / 4],
 			         f[0x28C / 4], f[0x290 / 4], f[0x2E4 / 4], f[0x2E8 / 4], f[0x2EC / 4], *(void**)(h.raw() + 0x284), *(void**)(h.raw() + 0x5BC));
 		}

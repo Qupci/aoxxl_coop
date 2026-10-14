@@ -1389,13 +1389,16 @@ void CoopFrame() {
 	//   A  your hero joins your partner's (lost, stuck, fell behind)
 	//   B  take your hero back from the game ("wait here" orders that a sequence
 	//      played out of order never ends)
-	//   Y  [cheats] fill the magic potion
+	//   Y  [cheats] the magic potion: filled, or emptied when it runs
 	//   X  [cheats] your hero becomes the leader
 	//   D-pad up / down  [cheats] Asterix gets the nearest torch, lit / throws it away
-	//   D-pad left  [cheats] every combo learned, combo bar full
-	// Player 1's controller is the one the game reads (pad identification).
+	//   D-pad left  [cheats] every combo learned, your combo bar full
+	// Player 1's controller is the one the game reads (pad identification) --
+	// until that is known (it can take a while), any other connected pad.
 	{
 		int p1pad = Player1Pad();
+		for (int i = 0; p1pad < 0 && i < kMaxPads; i++)
+			if (i != g.p2Pad && i != kKeyboardPad && PadGet(i).connected) p1pad = i;
 		const PadState& q = PadGet(p1pad);
 		bool mod1 = p1pad >= 0 && p1pad != g.p2Pad && q.connected && (q.buttons & PAD_RTHUMB);
 		bool mod2 = (p.buttons & (PAD_BACK | PAD_RTHUMB)) != 0;
@@ -1417,14 +1420,17 @@ void CoopFrame() {
 				StartAiCycle(me, "R3 + B");
 			}
 			if ((pressed & PAD_Y) && g_config.cheats) {
-				SetPotionGauge(300.0f);
-				Log("coop: cheat: magic potion filled by %s", player);
+				bool running = PotionGauge() > 0.01f;
+				SetPotionGauge(running ? 0.001f : 300.0f);   // nearly empty: the game's own countdown ends it
+				Log("coop: cheat: magic potion %s by %s", running ? "emptied" : "filled", player);
 			}
 			if ((pressed & PAD_DPAD_UP) && g_config.cheats) CoopTorchCheat(true);
 			if ((pressed & PAD_DPAD_DOWN) && g_config.cheats) CoopTorchCheat(false);
 			if ((pressed & PAD_DPAD_LEFT) && g_config.cheats) {
+				int prevStats = IndivEnter(me);   // individual heroes: this hero's own combo bar
 				CombosCheat();
-				Log("coop: cheat: every combo learned and the combo bar filled by %s", player);
+				IndivLeave(prevStats);
+				Log("coop: cheat: every combo learned and %s's combo bar filled by %s", HeroName(me), player);
 			}
 			if ((pressed & PAD_X) && g_config.cheats && t.Leader() != me && !g.suspended) {
 				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
