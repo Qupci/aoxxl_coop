@@ -2345,7 +2345,16 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 			*(uint8_t*)(other.raw() + 0x561) = 3;
 		}
 	}
+	// A hero spinning in the Twister (attack state +0x135 == 10) touching
+	// Romans: the same handler pushes it back from them (push vector +0x22C..
+	// +0x234), and in a crowd the Twister picks up too few in time (Obelix's
+	// most of all, user, a modded level full of Romans): the tornado stopped on
+	// them. A player's Twister goes through: that push is undone.
+	bool twister = (event & 0xFFFF) == 0x0300 && g.p2Joined && idx >= 0 && *(uint8_t*)(hero + 0x135) == 10;
+	float push[3];
+	if (twister) memcpy(push, hero + 0x22C, sizeof(push));
 	int r = g_origHeroSendEvent(hero, edx, event, param);
+	if (twister) memcpy(hero + 0x22C, push, sizeof(push));
 	if (bumped) {
 		*F18(bumped) = bumpedF18;
 		*(uint8_t*)(bumped.raw() + 0x561) = bumpedAi;

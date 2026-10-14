@@ -1435,3 +1435,10 @@ both halves).
   g_walkPlayer 0) and the fog walk hook stepped the boxes there with no restore. The HUD walks are flagged
   (g_hudWalk) and leave the fog boxes alone. Other walk-dt users to watch with any new walk: particles (stepped-once
   guard), sky (walks 1/2 only), anim blends (repeat walk), fog (now). User-verified in fog21.
+- Round 52: cheats -- P1's R3 cheats used Player1Pad() (pad identification, can take a minute): any connected pad
+  other than P2's until then; R3/Back + Y toggles the potion (empties to 0.001 so the game's countdown ends it);
+  D-pad left fills the presser's own combo bar (IndivEnter). Twister "stumble" (user, a modded level full of
+  Romans; also with Obelix leading): the hero contact handler pushes a hero back from touching enemies (push vector
+  +0x22C..+0x234) unless +0x38C bit 0x4000 -- not set in the Twister for either hero; the Twister picks Romans up
+  before they touch it in vanilla levels. In co-op the push is now undone for a hero in the Twister (attack state
+  +0x135 == 10). Not reproducible in vanilla levels: user to check in the modded level.
