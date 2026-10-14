@@ -1404,6 +1404,40 @@ const Step kShields6[] = {
 	END(7500),
 };
 
+// shieldfull (level 2, individual heroes): Obelix (player 2) with six shields
+// walks over the LV2-1 shield: not his (stays for Asterix); Asterix then takes it.
+const Step kShieldFull[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	{ 1100, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	{ 1200, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	GLIDEAT(1500, HERO_OBELIX, -807.3f, 512.5f, -1044.9f, 1500),
+	SHOT(4500, "shieldfull_1"),
+	GLIDEAT(6000, HERO_OBELIX, -820.0f, 512.5f, -1060.0f, 800),
+	GLIDEAT(6000, HERO_ASTERIX, -807.3f, 512.5f, -1044.9f, 1500),
+	SHOT(9000, "shieldfull_2"),
+	END(9500),
+};
+
+// req410 (-Level 4): the slide's helmet requirement in LV4-10 (the user's
+// detector -775.8 300.7 -1366 -> -1374, the spy's words clicked through with X):
+// its "0/1500" under its own plate at the right.
+const Step kReq410[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -775.754f, 300.724f, -1366.0f), PLACEAT(3000, HERO_OBELIX, -773.0f, 300.724f, -1366.0f),
+	GLIDEAT(4000, HERO_ASTERIX, -775.754f, 300.724f, -1374.0f, 800),
+	VPAD(7000, 1, PAD_X, 0, 0, "x"), VPAD(7200, 1, 0, 0, 0, "release"),
+	VPAD(8500, 1, PAD_X, 0, 0, "x"), VPAD(8700, 1, 0, 0, 0, "release"),
+	VPAD(10000, 1, PAD_X, 0, 0, "x"), VPAD(10200, 1, 0, 0, 0, "release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "x"), VPAD(11700, 1, 0, 0, 0, "release"),
+	VPAD(13000, 1, PAD_X, 0, 0, "x"), VPAD(13200, 1, 0, 0, 0, "release"),
+	VPAD(14500, 1, PAD_X, 0, 0, "x"), VPAD(14700, 1, 0, 0, 0, "release"),
+	SHOT(16000, "req410_1"), SHOT(18000, "req410_2"), SHOT(20000, "req410_3"),
+	END(20500),
+};
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -2587,6 +2621,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("revshield", kRevShield),
 	SCENARIO("combofull2", kComboFull2),
 	SCENARIO("shields6", kShields6),
+	SCENARIO("shieldfull", kShieldFull),
+	SCENARIO("req410", kReq410),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),
 	SCENARIO("bump1", kBump1),

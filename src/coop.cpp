@@ -601,6 +601,16 @@ static void WatchControllerPreset() {
 	if (g.lastLevel <= 0 || now - lastCheck < 1000) return;
 	lastCheck = now;
 	if (preset == 1 && (g_presetWithoutPad || !g_presetSeen) && GameSeesPad(in)) {
+		// The pad's own layout goes into the presets at boot, when the game sees a
+		// pad there (CKAsterixGameManager::vf10(1) -> FUN_00503B00, thiscall(game
+		// manager), done: +0x5BC = 1); the title then picks 3. With no pad seen at
+		// boot it was never built, and preset 3 alone was a default layout with the
+		// face buttons shifted (xxl_coop.its_back.log): build it first.
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (gm && *(int*)(gm + 0x5BC) == 0) {
+			((void(__fastcall*)(char*, void*))0x503B00)(gm, nullptr);
+			Log("input: the pad's layout was never built (no pad at boot) -- built now (FUN_00503B00)");
+		}
 		SetPreset(in, 3);
 		Log("input: level %d is running on the keyboard preset 1, which the game chose %s; it sees a pad now -- "
 		    "preset 3 set (the game's choice with a pad)", g.lastLevel,

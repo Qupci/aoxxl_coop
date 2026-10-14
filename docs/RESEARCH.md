@@ -1418,3 +1418,12 @@ both halves).
   other player's HUD and the helmet counter): with more than four, each row is scaled from its first shield (sizes
   and spacing, LTMs only) to 0.28 between the first and the last (shields6). P2's X in the merchant's item menu no
   longer means "back" (left the shop; P1's X does not): B only.
+- Round 49: helmet counter centring moved +0x154 too -- the slide's helmet requirement text ("0/1500", under its
+  own plate +0x138, FUN_0051CD80), not the counter's: only +0x134 / +0x150 / model +0xA8 move now. Health bonuses:
+  CKGrpAsterixBonusPool::vf39 (0x507320, thiscall(pool, hero), ret 4; the pool update asks for the leader, the mod
+  for the other player) only refuses the potion pool in the game; in individual mode a ham (pool type 5) only goes
+  to a hero below its own shields' health, a shield (type 4) to one below six, nothing to a fallen hero (autotest
+  shieldfull). Preset: the pad's layout goes into the presets at boot only when a pad is seen (vf10(1) ->
+  FUN_00503B00, done flag game manager +0x5BC); xxl_coop.its_back.log: none at boot, so the mod's preset 3 was a
+  default table (face buttons A0+0F..12 instead of 0E/10/0F/11). Now FUN_00503B00 is run first if +0x5BC is 0
+  (safe in a level: tested by forcing it).

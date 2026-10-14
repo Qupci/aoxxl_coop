@@ -362,7 +362,9 @@ void Hud2BeginP1(RwCamera* hud) {
 		MoveAlong(fr, cl, -ddx, true);   // screen x is minus the camera's
 		MoveAlong(fr, cl + 4, ddy, false);
 	};
-	const int helmet2d[] = { 0x134, 0x150, 0x154 };
+	// (+0x154 is the slide's helmet requirement text, under its own plate +0x138
+	// at the right: it stays.)
+	const int helmet2d[] = { 0x134, 0x150 };
 	for (int o : helmet2d) move2d(o, dx, 0.0f);
 	move3d(0xA8, dx, 0.0f);
 	// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01, off the right

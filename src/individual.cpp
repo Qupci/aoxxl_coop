@@ -324,6 +324,32 @@ void __fastcall CollectHook(char* pool, void* edx, char* hero) {
 	g_collector = prevCollector;
 }
 
+// "May this hero collect" (CKGrpAsterixBonusPool::vf39, 0x507320, thiscall(pool,
+// hero), ret 4: the pool update asks it for the leader, the mod's for the other
+// player's hero) only refuses the potion pool (type 3) in the game -- a ham at
+// full health or a seventh shield was taken and wasted. With a health each, it
+// went to a hero it did nothing for, under the nose of the one who needed it:
+// a ham (pool type 5) only for a hero short of its own shields' health, a
+// shield (type 4) only below six shields, nothing for a fallen hero.
+typedef char(__fastcall* MayCollectFn)(char* pool, void* edx, char* hero);
+MayCollectFn g_origMayCollect = nullptr;
+char __fastcall MayCollectHook(char* pool, void* edx, char* hero) {
+	char r = g_origMayCollect(pool, edx, hero);
+	if (!r || !g.active || !pool) return r;
+	int type = *(int*)(pool + 0x24);
+	if (type != 4 && type != 5) return r;
+	Trio t = GetTrio();
+	int who = -1;
+	for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
+		if (t.GetHero(i).raw() == hero) who = i;
+	if (who < 0) return r;
+	if (g.fallen[who]) return 0;
+	Stats& st = Current(who);
+	if (type == 5 && st.hp >= st.shields * 5) return 0;
+	if (type == 4 && st.shields >= 6) return 0;
+	return r;
+}
+
 int Picker() {
 	if (g_collector >= 0) return g_collector;
 	if (g.depth > 0) return g.ctx;   // inside one hero's business: that hero's
@@ -540,6 +566,8 @@ void IndivFrame() {
 bool IndivInstallHooks() {
 	bool ok = InstallDetour(kHeal, (void*)HealHook, (void**)&g_origHeal, kGmPrologue, sizeof(kGmPrologue),
 	                        "heal (individual heroes)");
+	ok &= PatchVtableSlot(0x62808C, 39, 0x507320, (void*)MayCollectHook, (void**)&g_origMayCollect,
+	                      "CKGrpAsterixBonusPool::vf39 (only a hero the health bonus is of use to)");
 	ok &= PatchVtableSlot(0x62808C, 40, 0x506E90, (void*)CollectHook, (void**)&g_origCollect,
 	                      "CKGrpAsterixBonusPool::vf40 (a bonus collected: the collector's stats)");
 	ok &= InstallDetour(kAddShield, (void*)AddShieldHook, (void**)&g_origAddShield, kGmPrologue, sizeof(kGmPrologue),
