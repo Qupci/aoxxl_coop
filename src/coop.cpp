@@ -2304,12 +2304,13 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 	// collision volumes, each one's owner at +0x20). Touched by a player's hero,
 	// a hero is pushed aside and, running into it, hops out of the way
 	// (FUN_0049CDF0, vertical speed 12) -- the AI sidekick dodging the player;
-	// touched by the AI sidekick, the player's hero just stops. Two players'
-	// heroes both took the sidekick's part: the "automatic jump". For the length
-	// of the handler the other hero passes for the sidekick (+0x18 bit 0), so
-	// each of them gets the player's part.
+	// touched by a waiting sidekick (AI state 3), the player's hero is pushed
+	// back -- blocked -- without the hop. Two players' heroes both took the
+	// dodging sidekick's part: the "automatic jump". For the length of the
+	// handler the other hero passes for a waiting sidekick (+0x18 bit 0, AI
+	// state +0x561 = 3), so each is blocked by the other and neither hops.
 	Hero bumped;
-	uint8_t bumpedF18 = 0;
+	uint8_t bumpedF18 = 0, bumpedAi = 0;
 	if ((event & 0xFFFF) == 0x0300 && g.p2Joined && idx >= 0 && param && HeroIsPlayerVariant(*F18(t.GetHero(idx)))) {
 		Hero other = t.GetHero(OtherHero(idx));
 		int n = 0;
@@ -2323,11 +2324,16 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 		if (touching && other && HeroIsPlayerVariant(*F18(other))) {
 			bumped = other;
 			bumpedF18 = *F18(other);
+			bumpedAi = *(uint8_t*)(other.raw() + 0x561);
 			*F18(other) = (uint8_t)(bumpedF18 | 1);
+			*(uint8_t*)(other.raw() + 0x561) = 3;
 		}
 	}
 	int r = g_origHeroSendEvent(hero, edx, event, param);
-	if (bumped) *F18(bumped) = bumpedF18;
+	if (bumped) {
+		*F18(bumped) = bumpedF18;
+		*(uint8_t*)(bumped.raw() + 0x561) = bumpedAi;
+	}
 	if (before > 0 && Health() == 0 && g.p2Joined && idx >= 0) {
 		char how[32];
 		sprintf(how, "hero event %04X", event & 0xFFFF);

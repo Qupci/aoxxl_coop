@@ -1391,3 +1391,7 @@ both halves).
   the player; touched by the sidekick, the player's hero gets neither (blocked). Two players' heroes both took the
   sidekick's part. Fix: while a hero handles a contact with the other player hero, that hero's +0x18 bit 0 is set
   (passes for the sidekick). Found with a rise watch on +0xA8 (autotest S_WATCHRW x=7). Not Idefix (bump2i).
+  Correction (user): passing for the sidekick made the heroes go through each other -- the player's hero touched by
+  the *moving* sidekick takes nothing. Touched by a *waiting* sidekick (AI state +0x561 == 3 or 9) it is pushed back
+  (blocked) without the hop (bVar6 = 0). Now the other hero passes for a waiting sidekick (+0x18 bit 0 and +0x561 = 3)
+  for the length of the handler: both solid, the runner pushes the other along, no hop, no lift (bump2/bump2i).
