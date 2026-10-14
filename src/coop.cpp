@@ -357,6 +357,8 @@ void CoopGiveLead(int idx, const char* why) {
 	Log("coop: %s takes the lead from %s (%s) -- leader now %s", HeroName(idx), HeroName(was), why, HeroName(t.Leader()));
 }
 
+bool CoopP2ShowsHud() { return g.p2Joined && g.p2BackHeldAt != 0 && !g.p2BackCombo; }
+
 float CoopHoldTime(int player, int action) {
 	if (action < 0 || action >= 256) return 0.0f;
 	if (player == 1) return g.p2Joined ? g.p2HoldTime[action] : 0.0f;
@@ -1358,7 +1360,9 @@ void CoopFrame() {
 	if (!(p.buttons & PAD_BACK)) g.p2BackCombo = false;
 	if (!inCutscene && (p.buttons & PAD_BACK) && !g.p2BackCombo) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
-		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs) { Release("held Back"); return; }
+		// Individual heroes: Back shows player 2's HUD, held as long as they like
+		// (Start leaves).
+		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs && !IndivActive()) { Release("held Back"); return; }
 	} else {
 		g.p2BackHeldAt = 0;
 	}

@@ -1354,3 +1354,21 @@ both halves).
   the health ((shields*5+1)/2), gm +0x5C |= 0x4000 so the HUD reads it again. Fallen heroes count as "out" for all
   proximity slicing (HeroOut): Romans/lions no longer get them as their leader (down2a: 22 hits -> 0). Preset 1 the
   hook never saw being chosen (boot pick before the ASI's hooks) with a pad visible -> 3.
+
+## Round 42 (Oct 14): player 2's HUD (hud2.cpp)
+
+- In-game interface (2/132) pieces: health = FUN_0051A140 (state +0x24 bits 4-5; fields +0x1E4..+0x277; 30 CNode
+  shield models +0x2C..+0xA0, node i = shield i/5 fill i%5, 0.08 apart; sparkles CParticlesNodeFx +0xA4); combo bar
+  = FUN_00518190 (bits 12-14, +0x2A0..+0x2EF, models +0xB4..+0xCC: a column at the left edge) + its glow FUN_00519E70
+  (bits 23-24, +0x2F0..+0x30F, +0x494..+0x49F); helmet counter = FUN_0051C160 (model +0xA8, plate CBillboard2d +0x134
+  drawn leftwards from its x, texts +0x150..+0x158); x3/x10 sign FUN_0051E440 (+0x130, +0x13C). Show triggers in game
+  manager +0x5C: 0x4000 health changed (consumed by the health part), 0x1000000 HUD button held (action 0xF), 0x40.
+  All parts are thiscall(interface, time), ret 4. CNode = 0x20 bytes (+0x10 flags, bit 1 hidden; +4 frame).
+- HUD camera (renderer +0x14): parallel, view window 0.5 x 0.5, frame right = -x, at = +z, at (0.5 0.5 -1); screen x
+  = minus the camera-space x; 2D elements' x in 0..1 = screen x + 0.5.
+- Player 2's HUD: the health/combo state (bits, ranges, element flags/anim/frames) kept as a second copy, ticked after
+  the game's with player 2's stats and show flags (Back held on pad 2), swapped in for a second HUD pass (repeat walk
+  into the 3 HUD lists, other interface models hidden, FUN_00414210 + lists vf3 between Rw camera begin/end, no 2D),
+  the models' screen x negated (mirrored to the right edge). The interface writes modelling matrices only; LTMs are
+  recomputed from modelling x parent LTM when a copy is applied. Helmet counter moved to the top middle for the
+  game's pass. Player 1's HUD flag 0x4000 = player 1's own stats changed. Back hold no longer leaves (individual).

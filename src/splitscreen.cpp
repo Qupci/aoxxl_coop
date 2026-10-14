@@ -6,6 +6,7 @@
 #include "trio.h"
 #include "p2cam.h"
 #include "gamecam.h"
+#include "hud2.h"
 
 #include <cmath>
 #include <intrin.h>
@@ -953,8 +954,59 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 			}
 		}
 	}
+	if (getenv("XXL_HUDPOS") && hud) {   // diagnostics: where the HUD's pieces are
+		static DWORD last = 0;
+		char* itf = (char*)GetLvlObject(2, 132, 0);
+		if (itf && GetTickCount() - last > 2000) {
+			last = GetTickCount();
+			float* cl = FrameLtm(hud);
+			Log("hudpos: camera proj %u window %.3f %.3f offset %.3f %.3f near %.3f far %.3f right %.3f %.3f %.3f up %.3f %.3f %.3f at %.3f %.3f %.3f pos %.3f %.3f %.3f",
+			    hud->projectionType, hud->viewWindow[0], hud->viewWindow[1], hud->viewOffset[0], hud->viewOffset[1],
+			    hud->nearPlane, hud->farPlane, cl[0], cl[1], cl[2], cl[4], cl[5], cl[6], cl[8], cl[9], cl[10], cl[12], cl[13], cl[14]);
+			const int offs[] = { 0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x54, 0x68, 0x7C, 0x90, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC };
+			for (int o : offs) {
+				char* n = *(char**)(itf + o);
+				char* fr = n ? *(char**)(n + 4) : nullptr;
+				if (!fr) continue;
+				float* l = (float*)(fr + 0x50);
+				float d[3] = { l[12] - cl[12], l[13] - cl[13], l[14] - cl[14] };
+				Log("hudpos: +%02X vt %p flags %04X cam xyz %.3f %.3f %.3f (scale %.3f)", o, *(void**)n, *(uint16_t*)(n + 0x10),
+				    d[0] * cl[0] + d[1] * cl[1] + d[2] * cl[2], d[0] * cl[4] + d[1] * cl[5] + d[2] * cl[6],
+				    d[0] * cl[8] + d[1] * cl[9] + d[2] * cl[10], sqrtf(l[0] * l[0] + l[1] * l[1] + l[2] * l[2]));
+			}
+			const int o2[] = { 0x134, 0x150, 0x154, 0x158 };
+			for (int o : o2) {
+				float* e = *(float**)(itf + o);
+				if (e) Log("hudpos: 2d +%03X flags %08X at %.3f %.3f size %.3f %.3f", o, ((uint32_t*)e)[1], e[5], e[6], e[13], e[14]);
+			}
+		}
+	}
+	Hud2BeginP1(hud);
 	DrawHud(view, nullptr, dt);
 	UnspreadShopHud();
+	Hud2EndP1();
+	if (Hud2BeginP2(hud)) {
+		// Individual heroes: player 2's health and combo bar, a HUD pass of its
+		// own -- the HUD lists collected again (no stepping: a repeat walk),
+		// drawn as FUN_00414070 draws them, without the 2D layer.
+		void* hudLists[kNumLists];
+		for (int i = 0; i < kNumLists; i++)
+			hudLists[i] = i >= kFirstHud ? *(void**)(view + 0x1C + 4 * i) : (void*)&g_dummy;
+		g_repeatWalk = true;
+		collect(root, nullptr, hudLists, dt);
+		g_repeatWalk = false;
+		ClearCamera(renderer, nullptr, 1);
+		typedef int(__cdecl* CamFn)(void* cam);
+		if (((CamFn)0x58FD30)(hud)) {
+			((ThisFn)0x414210)(view, nullptr);
+			for (int i = 0; i < 3; i++) {
+				char* list = *(char**)(view + 0x4C + 4 * i);
+				((ThisFn)(*(void***)list)[3])(list, nullptr);
+			}
+			((CamFn)0x58FD20)(hud);
+		}
+		Hud2EndP2();
+	}
 	if (g_hudVpActive) {
 		g_hudVpActive = false;
 		if (hud->viewWindow[1] != hudWindow[1]) RwCameraSetViewWindow(hud, hudWindow);

@@ -2,6 +2,7 @@
 #include "coop.h"
 #include "config.h"
 #include "detour.h"
+#include "hud2.h"
 #include "individual.h"
 #include "inputmgr.h"
 #include "log.h"
@@ -195,9 +196,12 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	{
 		// Individual heroes: the HUD (top left, player 1's half) is player 1's
 		// hero's health, shields and combo bar.
-		int prev = IndivEnter(CoopP1Hero());
+		Hud2BeforeInterfaceTick(self);
+		int shopper = CoopShopper();   // at the merchant: the shopper's own shields
+		int prev = IndivEnter(shopper >= 0 ? shopper : CoopP1Hero());
 		g_origInterfaceTick(self, edx, time);
 		IndivLeave(prev);
+		Hud2AfterInterfaceTick(self, time);   // player 2's own health and combo bar
 	}
 	if (!use) return;
 	*(float*)(text + 0x28) = savedWidth;

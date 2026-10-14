@@ -46,6 +46,8 @@ int  CoopShopper();      // the hero at the merchant while co-op goes on around 
 void CoopGiveLead(int idx, const char* why);
 // How long player `player` (0 = player 1) has held action `action` (seconds; 0 = not held).
 float CoopHoldTime(int player, int action);
+// Player 2 holds Back (not for a combo): their HUD shows.
+bool CoopP2ShowsHud();
 
 // Ask player 2 to leave (same as holding Back).
 void CoopRequestLeave(const char* why);

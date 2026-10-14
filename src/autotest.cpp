@@ -14,6 +14,7 @@
 #include "individual.h"
 
 #include <cmath>
+#include <cstdarg>
 #include <intrin.h>
 #include <cstdio>
 #include <cstdlib>
@@ -22,7 +23,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -1246,21 +1247,41 @@ const Step kCombo2[] = {
 	END(12000),
 };
 
+// huddiff (level 2): which HUD bytes change while the HUD shows -- a hit on
+// Asterix, hits on Romans (combo bar), Back.
+const Step kHudDiff[] = {
+	MARK(0, "baseline"),
+	{ 500, S_HUDDIFF, 0, 0, 0, 0, 0, "hud diff" },
+	{ 1500, S_ENEMY, HERO_ASTERIX, 0, 0, 0, 0, "asterix at a roman" },
+	P1(2000, PAD_X, 0, 0, "x"), P1(2150, 0, 0, 0, "release"),
+	P1(2500, PAD_X, 0, 0, "x"), P1(2650, 0, 0, 0, "release"),
+	P1(3000, PAD_X, 0, 0, "x"), P1(3150, 0, 0, 0, "release"),
+	SHOT(3300, "huddiff_1"),
+	P1(6000, PAD_BACK, 0, 0, "back"), P1(6300, 0, 0, 0, "release"),
+	SHOT(6600, "huddiff_2"),
+	END(10000),
+};
+
 // hud2 (level 2): the HUD in split screen -- Obelix hits a Roman (the combo bar
 // shows), player 1's Back shows the whole HUD.
 const Step kHud2[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	{ 1500, S_POKE8, -10, 0x50, 0, 7, 0, "asterix health 7" },
+	{ 1500, S_POKE8, -11, 0x50, 0, 12, 0, "obelix health 12" },
 	{ 1600, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix at a roman" },
 	VPAD(2000, 1, PAD_X, 0, 0, "p2 X"), VPAD(2150, 1, 0, 0, 0, "p2 release"),
 	VPAD(2500, 1, PAD_X, 0, 0, "p2 X"), VPAD(2650, 1, 0, 0, 0, "p2 release"),
-	SHOT(3000, "hud2_1"),
+	VPAD(3000, 1, PAD_X, 0, 0, "p2 X"), VPAD(3150, 1, 0, 0, 0, "p2 release"),
+	SHOT(3300, "hud2_1"),
 	P1(4000, PAD_BACK, 0, 0, "p1 back"), P1(4300, 0, 0, 0, "p1 release"),
 	SHOT(4600, "hud2_2"),
-	VPAD(6000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(6300, 1, 0, 0, 0, "p2 release"),
+	VPAD(6000, 1, PAD_BACK, 0, 0, "p2 back"),
 	SHOT(6600, "hud2_3"),
-	END(7500),
+	VPAD(9000, 1, 0, 0, 0, "p2 release"),
+	SHOT(9300, "hud2_4"),
+	SHOT(14000, "hud2_5"),
+	END(14500),
 };
 
 // pit26o (-Level 2): sector 6's big death pit; player 2's Obelix (not leading)
@@ -2427,6 +2448,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("hit2o", kHit2O),
 	SCENARIO("down2a", kDown2A),
 	SCENARIO("hud2", kHud2),
+	SCENARIO("huddiff", kHudDiff),
 	SCENARIO("combo2", kCombo2),
 	SCENARIO("pit26b", kPit26B),
 	SCENARIO("pit26c", kPit26C),
@@ -2595,6 +2617,80 @@ void Finish(const char* why) {
 		g_hookCounters.enforced, g_hookCounters.trioEvents, at.forceReverts);
 	LogClose();
 	TerminateProcess(GetCurrentProcess(), 0);
+}
+
+// HUD diagnostics (S_HUDDIFF): the in-game interface (2,132) and every object
+// it points at; from the start, which bytes of each ever change (per frame).
+struct HudObj { char* p; int size; char tag[40]; uint8_t prev[0x600]; uint8_t changed[0x600]; };
+HudObj* g_hud = nullptr;
+int g_nHud = 0;
+bool g_hudDiff = false;
+
+bool IsVt(uintptr_t v) { return v >= 0x620000 && v < 0x630000; }
+
+void HudAdd(char* p, int size, const char* fmt, ...) {
+	if (!p || g_nHud >= 400 || IsBadReadPtr(p, size)) return;
+	for (int i = 0; i < g_nHud; i++) if (g_hud[i].p == p) return;
+	HudObj& o = g_hud[g_nHud++];
+	o.p = p;
+	o.size = size;
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(o.tag, sizeof(o.tag), fmt, ap);
+	va_end(ap);
+	memcpy(o.prev, p, size);
+	memset(o.changed, 0, sizeof(o.changed));
+}
+
+void HudDiffStart() {
+	if (!g_hud) g_hud = new HudObj[400];
+	g_nHud = 0;
+	char* itf = (char*)GetLvlObject(2, 132, 0);
+	if (!itf) { Log("autotest: no in-game interface"); return; }
+	HudAdd(itf, 0x600, "interface");
+	for (int o = 0; o < 0x600; o += 4) {
+		char* q = *(char**)(itf + o);
+		if (!q || IsBadReadPtr(q, 0x60)) continue;
+		uintptr_t vt = *(uintptr_t*)q;
+		if (!IsVt(vt)) continue;
+		Log("autotest: interface +%03X -> %p vt %08X", o, q, (unsigned)vt);
+		HudAdd(q, 0x100, "+%03X obj vt %X", o, (unsigned)vt);
+		char* fr = *(char**)(q + 4);
+		if (vt >= 0x6230D4 && vt <= 0x623348 && fr && !IsBadReadPtr(fr, 0xA0)) {
+			HudAdd(fr, 0xA0, "+%03X frame", o);
+			char* at = *(char**)(q + 0x48);
+			if (at && !IsBadReadPtr(at, 0x80)) HudAdd(at, 0x80, "+%03X +48", o);
+		}
+	}
+	g_hudDiff = true;
+	Log("autotest: watching %d HUD objects", g_nHud);
+}
+
+void HudDiffFrame() {
+	if (!g_hudDiff) return;
+	for (int i = 0; i < g_nHud; i++) {
+		HudObj& o = g_hud[i];
+		for (int k = 0; k < o.size; k++) {
+			uint8_t v = o.p[k];
+			if (v != o.prev[k]) { o.changed[k] = 1; o.prev[k] = v; }
+		}
+	}
+}
+
+void HudDiffReport() {
+	if (!g_hudDiff) return;
+	for (int i = 0; i < g_nHud; i++) {
+		HudObj& o = g_hud[i];
+		char buf[1600];
+		LineBuf line(buf);
+		line.Add("autotest: hud %s %p changed:", o.tag, o.p);
+		int n = 0;
+		for (int k = 0; k < o.size; k += 4) {
+			if (!(o.changed[k] | o.changed[k + 1] | o.changed[k + 2] | o.changed[k + 3])) continue;
+			if (++n < 120) line.Add(" %X", k);
+		}
+		if (n) Log("%s", buf);
+	}
 }
 
 void LogTick(float t) {
@@ -3966,7 +4062,11 @@ void RunStep(const Step& s) {
 	case S_PROBE:
 		at.probe = s.a != 0;
 		break;
+	case S_HUDDIFF:
+		HudDiffStart();
+		break;
 	case S_END:
+		HudDiffReport();
 		Finish("timeline complete");
 		break;
 	}
@@ -4059,6 +4159,7 @@ void AutotestFrame() {
 
 	RunGlides(now);
 	InjectP1();
+	HudDiffFrame();
 	if ((int)(now - at.lastLog) >= 100) {
 		at.lastLog = now;
 		LogTick(t / 1000.0f);
