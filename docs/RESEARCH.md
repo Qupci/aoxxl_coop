@@ -1414,3 +1414,7 @@ both halves).
   mirrored twice, normal winding, the game's culling). P2's copy is captured after un-hiding the other part's
   models. Autotest combofull2 (S_GIVE b=2 sends the hero 0x4C0E x40) fills the stats but not the bar's full look
   (also P1's) -- the user checks the word in play.
+- Round 48: six shields per hero (merchant) at the single player HUD's size crossed the screen's middle (into the
+  other player's HUD and the helmet counter): with more than four, each row is scaled from its first shield (sizes
+  and spacing, LTMs only) to 0.28 between the first and the last (shields6). P2's X in the merchant's item menu no
+  longer means "back" (left the shop; P1's X does not): B only.

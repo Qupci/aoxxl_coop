@@ -64,6 +64,9 @@ struct State {
 	float*   mirrorCamModelling = nullptr;
 	void**   renderStateSlot = nullptr;   // engine +0x20 while the mirrored render state function is in
 	float*   flipped[8] = {};          // frames turned round on their own for the pass (the combo bar's)
+	// Player 1's shield models scaled down for the game's pass (ScaleHealth), to put back after it.
+	struct SavedLtm { float* f; float m[16]; } scaled[31];
+	int      nScaled = 0;
 	int      nFlipped = 0;
 	bool     loggedP2 = false;
 } g;
@@ -202,6 +205,42 @@ void __fastcall ItfVf15Hook(char* self, void* edx) {
 	IndivLeave(prev);
 }
 
+// More than four shields (up to six: the merchant's) at the single player HUD's
+// size reached past the screen's middle -- into the other player's HUD and the
+// helmet counter. The row is scaled down from its first shield, sizes and
+// spacing alike (0.08 apart), to fit 0.28 across between the first and the
+// last. LTMs only (what the draw reads); `save` keeps them to put back.
+void ScaleHealth(char* itf, const float* cl, int shields, bool save) {
+	if (shields <= 4) return;
+	if (shields > 6) shields = 6;
+	float sc = 0.28f / (0.08f * (float)(shields - 1));
+	auto camX = [&](float* fr) {
+		const float* lt = (const float*)((char*)fr + 0x50);
+		return (lt[12] - cl[12]) * cl[0] + (lt[13] - cl[13]) * cl[1] + (lt[14] - cl[14]) * cl[2];
+	};
+	char* n0 = ElemPtr(itf, 0);
+	float* f0 = n0 ? FrameOf(n0) : nullptr;
+	if (!f0) return;
+	float x0 = camX(f0);
+	for (int i = 0; i <= 30; i++) {
+		char* n = ElemPtr(itf, i);
+		float* fr = n ? FrameOf(n) : nullptr;
+		if (!fr) continue;
+		float* lt = (float*)((char*)fr + 0x50);
+		if (save && g.nScaled < 31) {
+			g.scaled[g.nScaled].f = fr;
+			memcpy(g.scaled[g.nScaled].m, lt, sizeof(g.scaled[0].m));
+			g.nScaled++;
+		}
+		float x = camX(fr);
+		float d = x0 + (x - x0) * sc - x;
+		for (int k = 0; k < 3; k++) {
+			lt[12 + k] += d * cl[k];
+			lt[k] *= sc; lt[4 + k] *= sc; lt[8 + k] *= sc;
+		}
+	}
+}
+
 // The health part's hidden state (+0x24 bits 4-5 == 0) with shield models
 // still showing: FUN_005154A0 (the game manager's, on its HUD toggles -- a
 // hero going down) puts the part in that state and shows the models for the
@@ -336,9 +375,13 @@ void Hud2BeginP1(RwCamera* hud) {
 	move2d(0x13C, dx - off, p * 0.5f);
 	move2d(0x158, dx - off, p * 0.5f);
 	move3d(0x130, dx - off, p * 0.5f);
+	int hp = 0, shields = 3;
+	if (IndivStats(CoopP1Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, true);
 }
 
 void Hud2EndP1() {
+	for (int i = 0; i < g.nScaled; i++) memcpy((char*)g.scaled[i].f + 0x50, g.scaled[i].m, sizeof(g.scaled[i].m));
+	g.nScaled = 0;
 	for (int i = 0; i < g.nMoved2d; i++) {
 		((float*)g.moved2d[i].p)[5] = g.moved2d[i].x;
 		((float*)g.moved2d[i].p)[6] = g.moved2d[i].y;
@@ -384,6 +427,10 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	// one that swaps "cull back" (2) and "cull front" (3).
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);
 	float* cm = (float*)((char*)*(void**)((char*)hud + 4) + 0x10);
+	if (part == 0) {   // as many shields as player 1's row fits (before the mirror; Apply puts them back)
+		int hp = 0, shields = 3;
+		if (IndivStats(CoopP2Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, false);
+	}
 	g.mirrorCam = cl;
 	g.mirrorCamModelling = cm;
 	for (int k = 0; k < 3; k++) { cl[k] = -cl[k]; cm[k] = -cm[k]; }

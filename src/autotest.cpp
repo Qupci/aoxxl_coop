@@ -1384,6 +1384,26 @@ const Step kComboFull2[] = {
 	END(6500),
 };
 
+// shields6 (level 2, individual heroes): both heroes with six shields -- both
+// HUDs fit their halves.
+const Step kShields6[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" },
+	{ 1600, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" },
+	{ 1700, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" },
+	{ 1800, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	{ 1900, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	{ 2000, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	SHOT(3500, "shields6_1"),
+	{ 5000, S_POKE8, -10, 0x50, 0, 22, 0, "asterix health 22" },
+	{ 5000, S_POKE8, -11, 0x50, 0, 17, 0, "obelix health 17" },
+	VPAD(5200, 1, PAD_BACK, 0, 0, "p2 back"), P1(5200, PAD_BACK, 0, 0, "p1 back"), P1(5500, 0, 0, 0, "p1 release"),
+	SHOT(6500, "shields6_2"),
+	VPAD(7000, 1, 0, 0, 0, "p2 release"),
+	END(7500),
+};
+
 // bump1 (level 2): single player -- Asterix runs into the AI companion Obelix.
 const Step kBump1[] = {
 	MARK(0, "baseline"),
@@ -2566,6 +2586,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shield2o", kShield2O),
 	SCENARIO("revshield", kRevShield),
 	SCENARIO("combofull2", kComboFull2),
+	SCENARIO("shields6", kShields6),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),
 	SCENARIO("bump1", kBump1),

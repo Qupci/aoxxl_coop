@@ -1226,16 +1226,16 @@ static void ShopInputFromP2(const PadState& p, InputManager im, int n) {
 	if (left && !wasLeft) press |= 1u << 2;
 	if (right && !wasRight) press |= 1u << 3;
 	if (p.pressed & PAD_A) press |= 1u << 4;
-	// Back (X or B, as the menu shows) only in the item menu (shop +8 bits 0-2 ==
-	// 3): during the merchant's words (state 2) X moves the words on (either
-	// player, shared.cpp) -- taken as "back" as well, it closed the menu as soon
-	// as it opened.
+	// Back: B, only in the item menu (shop +8 bits 0-2 == 3). X is not "back":
+	// during the merchant's words (state 2) it moves the words on (either player,
+	// shared.cpp) and closed the menu as soon as it opened; on an item it left
+	// the shop, where player 1's X does not.
 	int state = -1;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16 && state <= 0; i++) {
 		char* sh = (char*)GetLvlObject(2, 172, i);
 		if (sh) state = *(uint8_t*)(sh + 8) & 7;
 	}
-	if ((p.pressed & (PAD_X | PAD_B)) && state == 3) press |= 1u << 5;
+	if ((p.pressed & PAD_B) && state == 3) press |= 1u << 5;
 	wasLeft = left;
 	wasRight = right;
 	char* input = im.raw();
