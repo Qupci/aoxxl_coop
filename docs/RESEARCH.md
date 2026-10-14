@@ -1431,3 +1431,7 @@ both halves).
   also sets each shield's paleness -- the alpha byte (+7) of the colours in the shield node's list (node +0x1C:
   item +4 next, +0xC colour; 0x50 empty, 0xFF otherwise) -- shared by both HUDs. Now part of each player's copy
   (autotest hudorder: P1's HUD by a heal, P2's by Back, both orders).
+- Round 51: snow (CFogBoxNodeFx) fast again in split screen: P2's HUD pass walks the scene (up to two walks a frame,
+  g_walkPlayer 0) and the fog walk hook stepped the boxes there with no restore. The HUD walks are flagged
+  (g_hudWalk) and leave the fog boxes alone. Other walk-dt users to watch with any new walk: particles (stepped-once
+  guard), sky (walks 1/2 only), anim blends (repeat walk), fog (now). User-verified in fog21.

@@ -88,6 +88,7 @@ CollectFn g_origParticlesWalk = nullptr;
 bool      g_inSplitFrame = false;
 bool      g_stampWalk = false;
 int       g_walkPlayer = 0;   // 1 / 2: whose walk the split frame is in
+bool      g_hudWalk = false;  // player 2's HUD pass collecting its models (individual heroes)
 
 // Systems stepped in this split frame. A system with +0x10 bit 9 is stepped
 // whether or not it is in view (and stamps itself only when it is): the x10
@@ -241,7 +242,7 @@ void __fastcall FogWalkHook(char* self, void* edx, void** lists, void* dt) {
 		}
 	}
 	if (!g_inSplitFrame || off) { g_origFogWalk(self, edx, lists, dt); return; }
-	if (g_stampWalk) return;
+	if (g_stampWalk || g_hudWalk) return;   // the HUD pass only wants the HUD's models: no snow stepping
 	unsigned n = *(unsigned*)(self + 0x34) * *(unsigned*)(self + 0x44);
 	uint8_t* recs = *(uint8_t**)(self + 0x360);
 	uint8_t* fades = *(uint8_t**)(self + 0x35C);
@@ -993,7 +994,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 		for (int i = 0; i < kNumLists; i++)
 			hudLists[i] = i >= kFirstHud ? *(void**)(view + 0x1C + 4 * i) : (void*)&g_dummy;
 		g_repeatWalk = true;
+		g_hudWalk = true;
 		collect(root, nullptr, hudLists, dt);
+		g_hudWalk = false;
 		g_repeatWalk = false;
 		ClearCamera(renderer, nullptr, 1);
 		typedef int(__cdecl* CamFn)(void* cam);
