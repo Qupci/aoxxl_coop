@@ -2511,6 +2511,32 @@ const Step kGrab3[] = {
 	END(6000),
 };
 
+// cabled2 / spyd2 (level 2, with XXL_DOWNAT=1:1000): Obelix down, Asterix walks
+// onto the cable car / glides to the second spy three times -- each time put
+// back, the car never boarded, the talk never started.
+const Step kCableD2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1600, S_PLACE, HERO_ASTERIX, 2, 0, 0, 0, "asterix before car" },
+	P1(1800, 0, -1, 0, "p1 left"), P1(3500, 0, 0, 0, "p1 stop"),
+	{ 4000, S_PLACE, HERO_ASTERIX, 0, 0, 0, 0, "asterix on car" },
+	{ 7000, S_PLACE, HERO_ASTERIX, 0, 0, 0, 0, "asterix on car" },
+	{ 10000, S_PLACE, HERO_ASTERIX, 0, 0, 0, 0, "asterix on car" },
+	SHOT(12500, "cabled2"),
+	END(14000),
+};
+const Step kSpyD2[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	PLACEAT(2000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	GLIDEAT(7000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	GLIDEAT(11000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(14000, "spyd2"),
+	END(16000),
+};
+
 // swing (level 2): Asterix walks onto the cable car, player 2's Obelix pulls.
 const Step kSwing[] = {
 	MARK(0, "baseline"),
@@ -2799,6 +2825,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("cabled2", kCableD2),
+	SCENARIO("spyd2", kSpyD2),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),

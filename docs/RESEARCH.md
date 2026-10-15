@@ -1541,3 +1541,10 @@ both halves).
   title's preset 3 (FUN_00503AA0's FUN_00438950(3) from 0x503AED with a pad) is saved per binding as device /
   index / offset (xxl_coop_padlayout.txt) and put back when a level started without it (force_level: the mod's
   switch from the keyboard preset 1).
+- Round 63: (1) the object-tick hold never ran in play: BundleTickHook hands every bundle to the game when a player
+  hero is out (HeroOut -- a fallen hero is), so TickLife / IndivHoldsBack were skipped exactly while a hero was down
+  (the spy restarted its dialogue by itself, dialogue2.log). That branch now mirrors the bundle tick with the hold.
+  (2) The cable car: the hero's situation 2 (FUN_0049A670, +0x480 the car's node) boards on a later tick -- the car's
+  own 0x512B, then trio 0x4801 / 0x4812 -- and from then on the car holds the hero (put-backs ignored, frozen on it,
+  cable_car4.log). Situation 2 is now left at once (table[2](owner, 2, 0xFF), +0x3E9 = 0xFF, only when table[2] is
+  0x49A670) and the hero put back. Autotests cabled2 / spyd2 (three approaches each, XXL_DOWNAT=1:1000).

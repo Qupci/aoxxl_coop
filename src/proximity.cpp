@@ -295,6 +295,19 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 	// A hero the game has borrowed for a scripted order (Asterix riding the cable
 	// car Obelix pulls) is not a player's: objects see the real leader.
 	if (!CoopP2Joined() || CoopSuspended() || !h1 || !h2 || HeroOut(p1) || HeroOut(p2)) {
+		// Individual heroes with one down (a hero out): the same ticks, but what
+		// needs both heroes skips its tick while the standing hero is at it.
+		if (CoopP2Joined() && !CoopSuspended() && IndivFallenHero() >= 0) {
+			int* groupLife = *(int**)(bundle + 0x0C);
+			if (groupLife && (groupLife[1] & 3) == 0) ((TickFn)(*(void***)groupLife)[17])(groupLife, nullptr, dt);
+			for (int* life = *(int**)(bundle + 0x10); life; life = (int*)life[2]) {
+				if (*(uint8_t*)(life + 1) & 2) continue;
+				char* hook = *(char**)((char*)life + 0x10);
+				if (hook && IndivHoldsBack(hook)) continue;
+				((TickFn)(*(void***)life)[17])(life, nullptr, dt);
+			}
+			return;
+		}
 		g_origBundleTick(bundle, edx, dt);
 		return;
 	}
