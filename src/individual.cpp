@@ -42,6 +42,10 @@ struct State {
 	bool     gameOver = false;
 	SafeSpot safe[2][kSafeSpots];
 	int      safeNext[2] = {};
+	// A longer trail of safe spots, one every 2 units walked (the put-back from
+	// what needs both heroes: far enough not to be walked back onto at once).
+	Vector3  trail[2][16];
+	int      trailN[2] = {}, trailNext[2] = {};
 	DWORD    noSafeUntil[2] = {};
 	DWORD    onLauncherAt[2] = {};  // last seen where a launcher offers itself
 	DWORD    blockedAt[2] = {};     // last put back from something that needs both heroes
@@ -156,18 +160,30 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 	if (!ground || IsBadReadPtr(ground, 0x2C) || *(uintptr_t*)ground != 0x624258) return;
 	if ((*(uint8_t*)(ground + 0x2A) & 4) || (*(uint8_t*)(h.raw() + 0x384) & 7) != 0) return;
 	if (*(uint8_t*)(h.raw() + 0x3E9) != 0) return;
+	if (*(uint8_t*)(ground + 0x2A) & 8) return;   // slide ground (the belly slide)
 	const char* partner = nullptr;
 	if (OnPartnerGround(h, &partner)) return;   // a blue circle's plate: not a place to be put back on
 	SafeSpot& s = g.safe[idx][g.safeNext[idx]];
 	s.pos = h.Pos();
 	s.at = now;
 	g.safeNext[idx] = (g.safeNext[idx] + 1) % kSafeSpots;
+	int last = (g.trailNext[idx] + 15) % 16;
+	if (g.trailN[idx] == 0 || (g.trail[idx][last] - s.pos).len2() >= 2.0f * 2.0f) {
+		g.trail[idx][g.trailNext[idx]] = s.pos;
+		g.trailNext[idx] = (g.trailNext[idx] + 1) % 16;
+		if (g.trailN[idx] < 16) g.trailN[idx]++;
+	}
 }
 
 // Put back from something that needs both heroes: the newest safe spot at
 // least 4 units from where the hero stands (the last one can be right at the
 // thing's edge, walked back onto at once), else the farthest one known.
 bool SafeSpotAway(int idx, const Vector3& from, Vector3* out) {
+	// The trail first: the newest of its spots 6 units or more away.
+	for (int k = 1; k <= g.trailN[idx]; k++) {
+		const Vector3& p = g.trail[idx][(g.trailNext[idx] + 16 - k) % 16];
+		if ((p - from).len2() >= 6.0f * 6.0f) { *out = p; return true; }
+	}
 	const SafeSpot* best = nullptr;
 	const SafeSpot* farthest = nullptr;
 	float farD = -1.0f;
@@ -332,6 +348,13 @@ void BlockPartnerGrounds() {
 	Hero h = t ? t.GetHero(Other(down)) : Hero();
 	if (!h) return;
 	const char* what = nullptr;
+	// The belly slide's slope (ground flags +0x2A bit 3, "Slide"): walked down
+	// past its start zone it led on to the level's end without the partner.
+	char* ground = *(char**)(h.raw() + 0x280);
+	if (ground && !IsBadReadPtr(ground, 0x2C) && (*(uint8_t*)(ground + 0x2A) & 8)) {
+		IndivBlockPartnerSpot("the belly slide");
+		return;
+	}
 	if (!OnPartnerGround(h, &what)) return;   // (launchers: in the hero's prompt, coop.cpp)
 	IndivBlockPartnerSpot(what);
 }

@@ -595,14 +595,83 @@ static int __fastcall ShopMenuInputOff(char* in, void* edx, int group, int on) {
 
 static bool g_presetSeen = false;
 
+// The pad's layout (preset 3, built from the profile's options by the title
+// screen: vf10(1) -> FUN_004FF1E0 + FUN_00503B00). A level started straight
+// away (force_level) never gets it -- the same calls there give a default table
+// with the face buttons shifted -- so the title's is kept in a file and put
+// back. Each binding's source (+0xC) holds a pointer per preset (+4..+0x10)
+// into the input's devices: A (+4, 0xCC each), B (+8, 0x68), C (+0xC, 0x3FC).
+struct PadDev { char* base; int count, stride; };
+static void PadDevices(char* in, PadDev d[3]) {
+	d[0] = { *(char**)(in + 0x04), *(uint8_t*)(in + 0x10), 0xCC };
+	d[1] = { *(char**)(in + 0x08), *(uint8_t*)(in + 0x11), 0x68 };
+	d[2] = { *(char**)(in + 0x0C), *(uint8_t*)(in + 0x12), 0x3FC };
+}
+
+static void SavePadLayout(char* in) {
+	InputManager im = GetInputManager();
+	if (!im || im.raw() != in) return;
+	PadDev d[3];
+	PadDevices(in, d);
+	char path[MAX_PATH];
+	GameDirPath(path, sizeof(path), "xxl_coop_padlayout.txt");
+	FILE* f = fopen(path, "w");
+	if (!f) return;
+	int n = im.NumActions(), saved = 0;
+	fprintf(f, "# player 1's pad layout as the title screen built it (preset 3), put back when a level starts without it\n");
+	for (int i = 0; i < n; i++) {
+		char* b = im.Binding(i);
+		char* src = b ? *(char**)(b + 0xC) : nullptr;
+		char* p = src ? *(char**)(src + 0x10) : nullptr;
+		if (!p) continue;
+		for (int k = 0; k < 3; k++)
+			if (d[k].base && p >= d[k].base && p < d[k].base + d[k].count * d[k].stride) {
+				int off = (int)(p - d[k].base);
+				fprintf(f, "%d %d %d %d\n", i, k, off / d[k].stride, off % d[k].stride);
+				saved++;
+				break;
+			}
+	}
+	fclose(f);
+	Log("input: the pad's layout from the title screen kept (%d bindings, xxl_coop_padlayout.txt)", saved);
+}
+
+static bool RestorePadLayout(char* in) {
+	InputManager im = GetInputManager();
+	if (!im || im.raw() != in) return false;
+	char path[MAX_PATH];
+	GameDirPath(path, sizeof(path), "xxl_coop_padlayout.txt");
+	FILE* f = fopen(path, "r");
+	if (!f) return false;
+	PadDev d[3];
+	PadDevices(in, d);
+	int n = im.NumActions(), put = 0;
+	char line[128];
+	while (fgets(line, sizeof(line), f)) {
+		int i, k, idx, off;
+		if (line[0] == '#' || sscanf(line, "%d %d %d %d", &i, &k, &idx, &off) != 4) continue;
+		if (i < 0 || i >= n || k < 0 || k > 2 || !d[k].base || idx < 0 || idx >= d[k].count || off < 0 || off >= d[k].stride) continue;
+		char* b = im.Binding(i);
+		char* src = b ? *(char**)(b + 0xC) : nullptr;
+		if (!src) continue;
+		*(char**)(src + 0x10) = d[k].base + idx * d[k].stride + off;
+		put++;
+	}
+	fclose(f);
+	Log("input: the pad's layout from the title screen put back (%d bindings)", put);
+	return put > 0;
+}
+
 static void __fastcall SetPresetHook(char* in, void* edx, int preset) {
 	static bool fakeNoPad = getenv("XXL_PRESETNOPAD") && atoi(getenv("XXL_PRESETNOPAD"));
 	bool pad = GameSeesPad(in) && !fakeNoPad;
 	g_presetWithoutPad = preset == 1 && !pad;
 	g_presetSeen = true;
-	Log("input: the game sets controller preset %d (from %p; it sees %s)", preset, _ReturnAddress(),
-	    pad ? "a pad" : "no pad");
+	void* from = _ReturnAddress();
+	Log("input: the game sets controller preset %d (from %p; it sees %s)", preset, from, pad ? "a pad" : "no pad");
 	g_origSetPreset(in, edx, preset);
+	// The title's own choice with a pad (FUN_00503AA0): its layout is the right one.
+	if (preset == 3 && pad && (uintptr_t)from == 0x503AED) SavePadLayout(in);
 }
 
 static void WatchControllerPreset() {
@@ -630,6 +699,7 @@ static void WatchControllerPreset() {
 			((void(__fastcall*)(char*, void*))0x503B00)(gm, nullptr);
 			Log("input: the pad's layout was never built (no pad at boot) -- built now (FUN_00503B00)");
 		}
+		RestorePadLayout(in);
 		SetPreset(in, 3);
 		Log("input: level %d is running on the keyboard preset 1, which the game chose %s; it sees a pad now -- "
 		    "preset 3 set (the game's choice with a pad)", g.lastLevel,

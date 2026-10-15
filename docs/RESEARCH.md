@@ -1534,3 +1534,10 @@ both halves).
   (SafeSpotAway). Preset (user): wrong right at level 2's start (force_level), right after the title screen. The
   title's table (vf10(1) -> FUN_004FF1E0 + FUN_00503B00 with the profile's options) is A0+0E/10/0F/11/12...; at a
   force_level start the same calls give the default A0+0F/10/11/12/13 (options not loaded) -- force_level-only.
+- Round 62: put-backs from what needs both heroes go along a trail of safe spots one every 2 units (16): the newest
+  >= 6 units away (cable_car3.log: every put-back went to the boarding platform 2.4 units off, the 8 time-spaced spots
+  being all around the car). The belly slide's slope (ground +0x2A bit 3 "Slide") is held while a hero is down
+  (slide.log: the start zone held back 10 times, then the slope walked down to the level's end). Pad layout: the
+  title's preset 3 (FUN_00503AA0's FUN_00438950(3) from 0x503AED with a pad) is saved per binding as device /
+  index / offset (xxl_coop_padlayout.txt) and put back when a level started without it (force_level: the mod's
+  switch from the keyboard preset 1).
