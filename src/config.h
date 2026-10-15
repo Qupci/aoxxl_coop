@@ -28,6 +28,11 @@ struct CoopConfig {
 	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with
 	float deadzone      = 0.24f;
 
+	// Experimental rules ([experimental]; read at startup, single player too)
+	float squadAliveFactor = 2.0f;  // Romans of a squad alive at once
+	float squadCountFactor = 2.0f;  // Romans of each squad pool (phase) to defeat
+	float priceFactor      = 2.0f;  // the merchant's prices
+
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.
 	bool  keyboard      = true;

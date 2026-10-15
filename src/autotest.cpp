@@ -1773,6 +1773,41 @@ const Step kFight4A[] = {
 	SHOT(53000, "fight4_end"),
 	END(54000),
 };
+// fight64 (-Level 6): Asterix fights LV6-4's start squad (squad 8, around
+// 350.96 42.05 -292.06; pools 40 + 10 leaders + 950), potion on.
+const Step kFight64[] = {
+	MARK(0, "baseline"),
+	TAP1(1500), TAP1(2500), TAP1(3500), TAP1(4500), TAP1(5500), TAP1(6500), TAP1(7500), TAP1(8500), TAP1(9500), SHOT(10500, "fight64_0"),
+	{ 11000, S_WATCHENEMIES, 0, 0, 0, 350.96f, 42.05f, "watch romans", -292.06f },
+	PLACEAT(11200, HERO_ASTERIX, 350.96f, 42.8f, -292.06f), POTION(11400),
+	TAPS1(13000), TAPS1(18000), TAPS1(23000), TAPS1(28000), TAPS1(33000), POTION(37000),
+	TAPS1(38000), TAPS1(43000), TAPS1(48000), TAPS1(53000), TAPS1(58000), POTION(62000),
+	TAPS1(63000), TAPS1(68000), TAPS1(73000), TAPS1(78000), TAPS1(83000),
+	SHOT(88000, "fight64_end"),
+	END(89000),
+};
+
+// lock4 (-Level 4): Asterix walks into LV4-1's fight-lock sphere (-288.1 0.1
+// 117.3, r 5): the gate shows its squads' Romans to defeat (vanilla 94 + 6).
+const Step kLock4[] = {
+	MARK(0, "baseline"),
+	PLACEAT(1000, HERO_ASTERIX, -288.15f, 0.8f, 124.0f),
+	GLIDEAT(1500, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	SHOT(3000, "lock4_1"), SHOT(4500, "lock4_2"), SHOT(7000, "lock4_3"),
+	END(8000),
+};
+
+// fight4h (-Level 4): fight4a at LV4-1's hiding Romans (squad 21: a hiding spot at -263.7 0.2 52.8).
+const Step kFight4H[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_WATCHENEMIES, 0, 0, 0, -263.66f, 0.21f, "watch romans", 52.83f },
+	PLACEAT(1000, HERO_ASTERIX, -263.66f, 0.9f, 52.83f), POTION(1200),
+	TAPS1(3000), TAPS1(8000), TAPS1(13000), TAPS1(18000), TAPS1(23000), POTION(27000),
+	TAPS1(28000), TAPS1(33000), TAPS1(38000), TAPS1(43000), TAPS1(48000),
+	SHOT(53000, "fight4h_end"),
+	END(54000),
+};
 
 // twistco2: like twistco, but player 2 (not leading) asks for the fusion with X.
 const Step kTwistCo2[] = {
@@ -2720,6 +2755,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspy", kShopSpy),
 	SCENARIO("spyonly", kSpyOnly),
 	SCENARIO("shopspyw", kShopSpyW),
+	SCENARIO("fight4h", kFight4H),
+	SCENARIO("lock4", kLock4),
+	SCENARIO("fight64", kFight64),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("req410", kReq410),
@@ -3087,6 +3125,30 @@ void LogTick(float t) {
 		bool primed = at.enemiesPrimed;
 		at.enemiesPrimed = true;
 		line.Add(" | romans near %d", live);
+		static int s_classTick = 0;
+		if (!primed || ++s_classTick % 50 == 0)
+			for (int id : ids) {
+				unsigned n = GetNumLvlClassInstances(2, id), shown = 0;
+				for (unsigned i = 0; i < n; i++) {
+					char* e = (char*)GetLvlObject(2, id, i);
+					char* node = e ? *(char**)(e + 0x10) : nullptr;
+					if (node && !(*(uint8_t*)(node + 0x10) & 2)) shown++;
+				}
+				Log("autotest: class (2,%d): %u in the level, %u shown", id, n, shown);
+			}
+		if (!primed || s_classTick % 50 == 0)
+			for (unsigned i = 0, n = GetNumLvlClassInstances(4, 44); i < n; i++) {
+				char* pool = (char*)GetLvlObject(4, 44, i);
+				if (!pool) continue;
+				int nFree = 0, nHeld = 0;
+				__try {
+					typedef char** (__fastcall* ListFn)(char* self, void* edx);
+					char** head = ((ListFn)(*(void***)pool)[0x30 / 4])(pool, nullptr);
+					for (char* e = head ? *head : nullptr; e && nFree < 500; e = *(char**)(e + 4)) nFree++;
+					for (char* e = *(char**)(pool + 0xC); e && nHeld < 500; e = *(char**)(e + 4)) nHeld++;
+				} __except (EXCEPTION_EXECUTE_HANDLER) { nFree = -1; }
+				Log("autotest: Roman pool %u %p: %d free, %d in its +0C list", i, pool, nFree, nHeld);
+			}
 		for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 			char* sq = (char*)GetLvlObject(4, 26, i);
 			if (!sq) continue;

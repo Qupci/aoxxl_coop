@@ -1470,3 +1470,18 @@ both halves).
   FUN_0046F590 done). Forced close now: stop the line, clear 0x20, state 0, menu pieces off, state 5's exit, vf19,
   pose 0. FUN_00515830/FUN_00515A30 (gm tick, gm+0x5C bit 26 edges, mirror bit 27, bit 28 = HUD hidden) only
   hide/restore the HUD. Autotest shopspyw (state 2 now): state 0, pose 0, bars flag off.
+- Round 56: experimental rules ([experimental], read at startup, single player too; experimental.cpp).
+  Merchant prices: shop +0xE4, 12 uint32, scaled after CKHkAsterixShop::deserialize (0x4C0C50). Squads
+  (CKGrpSquad::deserialize 0x52DE80): pool records (squad +0x144, 0x1C each, count +0x14C): +0 CKGrpPoolSquad,
+  +4 enemy cpnt, +8 member list, +0x10 U1 (alive after a restart: vf33 else-branch / FUN_0052D460), +0x11 alive
+  (loaded as U2 = placed when the squad first wakes), +0x14 queued, +0x15 fallen to replace, +0x16 sent in so far,
+  +0x18 to defeat (int16, < 0 endless). Remaining = +0x18 - +0x16 - +0x15 - +0x14. Squad scripts (message actions)
+  run through vf25 (0x4C7F80, thiscall(cmd, args) ret 8): 5 cond alive (vf43 = +0x11) vs args[0] (op args[1],
+  pool args[2]), 8 queue (vf53), 12 send in at a point (vf55), 16 cond sent in (+0x16), 19 replace (vf65), 20 keep
+  N alive (vf54); 6/7 distance conds, 0/1/2/9/10 choreography. LV4-1 squad 1: "pool 0 alive <= 6 -> replace 1";
+  LV6-4 squad 8: "pool 0 alive <= 7 -> keep 8", "pool 1 alive <= 2 -> keep 3", "pool 0 alive == 0" (phase).
+  Romans come from the pool's free list (vf12 0x30, chained +4; FUN_00530380): its size caps Romans at once (LV6-4:
+  8 for squad 8's pool, 27 basic Romans in the level). Scaling: every count x squad_romans_to_defeat (and cond 16);
+  pools sent in by script: U1/U2 and script counts (5 >= 2, 8, 12, 19, 20) x squad_romans_at_once; placed-only pools
+  (count <= placed: set pieces, LV4-1 squad 21's hiding Romans) keep their spots and get the rest as a wave once
+  all have fallen (vf37 hook sets +0x15). LV4-1 gate: 100 -> 200 (autotest lock4). Env XXL_SQUADCMDS logs scripts.
