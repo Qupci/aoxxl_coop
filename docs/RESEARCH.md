@@ -1555,3 +1555,8 @@ both halves).
   needs both heroes (GroupNeedsBoth: trio commands, trio ride modes 0x4806/07/0B..0F, any message to the slide path)
   are held back with the put-back (ZoneEventHero already names the hero who crossed, swapped pass included). Last
   resort of a put-back: the hero's own position a second or more ago (every 0.1 s). Autotest slidecross.
+- Round 65 (slide3.log): a put-back went to a trail spot 0.12 past the slide's line (recorded in the crossing frame),
+  so the hero ended up on the far side. Zone put-backs now use the hero's position the frame before -- the detection
+  service's own (det +0x1C, by the hero's node index, swapped pass included) -- 1.5 units further back along the way
+  it came; spots noted in the last 0.5 s are dropped on every block. Autotest slidecross3 (three crossings: all put
+  back before z -903.82).

@@ -56,6 +56,9 @@ int IndivFallenHero();
 // down: the standing hero who reaches one is put back on its last solid ground.
 // True: it was (`what` for the log).
 bool IndivBlockPartnerSpot(const char* what);
+// The same for a zone the standing hero just crossed: back to where it was the
+// frame before (`before`, the detection service's), a little further back.
+bool IndivBlockPartnerSpotFrom(const char* what, const float before[3]);
 // Hero `hero` stands where a launcher offers itself (its prompt): no safe spot there.
 void IndivNoteLauncherSpot(int hero);
 // Should this object (a hook) skip its tick now: it needs both heroes, one is

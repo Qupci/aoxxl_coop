@@ -1463,7 +1463,17 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 			int zh = ZoneEventHero(eventId & 0xFFFF);
 			if (CoopP2Joined() && !CoopSuspended()) {
 				// (zh: the hero who set it off -- in the swapped pass too)
-				if (zh != IndivFallenHero()) IndivBlockPartnerSpot("a zone that needs both heroes");
+				if (zh != IndivFallenHero()) {
+					// back to the side it came from: its place the frame before (the service's)
+					Trio tz = GetTrio();
+					Hero hz = tz && zh >= 0 ? tz.GetHero(zh) : Hero();
+					int ni = hz && g_tickingDet ? NodeIndex(g_tickingDet, hz) : -1;
+					float* prevs = g_tickingDet ? *(float**)(g_tickingDet + 0x1C) : nullptr;
+					if (ni >= 0 && prevs && std::isfinite(prevs[3 * ni]))
+						IndivBlockPartnerSpotFrom("a zone that needs both heroes", prevs + 3 * ni);
+					else
+						IndivBlockPartnerSpot("a zone that needs both heroes");
+				}
 				static unsigned s_last = 0;
 				if (s_last != (eventId & 0xFFFF)) {
 					s_last = eventId & 0xFFFF;

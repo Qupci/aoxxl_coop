@@ -244,6 +244,55 @@ int IndivFallenHero() {
 
 namespace { void ShowDownHint(int down); }
 
+namespace {
+void ForgetRecentSpots(int idx, DWORD now) {
+	for (int i = 0; i < kSafeSpots; i++)
+		if (g.safe[idx][i].at && now - g.safe[idx][i].at < 500) g.safe[idx][i].at = 0;
+	// the trail's newest point, if it was added in that time, goes too
+	if (g.trailN[idx] > 0 && now - g.safe[idx][(g.safeNext[idx] + kSafeSpots - 1) % kSafeSpots].at < 500) {
+		g.trailNext[idx] = (g.trailNext[idx] + 15) % 16;
+		g.trailN[idx]--;
+	}
+}
+
+void PutBackLog(int up, int down, const char* what, const Vector3& spot) {
+	static DWORD s_told = 0;
+	DWORD now = GetTickCount();
+	if (now - s_told > 2000) {
+		s_told = now;
+		Log("indiv: %s reached %s with %s down -- back on its last solid ground (%.1f %.1f %.1f)", HeroName(up), what,
+		    HeroName(down), spot.x, spot.y, spot.z);
+		ShowDownHint(down);
+	}
+}
+}
+
+bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
+	Vector3 before(beforeXyz[0], beforeXyz[1], beforeXyz[2]);
+	int down = IndivFallenHero();
+	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;
+	int up = Other(down);
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(up) : Hero();
+	if (!h) return false;
+	Vector3 now = h.Pos();
+	Vector3 back = before - now;
+	back.y = 0.0f;
+	float len = std::sqrt(back.len2());
+	Vector3 spot = before;
+	if (len > 0.001f) spot = before + back * (1.5f / len);   // a step further back than it came from
+	spot.y = before.y + 0.3f;
+	ForgetRecentSpots(up, GetTickCount());
+	PlaceHero(h, spot);
+	g.noSafeUntil[up] = GetTickCount() + 1000;
+	if (h.hook->node) {
+		float at[3] = { spot.x, spot.y, spot.z };
+		ProximityForgetMove(h.hook->node, at);
+	}
+	PutBackLog(up, down, what, spot);
+	return true;
+}
+
 bool IndivBlockPartnerSpot(const char* what) {
 	int down = IndivFallenHero();
 	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;

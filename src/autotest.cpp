@@ -2522,6 +2522,17 @@ const Step kSlideCross[] = {
 	END(14000),
 };
 
+const Step kSlideCross3[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(3000, HERO_OBELIX, -903.96f, 528.2f, -938.49f),
+	GLIDEAT(4500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
+	GLIDEAT(8000, HERO_ASTERIX, -903.0f, 524.0f, -896.0f, 2000),
+	GLIDEAT(11000, HERO_ASTERIX, -909.0f, 524.0f, -896.0f, 2000),
+	SHOT(14000, "slidecross3"),
+	END(15000),
+};
+
 // slideend (level 2): Asterix walks down beside the belly slide (LV2-2,
 // -916.8 519.6 -883.8 -> -906.6 511.1 -860.4): what starts the level's end there.
 const Step kSlideEnd[] = {
@@ -2848,6 +2859,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("slidecross3", kSlideCross3),
 	SCENARIO("slidecross", kSlideCross),
 	SCENARIO("slideend", kSlideEnd),
 	SCENARIO("cabled2", kCableD2),
