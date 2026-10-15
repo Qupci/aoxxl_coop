@@ -82,7 +82,7 @@ char* GM() {
 }
 
 bool On() {
-	return IndivActive() && g_config.splitScreen && CoopP2Joined() && !CoopSuspended() && !CoopOneScreen() &&
+	return IndivActive() && g_config.splitScreen && CoopP2Joined() && !CoopOneScreen() &&
 	       CoopShopper() < 0 && CoopP2Hero() >= 0;
 }
 
@@ -301,8 +301,6 @@ void Hud2BeforeInterfaceTick(char* itf) {
 	if (StatsChanged(0, CoopP1Hero())) g.pending[0] = true;
 	*(uint32_t*)(gm + 0x5C) = (*(uint32_t*)(gm + 0x5C) & ~0x4000u) | (g.pending[0] ? 0x4000u : 0u);
 }
-
-void Hud2RefreshP1() { g.pending[0] = true; g.lastHp[0] = g.lastShields[0] = -1; }
 
 void Hud2AfterInterfaceTick(char* itf, void* time) {
 	if (!On() || !itf) return;

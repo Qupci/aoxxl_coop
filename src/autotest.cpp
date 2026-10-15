@@ -2002,7 +2002,10 @@ const Step kSlide2H[] = {
 	SHOT(36000, "slide2h_1"),
 	{ 37000, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
 	SHOT(37500, "slide2h_2"), SHOT(38500, "slide2h_3"),
-	END(40000),
+	{ 39000, S_GIVE, HERO_OBELIX, 0, 0, -5.0f, 0, "obelix hurt" }, SHOT(39500, "slide2h_4"),
+	VPAD(40500, 1, PAD_START, 0, 0, "p2 start (ignored)"), VPAD(40700, 1, 0, 0, 0, "p2 release"),
+	SHOT(43000, "slide2h_5"),
+	END(44000),
 };
 
 // slide22s (level 2): the LV2-2 belly slide in co-op: player 2 (Obelix) steers

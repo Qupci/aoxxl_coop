@@ -1494,3 +1494,10 @@ both halves).
   bar refill +0xA0 / +0xC8 -- combo_bar_fill divides the thresholds (ExperimentalFrame; 0/7/16 full 30 -> 0/14/32
   full 60). Slide / boat (co-op suspended): the one HUD shows the leader's stats (hints.cpp; the bar redrawn on the
   switch).
+- Round 58: fight gates: each squad with +0x154 >= -1 (-1 all pools, n pool n; 0xFE none) adds count - sent + alive
+  to gm+0x64 every frame (FUN_0052D340, from CKGrpEnemyLife's tick) -- the gate's number. Kept pools' doubling is
+  given to the biggest doubled pool counted by the same gate (ExperimentalFrame; LV4-1 194 -> 200). Combo drain: a
+  hit lost every gm+0x9C s before full (0.65), a full bar lasts gm+0xA0 s (30): combo_bar_drain /
+  combo_bar_full_drain divide them. One screen (co-op suspended: slide, boat): player 2's HUD pass now also runs
+  after the game's own HUD draw (FUN_00414070 detour; hud2 on while suspended), so Obelix's bar shows on the right.
+  P2 Start / Back-hold leave ignored while suspended (leaving mid-slide left both heroes stuck).

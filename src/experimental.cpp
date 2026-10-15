@@ -27,6 +27,8 @@ struct SquadOrig {
 	unsigned n = 0;
 	bool     scaled[8] = {};     // its Romans to defeat scaled
 	bool     atOnce[8] = {};     // its numbers at once scaled (a pool its script sends Romans in for)
+	int16_t  origCount[8] = {};  // Romans to defeat as the level has them
+	bool     settled[8] = {};    // kept as is: its share of the doubling given to another pool of its gate
 };
 std::unordered_map<char*, SquadOrig> g_squads;
 
@@ -76,6 +78,7 @@ void ScaleSquad(char* sq) {
 		uint8_t& u2 = *(uint8_t*)(rec + 0x11);
 		int16_t& count = *(int16_t*)(rec + 0x18);
 		int a0 = u1, s0 = u2, c0 = count;
+		o.origCount[i] = count;
 		// A set piece: all its Romans placed at the start, none sent in after (LV4-1's
 		// hiding Romans) -- as the level has it.
 		bool placedOnly = count > 0 && count <= (u2 > u1 ? u2 : u1);
@@ -198,32 +201,77 @@ uint32_t __fastcall JetCmdHook(char* self, void* edx, uint32_t cmd, uint32_t* ar
 	return SquadCmd(g_origJetCmd, self, edx, cmd, args);
 }
 
+// A fight gate (fight lock) counts the Romans left in the squads given to it
+// (squad +0x154: -1 all its pools, n pool n, 0xFE none): every frame each
+// such squad adds count - sent in + alive (FUN_0052D340) to game manager
+// +0x64, the number shown. A pool kept as the level has it (set piece, turtle)
+// gives what its doubling would have added to the biggest doubled pool counted
+// by the same gate, so the gate shows the whole total doubled.
+void BalanceGates() {
+	if (g_config.squadCountFactor == 1.0f) return;
+	struct Locked { char* sq; SquadOrig* o; int sel; };
+	Locked locked[64];
+	int nLocked = 0;
+	const int classes[2] = { 26, 64 };   // CKGrpSquadEnemy, CKGrpSquadJetPack
+	for (int c : classes)
+		for (unsigned i = 0, n = GetNumLvlClassInstances(4, c); i < n && nLocked < 64; i++) {
+			char* sq = (char*)GetLvlObject(4, c, i);
+			if (!sq) continue;
+			int sel = *(int8_t*)(sq + 0x154);
+			if (sel < -1) continue;
+			auto it = g_squads.find(sq);
+			if (it == g_squads.end() || it->second.n != *(unsigned*)(sq + 0x14C)) continue;
+			locked[nLocked++] = { sq, &it->second, sel };
+		}
+	if (!nLocked) return;
+	int deficit = 0;
+	int16_t* target = nullptr;
+	char* targetSq = nullptr;
+	for (int k = 0; k < nLocked; k++) {
+		const Locked& L = locked[k];
+		char* rec0 = *(char**)(L.sq + 0x144);
+		for (unsigned i = 0; i < L.o->n; i++) {
+			if (L.sel >= 0 && L.sel != (int)i) continue;
+			int16_t* count = (int16_t*)(rec0 + i * 0x1C + 0x18);
+			if (L.o->scaled[i]) {
+				if (*count > 0 && (!target || *count > *target)) { target = count; targetSq = L.sq; }
+			} else if (!L.o->settled[i] && L.o->origCount[i] > 0) {
+				deficit += Scaled(L.o->origCount[i], g_config.squadCountFactor, 32767) - L.o->origCount[i];
+			}
+		}
+	}
+	if (deficit <= 0 || !target) return;
+	for (int k = 0; k < nLocked; k++)
+		for (unsigned i = 0; i < locked[k].o->n; i++)
+			if ((locked[k].sel < 0 || locked[k].sel == (int)i) && !locked[k].o->scaled[i]) locked[k].o->settled[i] = true;
+	int before = *target;
+	*target = (int16_t)(before + deficit > 32767 ? 32767 : before + deficit);
+	Log("experimental: a fight gate counts %d squad(s): %d Romans of the kept pools go to squad %p (%d -> %d)",
+	    nLocked, deficit, targetSq, before, *target);
+}
+
 // The combo bar fills with the hits at game manager +0xB0 (+1 a hit, +3 with
 // the potion, from four places); FUN_0048C860 sets its level from the
 // thresholds +0xB8..+0xBA (bytes) and fills it at +0xC8 (byte: "full" once the
 // hits reach it); the HUD draws hits / +0xC8, a full bar's refill per hit is
 // +0xA0 / +0xC8. Those thresholds are divided by the factor: the bar fills
 // that much slower, whoever hits.
+// Draining: before it is full the bar loses a hit every +0x9C seconds (+0xA8
+// counts down); a full bar lasts +0xA0 seconds (+0xA4 counts down, a hit puts
+// back +0xA0 / +0xC8). Divided by their factors.
 char*   g_comboGm = nullptr;
 uint8_t g_comboSet[4] = {};   // the thresholds as last written
+float   g_drainSet[2] = {};   // +0x9C, +0xA0 as last written
 
-} // namespace
-
-void ExperimentalFrame() {
-	static int s_atOnce = -1;
-	int atOnce = AtOnceNow() ? 1 : 0;
-	if (atOnce != s_atOnce && g_config.squadAliveFactor != 1.0f) {
-		if (s_atOnce >= 0)
-			Log("experimental: Romans at once %s", atOnce ? "x%.2f again (both players play)" : "as the level has them (a player's hero is held)", g_config.squadAliveFactor);
-		s_atOnce = atOnce;
-	}
-	if (g_config.comboFactor == 1.0f) return;
+void ScaleCombo() {
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	if (!gm) return;
 	uint8_t* th[4] = { (uint8_t*)(gm + 0xB8), (uint8_t*)(gm + 0xB9), (uint8_t*)(gm + 0xBA), (uint8_t*)(gm + 0xC8) };
+	float* dr[2] = { (float*)(gm + 0x9C), (float*)(gm + 0xA0) };
 	bool same = gm == g_comboGm;
 	for (int i = 0; i < 4 && same; i++) same = *th[i] == g_comboSet[i];
+	for (int i = 0; i < 2 && same; i++) same = *dr[i] == g_drainSet[i];
 	if (same) return;
 	uint8_t orig[4];
 	for (int i = 0; i < 4; i++) {
@@ -232,13 +280,34 @@ void ExperimentalFrame() {
 		*th[i] = (uint8_t)(v > 255 ? 255 : v);
 		g_comboSet[i] = *th[i];
 	}
+	float origDr[2] = { *dr[0], *dr[1] };
+	*dr[0] = origDr[0] / g_config.comboDrainFactor;
+	*dr[1] = origDr[1] / g_config.comboFullDrainFactor;
+	g_drainSet[0] = *dr[0];
+	g_drainSet[1] = *dr[1];
 	g_comboGm = gm;
-	Log("experimental: combo bar levels %u/%u/%u, full at %u -> %u/%u/%u, full at %u", orig[0], orig[1], orig[2], orig[3],
-	    *th[0], *th[1], *th[2], *th[3]);
+	Log("experimental: combo bar levels %u/%u/%u, full at %u -> %u/%u/%u, full at %u; a hit lost every %.2f -> %.2f s, "
+	    "full for %.2f -> %.2f s", orig[0], orig[1], orig[2], orig[3], *th[0], *th[1], *th[2], *th[3], origDr[0], *dr[0],
+	    origDr[1], *dr[1]);
 }
 
-namespace {
 } // namespace
+
+void ExperimentalFrame() {
+	static int s_atOnce = -1;
+	int atOnce = AtOnceNow() ? 1 : 0;
+	if (atOnce != s_atOnce && g_config.squadAliveFactor != 1.0f) {
+		if (s_atOnce >= 0)
+			Log(atOnce ? "experimental: Romans at once x%.2f again (both players play)"
+			           : "experimental: Romans at once as the level has them (a player's hero is held; x%.2f off)",
+			    g_config.squadAliveFactor);
+		s_atOnce = atOnce;
+	}
+	BalanceGates();
+	if (g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f)
+		ScaleCombo();
+}
+
 
 bool ExperimentalInstallHooks() {
 	bool ok = true;

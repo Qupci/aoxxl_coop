@@ -1,4 +1,5 @@
 #include "splitscreen.h"
+#include "detour.h"
 #include "coop.h"
 #include "config.h"
 #include "log.h"
@@ -683,6 +684,40 @@ int SplitDebug() {
 	return v;
 }
 
+// Individual heroes: player 2's health and combo bar, a HUD pass of its own
+// after the game's (split screen, or the one screen of a scripted ride).
+void DrawP2Hud(char* view, void* dt) {
+	char* renderer = *(char**)(view + 0x08);
+	RwCamera* hud = renderer ? *(RwCamera**)(renderer + 0x14) : nullptr;
+	void* root = *(void**)(view + 0x0C);
+	if (!hud || !root) return;
+	CollectFn collect = (CollectFn)(*(void***)root)[14];
+	for (int part = 0; part < 2; part++) if (Hud2BeginP2(hud, part)) {
+	// Individual heroes: player 2's health and combo bar, a HUD pass of its
+	// own -- the HUD lists collected again (no stepping: a repeat walk),
+	// drawn as FUN_00414070 draws them, without the 2D layer.
+	void* hudLists[kNumLists];
+	for (int i = 0; i < kNumLists; i++)
+		hudLists[i] = i >= kFirstHud ? *(void**)(view + 0x1C + 4 * i) : (void*)&g_dummy;
+	g_repeatWalk = true;
+	g_hudWalk = true;
+	collect(root, nullptr, hudLists, dt);
+	g_hudWalk = false;
+	g_repeatWalk = false;
+	ClearCamera(renderer, nullptr, 1);
+	typedef int(__cdecl* CamFn)(void* cam);
+	if (((CamFn)0x58FD30)(hud)) {
+		((ThisFn)0x414210)(view, nullptr);
+		for (int i = 0; i < 3; i++) {
+			char* list = *(char**)(view + 0x4C + 4 * i);
+			((ThisFn)(*(void***)list)[3])(list, nullptr);
+		}
+		((CamFn)0x58FD20)(hud);
+	}
+	Hud2EndP2();
+}
+}
+
 void RenderSplitFrameImpl(char* view, void* dt);
 
 void RenderSplitFrame(char* view, void* dt) {
@@ -986,30 +1021,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	DrawHud(view, nullptr, dt);
 	UnspreadShopHud();
 	Hud2EndP1();
-	for (int part = 0; part < 2; part++) if (Hud2BeginP2(hud, part)) {
-		// Individual heroes: player 2's health and combo bar, a HUD pass of its
-		// own -- the HUD lists collected again (no stepping: a repeat walk),
-		// drawn as FUN_00414070 draws them, without the 2D layer.
-		void* hudLists[kNumLists];
-		for (int i = 0; i < kNumLists; i++)
-			hudLists[i] = i >= kFirstHud ? *(void**)(view + 0x1C + 4 * i) : (void*)&g_dummy;
-		g_repeatWalk = true;
-		g_hudWalk = true;
-		collect(root, nullptr, hudLists, dt);
-		g_hudWalk = false;
-		g_repeatWalk = false;
-		ClearCamera(renderer, nullptr, 1);
-		typedef int(__cdecl* CamFn)(void* cam);
-		if (((CamFn)0x58FD30)(hud)) {
-			((ThisFn)0x414210)(view, nullptr);
-			for (int i = 0; i < 3; i++) {
-				char* list = *(char**)(view + 0x4C + 4 * i);
-				((ThisFn)(*(void***)list)[3])(list, nullptr);
-			}
-			((CamFn)0x58FD20)(hud);
-		}
-		Hud2EndP2();
-	}
+	DrawP2Hud(view, dt);
 	if (g_hudVpActive) {
 		g_hudVpActive = false;
 		if (hud->viewWindow[1] != hudWindow[1]) RwCameraSetViewWindow(hud, hudWindow);
@@ -1021,6 +1033,22 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	Present(renderer, nullptr);
 	*(uint32_t*)(view + 0x68) &= 0xFFFFFFC1;
 	InterlockedIncrement(&g_splitFrames);
+}
+
+// One screen (no split: a scripted ride, a cutscene): the game's own frame
+// draws the HUD (FUN_00414070, thiscall(view, dt), ret 4); player 1's HUD with
+// the helmet counter in the middle, then player 2's.
+ThisArgFn g_origDrawHud = nullptr;
+const uint8_t kDrawHudPrologue[7] = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4E, 0x5C };
+
+void __fastcall DrawHudHook(char* view, void* edx, void* dt) {
+	if (g_splitActive || !CoopP2Joined()) { g_origDrawHud(view, edx, dt); return; }
+	char* renderer = *(char**)(view + 0x08);
+	RwCamera* hud = renderer ? *(RwCamera**)(renderer + 0x14) : nullptr;
+	Hud2BeginP1(hud);
+	g_origDrawHud(view, edx, dt);
+	Hud2EndP1();
+	DrawP2Hud(view, dt);
 }
 
 bool WantSplit() {
@@ -1059,6 +1087,8 @@ bool SplitInstallHooks() {
 	ok &= PatchVtableSlot(kAnimNodeVtbl, kWalkSlot, kAnimNodeWalk, (void*)AnimNodeWalkHook, (void**)&g_origAnimNodeWalk, "CAnimatedNode::walk");
 	ok &= PatchVtableSlot(kAnimCloneVtbl, kWalkSlot, kAnimCloneWalk, (void*)AnimCloneWalkHook, (void**)&g_origAnimCloneWalk, "CAnimatedClone::walk");
 	ok &= PatchVtableSlot(kFogVtbl, kWalkSlot, kFogWalk, (void*)FogWalkHook, (void**)&g_origFogWalk, "CFogBoxNodeFx::walk");
+	ok &= InstallDetour(0x414070, (void*)DrawHudHook, (void**)&g_origDrawHud, kDrawHudPrologue, sizeof(kDrawHudPrologue),
+	                    "HUD draw (player 2's HUD on one screen)");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");

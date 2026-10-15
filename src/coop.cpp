@@ -1428,7 +1428,17 @@ void CoopFrame() {
 	}
 	// Start and Back are left alone during a cutscene: Start may be what skips it.
 	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars() || g.shopping;
-	if (!inCutscene && (p.pressed & PAD_START)) { Release("pressed Start"); return; }
+	// ... and leaving waits for the end of a scripted ride (the belly slide, the
+	// boat): handed back in the middle of it, both heroes stood stuck.
+	if (!inCutscene && (p.pressed & PAD_START)) {
+		if (g.suspended) {
+			static DWORD s_told = 0;
+			if (GetTickCount() - s_told > 3000) { s_told = GetTickCount(); Log("coop: player 2's Start ignored -- a scripted ride is on"); }
+		} else {
+			Release("pressed Start");
+			return;
+		}
+	}
 	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y;
 	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & kFace)) g.p2BackCombo = true;
 	if (!(p.buttons & PAD_BACK)) g.p2BackCombo = false;
@@ -1436,7 +1446,7 @@ void CoopFrame() {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
 		// Individual heroes: Back shows player 2's HUD, held as long as they like
 		// (Start leaves).
-		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs && !IndivActive()) { Release("held Back"); return; }
+		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs && !IndivActive() && !g.suspended) { Release("held Back"); return; }
 	} else {
 		g.p2BackHeldAt = 0;
 	}

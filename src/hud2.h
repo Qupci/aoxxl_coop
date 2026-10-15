@@ -23,8 +23,6 @@ bool Hud2InstallHooks();
 // flag, then player 2's copy ticked.
 void Hud2BeforeInterfaceTick(char* itf);
 void Hud2AfterInterfaceTick(char* itf, void* time);
-// Player 1's HUD shows another hero's stats from now on: redrawn.
-void Hud2RefreshP1();
 
 // Render (splitscreen.cpp): the game's HUD pass with the helmet counter in the
 // middle; then, if Hud2BeginP2 says so, player 2's pass (the caller collects
