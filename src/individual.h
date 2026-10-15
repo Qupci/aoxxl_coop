@@ -58,6 +58,10 @@ int IndivFallenHero();
 bool IndivBlockPartnerSpot(const char* what);
 // Hero `hero` stands where a launcher offers itself (its prompt): no safe spot there.
 void IndivNoteLauncherSpot(int hero);
+// Should this object (a hook) skip its tick now: it needs both heroes, one is
+// down, and the standing hero is at it (on its ground; within a Roman agent's
+// talk). That hero is put back too.
+bool IndivHoldsBack(char* hook);
 
 // The stats of `hero` (for the HUD): health points, shields, combo hits.
 bool IndivStats(int hero, int* hp, int* shields, int* hits = nullptr, float* gauge = nullptr);

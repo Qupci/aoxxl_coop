@@ -1525,3 +1525,12 @@ both halves).
   sky and anim blends again: the walk hooks treat it as a repeat walk. Preset: its_back2.log -- the level ran on
   preset 3 with A0+0F..12 (no pad at boot, layout flag set anyway), the title screen later rebuilt A0+0E..; which one
   the user calls swapped is unclear -- asked.
+- Round 61 (user: still through the dialogue, blue circles, cable car): the objects went on by themselves -- the
+  spy's dialogue cutscene started with no trio event once the hero came back (xxl_coop.dialogue.log); the cable car
+  put-back went to a spot 3 units off, walked back onto, and the "same spot again: forget it" rule left no spot
+  (xxl_coop.cable_car2.log). Now the objects' own ticks are held (proximity TickLife -> IndivHoldsBack) while the
+  standing hero is at one with the other down: spy (spawned, within +0x70), blue circle (+0x28 ground, events command
+  the trio), corkscrew / lifter / cable cars (own CDynamicGround); put back to the newest safe spot >= 4 units away
+  (SafeSpotAway). Preset (user): wrong right at level 2's start (force_level), right after the title screen. The
+  title's table (vf10(1) -> FUN_004FF1E0 + FUN_00503B00 with the profile's options) is A0+0E/10/0F/11/12...; at a
+  force_level start the same calls give the default A0+0F/10/11/12/13 (options not loaded) -- force_level-only.

@@ -145,6 +145,7 @@ bool OnDeathGround(Hero h) {
 }
 
 bool OnPartnerGround(Hero h, const char** what);
+bool SafeSpotAway(int idx, const Vector3& from, Vector3* out);
 
 // Where a hero stood last on solid ground: a static ground (CGround, not a
 // lifter's CDynamicGround), not a death pit, on its feet (+0x384 bits 0-2).
@@ -161,6 +162,26 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 	s.pos = h.Pos();
 	s.at = now;
 	g.safeNext[idx] = (g.safeNext[idx] + 1) % kSafeSpots;
+}
+
+// Put back from something that needs both heroes: the newest safe spot at
+// least 4 units from where the hero stands (the last one can be right at the
+// thing's edge, walked back onto at once), else the farthest one known.
+bool SafeSpotAway(int idx, const Vector3& from, Vector3* out) {
+	const SafeSpot* best = nullptr;
+	const SafeSpot* farthest = nullptr;
+	float farD = -1.0f;
+	for (int i = 0; i < kSafeSpots; i++) {
+		const SafeSpot& s = g.safe[idx][i];
+		if (!s.at) continue;
+		float d = (s.pos - from).len2();
+		if (d > farD) { farD = d; farthest = &s; }
+		if (d >= 4.0f * 4.0f && (!best || (int)(s.at - best->at) > 0)) best = &s;
+	}
+	if (!best) best = farthest;
+	if (!best) return false;
+	*out = best->pos;
+	return true;
 }
 
 // The newest safe spot at least 0.7 s old (the edge it jumped from is too near
@@ -202,17 +223,7 @@ bool IndivBlockPartnerSpot(const char* what) {
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
 	Vector3 spot;
-	if (!h || !SafeSpotFor(up, &spot)) return false;
-	// Put back to the same place a moment ago and blocked again: that place is
-	// part of it (a launcher's pad) -- forgotten, an older one taken.
-	DWORD t0 = GetTickCount();
-	if (t0 - g.blockedAt[up] < 1500 && (spot - g.blockedTo[up]).len2() < 1.0f) {
-		for (int i = 0; i < kSafeSpots; i++)
-			if (g.safe[up][i].at && (g.safe[up][i].pos - spot).len2() < 1.0f) g.safe[up][i].at = 0;
-		if (!SafeSpotFor(up, &spot)) return false;
-	}
-	g.blockedAt[up] = t0;
-	g.blockedTo[up] = spot;
+	if (!h || !SafeSpotAway(up, h.Pos(), &spot)) return false;
 	spot.y += 0.5f;
 	PlaceHero(h, spot);
 	g.noSafeUntil[up] = GetTickCount() + 1000;
@@ -271,6 +282,48 @@ bool OnPartnerGround(Hero h, const char** what) {
 	}
 	return false;
 }
+
+} // namespace
+
+bool IndivHoldsBack(char* hook) {
+	int down = IndivFallenHero();
+	if (down < 0 || !hook || CoopSuspended() || !CoopP2Joined()) return false;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(Other(down)) : Hero();
+	if (!h) return false;
+	uintptr_t vt = *(uintptr_t*)hook;
+	char* ground = *(char**)(h.raw() + 0x280);
+	const char* what = nullptr;
+	if (vt == 0x6261F4) {   // CKHkClueMan: spawned (its node shown) and the hero within its talk (+0x70)
+		char* node = *(char**)(hook + 0x10);
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr || (*(uint16_t*)(node + 0x10) & 2)) return false;
+		const float* p = (const float*)(fr + 0x80);
+		float r = *(float*)(hook + 0x70);
+		if (!(r > 0.5f && r < 50.0f)) r = 5.0f;
+		Vector3 d = h.Pos() - Vector3(p[0], p[1], p[2]);
+		if (d.len2() > r * r) return false;
+		what = "a Roman agent's talk";
+	} else if (vt == 0x628EE4) {   // a blue circle (its events command the trio), the hero on it
+		if (!ground || *(char**)(hook + 0x28) != ground) return false;
+		if (!ProximityGroupCommandsTrio(*(uint16_t*)(hook + 0x30)) && !ProximityGroupCommandsTrio(*(uint16_t*)(hook + 0x32)))
+			return false;
+		what = "a blue circle";
+	} else if (vt == 0x628E0C || vt == 0x625E2C || vt == 0x6293D4 || vt == 0x6262D4) {
+		// the spinning platform, a lifter, cable cars: the hero on its own moving ground
+		if (!ground || *(uintptr_t*)ground != 0x6241BC) return false;
+		bool on = false;
+		for (int off = 0x10; off < 0x100 && !on; off += 4) on = *(char**)(hook + off) == ground;
+		if (!on) return false;
+		what = vt == 0x628E0C ? "the spinning platform" : vt == 0x625E2C ? "a lifter" : "a cable car";
+	} else {
+		return false;
+	}
+	IndivBlockPartnerSpot(what);
+	return true;
+}
+
+namespace {
 
 void BlockPartnerGrounds() {
 	int down = IndivFallenHero();

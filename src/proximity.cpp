@@ -233,6 +233,9 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	uintptr_t vt = *(uintptr_t*)life;
 	Vector3 at;
 	char* hook = isGroup ? nullptr : *(char**)((char*)life + 0x10);
+	// Individual heroes: what needs both heroes skips its tick while the standing
+	// hero is at it with the other down (the hero is put back too): it cannot start.
+	if (hook && IndivHoldsBack(hook)) return;
 	if (hook && *(uintptr_t*)hook == kLifterVtbl) *(float*)(hook + 0x34) = 0.0f;
 	if (hook && *(uintptr_t*)hook == kPressionStoneVtbl && PlateForEither(hook)) {
 		TickPlate(life, dt, hook, t);
