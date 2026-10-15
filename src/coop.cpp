@@ -17,6 +17,7 @@
 #include "crash.h"
 #include "proximity.h"
 #include "detour.h"
+#include "experimental.h"
 #include "klusters.h"
 #include "sound.h"
 #include "autotest.h"
@@ -1341,6 +1342,7 @@ void CoopFrame() {
 	PadsPoll();
 	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
 	IndivFrame();
+	ExperimentalFrame();
 	SendDeferredSwitch();
 	TracePotionFrame();
 	SoundSetP2Listener();

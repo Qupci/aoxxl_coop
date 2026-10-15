@@ -1,5 +1,6 @@
 // Experimental rules (ini [experimental]) for a harder game with two players:
-// more Romans at once in a squad, more Romans to defeat, dearer merchant. They
+// more Romans at once in a squad, more Romans to defeat, a dearer merchant, a
+// slower combo bar. They
 // change the level data as it loads -- single player too, and whatever co-op
 // is doing -- so they are read once, at startup.
 //
@@ -18,3 +19,5 @@
 #pragma once
 
 bool ExperimentalInstallHooks();
+// Once per frame: the combo bar's thresholds.
+void ExperimentalFrame();

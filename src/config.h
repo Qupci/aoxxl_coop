@@ -32,6 +32,7 @@ struct CoopConfig {
 	float squadAliveFactor = 2.0f;  // Romans of a squad alive at once
 	float squadCountFactor = 2.0f;  // Romans of each squad pool (phase) to defeat
 	float priceFactor      = 2.0f;  // the merchant's prices
+	float comboFactor      = 0.5f;  // combo bar hits counted per Roman hit
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

@@ -1990,6 +1990,21 @@ const Step kSlide22[] = {
 	END(116000),
 };
 
+// slide2h (level 2): slide22s, Obelix (player 2) on the slide gets a shield:
+// the one HUD shows his health then.
+const Step kSlide2H[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -905.7f, 527.9f, -938.4f), PLACEAT(2000, HERO_OBELIX, -903.7f, 527.9f, -938.4f),
+	GLIDEAT(3000, HERO_ASTERIX, -911.0f, 528.2f, -913.4f, 2500),
+	CINE_SKIP(6000), CINE_SKIP(8000), CINE_SKIP(10000), CINE_SKIP(12000), CINE_SKIP(14000), CINE_SKIP(16000), CINE_SKIP(18000), CINE_SKIP(20000), CINE_SKIP(22000), CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000),
+	GLIDEAT(31000, HERO_ASTERIX, -907.3f, 526.8f, -903.6f, 1500),
+	SHOT(36000, "slide2h_1"),
+	{ 37000, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "obelix a shield" },
+	SHOT(37500, "slide2h_2"), SHOT(38500, "slide2h_3"),
+	END(40000),
+};
+
 // slide22s (level 2): the LV2-2 belly slide in co-op: player 2 (Obelix) steers
 // it and turns the camera, player 1 (Asterix) jumps.
 const Step kSlide22S[] = {
@@ -2799,6 +2814,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("cam32o", kCam32O),
 	SCENARIO("slide22", kSlide22),
 	SCENARIO("slide22s", kSlide22S),
+	SCENARIO("slide2h", kSlide2H),
 	SCENARIO("camjump", kCamJump),
 	SCENARIO("p2dir", kP2Dir),
 	SCENARIO("cable33", kCable33),

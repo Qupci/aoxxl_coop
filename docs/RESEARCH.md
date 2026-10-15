@@ -1485,3 +1485,12 @@ both halves).
   pools sent in by script: U1/U2 and script counts (5 >= 2, 8, 12, 19, 20) x squad_romans_at_once; placed-only pools
   (count <= placed: set pieces, LV4-1 squad 21's hiding Romans) keep their spots and get the rest as a wave once
   all have fallen (vf37 hook sets +0x15). LV4-1 gate: 100 -> 200 (autotest lock4). Env XXL_SQUADCMDS logs scripts.
+- Round 57 (user's play of round 56): placed-only squads (count <= U1/U2: hiding Romans, lone guards) are left as the
+  level has them -- a raised count there met the gate early and the top-up wave ran at the players; top-up removed.
+  Kept by enemy type (pool cpnt vtable): JetPackRoman 0x627C90, MobileTower 0x627D20, turtles 0x627D50 / 0x627DB8 /
+  0x627DEC / 0x627E20 (LV4-1 gate 194). Script numbers at once only while no player's hero is held (CoopHeroHeld;
+  cable car autotest swing). Combo bar: hits gm+0xB0 (+1, +3 potion; added in four places: FUN_005093A0, 0x480000,
+  2x 0x4E0000), level thresholds gm+0xB8..+0xBA, full at gm+0xC8 (bytes; FUN_0048C860), HUD fill hits / +0xC8, full
+  bar refill +0xA0 / +0xC8 -- combo_bar_fill divides the thresholds (ExperimentalFrame; 0/7/16 full 30 -> 0/14/32
+  full 60). Slide / boat (co-op suspended): the one HUD shows the leader's stats (hints.cpp; the bar redrawn on the
+  switch).

@@ -198,7 +198,24 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		// hero's health, shields and combo bar.
 		Hud2BeforeInterfaceTick(self);
 		int shopper = CoopShopper();   // at the merchant: the shopper's own shields
-		int prev = IndivEnter(shopper >= 0 ? shopper : CoopP1Hero());
+		// One screen for a scripted ride (the slide, Obelix riding): the hero on it
+		int shown = shopper >= 0 ? shopper : CoopP1Hero();
+		if (shopper < 0 && CoopP2Joined() && CoopSuspended()) {
+			Trio t = GetTrio();
+			if (t && t.Leader() >= 0) shown = t.Leader();
+		}
+		static int s_shown = -1;
+		if (shown != s_shown) {   // another hero's stats: the health part redrawn
+			if (s_shown >= 0) {
+				Hud2RefreshP1();
+				CKYellowPages* yp = YellowPages();
+				char* gm = yp ? (char*)yp->gameManager : nullptr;
+				if (gm) *(uint32_t*)(gm + 0x5C) |= 0x4000;
+			}
+			Log("hints: the HUD shows %s's health", HeroName(shown));
+			s_shown = shown;
+		}
+		int prev = IndivEnter(shown);
 		g_origInterfaceTick(self, edx, time);
 		IndivLeave(prev);
 		Hud2AfterInterfaceTick(self, time);   // player 2's own health and combo bar

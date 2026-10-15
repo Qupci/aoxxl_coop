@@ -112,6 +112,7 @@ void CoopConfig::Load(const char* iniPath) {
 	squadAliveFactor = readFactor("squad_romans_at_once", squadAliveFactor);
 	squadCountFactor = readFactor("squad_romans_to_defeat", squadCountFactor);
 	priceFactor      = readFactor("merchant_prices", priceFactor);
+	comboFactor      = readFactor("combo_bar_fill", comboFactor);
 
 	GetPrivateProfileStringA("coop", "deadzone", "0.24", buf, sizeof(buf), full);
 	deadzone = (float)atof(buf);
@@ -119,8 +120,8 @@ void CoopConfig::Load(const char* iniPath) {
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
 		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d "
-		"experimental: squad at once x%.2f, to defeat x%.2f, prices x%.2f",
+		"experimental: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
 		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual,
-		squadAliveFactor, squadCountFactor, priceFactor);
+		squadAliveFactor, squadCountFactor, priceFactor, comboFactor);
 }
