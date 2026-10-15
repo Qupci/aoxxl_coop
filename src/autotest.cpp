@@ -23,7 +23,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -1787,6 +1787,19 @@ const Step kFight64[] = {
 	END(89000),
 };
 
+// reload2 (level 2): player 2 in, split screen with both game cameras, then
+// the same level loaded again (the Inspector's "go to level 2"): no crash.
+const Step kReload2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(1500, 1, 0, 0, 1.0f, "p2 walks"), VPAD(3000, 1, 0, 0, 0, "p2 stops"),
+	{ 4000, S_RELOAD, 0, 0, 0, 0, 0, "reload" },
+	SHOT(12000, "reload2_1"),
+	VPAD(13000, 1, 0, 1.0f, 0, "p2 walks"), VPAD(15000, 1, 0, 0, 0, "p2 stops"),
+	SHOT(16000, "reload2_2"),
+	END(17000),
+};
+
 // lock4 (-Level 4): Asterix walks into LV4-1's fight-lock sphere (-288.1 0.1
 // 117.3, r 5): the gate shows its squads' Romans to defeat (vanilla 94 + 6).
 const Step kLock4[] = {
@@ -2075,6 +2088,17 @@ const Step kLift58A[] = {
 	GLIDEAT(10000, HERO_ASTERIX, -360.0f, 18.3f, -25.24f, 3000),
 	SHOT(14000, "lift58_1"), SHOT(20000, "lift58_2"),
 	END(22000),
+};
+// liftd58 (-Level 5, with XXL_DOWNAT=1:2000): Asterix walks onto sector 8's
+// lifter (-375.46 0 -39.19, the user's spot) with Obelix down.
+const Step kLiftD58[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, -324.78f, 10.3f, 9.6f),
+	PLACEAT(3000, HERO_ASTERIX, -375.46f, 1.0f, -32.0f),
+	GLIDEAT(4500, HERO_ASTERIX, -375.46f, 0.5f, -39.19f, 1500),
+	SHOT(7000, "liftd58_1"), SHOT(10000, "liftd58_2"),
+	END(12000),
 };
 // lift58u (-Level 5): the user's repro -- both at the sector's entrance
 // (-376.8 16.5 20.0), potion; player 2's Obelix (not leading) walks to
@@ -2775,6 +2799,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("liftd58", kLiftD58),
+	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
@@ -4466,6 +4492,15 @@ void RunStep(const Step& s) {
 	case S_PROBE:
 		at.probe = s.a != 0;
 		break;
+	case S_RELOAD: {   // the current level loaded again (as the Inspector's "go to level" does)
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		if (!gm) break;
+		int cur = *(int*)(gm + ax::kGM_currentLevel);
+		Log("autotest: level %d loaded again", cur);
+		*(int*)(gm + ax::kGM_nextLevel) = cur;
+		break;
+	}
 	case S_GIVE: {   // hero a gets a shield (b = 1) or x health points (b = 0), as a bonus gives them
 		CKYellowPages* yp = YellowPages();
 		char* gm = yp ? (char*)yp->gameManager : nullptr;

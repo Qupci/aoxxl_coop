@@ -116,11 +116,13 @@ void MarkStepped(char* node) {
 
 void __fastcall ParticlesWalkHook(char* self, void* edx, void** lists, char* dt) {
 	char* ps = *(char**)(self + 0x48);
-	if (!g_inSplitFrame || !ps || (*(uint16_t*)(self + 0x10) & 2)) {
+	// (Player 2's HUD pass on one screen -- a scripted ride, a dialogue -- is a
+	// repeat walk too: nothing it meets is stepped again.)
+	if ((!g_inSplitFrame && !g_hudWalk) || !ps || (*(uint16_t*)(self + 0x10) & 2)) {
 		g_origParticlesWalk(self, edx, lists, dt);
 		return;
 	}
-	if (!Stepped(self)) {
+	if (g_inSplitFrame && !Stepped(self)) {
 		bool active = (*(uint32_t*)(ps + 4) & 2) != 0;
 		static const bool plog = getenv("XXL_PARTLOG") != nullptr;   // diagnostics: systems stepped twice in a frame
 		if (plog && active) {
@@ -170,9 +172,9 @@ void AnimWalk(CollectFn orig, char* self, void* edx, void** lists, void* dt) {
 			Log("split: Asterix blend mode %d clock %.3f of %.3f (walk %d%s, dt %.4f)", (f & 0x180) >> 7, *(float*)(self + 0x48),
 			    *(float*)(self + 0x44), g_walkPlayer, g_stampWalk ? " stamp" : "", *(float*)((char*)dt + 0xC));
 	}
-	if (!g_inSplitFrame || off) { orig(self, edx, lists, dt); return; }
+	if ((!g_inSplitFrame && !g_hudWalk) || off) { orig(self, edx, lists, dt); return; }
 	char* key = self + 1;   // own entries in the stepped table (particle systems use the node pointer)
-	if (!Stepped(key)) {
+	if (g_inSplitFrame && !Stepped(key)) {
 		MarkStepped(key);
 		orig(self, edx, lists, dt);
 		return;
@@ -242,7 +244,7 @@ void __fastcall FogWalkHook(char* self, void* edx, void** lists, void* dt) {
 			}
 		}
 	}
-	if (!g_inSplitFrame || off) { g_origFogWalk(self, edx, lists, dt); return; }
+	if ((!g_inSplitFrame && !g_hudWalk) || off) { g_origFogWalk(self, edx, lists, dt); return; }
 	if (g_stampWalk || g_hudWalk) return;   // the HUD pass only wants the HUD's models: no snow stepping
 	unsigned n = *(unsigned*)(self + 0x34) * *(unsigned*)(self + 0x44);
 	uint8_t* recs = *(uint8_t**)(self + 0x360);
@@ -304,6 +306,7 @@ struct SkyState { char* node; bool valid[2]; uint8_t flags[2]; uint8_t data[2][0
 SkyState g_sky[8];
 
 void __fastcall SkyWalkHook(char* self, void* edx, void** lists, void* dt) {
+	if (!g_inSplitFrame && g_hudWalk) return;   // player 2's HUD pass on one screen: no sky
 	if (!g_inSplitFrame) {
 		for (SkyState& st : g_sky) if (st.node == self) st.valid[0] = st.valid[1] = false;
 		g_origSkyWalk(self, edx, lists, dt);

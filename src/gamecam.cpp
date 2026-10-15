@@ -320,12 +320,35 @@ void TickCopy(char* svc, void* frame, int hero) {
 	} else {
 		g_copy.valid = false;
 		g_copy.haveView = false;
+		g_copy.numTracks = 0;
 		Log("gamecam: the copy's tick failed (exception); starting over from the game's camera");
 	}
 	// ...and the game's state back.
 	memcpy(svc, g_liveSvc, kSrvSize);
 	RestoreTracks();
 	RestoreExtras(svc, cam, live);
+}
+
+// A level loaded again (the same level too: the camera service stays, its
+// tracks and the trio are new): the copy's saved tracks belong to the old one
+// -- dropped (true).
+void* g_copyTrio = nullptr;
+bool CopyStale(char* svc, void* trio) {
+	bool stale = svc != g_svc || trio != g_copyTrio;
+	if (!stale && g_copy.valid)
+		for (int i = 0; i < g_copy.numTracks && !stale; i++) {
+			bool known = false;
+			int n = 0;
+			for (char* tr = *(char**)(svc + 0x20); tr && n < kMaxTracks && !known; tr = *(char**)(tr + 4), n++)
+				known = tr == g_copy.tracks[i].track;
+			stale = !known;
+		}
+	if (!stale) return false;
+	if (g_copy.valid && svc == g_svc) Log("gamecam: the level was loaded again -- the copy starts over from the game's camera");
+	g_copy.valid = false;
+	g_copy.haveView = false;
+	g_copy.numTracks = 0;
+	return true;
 }
 
 bool Wanted() {
@@ -343,14 +366,14 @@ void __fastcall TickHook(char* svc, void* edx, void* frame) {
 	if (!want) {
 		g_copy.valid = false;
 		g_copy.haveView = false;
+		g_copy.numTracks = 0;
 		g_liveOwner = -1;
 		g_origTick(svc, edx, frame);
 		return;
 	}
-	if (svc != g_svc) {
+	if (CopyStale(svc, t.raw())) {
 		g_svc = svc;
-		g_copy.valid = false;
-		g_copy.haveView = false;
+		g_copyTrio = t.raw();
 		g_liveOwner = -1;
 	}
 	int lead = t.Leader();
@@ -405,6 +428,10 @@ void GameCamBeginHeroTick(int hero) {
 	g_heroSwapped = false;
 	char* svc = g_svc;
 	if (!g_active || g_inCopy || !svc || !g_copy.valid || g_copy.hero != hero || hero == g_liveOwner) return;
+	{
+		Trio t = GetTrio();
+		if (!t || CopyStale(svc, t.raw())) return;
+	}
 	CKYellowPages* yp = YellowPages();
 	if (!yp || *(char**)((char*)yp + 0x68) != svc) return;
 	memcpy(g_heroLiveSvc, svc, kSrvSize);

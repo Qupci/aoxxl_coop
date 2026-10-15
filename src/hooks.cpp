@@ -38,6 +38,9 @@ typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* par
 
 InputUpdateFn g_origInputUpdate = nullptr;
 SendEventFn   g_origTrioSendEvent = nullptr;
+} // namespace
+void* g_trioEventCaller = nullptr;   // who sends the trio event under way (coop.cpp)
+namespace {
 
 void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	g_origInputUpdate(self, edx, timeInfo);   // let the action array refresh first
@@ -50,6 +53,7 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 }
 
 int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) {
+	g_trioEventCaller = _ReturnAddress();
 	if (CoopDeferTrioEvent(self, event)) return 0;
 	CoopNoteTrioEvent(self, event, param);
 	int cookie = CoopBeforeTrioEvent(event, _ReturnAddress());

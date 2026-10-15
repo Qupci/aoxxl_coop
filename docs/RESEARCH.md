@@ -1512,3 +1512,16 @@ both halves).
   cable car, the slide, LV2's boss gate) -- not blocked (progress saves). Autotest env XXL_DOWNAT=<hero>:<ms> puts a
   hero down in any scenario. Verified: cable car, spy, launcher, LV4 blue circle zone; lifter / corkscrew tests only
   place the hero beside them (user to check).
+- Round 60 (user's play of round 59): the cable car is taken from the hero's own tick (0x49ACB9 "Obelix leads",
+  0x49ACC7 "Asterix rides", 0x4812 AI order 9) before the frame check -- those events from there are held back, the
+  hero reset (StartAiCycle, as R3+B) and put back. Grounds: only the objects' CDynamicGround (vt 0x6241BC) count (the
+  station grounds a cable car points at teleported the hero around it); the check also runs after each hero tick
+  (IndivAfterHeroTick), before the objects tick (blue circle / spinning platform were set off in the same frame).
+  LV5-8's lifter: hero ground = lifter +0x50 (dynamic), blocked (autotest liftd58). Hints: the game's own prompt
+  taking the plate over gets its slide places back (+0x42C/+0x434 = +0x428; the boat's "Use" plate stayed where the
+  hint had put it). Same-level reload (Inspector): gamecam's copy kept the old level's tracks (same camera service)
+  and wrote them back into freed memory -> crash; now dropped when the trio changes or a track is no longer in the
+  service's list (autotest reload2, S_RELOAD). One-screen P2 HUD pass (slide, dialogue) stepped the snow, particles,
+  sky and anim blends again: the walk hooks treat it as a repeat walk. Preset: its_back2.log -- the level ran on
+  preset 3 with A0+0F..12 (no pad at boot, layout flag set anyway), the title screen later rebuilt A0+0E..; which one
+  the user calls swapped is unclear -- asked.

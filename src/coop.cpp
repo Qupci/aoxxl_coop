@@ -1055,6 +1055,25 @@ static bool HeroFlying(Trio t) {
 }
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
+	// Individual heroes: a cable car takes the hero who steps on it from the
+	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
+	// AI order 9) -- with the partner down the ride is not started: the hero
+	// reset (two AI ticks, as R3 + B) and put back.
+	{
+		extern void* g_trioEventCaller;
+		uintptr_t from = (uintptr_t)g_trioEventCaller;
+		int e = ev & 0xFFFF;
+		if ((e == 0x4801 || e == 0x4800 || e == 0x4812) && from >= 0x49AC80 && from < 0x49AD00 && IndivFallenHero() >= 0 &&
+		    g.p2Joined && !g.suspended) {
+			int up = IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+			if (e == 0x4812) {
+				StartAiCycle(up, "a cable car with the partner down");
+				IndivBlockPartnerSpot("a cable car");
+			}
+			Log("coop: trio event %04X from %p held back -- the cable car waits for both heroes", e, (void*)from);
+			return true;
+		}
+	}
 	// Individual heroes: a Roman agent's talk needs both heroes -- with one down
 	// its offer (0x511F) and start (0x5120) are held back, the hero put back.
 	if (((ev & 0xFFFF) == 0x511F || (ev & 0xFFFF) == 0x5120) && IndivFallenHero() >= 0 && g.p2Joined && !g.suspended) {
@@ -2421,6 +2440,7 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 		LeadTheDeath();
 	}
 	IndivAfterFallenTick(heroIndex);
+	IndivAfterHeroTick(heroIndex);
 	IndivLeave(g.indivPrev);
 	g.indivPrev = -1;
 }

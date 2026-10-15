@@ -44,6 +44,9 @@ bool IndivFallen(int hero);
 bool IndivDropEvent(int hero, int event);
 // After a fallen hero's Life tick.
 void IndivAfterFallenTick(int hero);
+// After a hero's Life tick: the standing hero on what needs both heroes is put
+// back there and then, before the thing's own tick can start it.
+void IndivAfterHeroTick(int hero);
 
 // A hero down while the other stands: that hero, else -1.
 int IndivFallenHero();

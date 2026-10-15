@@ -171,6 +171,13 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		*cc = (*cc & ~0xF0u) | (kHintKind << 4);
 	}
 	if (use != g_showing) {
+		// Taken over by the game's own prompt ("Use" on a boat): the place the hint
+		// had the prompt slide to (+0x42C, +0x434) is the game's again -- the prompt
+		// is already up, the game would not set it again.
+		if (!use && g_showing) {
+			float gx = *(float*)(self + 0x428);
+			*(float*)(self + 0x42C) = *(float*)(self + 0x434) = gx;
+		}
 		char a[96] = {};
 		for (int i = 0; use && g_shown[i] && i < 95; i++) a[i] = g_shown[i] < 128 ? (char)g_shown[i] : '?';
 		Log("hints: %s%s%s", use ? "showing \"" : "hint gone", use ? a : "", use ? "\"" : "");

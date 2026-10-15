@@ -258,8 +258,8 @@ bool OnPartnerGround(Hero h, const char** what) {
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, k.id); i < n; i++) {
 			char* o = (char*)GetLvlObject(2, k.id, i);
 			if (!o || IsBadReadPtr(o, 0x100)) continue;
-			for (int off = 0x10; off < 0x100; off += 4)
-				if (*(char**)(o + off) == ground) { *what = k.what; return true; }
+			for (int off = 0x10; off < 0x100; off += 4)   // its own moving ground (CDynamicGround), not a station's
+				if (*(char**)(o + off) == ground && *(uintptr_t*)ground == 0x6241BC) { *what = k.what; return true; }
 		}
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 21); i < n; i++) {
 		char* o = (char*)GetLvlObject(2, 21, i);
@@ -574,6 +574,11 @@ void IndivAfterFallenTick(int hero) {
 	// the game over (+0x2FD); only the game over of both is one.
 	char* gm = GM();
 	if (gm) *(uint8_t*)(gm + 0x2FD) = 0;
+}
+
+void IndivAfterHeroTick(int hero) {
+	int down = IndivFallenHero();
+	if (down >= 0 && hero != down) BlockPartnerGrounds();
 }
 
 void IndivFrame() {
