@@ -51,6 +51,7 @@ struct State {
 	Vector3  recent[2][20];
 	int      recentN[2] = {}, recentNext[2] = {};
 	DWORD    recentAt = 0;
+	Vector3  frameStart[2];   // each hero's place when the frame began
 	DWORD    noSafeUntil[2] = {};
 	DWORD    onLauncherAt[2] = {};  // last seen where a launcher offers itself
 	DWORD    blockedAt[2] = {};     // last put back from something that needs both heroes
@@ -279,6 +280,7 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	Vector3 back = before - now;
 	back.y = 0.0f;
 	float len = std::sqrt(back.len2());
+	if (len < 0.05f) return IndivBlockPartnerSpot(what);   // not moving in (already there): the trail
 	Vector3 spot = before;
 	if (len > 0.001f) spot = before + back * (1.5f / len);   // a step further back than it came from
 	spot.y = before.y + 0.3f;
@@ -291,6 +293,14 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	}
 	PutBackLog(up, down, what, spot);
 	return true;
+}
+
+bool IndivBlockPartnerSpotFrameStart(const char* what) {
+	int down = IndivFallenHero();
+	if (down < 0) return false;
+	const Vector3& p = g.frameStart[Other(down)];
+	float xyz[3] = { p.x, p.y, p.z };
+	return IndivBlockPartnerSpotFrom(what, xyz);
 }
 
 bool IndivBlockPartnerSpot(const char* what) {
@@ -380,7 +390,8 @@ bool IndivHoldsBack(char* hook) {
 		if (!(r > 0.5f && r < 50.0f)) r = 5.0f;
 		Vector3 d = h.Pos() - Vector3(p[0], p[1], p[2]);
 		if (d.len2() > r * r) return false;
-		what = "a Roman agent's talk";
+		IndivBlockPartnerSpotFrameStart("a Roman agent's talk");
+		return true;
 	} else if (vt == 0x628EE4) {   // a blue circle (its events command the trio), the hero on it
 		if (!ground || *(char**)(hook + 0x28) != ground) return false;
 		if (!ProximityGroupCommandsTrio(*(uint16_t*)(hook + 0x30)) && !ProximityGroupCommandsTrio(*(uint16_t*)(hook + 0x32)))
@@ -733,6 +744,13 @@ void IndivAfterHeroTick(int hero) {
 }
 
 void IndivFrame() {
+	{
+		Trio tf = GetTrio();
+		for (int i = 0; tf && i < 2; i++) {
+			Hero h = tf.GetHero(i);
+			if (h) g.frameStart[i] = h.Pos();
+		}
+	}
 	{
 		DWORD now = GetTickCount();
 		Trio t = GetTrio();

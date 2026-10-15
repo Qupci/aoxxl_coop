@@ -59,6 +59,9 @@ bool IndivBlockPartnerSpot(const char* what);
 // The same for a zone the standing hero just crossed: back to where it was the
 // frame before (`before`, the detection service's), a little further back.
 bool IndivBlockPartnerSpotFrom(const char* what, const float before[3]);
+// The same, from where the standing hero was when this frame began (a Roman
+// agent's talk: the side it walked in from).
+bool IndivBlockPartnerSpotFrameStart(const char* what);
 // Hero `hero` stands where a launcher offers itself (its prompt): no safe spot there.
 void IndivNoteLauncherSpot(int hero);
 // Should this object (a hook) skip its tick now: it needs both heroes, one is

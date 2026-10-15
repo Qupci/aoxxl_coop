@@ -1147,7 +1147,7 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Individual heroes: a Roman agent's talk needs both heroes -- with one down
 	// its offer (0x511F) and start (0x5120) are held back, the hero put back.
 	if (((ev & 0xFFFF) == 0x511F || (ev & 0xFFFF) == 0x5120) && IndivFallenHero() >= 0 && g.p2Joined && !g.suspended) {
-		IndivBlockPartnerSpot("a Roman agent's talk");
+		IndivBlockPartnerSpotFrameStart("a Roman agent's talk");
 		return true;
 	}
 	Trio t = GetTrio();
