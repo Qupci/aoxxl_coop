@@ -2545,6 +2545,20 @@ const Step kSlideEnd[] = {
 	END(14000),
 };
 
+// lockcircle (level 2, XXL_DOWNAT=1:6000): Asterix steps on the blue circle by
+// the spinning platform (-778.45 516.45 -977.28): he waits there for Obelix;
+// then Obelix goes down -- the wait must be undone.
+const Step kLockCircle[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f),
+	GLIDEAT(2500, HERO_ASTERIX, -778.45f, 516.8f, -977.28f, 1000),
+	SHOT(5000, "lockcircle_1"), SHOT(9000, "lockcircle_2"),
+	P1(10000, 0, 0, 1, "p1 walks"), P1(11500, 0, 0, 0, "p1 stops"),
+	SHOT(12000, "lockcircle_3"),
+	END(13000),
+};
+
 // cabled2 / spyd2 (level 2, with XXL_DOWNAT=1:1000): Obelix down, Asterix walks
 // onto the cable car / glides to the second spy three times -- each time put
 // back, the car never boarded, the talk never started.
@@ -2859,6 +2873,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("lockcircle", kLockCircle),
 	SCENARIO("slidecross3", kSlideCross3),
 	SCENARIO("slidecross", kSlideCross),
 	SCENARIO("slideend", kSlideEnd),

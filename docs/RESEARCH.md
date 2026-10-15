@@ -1560,3 +1560,11 @@ both halves).
   service's own (det +0x1C, by the hero's node index, swapped pass included) -- 1.5 units further back along the way
   it came; spots noted in the last 0.5 s are dropped on every block. Autotest slidecross3 (three crossings: all put
   back before z -903.82).
+- Round 66: dialogue put-back from where the hero was when the frame began (its own record; the detectors' previous
+  positions are the game's, always kept). Locked sequences (user: a hero waiting in the rope cable car / on a blue
+  circle / the rotary beam softlocked when the other fell): trio 0x4802 sets the companion's AI order +0x564 = 3
+  (wait; 0x4803 -> 0), the cable car holds the rider (order 9). At the lock the detection service's enabled bits are
+  kept (5 lists, 8-byte entries, bit 0 of byte 4); if the other hero falls while it still waits / is held: rope cable
+  cars (CKHkTowedTelepher 2,159 only -- not the automatic CKHkTelepher) within 12 units get 0x512D and vf16 (back to
+  the start), the detectors are set back, trio 0x4803 + the lead, the hero released (AI reset pass) and put on solid
+  ground. Autotests swing / lockcircle with XXL_DOWNAT: both undone, the hero free.

@@ -201,6 +201,64 @@ bool IsScriptedOrder(int o) {
 	       o != AI_TAKE_HIT;
 }
 
+// Locked sequences. A player's hero locked by the level -- frozen as the
+// companion ("disable sidekick movement", trio 0x4802: a blue circle, the
+// rotary beam), or held for a ride (the rope-pulled cable car) -- waits for the
+// other hero to finish it. When the lock starts the detectors' enabled bits
+// (detection service yp +0x54: five lists +0x2C/+0x34/+0x3C/+0x44/+0x4C of 8
+// byte entries, counts at +4, bit 0 of byte 4) are kept: the lock disables its
+// own box (a blue circle: "Disable Enter Bounding Box detector") and enables the
+// ones that finish it.
+struct LockState {
+	int     hero = -1;           // the locked hero
+	size_t  n = 0;
+	uint8_t bits[4096];
+	DWORD   since = 0;
+} g_lock;
+
+static char* DetectionService() {
+	CKYellowPages* yp = YellowPages();
+	char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+	return det && *(uintptr_t*)det == 0x62504C ? det : nullptr;
+}
+
+static void NoteLock(int hero, const char* why) {
+	char* det = DetectionService();
+	// (the same lock noted twice -- its 0x4802, then the held order -- keeps the
+	// first picture, taken before the lock turned its own box off)
+	if (!det || hero < 0 || (g_lock.hero == hero && GetTickCount() - g_lock.since < 60000)) return;
+	size_t k = 0;
+	const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+	for (int b : bases) {
+		char* e = *(char**)(det + b);
+		unsigned n = *(uint16_t*)(det + b + 4);
+		for (unsigned i = 0; e && i < n && k < sizeof(g_lock.bits); i++) g_lock.bits[k++] = (uint8_t)e[8 * i + 4];
+	}
+	g_lock.n = k;
+	g_lock.hero = hero;
+	g_lock.since = GetTickCount();
+	Log("coop: %s locked by the level (%s) -- %u detectors kept", HeroName(hero), why, (unsigned)k);
+}
+
+static void EndLock() { g_lock.hero = -1; }
+
+static void RestoreDetectors() {
+	char* det = DetectionService();
+	if (!det || !g_lock.n) return;
+	size_t k = 0;
+	int changed = 0;
+	const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+	for (int b : bases) {
+		char* e = *(char**)(det + b);
+		unsigned n = *(uint16_t*)(det + b + 4);
+		for (unsigned i = 0; e && i < n && k < g_lock.n; i++, k++) {
+			uint8_t& f = *(uint8_t*)(e + 8 * i + 4);
+			if ((f & 1) != (g_lock.bits[k] & 1)) { f = (uint8_t)((f & ~1) | (g_lock.bits[k] & 1)); changed++; }
+		}
+	}
+	Log("coop: detectors as before the lock (%d switched back)", changed);
+}
+
 void Hold(Trio t, int idx, const char* why) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
@@ -210,6 +268,7 @@ void Hold(Trio t, int idx, const char* why) {
 	uint8_t f = *F18(h);
 	if (HeroModePlayable(f)) *F18(h) = HeroAiVariant(f);
 	Log("coop: %s handed to the game (%s, AI order %d)", HeroName(idx), why, (int)h.Order());
+	NoteLock(idx, "held for a scripted order");
 }
 
 uint8_t Situation(Hero h) { return h ? *(uint8_t*)(h.raw() + 0x3E9) : 0xFF; }
@@ -1227,7 +1286,48 @@ void CloseShopFor(const char* why) {
 	}
 }
 
+void CoopUndoLockFor(int fallen) {
+	int up = fallen == HERO_ASTERIX ? HERO_OBELIX : fallen == HERO_OBELIX ? HERO_ASTERIX : -1;
+	if (up < 0 || !g.p2Joined) return;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(up) : Hero();
+	if (!h) return;
+	// still locked: held by the game, or told to wait (+0x564 = 3, 0x4802; 0x4803 sets 0)
+	bool waits = g_lock.hero == up && *(uint8_t*)(h.raw() + 0x564) == 3;
+	if (!g.held[up] && !waits) return;
+	Log("coop: %s went down while %s waited on it -- the sequence undone", HeroName(fallen), HeroName(up));
+	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) near the
+	// locked hero lets go (0x512D) and goes back to its start (vf16).
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n; i++) {
+		char* car = (char*)GetLvlObject(2, 159, i);
+		char* node = car ? *(char**)(car + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr) continue;
+		const float* p = (const float*)(fr + 0x80);
+		Vector3 d = h.Pos() - Vector3(p[0], p[1], p[2]);
+		if (d.len2() > 12.0f * 12.0f) continue;
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		((SendEventFn)(*(void***)car)[5])(car, nullptr, 0x512D, nullptr);
+		((void(__fastcall*)(char*, void*))(*(void***)car)[16])(car, nullptr);
+		Log("coop: the cable car %p let go of %s and went back to its start", car, HeroName(up));
+	}
+	if (g_lock.hero == up) RestoreDetectors();
+	EndLock();
+	// The hero freed: the companion moves again, it leads, and a reset pass.
+	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
+	if (t.Leader() != up) ((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, up == HERO_ASTERIX ? 0x4800 : 0x4801, nullptr);
+	g.held[up] = false;
+	StartAiCycle(up, "its sequence undone");
+	IndivPutOnSafeGround(up);
+}
+
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
+	if (g.p2Joined && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
+		Trio tl = GetTrio();
+		if ((event & 0xFFFF) == 0x4803) EndLock();
+		else if (tl) NoteLock(tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX, "the companion told to wait");
+	}
 	SpyWalk& w = g_spyWalk;
 	event &= 0xFFFF;
 	char* cs = CameraService();

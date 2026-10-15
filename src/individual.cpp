@@ -295,6 +295,20 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	return true;
 }
 
+void IndivPutOnSafeGround(int hero) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(hero) : Hero();
+	Vector3 spot;
+	if (!h || !SafeSpotAway(hero, h.Pos(), &spot)) return;
+	spot.y += 0.5f;
+	PlaceHero(h, spot);
+	if (h.hook->node) {
+		float at[3] = { spot.x, spot.y, spot.z };
+		ProximityForgetMove(h.hook->node, at);
+	}
+	Log("indiv: %s put on its last solid ground (%.1f %.1f %.1f)", HeroName(hero), spot.x, spot.y, spot.z);
+}
+
 bool IndivBlockPartnerSpotFrameStart(const char* what) {
 	int down = IndivFallenHero();
 	if (down < 0) return false;
@@ -726,6 +740,7 @@ bool IndivHeroDown(int hero, const char* how) {
 		PlaceHero(h, spot);
 	}
 	Log("indiv: %s is down (%s) -- %s plays on and can revive it", HeroName(hero), how, HeroName(other));
+	CoopUndoLockFor(hero);
 	ShowDownHint(hero);
 	return true;
 }
