@@ -4578,6 +4578,28 @@ void AutotestFrame() {
 	int t = (int)(now - at.runStart);
 	while (at.phase == AutotestState::RUN && at.next < at.sc->count && at.sc->steps[at.next].t <= t)
 		RunStep(at.sc->steps[at.next++]);
+	{
+		// XXL_DOWNAT=<hero>:<ms>: that hero (0 Asterix, 1 Obelix) goes down that long
+		// into the run (individual heroes): any scenario with a fallen ally.
+		static int s_downHero = -2, s_downAt = 0;
+		if (s_downHero == -2) {
+			const char* e = getenv("XXL_DOWNAT");
+			s_downHero = -1;
+			if (e && sscanf(e, "%d:%d", &s_downHero, &s_downAt) != 2) s_downHero = -1;
+		}
+		if (s_downHero >= 0 && t >= s_downAt) {
+			int hero = s_downHero;
+			s_downHero = -1;
+			int prev = IndivEnter(hero);
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+			if (cb) *(uint8_t*)(cb + 0x50) = 0;
+			IndivLeave(prev);
+			bool down = IndivHeroDown(hero, "autotest XXL_DOWNAT");
+			Log("autotest: %s put down (%s)", HeroName(hero), down ? "fallen" : "not fallen");
+		}
+	}
 	if (at.phase != AutotestState::RUN) return;
 
 	RunGlides(now);

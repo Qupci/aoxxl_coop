@@ -1,4 +1,5 @@
 #include "individual.h"
+#include "proximity.h"
 #include "coop.h"
 #include "config.h"
 #include "detour.h"
@@ -41,6 +42,10 @@ struct State {
 	bool     gameOver = false;
 	SafeSpot safe[2][kSafeSpots];
 	int      safeNext[2] = {};
+	DWORD    noSafeUntil[2] = {};
+	DWORD    onLauncherAt[2] = {};  // last seen where a launcher offers itself
+	DWORD    blockedAt[2] = {};     // last put back from something that needs both heroes
+	Vector3  blockedTo[2];          // ... to there   // just put back: no new safe spot (it would be the lifted place)
 	int      lastSector = -1;
 	DWORD    lastFrame = 0;
 	DWORD    hintAt = 0;
@@ -139,14 +144,19 @@ bool OnDeathGround(Hero h) {
 	return ground && !IsBadReadPtr(ground, 0x2C) && (*(uint8_t*)(ground + 0x2A) & 4);
 }
 
+bool OnPartnerGround(Hero h, const char** what);
+
 // Where a hero stood last on solid ground: a static ground (CGround, not a
 // lifter's CDynamicGround), not a death pit, on its feet (+0x384 bits 0-2).
 void NoteSafeSpot(int idx, Hero h, DWORD now) {
+	if ((int)(g.noSafeUntil[idx] - now) > 0 || now - g.onLauncherAt[idx] < 500) return;
 	if (now - g.safe[idx][(g.safeNext[idx] + kSafeSpots - 1) % kSafeSpots].at < 250) return;
 	char* ground = *(char**)(h.raw() + 0x280);
 	if (!ground || IsBadReadPtr(ground, 0x2C) || *(uintptr_t*)ground != 0x624258) return;
 	if ((*(uint8_t*)(ground + 0x2A) & 4) || (*(uint8_t*)(h.raw() + 0x384) & 7) != 0) return;
 	if (*(uint8_t*)(h.raw() + 0x3E9) != 0) return;
+	const char* partner = nullptr;
+	if (OnPartnerGround(h, &partner)) return;   // a blue circle's plate: not a place to be put back on
 	SafeSpot& s = g.safe[idx][g.safeNext[idx]];
 	s.pos = h.Pos();
 	s.at = now;
@@ -169,6 +179,108 @@ bool SafeSpotFor(int idx, Vector3* out) {
 	if (!best) return false;
 	*out = best->pos;
 	return true;
+}
+
+} // namespace
+
+void IndivNoteLauncherSpot(int hero) {
+	if (hero == HERO_ASTERIX || hero == HERO_OBELIX) g.onLauncherAt[hero] = GetTickCount();
+}
+
+int IndivFallenHero() {
+	if (!g.active || g.gameOver) return -1;
+	if (g.fallen[HERO_ASTERIX] != g.fallen[HERO_OBELIX]) return g.fallen[HERO_ASTERIX] ? HERO_ASTERIX : HERO_OBELIX;
+	return -1;
+}
+
+namespace { void ShowDownHint(int down); }
+
+bool IndivBlockPartnerSpot(const char* what) {
+	int down = IndivFallenHero();
+	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;
+	int up = Other(down);
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(up) : Hero();
+	Vector3 spot;
+	if (!h || !SafeSpotFor(up, &spot)) return false;
+	// Put back to the same place a moment ago and blocked again: that place is
+	// part of it (a launcher's pad) -- forgotten, an older one taken.
+	DWORD t0 = GetTickCount();
+	if (t0 - g.blockedAt[up] < 1500 && (spot - g.blockedTo[up]).len2() < 1.0f) {
+		for (int i = 0; i < kSafeSpots; i++)
+			if (g.safe[up][i].at && (g.safe[up][i].pos - spot).len2() < 1.0f) g.safe[up][i].at = 0;
+		if (!SafeSpotFor(up, &spot)) return false;
+	}
+	g.blockedAt[up] = t0;
+	g.blockedTo[up] = spot;
+	spot.y += 0.5f;
+	PlaceHero(h, spot);
+	g.noSafeUntil[up] = GetTickCount() + 1000;
+	if (h.hook->node) {
+		float at[3] = { spot.x, spot.y, spot.z };
+		ProximityForgetMove(h.hook->node, at);
+	}
+	static DWORD s_told = 0;
+	DWORD now = GetTickCount();
+	if (now - s_told > 2000) {
+		s_told = now;
+		Log("indiv: %s reached %s with %s down -- back on its last solid ground (%.1f %.1f %.1f)", HeroName(up), what,
+		    HeroName(down), spot.x, spot.y, spot.z);
+		ShowDownHint(down);
+	}
+	return true;
+}
+
+namespace {
+
+// The grounds of what needs both heroes: lifters (2,47), the spinning platform
+// (CKHkCorkscrew 2,44), cable cars (CKHkTelepher 2,158, CKHkTowedTelepher
+// 2,159) -- any field of theirs pointing at the ground the hero stands on --,
+// and blue circles (pressure plates 2,21 whose events command the trio: ground
+// +0x28).
+bool OnPartnerGround(Hero h, const char** what) {
+	char* ground = *(char**)(h.raw() + 0x280);
+	if (!ground) return false;
+	static const bool logGrounds = getenv("XXL_GROUNDLOG") != nullptr;
+	if (logGrounds) {
+		static DWORD s_last = 0;
+		if (GetTickCount() - s_last > 1000) {
+			s_last = GetTickCount();
+			for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n; i++) {
+				char* o = (char*)GetLvlObject(2, 47, i);
+				if (o) Log("indiv: hero ground %p; lifter %u %p +50 %p +54 %p", ground, i, o, *(void**)(o + 0x50), *(void**)(o + 0x54));
+			}
+		}
+	}
+	static const struct { int id; const char* what; } kinds[] = {
+		{ 47, "a lifter" }, { 44, "the spinning platform" }, { 158, "a cable car" }, { 159, "a cable car" } };
+	for (const auto& k : kinds)
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, k.id); i < n; i++) {
+			char* o = (char*)GetLvlObject(2, k.id, i);
+			if (!o || IsBadReadPtr(o, 0x100)) continue;
+			for (int off = 0x10; off < 0x100; off += 4)
+				if (*(char**)(o + off) == ground) { *what = k.what; return true; }
+		}
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 21); i < n; i++) {
+		char* o = (char*)GetLvlObject(2, 21, i);
+		if (!o || *(char**)(o + 0x28) != ground) continue;
+		if (ProximityGroupCommandsTrio(*(uint16_t*)(o + 0x30)) || ProximityGroupCommandsTrio(*(uint16_t*)(o + 0x32))) {
+			*what = "a blue circle";
+			return true;
+		}
+	}
+	return false;
+}
+
+void BlockPartnerGrounds() {
+	int down = IndivFallenHero();
+	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(Other(down)) : Hero();
+	if (!h) return;
+	const char* what = nullptr;
+	if (!OnPartnerGround(h, &what)) return;   // (launchers: in the hero's prompt, coop.cpp)
+	IndivBlockPartnerSpot(what);
 }
 
 void ShowDownHint(int down) {
@@ -465,6 +577,7 @@ void IndivAfterFallenTick(int hero) {
 }
 
 void IndivFrame() {
+	BlockPartnerGrounds();
 	DWORD now = GetTickCount();
 	float dt = g.lastFrame ? (now - g.lastFrame) / 1000.0f : 0.0f;
 	if (dt > 0.1f) dt = 0.1f;

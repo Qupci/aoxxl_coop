@@ -1055,6 +1055,12 @@ static bool HeroFlying(Trio t) {
 }
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
+	// Individual heroes: a Roman agent's talk needs both heroes -- with one down
+	// its offer (0x511F) and start (0x5120) are held back, the hero put back.
+	if (((ev & 0xFFFF) == 0x511F || (ev & 0xFFFF) == 0x5120) && IndivFallenHero() >= 0 && g.p2Joined && !g.suspended) {
+		IndivBlockPartnerSpot("a Roman agent's talk");
+		return true;
+	}
 	Trio t = GetTrio();
 	// Asterix's X at a machine (FUN_0049A080) with Obelix's player elsewhere.
 	int lo = ev & 0xFFFF;
@@ -1900,6 +1906,25 @@ struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; }
 
 static void __fastcall PromptHook(char* hero, void* edx) {
 	g_origPrompt(hero, edx);
+	// Individual heroes: a launcher (hero +0x3F0 bit 0x4000, set in the hero's own
+	// tick: its "Activate") needs both heroes -- with one down the hero is put
+	// back before X can start it.
+	if (*(uint32_t*)(hero + 0x3F0) & 0x4000) {
+		Trio tt = GetTrio();
+		if (tt) IndivNoteLauncherSpot(hero == tt.GetHero(HERO_ASTERIX).raw() ? HERO_ASTERIX : hero == tt.GetHero(HERO_OBELIX).raw() ? HERO_OBELIX : -1);
+	}
+	if ((*(uint32_t*)(hero + 0x3F0) & 0x4000) && IndivFallenHero() >= 0) {
+		Trio tt = GetTrio();
+		int fallen = IndivFallenHero();
+		if (tt && hero != tt.GetHero(fallen).raw() && !CoopSuspended() && CoopP2Joined()) {
+			IndivBlockPartnerSpot("a launcher");   // put back if it can be; never started either way
+			*(uint32_t*)(hero + 0x3F0) &= ~0x4000u;
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			if (gm) *(uint32_t*)(gm + 0xCC) = (*(uint32_t*)(gm + 0xCC) & ~0xF0u) | (kPromptNone << 4);
+			return;
+		}
+	}
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	Trio t = GetTrio();

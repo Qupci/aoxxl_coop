@@ -45,5 +45,16 @@ bool IndivDropEvent(int hero, int event);
 // After a fallen hero's Life tick.
 void IndivAfterFallenTick(int hero);
 
+// A hero down while the other stands: that hero, else -1.
+int IndivFallenHero();
+// Things that need both heroes -- a lifter, a cable car, a blue circle, the
+// spinning platform, a launcher, a zone that orders the companion (the boss
+// gates, the slide, the boats), a Roman agent's talk -- stay shut while a hero is
+// down: the standing hero who reaches one is put back on its last solid ground.
+// True: it was (`what` for the log).
+bool IndivBlockPartnerSpot(const char* what);
+// Hero `hero` stands where a launcher offers itself (its prompt): no safe spot there.
+void IndivNoteLauncherSpot(int hero);
+
 // The stats of `hero` (for the HUD): health points, shields, combo hits.
 bool IndivStats(int hero, int* hp, int* shields, int* hits = nullptr, float* gauge = nullptr);

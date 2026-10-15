@@ -1411,6 +1411,21 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		    t ? HeroName(t.Leader()) : "?");
 	}
 	if (from >= kDetectTickBegin && from < kDetectTickEnd) {
+		// Individual heroes: a zone that orders the companion (a boss gate, the
+		// slide, a boat...) stays shut while a hero is down -- not set off, the
+		// hero who walked in put back.
+		if (IndivFallenHero() >= 0 && GroupCommandsTrio(eventId)) {
+			int zh = ZoneEventHero(eventId & 0xFFFF);
+			if (CoopP2Joined() && !CoopSuspended()) {
+				if (zh != IndivFallenHero()) IndivBlockPartnerSpot("a zone that needs both heroes");
+				static unsigned s_last = 0;
+				if (s_last != (eventId & 0xFFFF)) {
+					s_last = eventId & 0xFFFF;
+					Log("proximity: zone event %04X held back -- %s is down", eventId & 0xFFFF, HeroName(IndivFallenHero()));
+				}
+				return;
+			}
+		}
 		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
 		int zh = ZoneEventHero(eventId & 0xFFFF);
 		if (zh >= 0) CoopNoteZoneHero(zh);
@@ -1425,6 +1440,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 } // namespace
 
 long ProximityP2Contacts() { return g_p2Contacts; }
+bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;
 	int a = GroupSwitchTarget(*(uint16_t*)(l + 0x28));

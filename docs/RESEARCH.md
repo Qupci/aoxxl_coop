@@ -1501,3 +1501,14 @@ both halves).
   combo_bar_full_drain divide them. One screen (co-op suspended: slide, boat): player 2's HUD pass now also runs
   after the game's own HUD draw (FUN_00414070 detour; hud2 on while suspended), so Obelix's bar shows on the right.
   P2 Start / Back-hold leave ignored while suspended (leaving mid-slide left both heroes stuck).
+- Round 59: things that need both heroes stay shut while one is down (individual heroes): the standing hero who reaches
+  one is put back on its last solid ground (IndivBlockPartnerSpot; safe spots: static CGround only, not a blue circle's
+  plate, not where a launcher offers itself, a spot blocked again within 1.5 s forgotten). Grounds (hero +0x280) of
+  lifters (2,47: +0x50 dyn / +0x54 static), the corkscrew (2,44), cable cars (2,158 / 2,159) -- any field pointing at
+  it -- and blue circles (2,21 +0x28, events +0x30/+0x32 commanding the trio); launchers: hero +0x3F0 bit 0x4000 in
+  the prompt (FUN_0049A1A0) -- bit and prompt cleared; detector zones (CKSrvDetection::vf17 0x46BE90, flags on
+  outside->inside, no auto-disable) whose group commands the trio: event dropped; a Roman agent's 0x511F / 0x5120
+  dropped. Checkpoints (CKGrpAsterixCheckpoint::vf29 0x536DD0, leader in radius) also send leader switches (the
+  cable car, the slide, LV2's boss gate) -- not blocked (progress saves). Autotest env XXL_DOWNAT=<hero>:<ms> puts a
+  hero down in any scenario. Verified: cable car, spy, launcher, LV4 blue circle zone; lifter / corkscrew tests only
+  place the hero beside them (user to check).
