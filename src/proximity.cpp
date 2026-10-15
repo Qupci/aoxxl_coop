@@ -951,6 +951,32 @@ bool GroupCommandsTrio(unsigned ev) {
 	return false;
 }
 
+// Does event `ev`'s group need both heroes: command the trio (above), or start a
+// ride / scripted mode for both (trio 0x4806, 0x4807, 0x480B..0x480F: the belly
+// slide's cross detector, LV2-2 z -903.8, sends 0x480B)?
+bool GroupNeedsBoth(unsigned ev) {
+	if (GroupCommandsTrio(ev)) return true;
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return false;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return false;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	uint16_t* msgs = *(uint16_t**)(es + 0x14);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++) {
+		uintptr_t vt = objs[first + k] ? *(uintptr_t*)objs[first + k] : 0;
+		if (vt == 0x6259E4) return true;   // CKAsterixSlideFP: the belly slide started (0x480B there)
+		if (vt != 0x6256A0) continue;
+		unsigned m = msgs[first + k];
+		if (m == 0x4806 || m == 0x4807 || (m >= 0x480B && m <= 0x480F)) return true;
+	}
+	return false;
+}
+
 // Does event `ev`'s group run a cutscene (a cinematic bloc, 8,9..8,28 /
 // CKSkyCinematicBloc, or the cinematic service among its targets)?
 bool GroupPlaysCutscene(unsigned ev) {
@@ -1313,8 +1339,11 @@ int NodeIndex(char* det, Hero h) {
 
 void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 	Trio t = GetTrio();
+	// (A fallen hero -- individual heroes -- counts here: zones bound to it are
+	// still tried with the standing hero, so what needs both heroes is caught.)
+	int fallen = IndivFallenHero();
 	bool coop = t && CoopP2Joined() && !CoopSuspended() && *(uint8_t*)(det + 0x2A) &&
-	            !HeroOut(HERO_ASTERIX) && !HeroOut(HERO_OBELIX);
+	            (!HeroOut(HERO_ASTERIX) || fallen == HERO_ASTERIX) && (!HeroOut(HERO_OBELIX) || fallen == HERO_OBELIX);
 	int ia = coop ? NodeIndex(det, t.GetHero(HERO_ASTERIX)) : -1;
 	int io = coop ? NodeIndex(det, t.GetHero(HERO_OBELIX)) : -1;
 	g_tickingDet = det;
@@ -1430,9 +1459,10 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		// Individual heroes: a zone that orders the companion (a boss gate, the
 		// slide, a boat...) stays shut while a hero is down -- not set off, the
 		// hero who walked in put back.
-		if (IndivFallenHero() >= 0 && GroupCommandsTrio(eventId)) {
+		if (IndivFallenHero() >= 0 && GroupNeedsBoth(eventId)) {
 			int zh = ZoneEventHero(eventId & 0xFFFF);
 			if (CoopP2Joined() && !CoopSuspended()) {
+				// (zh: the hero who set it off -- in the swapped pass too)
 				if (zh != IndivFallenHero()) IndivBlockPartnerSpot("a zone that needs both heroes");
 				static unsigned s_last = 0;
 				if (s_last != (eventId & 0xFFFF)) {

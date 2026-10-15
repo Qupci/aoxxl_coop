@@ -46,6 +46,11 @@ struct State {
 	// what needs both heroes: far enough not to be walked back onto at once).
 	Vector3  trail[2][16];
 	int      trailN[2] = {}, trailNext[2] = {};
+	// Where the hero was lately, whatever it stood on (every 0.1 s, 2 s): the
+	// last resort of a put-back.
+	Vector3  recent[2][20];
+	int      recentN[2] = {}, recentNext[2] = {};
+	DWORD    recentAt = 0;
 	DWORD    noSafeUntil[2] = {};
 	DWORD    onLauncherAt[2] = {};  // last seen where a launcher offers itself
 	DWORD    blockedAt[2] = {};     // last put back from something that needs both heroes
@@ -195,7 +200,14 @@ bool SafeSpotAway(int idx, const Vector3& from, Vector3* out) {
 		if (d >= 4.0f * 4.0f && (!best || (int)(s.at - best->at) > 0)) best = &s;
 	}
 	if (!best) best = farthest;
-	if (!best) return false;
+	if (!best) {
+		// No safe spot known (just teleported): where it was a second ago or more.
+		for (int k = 10; k <= g.recentN[idx]; k++) {
+			const Vector3& p = g.recent[idx][(g.recentNext[idx] + 20 - k) % 20];
+			if ((p - from).len2() >= 2.0f * 2.0f) { *out = p; return true; }
+		}
+		return false;
+	}
 	*out = best->pos;
 	return true;
 }
@@ -672,6 +684,20 @@ void IndivAfterHeroTick(int hero) {
 }
 
 void IndivFrame() {
+	{
+		DWORD now = GetTickCount();
+		Trio t = GetTrio();
+		if (t && now - g.recentAt >= 100) {
+			g.recentAt = now;
+			for (int i = 0; i < 2; i++) {
+				Hero h = t.GetHero(i);
+				if (!h || g.fallen[i]) continue;
+				g.recent[i][g.recentNext[i]] = h.Pos();
+				g.recentNext[i] = (g.recentNext[i] + 1) % 20;
+				if (g.recentN[i] < 20) g.recentN[i]++;
+			}
+		}
+	}
 	BlockPartnerGrounds();
 	DWORD now = GetTickCount();
 	float dt = g.lastFrame ? (now - g.lastFrame) / 1000.0f : 0.0f;

@@ -2511,6 +2511,17 @@ const Step kGrab3[] = {
 	END(6000),
 };
 
+// slidecross (level 2): from -905.96 527.36 -938.49 Asterix walks past LV2-2's
+// cross detector (z -903.82, event #5): the belly slide starts.
+const Step kSlideCross[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(3000, HERO_OBELIX, -903.96f, 528.2f, -938.49f),
+	GLIDEAT(4500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
+	SHOT(8000, "slidecross_1"), SHOT(11000, "slidecross_2"),
+	END(14000),
+};
+
 // slideend (level 2): Asterix walks down beside the belly slide (LV2-2,
 // -916.8 519.6 -883.8 -> -906.6 511.1 -860.4): what starts the level's end there.
 const Step kSlideEnd[] = {
@@ -2837,6 +2848,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("slidecross", kSlideCross),
 	SCENARIO("slideend", kSlideEnd),
 	SCENARIO("cabled2", kCableD2),
 	SCENARIO("spyd2", kSpyD2),

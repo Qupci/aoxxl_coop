@@ -1548,3 +1548,10 @@ both halves).
   own 0x512B, then trio 0x4801 / 0x4812 -- and from then on the car holds the hero (put-backs ignored, frozen on it,
   cable_car4.log). Situation 2 is now left at once (table[2](owner, 2, 0xFF), +0x3E9 = 0xFF, only when table[2] is
   0x49A670) and the hero put back. Autotests cabled2 / spyd2 (three approaches each, XXL_DOWNAT=1:1000).
+- Round 64: LV2-2's belly slide starts at a cross detector (plane z -903.82, event 0x0028, group 5, bound to Obelix,
+  fired for Asterix only by the co-op swapped pass): its group sends 0x480B to CKAsterixSlideFP (vt 0x6259E4), not to
+  the trio. With Obelix down the swapped pass did not run (HeroOut) -- the plane was simply walked past and the slope
+  walked down (slide2.log). Now the swapped pass runs when the only hero out is the fallen one, and zones whose group
+  needs both heroes (GroupNeedsBoth: trio commands, trio ride modes 0x4806/07/0B..0F, any message to the slide path)
+  are held back with the put-back (ZoneEventHero already names the hero who crossed, swapped pass included). Last
+  resort of a put-back: the hero's own position a second or more ago (every 0.1 s). Autotest slidecross.
