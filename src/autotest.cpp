@@ -2511,6 +2511,18 @@ const Step kGrab3[] = {
 	END(6000),
 };
 
+// slideend (level 2): Asterix walks down beside the belly slide (LV2-2,
+// -916.8 519.6 -883.8 -> -906.6 511.1 -860.4): what starts the level's end there.
+const Step kSlideEnd[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -916.8f, 520.5f, -883.8f), PLACEAT(3000, HERO_OBELIX, -914.8f, 520.5f, -884.8f),
+	GLIDEAT(4000, HERO_ASTERIX, -905.96f, 518.3f, -878.35f, 1500),
+	GLIDEAT(6000, HERO_ASTERIX, -906.5f, 512.0f, -861.0f, 2500),
+	SHOT(9500, "slideend_1"),
+	END(14000),
+};
+
 // cabled2 / spyd2 (level 2, with XXL_DOWNAT=1:1000): Obelix down, Asterix walks
 // onto the cable car / glides to the second spy three times -- each time put
 // back, the car never boarded, the talk never started.
@@ -2825,6 +2837,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("slideend", kSlideEnd),
 	SCENARIO("cabled2", kCableD2),
 	SCENARIO("spyd2", kSpyD2),
 	SCENARIO("liftd58", kLiftD58),
