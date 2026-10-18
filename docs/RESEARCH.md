@@ -1606,3 +1606,18 @@ both halves).
   returned to. The shop's leaving-state entry (FUN_004C1B90(1)) hands it back: svc +0xC |= 0x400, +0xE0/+0x34 from
   shop +0x120/+0x11C, +0xE4 = 0, SetTarget(shop +0x19C, 1 s) (0x459050 -- the index's "Node_FadeVisibility" is
   CKSrvCamera::SetTarget), new track +0x48 = shop +0x1B0. Now done in CloseShopFor (user-verified with shopsave).
+- Round 70 (user: xxl_coop.save+shop.log, xxl_coop.bro_test.log): LV2-10's zone by the save point (event 05A0,
+  group 0B4: detection 1622, corkscrew 0999, trio 4800 + 4803, light pillar 0900) sends "Asterix leads" when
+  Asterix walks in. In single player the merchant pauses the world, so it never arrives mid-visit; in co-op it took
+  the lead from Obelix at the merchant: Obelix reset through the AI in situation 0A, the shop went on as Asterix's
+  (camera in player 1's half, Obelix walking with the menu up), and CloseShopFor's camera hand-back went into
+  Asterix's camera aimed at the shop's +0x19C (Obelix) -- player 1's view mirrored player 2's after the save menu.
+  Now leader switches (4800/4801/48B7/48B8) wait while a shop's state is not 0 or a hero is in situation 0A
+  (CoopDeferTrioEvent, sent once out); the lead taken for the shop goes back only once the shopper is out of 0A;
+  CloseShopFor hands the camera back only if the game's camera is the shopper's (else GameCamDropCopy). Autotest
+  shopzone.
+  Combo bar: the game manager tick (FUN_00504080) ends the full state when the gauge runs out (stats +0x10 bit 14
+  cleared at 0x504295); the mod's run-down for the non-leading hero (RunDownCombo) did not -- that hero stayed
+  "full" with an empty gauge, hits went nowhere, the bar hidden until the hero led again. Fixed (autotest
+  combodrain: log line). Game manager +0x160 bits 2 (a hit filled the full gauge) and 4 (a combo spent,
+  FUN_00493810) are taken by the combo bar's state 4 (FUN_00518190) -- now per hero in Stats.
