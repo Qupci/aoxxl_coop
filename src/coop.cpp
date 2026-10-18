@@ -228,10 +228,17 @@ struct LockPicture {
 };
 struct LockState {
 	int         hero = -1;           // the locked hero
+	char*       car = nullptr;       // the rope-pulled cable car it rides (CKHkTowedTelepher 2,159)
 	DWORD       since = 0;
 	LockPicture pic;
 } g_lock;
 LockPicture g_prePic;
+// A lock that ended (0x4803) while its sequence goes on: the spinning platform
+// frees Asterix once Obelix is at the turnstile, but it stays switched off
+// (0x99A) and its pillar dark until Asterix reaches the box at its top. Kept
+// until then.
+LockPicture g_seqPic;
+bool g_seqLive = false;
 
 static char* DetectionService() {
 	CKYellowPages* yp = YellowPages();
@@ -276,14 +283,45 @@ static void NoteLock(int hero, const char* why) {
 	g_prePic.at = 0;
 	g_lock.hero = hero;
 	g_lock.since = GetTickCount();
+	g_seqLive = false;
+	// The car boarded (the rider's own position stays at the boarding spot
+	// while the car moves on): the nearest one now.
+	g_lock.car = nullptr;
+	float best = 12.0f * 12.0f;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(hero) : Hero();
+	for (unsigned i = 0, n = h ? GetNumLvlClassInstances(2, 159) : 0; i < n; i++) {
+		char* car = (char*)GetLvlObject(2, 159, i);
+		char* node = car ? *(char**)(car + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr) continue;
+		const float* p = (const float*)(fr + 0x80);
+		float d2 = (h.Pos() - Vector3(p[0], p[1], p[2])).len2();
+		if (d2 < best) { best = d2; g_lock.car = car; }
+	}
 	Log("coop: %s locked by the level (%s) -- %u detectors, %u circles kept (%s %04X)", HeroName(hero), why,
 	    (unsigned)g_lock.pic.n, (unsigned)g_lock.pic.nFlags, pre ? "as before its event" : "as now", g_lock.pic.event);
 }
 
-static void EndLock() { g_lock.hero = -1; }
+static void EndLock(bool goesOn = false) {
+	if (goesOn && g_lock.hero >= 0) { g_seqPic = g_lock.pic; g_seqLive = true; }
+	g_lock.hero = -1;
+}
 
-static void RestoreLockPicture() {
-	const LockPicture& p = g_lock.pic;
+// The ended lock's sequence is still under way: a spinning platform it set off
+// (bit 0) or switched off (bit 1: the zone that frees Asterix sends 0x99C and
+// 0x99A; the turn's end switches it on again) is not as before.
+static bool SequenceUnderWay() {
+	if (!g_seqLive) return false;
+	for (size_t i = 0; i < g_seqPic.nFlags; i++) {
+		char* o = g_seqPic.flags[i].hook;
+		if (*(uintptr_t*)o == 0x628E0C && ((g_seqPic.flags[i].f ^ *(uint32_t*)(o + 8)) & 3)) return true;
+	}
+	g_seqLive = false;   // finished (or never set one off)
+	return false;
+}
+
+static void RestoreLockPicture(const LockPicture& p) {
 	int changed = 0, shown = 0, flags = 0;
 	if (char* det = DetectionService()) {
 		size_t k = 0;
@@ -1359,18 +1397,25 @@ void CoopUndoLockFor(int fallen) {
 	if (!h) return;
 	// still locked: held by the game, or told to wait (+0x564 = 3, 0x4802; 0x4803 sets 0)
 	bool waits = g_lock.hero == up && *(uint8_t*)(h.raw() + 0x564) == 3;
-	if (!g.held[up] && !waits) return;
+	if (!g.held[up] && !waits) {
+		if (!SequenceUnderWay()) return;
+		// Freed already, but the platform's turn not finished: back to before it set off.
+		Log("coop: %s went down before the spinning platform's turn ended -- the sequence undone", HeroName(fallen));
+		for (size_t i = 0; i < g_seqPic.nFlags; i++)
+			if (*(uintptr_t*)g_seqPic.flags[i].hook == 0x628E0C) *(float*)(g_seqPic.flags[i].hook + 0x28) = 0.0f;   // down again
+		RestoreLockPicture(g_seqPic);
+		g_seqLive = false;
+		return;
+	}
 	Log("coop: %s went down while %s waited on it -- the sequence undone", HeroName(fallen), HeroName(up));
-	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) near the
-	// locked hero lets go (0x512D) and goes back to its start (vf16).
+	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) the
+	// locked hero boarded lets go (0x512D) and goes back to its start (vf16).
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n; i++) {
 		char* car = (char*)GetLvlObject(2, 159, i);
 		char* node = car ? *(char**)(car + 0x10) : nullptr;
 		char* fr = node ? *(char**)(node + 4) : nullptr;
 		if (!fr) continue;
-		const float* p = (const float*)(fr + 0x80);
-		Vector3 d = h.Pos() - Vector3(p[0], p[1], p[2]);
-		if (d.len2() > 12.0f * 12.0f) continue;
+		if (g_lock.hero != up || car != g_lock.car) continue;
 		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 		uint32_t f0 = *(uint32_t*)(node + 0x10), h0 = *(uint32_t*)(car + 0x7C);
 		((SendEventFn)(*(void***)car)[5])(car, nullptr, 0x512D, nullptr);
@@ -1384,7 +1429,7 @@ void CoopUndoLockFor(int fallen) {
 		    "now at %.1f %.1f %.1f)", car, HeroName(up), node, f0, node ? *(uint32_t*)(node + 0x10) : 0, h0,
 		    *(uint32_t*)(car + 0x7C), fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0, fr ? ((float*)(fr + 0x80))[2] : 0);
 	}
-	if (g_lock.hero == up) RestoreLockPicture();
+	if (g_lock.hero == up) RestoreLockPicture(g_lock.pic);
 	EndLock();
 	// The hero freed: the companion moves again, it leads, and a reset pass.
 	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
@@ -1398,7 +1443,7 @@ void CoopUndoLockFor(int fallen) {
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
-		if ((event & 0xFFFF) == 0x4803) EndLock();
+		if ((event & 0xFFFF) == 0x4803) EndLock(true);
 		else if (tl) NoteLock(tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX, "the companion told to wait");
 	}
 	SpyWalk& w = g_spyWalk;

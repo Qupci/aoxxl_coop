@@ -1964,6 +1964,24 @@ const Step kCable33[] = {
 	END(12500),
 };
 
+// cabled33 (-Level 3, XXL_DOWNAT=1:9000 XXL_UPAT=12000): cable33, Obelix falls
+// with the car halfway -- it must be back at its start, then ride again.
+const Step kCableD33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	SHOT(4000, "cabled33_1"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(5500, HERO_OBELIX, 287.0f, 10.43f, -209.1f, 3200), SHOT(8500, "cabled33_2"),
+	VPAD(9000, 1, 0, 0, 0, "p2 release"), SHOT(10000, "cabled33_3"),
+	PLACEAT(13000, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(13000, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	SHOT(14500, "cabled33_4"),
+	VPAD(15000, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(16500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2500), SHOT(19000, "cabled33_5"),
+	VPAD(20000, 1, 0, 0, 0, "p2 release"),
+	END(21000),
+};
+
 // p2dir (level 2): player 2 turns their camera (right stick) and then pushes
 // the left stick up: Obelix must walk away from player 2's camera.
 const Step kP2Dir[] = {
@@ -2574,6 +2592,25 @@ const Step kLockAgain[] = {
 	END(16000),
 };
 
+// corkdown (level 2, XXL_DOWNAT=1:10000 XXL_UPAT=13000): lockcircle, Obelix
+// walks through the zone that frees Asterix (0x03C8, 4803) to the turnstile,
+// then goes down before the platform's turn ends -- undone after the lock; the
+// circle must set off again after the revive.
+const Step kCorkDown[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f), PLACEAT(1800, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	PLACEAT(2000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f),
+	GLIDEAT(2500, HERO_ASTERIX, -778.45f, 516.8f, -977.28f, 1000),
+	GLIDEAT(5000, HERO_OBELIX, -762.0f, 515.8f, -979.2f, 1500),
+	GLIDEAT(7000, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 2000),
+	SHOT(9500, "corkdown_1"), SHOT(11000, "corkdown_2"),
+	PLACEAT(14000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f),
+	GLIDEAT(15000, HERO_ASTERIX, -778.45f, 516.8f, -977.28f, 1000),
+	SHOT(17500, "corkdown_3"),
+	END(19000),
+};
+
 // beamundo (-Level 4 sector 2..., XXL_DOWNAT=1:7000): the hearth by the rotary
 // beam lit, Asterix onto its blue circle (he waits for Obelix), Obelix falls --
 // undone; the circle's group and what it changed are logged.
@@ -2948,6 +2985,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("spyrev", kSpyRev),
 	SCENARIO("swingundo", kSwingUndo),
 	SCENARIO("lockagain", kLockAgain),
+	SCENARIO("cabled33", kCableD33),
+	SCENARIO("corkdown", kCorkDown),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),

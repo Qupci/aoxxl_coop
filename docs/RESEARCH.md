@@ -1585,3 +1585,13 @@ both halves).
   sub node and sets +8 bit 0, cleared only when its turn ends (or 0x99C / vf20) -- its +8 is restored. Towed cable
   car vf16 (= CKHkTelepher::vf16, its init) hides the node (+0x10 bit 1): shown again. Restoring all models'
   hidden bits was tried and dropped (crates broken meanwhile came back).
+- Round 68 (user: spinning platform still dead after Obelix fell, xxl_coop.CKHkCorkscrew.log; cable car stuck when
+  pulled far). LV2-1 platform flow: Asterix on its circle -> event 0x0050 (trio 4801/4802, pillar 0x901, detectors);
+  Obelix walks to the turnstile through zone 0x03C8, whose group sends the corkscrew 0x99C + 0x99A (switched off),
+  trio 4803 (Asterix freed), detector toggles, CKCameraSector 0x700, CKPFGraphTransition 0xA01; the box at the
+  platform's top (Asterix) switches it on again. Obelix falling after 03C8 left it off for good. Now a lock ended by
+  4803 keeps its picture while a corkscrew in it differs in +8 bits 0/1; a fall then restores it (+0x28 = 0, pillar,
+  detectors). Autotest corkdown. Cable car: the rider's own position stays at the boarding spot, so the undo's
+  "car within 12 units of the rider" missed far pulls; the car nearest the rider at the lock is kept and reset.
+  Autotest cabled33 (-Level 3, pull to x 287). A fallen rider (Asterix) stays in the car; Obelix can take the rope
+  again (user: fine as is).
