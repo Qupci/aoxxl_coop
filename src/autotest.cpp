@@ -1487,6 +1487,44 @@ const Step kShopSave[] = {
 	END(26500),
 };
 
+// shopzone (-Level 2, sector 10): player 2's Obelix at the merchant, player 1's
+// Asterix walks to the save point -- the zone there (event 05A0) sends "Asterix
+// leads": held back until the visit is over (the shop stays Obelix's, in his
+// half; xxl_coop.bro_test.log). Player 2 then leaves the shop (B, B).
+const Step kShopZone[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 1647.88f, -744.5f, -1208.53f), PLACEAT(3000, HERO_ASTERIX, 1652.0f, -744.5f, -1205.0f),
+	PLACEAT(3400, HERO_OBELIX, 1647.88f, -744.5f, -1208.53f), PLACEAT(3400, HERO_ASTERIX, 1652.0f, -744.5f, -1205.0f),
+	SECTORS(3600),
+	{ 4000, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"), VPAD(4700, 1, 0, 0, 0, "p2 release"),
+	VPAD(8000, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(8200, 1, 0, 0, 0, "p2 release"),
+	SHOT(9000, "shopzone_1"),
+	GLIDEAT(9500, HERO_ASTERIX, 1661.5f, -743.8f, -1217.3f, 2500),
+	SHOT(13000, "shopzone_2"),
+	VPAD(14000, 1, PAD_B, 0, 0, "p2 B (back)"), VPAD(14200, 1, 0, 0, 0, "p2 release"),
+	VPAD(15500, 1, PAD_B, 0, 0, "p2 B (leave)"), VPAD(15700, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "shopzone_3"),
+	VPAD(19500, 1, 0, 0, -1.0f, "p2 walks"), VPAD(21000, 1, 0, 0, 0, "p2 stops"),
+	SHOT(22000, "shopzone_4"),
+	END(22500),
+};
+
+// combodrain (level 2, individual heroes): player 2's Obelix (not leading)
+// fills his combo bar (cheat: Dpad left) and lets it run out -- it must leave
+// the "full" state ("indiv: ... ran out"), then fill again from hits.
+const Step kComboDrain[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(1800, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(2000, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 combo cheat"), VPAD(2200, 1, 0, 0, 0, "p2 release"),
+	SHOT(3000, "combodrain_1"),
+	SHOT(20000, "combodrain_2"),
+	VPAD(39800, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(40000, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 combo cheat"), VPAD(40200, 1, 0, 0, 0, "p2 release"),
+	SHOT(41000, "combodrain_3"),
+	END(41500),
+};
+
 // shopjoin (level 2): single player at the merchant, player 2 presses Start --
 // refused while the shop is open; after leaving it, Start joins.
 const Step kShopJoin[] = {
@@ -3035,6 +3073,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("swingundo", kSwingUndo),
 	SCENARIO("lockagain", kLockAgain),
 	SCENARIO("shopjoin", kShopJoin),
+	SCENARIO("combodrain", kComboDrain),
+	SCENARIO("shopzone", kShopZone),
 	SCENARIO("shopsave", kShopSave),
 	SCENARIO("cabled33", kCableD33),
 	SCENARIO("corkdown", kCorkDown),

@@ -22,7 +22,12 @@ struct Stats {
 	uint32_t hits = 0, chain = 0, c4 = 0;   // +0xB0, +0xB4, +0xC4
 	uint32_t level = 0;                // +0xCC bits 9-10
 	bool     full = false;             // +0x40 -> +0x10 bit 0x4000
+	// +0x160 bits 2 and 4: a hit filled the full gauge, a combo spent from it --
+	// the combo bar's "full" state (FUN_00518190 state 4) takes them. Kept with
+	// one hero, the other's bar took them and the hero's own never saw them.
+	uint8_t  barFlags = 0;
 };
+const uint8_t kBarFlags = 0x14;
 
 struct SafeSpot { Vector3 pos; DWORD at = 0; };
 const int kSafeSpots = 8;
@@ -91,6 +96,7 @@ bool Read(Stats& s) {
 	s.c4 = *(uint32_t*)(gm + 0xC4);
 	s.level = *(uint32_t*)(gm + 0xCC) & 0x600;
 	s.full = (*(uint32_t*)(cb + 0x10) & 0x4000) != 0;
+	s.barFlags = *(uint8_t*)(gm + 0x160) & kBarFlags;
 	return true;
 }
 
@@ -107,6 +113,7 @@ void Write(const Stats& s) {
 	*(uint32_t*)(gm + 0xC4) = s.c4;
 	*(uint32_t*)(gm + 0xCC) = (*(uint32_t*)(gm + 0xCC) & ~0x600u) | s.level;
 	*(uint32_t*)(cb + 0x10) = (*(uint32_t*)(cb + 0x10) & ~0x4000u) | (s.full ? 0x4000u : 0u);
+	*(uint8_t*)(gm + 0x160) = (*(uint8_t*)(gm + 0x160) & ~kBarFlags) | s.barFlags;
 }
 
 void Use(int idx) {
@@ -590,7 +597,16 @@ void RunDownCombo(int idx) {
 			if (s.hits) s.hits--;
 		} else s.decay -= dt;
 	} else {
-		if (s.gauge <= 0.0f) { s.chain = s.hits = s.c4 = 0; s.gauge = 0.0f; }
+		// Run out: the game's tick also ends the "full" state (FUN_00504080: the
+		// stats' +0x10 bit 14 cleared). Left on, the hero's hits went to an empty
+		// gauge -- the bar never showed again, or never got to "Combo", until the
+		// hero led once more.
+		if (s.gauge <= 0.0f) {
+			s.chain = s.hits = s.c4 = 0;
+			s.gauge = 0.0f;
+			s.full = false;
+			Log("indiv: %s's full combo bar ran out (not leading)", HeroName(idx));
+		}
 		else if (s.gauge <= dt) s.gauge = 0.0f;
 		else s.gauge -= dt;
 	}

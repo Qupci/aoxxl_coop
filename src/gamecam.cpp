@@ -463,6 +463,13 @@ const char* GameCamCopyState(int hero) {
 	return g_active && g_copy.valid && g_copy.hero == hero ? (const char*)g_copy.svc : nullptr;
 }
 
+void GameCamDropCopy(int hero) {
+	if (!g_copy.valid || g_copy.hero != hero) return;
+	g_copy.valid = false;
+	g_copy.haveView = false;
+	g_copy.numTracks = 0;
+}
+
 bool GameCamInstallHooks() {
 	bool ok = PatchVtableSlot(kSrvCameraVtbl, kTickSlot, kTick, (void*)TickHook, (void**)&g_origTick,
 	                          "CKSrvCamera::tick");

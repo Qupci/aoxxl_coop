@@ -31,3 +31,6 @@ void GameCamBeginHeroTick(int hero);
 void GameCamEndHeroTick();
 // The copy's service bytes (camera position +0x5B0, look-at +0x5BC), or nullptr.
 const char* GameCamCopyState(int hero);
+
+// The copy (if it is that hero's) starts over from the game's camera.
+void GameCamDropCopy(int hero);

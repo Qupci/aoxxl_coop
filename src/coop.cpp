@@ -14,6 +14,7 @@
 //    (only its leader in a player state), then player control is re-applied.
 
 #include "coop.h"
+#include "gamecam.h"
 #include "crash.h"
 #include "proximity.h"
 #include "detour.h"
@@ -138,6 +139,7 @@ struct CoopState {
 	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
 	char*    closedShop = nullptr;
 	int      shopCloseCheck = 0;        // frames until the forced close's result is logged
+	bool     shopLeadBack = false;      // the merchant's visit over: the lead goes back once the shopper is out
 	bool     shopForcedClosed = false;  // the merchant closed for the other player's dialogue (until the shopper is out)
 } g;
 
@@ -461,6 +463,7 @@ void ForgetP2() {
 	g.p2ValuesReady = false;
 	g.suspended = false;
 	g.shopping = false;
+	g.shopLeadBack = false;
 	g.dying = -1;
 	g.dyingLeads = false;
 	for (int i = 0; i < HERO_COUNT; i++) g.held[i] = false;
@@ -1282,6 +1285,20 @@ static bool IsLeaderSwitch(int ev) {
 	return ev == 0x4800 || ev == 0x4801 || ev == 0x48B7 || ev == 0x48B8;
 }
 
+// Someone at the merchant: its state (+8 bits 0-2) not 0, or a hero still in
+// the shop's situation (0x0A: walking up to it, or the goodbye's last frames).
+static bool ShopBusy(Trio t) {
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
+		char* s = (char*)GetLvlObject(2, 172, i);
+		if (s && (*(uint8_t*)(s + 8) & 7) != 0) return true;
+	}
+	for (int i = 0; t && i < 2; i++) {
+		Hero h = t.GetHero(i);
+		if (h && Situation(h) == kSituationShop) return true;
+	}
+	return false;
+}
+
 static bool HeroFlying(Trio t) {
 	for (int i = 0; i < 2; i++) {
 		Hero h = t.GetHero(i);
@@ -1331,10 +1348,18 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 		Log("coop: trio event %04X (the sidekick runs ahead from the boss) dropped: each player runs their own hero", ev & 0xFFFF);
 		return true;
 	}
-	if (!t || t.raw() != (char*)trio || !IsLeaderSwitch(ev) || !HeroFlying(t)) return false;
+	if (!t || t.raw() != (char*)trio || !IsLeaderSwitch(ev)) return false;
+	// The same while a player is at the merchant (the shop pauses the world in
+	// single player; in co-op the other player plays on): LV2-10's zone by the
+	// save point (event 05A0) sends "Asterix leads" when Asterix walks in -- taken
+	// from Obelix at the merchant, the shop went on as Asterix's, its camera in
+	// player 1's half, Obelix free to walk off with the menu up (bro_test log).
+	bool shop = g.p2Joined && ShopBusy(t);
+	if (!shop && !HeroFlying(t)) return false;
 	g_deferredSwitch = ev & 0xFFFF;
 	g_deferredSince = GetTickCount();
-	Log("coop: trio event %04X while flying from a catapult -- after the landing", g_deferredSwitch);
+	Log("coop: trio event %04X %s", g_deferredSwitch,
+	    shop ? "while a player is at the merchant -- after the visit" : "while flying from a catapult -- after the landing");
 	return true;
 }
 
@@ -1343,9 +1368,10 @@ static void SendDeferredSwitch() {
 	Trio t = GetTrio();
 	if (!t) { g_deferredSwitch = -1; return; }
 	if (HeroFlying(t) && GetTickCount() - g_deferredSince < 20000) return;
+	if (g.p2Joined && ShopBusy(t)) return;
 	int ev = g_deferredSwitch;
 	g_deferredSwitch = -1;
-	Log("coop: landed -- trio event %04X sent now", ev);
+	Log("coop: landed / out of the shop -- trio event %04X sent now", ev);
 	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
 	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, ev, nullptr);
 }
@@ -1380,7 +1406,14 @@ void CloseShopFor(const char* why) {
 		// shop's +0x19C, the new track's position the one kept at the visit's start
 		// (+0x1B0). Without it the camera stayed the shop's: through the other
 		// player's save menu and after it (player 2's half, LV2-10).
-		if (char* cs = CameraService(); cs && *(void**)(sh + 0x118)) {
+		// The game's camera is the shopper's (a leader switch waits for the visit's
+		// end); if it is the other player's, the shop's camera is in the copy, which
+		// starts over from the game's camera, aimed at its own hero.
+		int live = GameCamLiveHero();
+		if (live >= 0 && live != g.shopper) {
+			GameCamDropCopy(g.shopper);
+			Log("coop: the merchant's camera was in %s's copy -- the copy starts over", HeroName(g.shopper));
+		} else if (char* cs = CameraService(); cs && *(void**)(sh + 0x118)) {
 			*(uint32_t*)(cs + 0xC) |= 0x400;
 			*(uint32_t*)(cs + 0xE0) = *(uint32_t*)(sh + 0x120);
 			*(uint32_t*)(cs + 0x34) = *(uint32_t*)(sh + 0x11C);
@@ -1884,6 +1917,13 @@ void CoopFrame() {
 		g.shopForcedClosed = false;
 	if (!shopping && g.shopping) {
 		Log("coop: %s is done at the merchant", HeroName(g.shopper));
+		g.shopLeadBack = true;
+	}
+	// The lead back once the shopper is out of the shop's situation too: given
+	// back on the goodbye's last frames, the hero reset through the AI went back
+	// in (0x48EF) as the companion -- the visit ran again as the leader's.
+	if (g.shopLeadBack && !ShopBusy(t)) {
+		g.shopLeadBack = false;
 		if (!g.suspended) GiveBackLead(t);   // no suspension to resume from any more
 	}
 	g.shopping = shopping;
