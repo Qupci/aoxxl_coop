@@ -1525,6 +1525,70 @@ const Step kComboDrain[] = {
 	END(41500),
 };
 
+// shopboss (-Level 2, sector 10): player 1's Asterix at the merchant, player 2's
+// Obelix walks east into the boss's zone (cutscene; xxl_coop.cinematic+shop.log):
+// the shop closes, Asterix is brought to Obelix, and after the cutscene both
+// cameras follow their heroes (not the shop's).
+const Step kShopBoss[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1647.88f, -744.5f, -1208.53f), PLACEAT(3000, HERO_OBELIX, 1663.5f, -743.3f, -1211.1f),
+	PLACEAT(3400, HERO_ASTERIX, 1647.88f, -744.5f, -1208.53f), PLACEAT(3400, HERO_OBELIX, 1663.5f, -743.3f, -1211.1f),
+	SECTORS(3600),
+	{ 4000, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(4500, PAD_X, 0, 0, "p1 X"), P1(4700, 0, 0, 0, "p1 release"),
+	P1(8000, PAD_X, 0, 0, "p1 X (words)"), P1(8200, 0, 0, 0, "p1 release"),
+	SHOT(9500, "shopboss_1"),
+	GLIDEAT(10000, HERO_OBELIX, 1685.0f, -743.8f, -1211.0f, 3000),
+	SHOT(14000, "shopboss_2"),
+	SHOT(24000, "shopboss_3"),
+	P1(25000, 0, 0, 1.0f, "p1 walks"), VPAD(25000, 1, 0, 0, -1.0f, "p2 walks"),
+	P1(26500, 0, 0, 0, "p1 stops"), VPAD(26500, 1, 0, 0, 0, "p2 stops"),
+	SHOT(27500, "shopboss_4"),
+	END(28000),
+};
+
+// shopsas (level 2): player 1's Asterix at LV2-1's merchant, player 2's Obelix
+// goes through the Sas into sector 2 -- the shop closes, the catch-up brings
+// Asterix over; then Obelix starts the launcher with Asterix by it.
+const Step kShopSas[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
+	P1(7500, PAD_X, 0, 0, "p1 X (words)"), P1(7700, 0, 0, 0, "p1 release"),
+	SHOT(9000, "shopsas_1"),
+	{ 9500, S_PLACE, HERO_OBELIX, 10, 0, 0, 0, "obelix into the sas (sector 2)" },
+	{ 11000, S_PLACE, HERO_OBELIX, 11, 0, 0, 0, "obelix before the rectangles" },
+	GLIDEAT(11500, HERO_OBELIX, -819.0f, 532.0f, -987.0f, 1200),
+	SHOT(14000, "shopsas_2"), SHOT(15800, "shopsas_2b"),
+	{ 16000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "asterix next to the launcher" },
+	{ 16000, S_PLACE, HERO_OBELIX, 17, 0, 0, 0, "obelix on the launcher" },
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17700, 1, 0, 0, 0, "p2 release"),
+	SHOT(20000, "shopsas_3"),
+	SHOT(40000, "shopsas_4"),
+	END(40500),
+};
+// shopsas0: shopsas without the shop (the cameras after the Sas and catch-up).
+const Step kShopSas0[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+			SHOT(9000, "shopsas0_1"),
+	{ 9500, S_PLACE, HERO_OBELIX, 10, 0, 0, 0, "obelix into the sas (sector 2)" },
+	{ 11000, S_PLACE, HERO_OBELIX, 11, 0, 0, 0, "obelix before the rectangles" },
+	GLIDEAT(11500, HERO_OBELIX, -819.0f, 532.0f, -987.0f, 1200),
+	SHOT(14000, "shopsas0_2"), SHOT(15800, "shopsas0_2b"),
+	{ 16000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "asterix next to the launcher" },
+	{ 16000, S_PLACE, HERO_OBELIX, 17, 0, 0, 0, "obelix on the launcher" },
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17700, 1, 0, 0, 0, "p2 release"),
+	SHOT(20000, "shopsas0_3"),
+	SHOT(40000, "shopsas0_4"),
+	END(40500),
+};
+
 // shopjoin (level 2): single player at the merchant, player 2 presses Start --
 // refused while the shop is open; after leaving it, Start joins.
 const Step kShopJoin[] = {
@@ -3073,6 +3137,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("swingundo", kSwingUndo),
 	SCENARIO("lockagain", kLockAgain),
 	SCENARIO("shopjoin", kShopJoin),
+	SCENARIO("shopsas", kShopSas),
+	SCENARIO("shopsas0", kShopSas0),
+	SCENARIO("shopboss", kShopBoss),
 	SCENARIO("combodrain", kComboDrain),
 	SCENARIO("shopzone", kShopZone),
 	SCENARIO("shopsave", kShopSave),

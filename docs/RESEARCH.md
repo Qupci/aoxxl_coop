@@ -1621,3 +1621,14 @@ both halves).
   "full" with an empty gauge, hits went nowhere, the bar hidden until the hero led again. Fixed (autotest
   combodrain: log line). Game manager +0x160 bits 2 (a hit filled the full gauge) and 4 (a combo spent,
   FUN_00493810) are taken by the combo bar's state 4 (FUN_00518190) -- now per hero in Stats.
+- Round 71 (user: xxl_coop.cinematic+shop.log): LV2-10's boss zone crossed by the other player while one shops: the
+  cutscene's camera (plain CKCamera 6245BC) had taken the camera service before the bars closed the shop, and the
+  hand-back (SetTarget + new track +0x48) went into the cutscene's camera; the cutscene's end went back to the shop's
+  track (sh +0x118, which the shop's start put in svc +0x34: FUN_004BF6C0), so both views stayed on the shop. Now the
+  hand-back waits until svc +0x38 is the shop's track again (WatchShopCamera; a camera copy on it starts over), aimed
+  at the live camera's hero. The shopper is brought to the other hero when a cutscene closes the shop (game then
+  places the companion by the leader). The shop also closes for trio 0x4804 (launcher / lifter: companion to its
+  marker), 0x4807 (boat, once not refused), 0x480A..0x480F (slide and other rides) and when the streaming leaves the
+  shopper behind (sector catch-up brings it over); not for cable cars (0x4812) or light pillars (0x4802/0x4803).
+  Autotests shopboss (boss zone), shopsas (Sas to LV2 sector 2; shopsas0 = same without the shop -- the cameras in
+  its screenshots right after the scripted jumps look the same either way, the user saw it fine live).

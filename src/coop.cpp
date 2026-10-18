@@ -48,6 +48,7 @@ static void WatchLifterHint(Trio t);
 static bool GunSolo(Trio t);
 static void JoinGun(Trio t, const char* why);
 static void GiveBackLead(Trio t);
+void CloseShopFor(const char* why);
 
 namespace {
 
@@ -139,6 +140,10 @@ struct CoopState {
 	int      indivPrev = -1;            // individual heroes: whose stats were in place before the tick
 	char*    closedShop = nullptr;
 	int      shopCloseCheck = 0;        // frames until the forced close's result is logged
+	char*    shopCamPending = nullptr;  // a forced close met another camera (a cutscene's): hand back once the shop's is up again
+	DWORD    shopCamSince = 0;
+	int      shopClosedHero = -1;       // the shopper of the last forced close, and when
+	DWORD    shopClosedAt = 0;
 	bool     shopLeadBack = false;      // the merchant's visit over: the lead goes back once the shopper is out
 	bool     shopForcedClosed = false;  // the merchant closed for the other player's dialogue (until the shopper is out)
 } g;
@@ -1115,6 +1120,11 @@ static void WatchSectors(Trio t, DWORD now) {
 		    g_sec.sector[HERO_ASTERIX], g_sec.sector[HERO_OBELIX]);
 		for (int i : idx) g_sec.leftBehind[i] = g_sec.sector[i] != cur;
 		g_sec.lastCur = cur;
+		// The streaming moved on from a player at the merchant (the other walked
+		// through a Sas): the visit ends, and the catch-up brings the shopper over.
+		if (g.p2Joined && g.shopping && !g.shopForcedClosed && g.shopper >= 0 && g.shopper < HERO_COUNT &&
+		    g_sec.leftBehind[g.shopper])
+			CloseShopFor("the other player's sector change");
 		g_sec.zoneHero = -1;
 	}
 	// Heroes together are in the same place: whatever the game did to put them
@@ -1348,6 +1358,18 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 		Log("coop: trio event %04X (the sidekick runs ahead from the boss) dropped: each player runs their own hero", ev & 0xFFFF);
 		return true;
 	}
+	// What takes "the companion" along -- a launcher's or lifter's call to its
+	// marker (0x4804), a ride (the boat 0x4807, the belly slide and the other
+	// modes 0x480A..0x480F) -- with the other player at the merchant: the visit
+	// ends first (the shopper is in the shop's situation, out of the game's reach).
+	// Cable cars (0x4812) and light pillars (0x4802 / 0x4803) wait for both
+	// players instead, so the shop stays.
+	if (t && t.raw() == (char*)trio && g.p2Joined && g.shopping && !g.shopForcedClosed &&
+	    (lo == 0x4804 || lo == 0x4807 || (lo >= 0x480A && lo <= 0x480F)) && ShopBusy(t)) {
+		char why[64];
+		sprintf(why, "the other player's ride / launcher (trio event %04X)", lo);
+		CloseShopFor(why);
+	}
 	if (!t || t.raw() != (char*)trio || !IsLeaderSwitch(ev)) return false;
 	// The same while a player is at the merchant (the shop pauses the world in
 	// single player; in co-op the other player plays on): LV2-10's zone by the
@@ -1382,6 +1404,48 @@ static void SendDeferredSwitch() {
 // ends first, as the shop ends it itself after the goodbye (state 4): state 0
 // (FUN_004C1040, thiscall(shop, state): the state's exit and entry), then trio
 // 0x5124 ("done": the shopper's situation 0x0A ends).
+// The camera back as the shop's leaving state's entry gives it (FUN_004C1B90(1)):
+// the camera service's +0x34 / +0xE0 from the shop's +0x11C / +0x120, its target
+// (CKSrvCamera::SetTarget 0x459050, thiscall(target, seconds, cut)) `target`, the
+// new track's position the one kept at the visit's start (+0x1B0). Without it the
+// camera stayed the shop's: through the other player's save menu and after it.
+static void HandBackShopCamera(char* cs, char* sh, void* target) {
+	*(uint32_t*)(cs + 0xC) |= 0x400;
+	*(uint32_t*)(cs + 0xE0) = *(uint32_t*)(sh + 0x120);
+	*(uint32_t*)(cs + 0x34) = *(uint32_t*)(sh + 0x11C);
+	*(uint8_t*)(cs + 0xE4) = 0;
+	((void(__fastcall*)(char*, void*, void*, float, char))0x459050)(cs, nullptr, target, 1.0f, 0);
+	if (char* tr = *(char**)(cs + 0x38)) memcpy(tr + 0x48, sh + 0x1B0, 12);
+	Log("coop: the merchant's camera handed back (track now %p)", *(void**)(cs + 0x38));
+}
+
+// A forced close met a cutscene's camera: once the game's camera is back on the
+// shop's (the cutscene's end goes back to the camera it took over -- both
+// players' views stayed on the shop), it is handed back, aimed at the hero whose
+// camera it is; a player's copy on the shop's camera starts over.
+static void WatchShopCamera(Trio t) {
+	char* sh = g.shopCamPending;
+	if (!sh || !t) return;
+	if (!g.p2Joined || ShopBusy(t) || GetTickCount() - g.shopCamSince > 120000) { g.shopCamPending = nullptr; return; }
+	void* shopTrack = *(void**)(sh + 0x118);
+	for (int h = 0; h < 2; h++) {
+		const char* c = GameCamCopyState(h);
+		if (c && *(void* const*)(c + 0x38) == shopTrack) {
+			GameCamDropCopy(h);
+			Log("coop: %s's camera copy was on the merchant's camera -- it starts over", HeroName(h));
+		}
+	}
+	char* cs = CameraService();
+	if (!cs || *(void**)(cs + 0x38) != shopTrack) return;
+	int who = GameCamLiveHero();
+	if (who < 0) who = t.Leader();
+	Hero h = who >= 0 && who < 2 ? t.GetHero(who) : Hero();
+	void* target = h ? *(void**)(h.raw() + 0x10) : *(void**)(sh + 0x19C);
+	g.shopCamPending = nullptr;
+	Log("coop: the game's camera is back on the merchant's after the cutscene -- handed back to %s", HeroName(who));
+	HandBackShopCamera(cs, sh, target);
+}
+
 void CloseShopFor(const char* why) {
 	Trio t = GetTrio();
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); t && i < n && i < 16; i++) {
@@ -1408,20 +1472,25 @@ void CloseShopFor(const char* why) {
 		// player's save menu and after it (player 2's half, LV2-10).
 		// The game's camera is the shopper's (a leader switch waits for the visit's
 		// end); if it is the other player's, the shop's camera is in the copy, which
-		// starts over from the game's camera, aimed at its own hero.
+		// starts over from the game's camera, aimed at its own hero. A cutscene that
+		// has already taken the camera (the other player's boss zone, LV2-10) goes
+		// back to the shop's when it ends: handed back then (WatchShopCamera) --
+		// handing back now wrote the shop's place into the cutscene's own camera.
 		int live = GameCamLiveHero();
+		char* cs = CameraService();
 		if (live >= 0 && live != g.shopper) {
 			GameCamDropCopy(g.shopper);
 			Log("coop: the merchant's camera was in %s's copy -- the copy starts over", HeroName(g.shopper));
-		} else if (char* cs = CameraService(); cs && *(void**)(sh + 0x118)) {
-			*(uint32_t*)(cs + 0xC) |= 0x400;
-			*(uint32_t*)(cs + 0xE0) = *(uint32_t*)(sh + 0x120);
-			*(uint32_t*)(cs + 0x34) = *(uint32_t*)(sh + 0x11C);
-			*(uint8_t*)(cs + 0xE4) = 0;
-			((void(__fastcall*)(char*, void*, void*, float, char))0x459050)(cs, nullptr, *(void**)(sh + 0x19C), 1.0f, 0);
-			if (char* tr = *(char**)(cs + 0x38)) memcpy(tr + 0x48, sh + 0x1B0, 12);
-			Log("coop: the merchant's camera handed back (track now %p)", *(void**)(cs + 0x38));
+		} else if (cs && *(void**)(sh + 0x118) && *(void**)(cs + 0x38) == *(void**)(sh + 0x118)) {
+			HandBackShopCamera(cs, sh, *(void**)(sh + 0x19C));
+		} else if (cs && *(void**)(sh + 0x118)) {
+			g.shopCamPending = sh;
+			g.shopCamSince = GetTickCount();
+			Log("coop: the merchant's camera is not up (track %p) -- handed back once the game goes back to it",
+			    *(void**)(cs + 0x38));
 		}
+		g.shopClosedHero = g.shopper;
+		g.shopClosedAt = GetTickCount();
 		// and the leaving state's exit (state 5, FUN_004C1B90(2, x), thiscall ret 8),
 		// which the natural end goes through: the world unpaused and the game manager's
 		// "at the merchant" bit (+0x5C 0x4000000: the shop's screen, bars) cleared
@@ -1600,6 +1669,24 @@ static void BringAlongForBossRun(Trio t) {
 static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 	CKYellowPages* yp = YellowPages();
 	char* srv = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	// The cutscene closed a player's shop: the other player set it off (the boss
+	// zone in LV2-10) -- the shopper comes along, as in single player the one who
+	// crossed it would have been the whole trio.
+	if (g.shopClosedHero >= 0 && GetTickCount() - g.shopClosedAt < 3000) {
+		int shopper = g.shopClosedHero, other = shopper == g.p1Hero ? g.p2Hero : g.p1Hero;
+		g.shopClosedHero = -1;
+		Hero s = t.GetHero(shopper), o = other >= 0 ? t.GetHero(other) : Hero();
+		if (s && o && !g.held[shopper] && (s.Pos() - o.Pos()).len2() >= 6.0f * 6.0f) {
+			Vector3 to = o.Pos();
+			to.y += 1.0f;
+			SetHeroPosition(s, to);
+			ProximityForgetMove(s.hook->node, &to.x);
+			Log("coop: cutscene while %s was at the merchant: brought to %s at (%.1f %.1f %.1f)", HeroName(shopper),
+			    HeroName(other), to.x, to.y, to.z);
+			g.storyZoneHero = -1;
+			return;
+		}
+	}
 	// The cutscene's zone is bound to one hero and the other set it off (level 2's
 	// boss: Asterix's zone crossed by player 2's Obelix, who the game then walks
 	// to his marker): the zone's own hero is brought to the one that crossed it.
@@ -1922,6 +2009,7 @@ void CoopFrame() {
 	// The lead back once the shopper is out of the shop's situation too: given
 	// back on the goodbye's last frames, the hero reset through the AI went back
 	// in (0x48EF) as the companion -- the visit ran again as the leader's.
+	WatchShopCamera(t);
 	if (g.shopLeadBack && !ShopBusy(t)) {
 		g.shopLeadBack = false;
 		if (!g.suspended) GiveBackLead(t);   // no suspension to resume from any more
