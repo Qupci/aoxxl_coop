@@ -50,6 +50,7 @@ DWORD WINAPI WatchdogThread(LPVOID) {
 			long ca = g_hookCounters.asterixTicks;
 			long co = g_hookCounters.obelixTicks;
 			long cr = g_hookCounters.p2Routed;
+			long framesNow = ci - lastInput;
 			static long lastSplit = 0, lastProx = 0;
 			long cs = SplitFrames();
 			long cp = ProximitySlices();
@@ -67,6 +68,19 @@ DWORD WINAPI WatchdogThread(LPVOID) {
 			lastProx = cp;
 			lastInput = ci; lastAst = ca; lastObe = co; lastRouted = cr;
 
+			// Closing the window sometimes hangs in the game's own shutdown (its
+			// sound / C runtime teardown: the game thread waits on a lock for good,
+			// the process stays with no window). With the game manager gone after a
+			// level was up and no frame for 10 s, the shutdown is over as far as
+			// anyone can tell: the process ends.
+			static bool s_levelSeen = false;
+			static int s_deadTicks = 0;
+			if (curLevel >= 0) s_levelSeen = true;
+			s_deadTicks = s_levelSeen && !gm && framesNow == 0 ? s_deadTicks + 1 : 0;
+			if (s_deadTicks >= 5) {
+				Log("watch: the game has been shutting down for 10 s without a frame -- the process ends here");
+				TerminateProcess(GetCurrentProcess(), 0);
+			}
 			RenderProbeTick();
 			VtProfileReport();
 			if (curLevel < 0) return;   // in the menus, nothing else is live

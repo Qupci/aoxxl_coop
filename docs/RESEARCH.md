@@ -1632,3 +1632,15 @@ both halves).
   shopper behind (sector catch-up brings it over); not for cable cars (0x4812) or light pillars (0x4802/0x4803).
   Autotests shopboss (boss zone), shopsas (Sas to LV2 sector 2; shopsas0 = same without the shop -- the cameras in
   its screenshots right after the scripted jumps look the same either way, the user saw it fine live).
+- Round 72 (user: xxl_coop.shop+boss_tp.log, xxl_coop.shop+launcher.log): LV2-10's boss run (zone 00A0, no cutscene
+  once the boss's cutscene has played) brought the shopper along with its shop still up: BringAlongForBossRun now
+  closes the shop first (autotest shopbossrun). LV4-5 launcher with player 1 in the item menu: player 1's pad dead
+  after the landing. The menu (FUN_004BFAD0) turns the gameplay bindings off (FUN_00437F10 group 0; per binding +4)
+  and its exit (state 3's handler 0x4C1A40, mode 2 -> FUN_004C0200) on again -- but the forced close ran inside
+  Obelix's tick (player 2's X on the launcher -> 0x4804), when CKInput +0x18 is player 2's copy of the bindings
+  (hold times), so the "on" was thrown away with the copy. Now whatever the game changes in the copy during player
+  2's tick (all but +0x18..+0x1B) goes back to the real table (autotest shoplaunch4). Lifters do not send 0x4804
+  (every 0x4804 in the test logs came from 0x49C699 with a launcher; LV2-1's lifter waits for both players): the shop
+  stays (autotest shoplift). Closing the window could hang in the game's own shutdown (game thread waiting in its C
+  runtime / DirectSound teardown, seen in older sessions too): the watchdog ends the process after 10 s with the game
+  manager gone and no frames.

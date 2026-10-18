@@ -1358,8 +1358,8 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 		Log("coop: trio event %04X (the sidekick runs ahead from the boss) dropped: each player runs their own hero", ev & 0xFFFF);
 		return true;
 	}
-	// What takes "the companion" along -- a launcher's or lifter's call to its
-	// marker (0x4804), a ride (the boat 0x4807, the belly slide and the other
+	// What takes "the companion" along -- a launcher's call to its marker
+	// (0x4804; lifters do not send it, they wait for both players), a ride (the boat 0x4807, the belly slide and the other
 	// modes 0x480A..0x480F) -- with the other player at the merchant: the visit
 	// ends first (the shopper is in the shop's situation, out of the game's reach).
 	// Cable cars (0x4812) and light pillars (0x4802 / 0x4803) wait for both
@@ -1649,6 +1649,9 @@ static void BringAlongForBossRun(Trio t) {
 	if (!h || !o) return;
 	float apart = sqrtf((h.Pos() - o.Pos()).len2());
 	if (apart < 6.0f) return;
+	// At the merchant: the visit ends first (it went along in the shop's
+	// situation, the shop still up in that player's half).
+	if (g.shopping && !g.shopForcedClosed && g.shopper == other) CloseShopFor("the other player's boss run");
 	if (g.held[other]) {
 		Log("coop: %s woke the boss; %s is busy with the game (not brought along)", HeroName(by), HeroName(other));
 		return;
@@ -2027,6 +2030,14 @@ void CoopFrame() {
 			static int s_told;
 			if (s_told++ < 8) Log("coop: player 1's controls back on during player 2's shopping");
 		}
+	}
+	{
+		// player 1's gameplay bindings on / off (FUN_00437F10 group 0), when it changes
+		InputManager im = GetInputManager();
+		static int s_bindOn = -1;
+		int on = im && im.Binding(0) ? *(uint8_t*)(im.Binding(0) + 4) != 0 : -1;
+		if (on != s_bindOn && on >= 0) Log("coop: player 1's gameplay bindings %s", on ? "on" : "off");
+		s_bindOn = on;
 	}
 	if (!g.suspended) TwisterNearness(t, h1, h2);
 	// The fused tornado is one: one screen while it lasts (the heroes stay the
@@ -2861,7 +2872,26 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	if (g.swapped) {
 		InputManager im = GetInputManager();
 		if (im) *(uint8_t**)(im.raw() + 0x1C) = g.savedValues;
-		if (im && g.savedBindings) *(char**)(im.raw() + 0x18) = g.savedBindings;
+		if (im && g.savedBindings) {
+			// What the game changed in the copy during the tick is the real table's:
+			// a menu's FUN_00437F10 turning the gameplay bindings on (+4) -- the
+			// merchant's shop closed by player 2's X on a launcher (0x4804 in Obelix's
+			// tick) left player 1's controls off for good. Only the hold times
+			// (+0x18) are player 2's own.
+			char* copy = *(char**)(im.raw() + 0x18);
+			unsigned nb = *(uint8_t*)(im.raw() + 0x3A);
+			int changed = 0;
+			for (unsigned i = 0; copy && copy != g.savedBindings && i < nb; i++)
+				for (unsigned k = 0; k < 0x20; k++) {
+					if (k >= 0x18 && k < 0x1C) continue;
+					char& real = g.savedBindings[i * 0x20 + k];
+					if (real != copy[i * 0x20 + k]) { real = copy[i * 0x20 + k]; changed++; }
+				}
+			static int s_told;
+			if (changed && s_told++ < 8)
+				Log("coop: the game changed the bindings during %s's tick (%d bytes) -- kept", HeroName(heroIndex), changed);
+			*(char**)(im.raw() + 0x18) = g.savedBindings;
+		}
 		g.savedBindings = nullptr;
 		g.swapped = false;
 	}
