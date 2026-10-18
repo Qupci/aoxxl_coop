@@ -1595,3 +1595,10 @@ both halves).
   "car within 12 units of the rider" missed far pulls; the car nearest the rider at the lock is kept and reset.
   Autotest cabled33 (-Level 3, pull to x 287). A fallen rider (Asterix) stays in the car; Obelix can take the rope
   again (user: fine as is).
+- Round 69 (user: LV2-10 shop + save point, xxl_coop.broken_merchant.log): P2 opened the save point's menu
+  (CKHkAsterixCheckpoint 2,193) while P1 shopped: bars + gm +0x5C bit 20, co-op suspended with the shop still open;
+  after the menu the shop's camera stayed in P2's half and P1's shop input was gone. Now bars while shopping close the
+  shop first (CloseShopFor, as for the spy's dialogue) -- autotest shopsave (-Level 2 sector 10; the save menu does
+  not take the autotest's P1 values or keyboard keys: closed by hand). Joining while a shop is open is refused
+  (CoopAllowedNow "at the merchant"; autotest shopjoin). Revive 5 s (was 8). Lifter "waits for" hint after 4 s.
+  Keyboard P2: center_camera key (R3), default R in the shipped ini.

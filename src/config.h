@@ -41,9 +41,9 @@ struct CoopConfig {
 	bool  keyboard      = true;
 	enum { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_LOOK_UP, KEY_LOOK_DOWN, KEY_LOOK_LEFT,
 	       KEY_LOOK_RIGHT, KEY_JUMP, KEY_ATTACK, KEY_GRAB, KEY_DASH, KEY_LB, KEY_RB, KEY_START,
-	       KEY_BACK, KEY_COUNT };
+	       KEY_BACK, KEY_CENTER_CAMERA, KEY_COUNT };
 	int   keys[KEY_COUNT] = { 'W', 'S', 'A', 'D', 0x26, 0x28, 0x25, 0x27, 0x20, 'J', 'K', 'L', 'U', 'O',
-	                          0x0D, 0x08 };
+	                          0x0D, 0x08, 'M' };
 
 	void Load(const char* iniPath);
 };

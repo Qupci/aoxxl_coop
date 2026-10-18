@@ -94,7 +94,7 @@ void CoopConfig::Load(const char* iniPath) {
 	keyboard = ReadBool("keyboard", "enabled", keyboard, full);
 	static const char* const kKeyNames[KEY_COUNT] = {
 		"move_up", "move_down", "move_left", "move_right", "look_up", "look_down", "look_left",
-		"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back" };
+		"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back", "center_camera" };
 	for (int i = 0; i < KEY_COUNT; i++) {
 		char kb[32] = {};
 		GetPrivateProfileStringA("keyboard", kKeyNames[i], "", kb, sizeof(kb), full);

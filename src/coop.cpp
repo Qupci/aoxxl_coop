@@ -443,6 +443,12 @@ bool CoopAllowedNow(Trio t, const char** why) {
 	if (!HeroModePlayable(a.Flags18()) || !HeroModePlayable(o.Flags18())) { *why = "scripted mode"; return false; }
 	if (a.Busy() || o.Busy()) { *why = "hero busy"; return false; }
 	if (CutsceneBars() || g.cutsceneHold > 0) { *why = "cutscene"; return false; }
+	// Joining at the merchant left the shop's camera on player 2's half for good:
+	// not while one is open (CKHkAsterixShop 2,172: state +8 bits 0-2).
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
+		char* s = (char*)GetLvlObject(2, 172, i);
+		if (s && (*(uint8_t*)(s + 8) & 7) != 0) { *why = "at the merchant"; return false; }
+	}
 	return true;
 }
 
@@ -1708,6 +1714,12 @@ void CoopFrame() {
 	// every Start after that was refused as "cutscene".
 	if (CutsceneBars()) g.cutsceneHold = kCutsceneHoldFrames;
 	else if (g.cutsceneHold > 0) g.cutsceneHold--;
+	// The other player sets off something that takes the screen while one shops
+	// (a save point's menu: bars and game manager +0x5C bit 20; the shop shows
+	// neither): the visit ends first, as for a Roman agent's dialogue. Kept open,
+	// its camera stayed on player 2's half after the save menu and player 1's
+	// menu input was gone (xxl_coop.broken_merchant.log).
+	if (g.p2Joined && g.shopping && !g.shopForcedClosed && CutsceneBars()) CloseShopFor("the save menu (or a cutscene)");
 	{
 		static bool dumped = false;
 		if (!dumped && t && getenv("XXL_DUMPBIND")) { dumped = true; TraceDumpBindings(); }
@@ -2914,9 +2926,11 @@ static void ShowJoinHint(Trio t) {
 // Hint: a lifter waiting at the bottom for the trio (CKHkLifter, 2/47: state
 // (+8 >> 1) & 3 == 0 with flag +8 bit 0) with one player's hero on its platform
 // (+0x50: the object under a hero's feet, hero +0x280, on the ground) -- in co-op
-// it waits for both (proximity.cpp).
+// it waits for both (proximity.cpp). Shown after 4 s of waiting, not at once.
 static void WatchLifterHint(Trio t) {
-	if (!g.p2Joined || g.suspended || !t) return;
+	static char* waiting = nullptr;
+	static DWORD since = 0;
+	if (!g.p2Joined || g.suspended || !t) { waiting = nullptr; return; }
 	Hero h[2] = { t.GetHero(HERO_ASTERIX), t.GetHero(HERO_OBELIX) };
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n && i < 32; i++) {
 		char* l = (char*)GetLvlObject(2, 47, i);
@@ -2927,10 +2941,13 @@ static void WatchLifterHint(Trio t) {
 			on[k] = h[k] && platform && (*(uint32_t*)(h[k].raw() + 0x384) & 7) == 0 &&
 			        *(void**)(h[k].raw() + 0x280) == platform;
 		if (on[0] == on[1]) continue;
+		if (waiting != l) { waiting = l; since = GetTickCount(); }
+		if (GetTickCount() - since < 4000) return;
 		HintShow(HINT_LIFTER, on[0] ? L"The lifter waits for Obelix\nto go up" : L"The lifter waits for Asterix\nto go up",
 		         300);
 		return;
 	}
+	waiting = nullptr;
 }
 
 // ---------------------------------------------------------------------------

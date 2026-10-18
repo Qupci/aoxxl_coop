@@ -1456,6 +1456,55 @@ const Step kHudOrder[] = {
 };
 
 
+// shopsave (-Level 2, sector 10): player 1's Asterix at the merchant
+// (1647.88 -745.09 -1208.53), player 2's Obelix opens the save point's menu
+// (1658.87 -743.84 -1216.27): the shop closes first; player 1 leaves the save
+// menu (B, left, A), then walks -- and can shop again.
+const Step kShopSave[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1647.88f, -744.5f, -1208.53f), PLACEAT(3000, HERO_OBELIX, 1658.87f, -743.3f, -1216.27f),
+	PLACEAT(3400, HERO_ASTERIX, 1647.88f, -744.5f, -1208.53f), PLACEAT(3400, HERO_OBELIX, 1658.87f, -743.3f, -1216.27f),
+	SECTORS(3600),
+	{ 4000, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(4500, PAD_X, 0, 0, "p1 X"), P1(4700, 0, 0, 0, "p1 release"),
+	P1(8000, PAD_X, 0, 0, "p1 X (words)"), P1(8200, 0, 0, 0, "p1 release"),
+	SHOT(9500, "shopsave_1"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X (save point)"), VPAD(10200, 1, 0, 0, 0, "p2 release"),
+	SHOT(12000, "shopsave_2"),
+	KEY(13000, VK_ESCAPE, 1, "esc"), KEY(13150, VK_ESCAPE, 0, "esc up"),
+	SHOT(14000, "shopsave_3"),
+	KEY(14500, VK_LEFT, 1, "left"), KEY(14650, VK_LEFT, 0, "left up"),
+	KEY(15500, VK_RETURN, 1, "enter"), KEY(15650, VK_RETURN, 0, "enter up"),
+	SHOT(17500, "shopsave_4"),
+	P1(18000, 0, 0, 1.0f, "p1 walks"), P1(19000, 0, 0, 0, "p1 stops"),
+	SHOT(19500, "shopsave_5"),
+	{ 20000, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant again" },
+	P1(20500, PAD_X, 0, 0, "p1 X"), P1(20700, 0, 0, 0, "p1 release"),
+	SHOT(23000, "shopsave_6"),
+	P1(23500, PAD_B, 0, 0, "p1 B (back)"), P1(23700, 0, 0, 0, "p1 release"),
+	SHOT(25500, "shopsave_7"),
+	END(26500),
+};
+
+// shopjoin (level 2): single player at the merchant, player 2 presses Start --
+// refused while the shop is open; after leaving it, Start joins.
+const Step kShopJoin[] = {
+	MARK(0, "baseline"),
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
+	P1(7500, PAD_X, 0, 0, "p1 X (words)"), P1(7700, 0, 0, 0, "p1 release"),
+	VPAD(9000, 1, PAD_START, 0, 0, "p2 start (shop open)"), VPAD(9200, 1, 0, 0, 0, "p2 release"),
+	SHOT(10000, "shopjoin_1"),
+	P1(11000, PAD_B, 0, 0, "p1 B (back)"), P1(11200, 0, 0, 0, "p1 release"),
+	P1(12500, PAD_B, 0, 0, "p1 B (leave)"), P1(12700, 0, 0, 0, "p1 release"),
+	SHOT(16000, "shopjoin_2"),
+	VPAD(17000, 1, PAD_START, 0, 0, "p2 start"), VPAD(17200, 1, 0, 0, 0, "p2 release"),
+	SHOT(18500, "shopjoin_3"),
+	END(19000),
+};
+
 // shopspy (level 2): player 2's Obelix at the merchant (item menu), player 1's
 // Asterix sets off the second spy: the shop closes first; then player 1's A.
 const Step kShopSpy[] = {
@@ -2985,6 +3034,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("spyrev", kSpyRev),
 	SCENARIO("swingundo", kSwingUndo),
 	SCENARIO("lockagain", kLockAgain),
+	SCENARIO("shopjoin", kShopJoin),
+	SCENARIO("shopsave", kShopSave),
 	SCENARIO("cabled33", kCableD33),
 	SCENARIO("corkdown", kCorkDown),
 	SCENARIO("beamundo", kBeamUndo),

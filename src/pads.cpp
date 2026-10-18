@@ -187,6 +187,7 @@ static void PollKeyboard(PadState& p) {
 	if (down(CoopConfig::KEY_RB))     b |= PAD_RB;
 	if (down(CoopConfig::KEY_START))  b |= PAD_START;
 	if (down(CoopConfig::KEY_BACK))   b |= PAD_BACK;
+	if (down(CoopConfig::KEY_CENTER_CAMERA)) b |= PAD_RTHUMB;
 	p.buttons  = b;
 	p.pressed  = (uint16_t)(b & ~prev);
 	p.released = (uint16_t)(prev & ~b);

@@ -27,7 +27,7 @@ struct Stats {
 struct SafeSpot { Vector3 pos; DWORD at = 0; };
 const int kSafeSpots = 8;
 
-const float kReviveSeconds = 8.0f;
+const float kReviveSeconds = 5.0f;
 const float kReviveRange = 3.0f;      // horizontally
 const float kReviveHeight = 2.5f;
 
