@@ -23,7 +23,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -2559,6 +2559,44 @@ const Step kLockCircle[] = {
 	END(13000),
 };
 
+// lockagain (level 2, XXL_DOWNAT=1:6000 XXL_UPAT=9000): lockcircle, then
+// Obelix revived and Asterix back onto the spinning platform's circle -- it must
+// set off again (undone: its "set off" bit, its pillar, its detectors).
+const Step kLockAgain[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f),
+	GLIDEAT(2500, HERO_ASTERIX, -778.45f, 516.8f, -977.28f, 1000),
+	SHOT(5000, "lockagain_1"), SHOT(7500, "lockagain_2"),
+	PLACEAT(10000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f),
+	GLIDEAT(11000, HERO_ASTERIX, -778.45f, 516.8f, -977.28f, 1000),
+	SHOT(14000, "lockagain_3"),
+	END(16000),
+};
+
+// beamundo (-Level 4 sector 2..., XXL_DOWNAT=1:7000): the hearth by the rotary
+// beam lit, Asterix onto its blue circle (he waits for Obelix), Obelix falls --
+// undone; the circle's group and what it changed are logged.
+const Step kBeamUndo[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	LOADSECTOR(600, 2),
+	PLACEAT(3000, HERO_ASTERIX, -381.93f, 3.0f, -119.07f), PLACEAT(3100, HERO_OBELIX, -384.0f, 3.0f, -125.0f),
+	PLACEAT(3500, HERO_ASTERIX, -381.93f, 3.0f, -119.07f), PLACEAT(3600, HERO_OBELIX, -384.0f, 3.0f, -125.0f),
+	{ 3800, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4000, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	{ 4300, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	PLACEAT(4600, HERO_ASTERIX, -378.5f, 3.0f, -119.07f),
+	GLIDEAT(5000, HERO_ASTERIX, -381.93f, 2.5f, -119.07f, 600),
+	P1(6200, PAD_X, 0, 0, "p1 X: light the hearth"), P1(6400, 0, 0, 0, "p1 release"),
+	SHOT(7500, "beamundo_0"),
+	GLIDEAT(8500, HERO_ASTERIX, -394.73f, 5.2f, -119.08f, 1000),
+	SHOT(11000, "beamundo_1"), SHOT(13500, "beamundo_2"),
+	PLACEAT(16000, HERO_ASTERIX, -381.93f, 3.0f, -119.07f),
+	GLIDEAT(17000, HERO_ASTERIX, -394.73f, 5.2f, -119.08f, 1000),
+	SHOT(20000, "beamundo_3"),
+	END(21000),
+};
+
 // cabled2 / spyd2 (level 2, with XXL_DOWNAT=1:1000): Obelix down, Asterix walks
 // onto the cable car / glides to the second spy three times -- each time put
 // back, the car never boarded, the talk never started.
@@ -2621,6 +2659,19 @@ const Step kSwing[] = {
 	VPAD(6400, 1, PAD_X, 0, 0, "p2 X"), VPAD(6550, 1, 0, 0, 0, "p2 release"),
 	SHOT(7000, "swing_02"),
 	END(9000),
+};
+
+// swingundo (level 2, XXL_DOWNAT=1:3500): Asterix on the cable car, Obelix
+// falls before pulling -- the car let go and back at its start, still shown.
+const Step kSwingUndo[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_OBELIX, 1, 0, 0, 0, "obelix to rope" },
+	{ 1600, S_PLACE, HERO_ASTERIX, 2, 0, 0, 0, "asterix before car" },
+	P1(1800, 0, -1, 0, "p1 left (held)"), P1(2300, 0, 0, 0, "p1 neutral"),
+	{ 2400, S_PLACE, HERO_ASTERIX, 0, 0, 0, 0, "asterix on car" },
+	SHOT(3300, "swingundo_0"), SHOT(4500, "swingundo_1"), SHOT(7000, "swingundo_2"),
+	END(8000),
 };
 
 // swingsp (level 2): the same without player 2 -- player 1 drives whoever the
@@ -2895,6 +2946,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("cabled2", kCableD2),
 	SCENARIO("spyd2", kSpyD2),
 	SCENARIO("spyrev", kSpyRev),
+	SCENARIO("swingundo", kSwingUndo),
+	SCENARIO("lockagain", kLockAgain),
+	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
@@ -3524,6 +3578,27 @@ void RunStep(const Step& s) {
 		if (!lvl) break;
 		Log("autotest: loading sector %d (current %d)", s.a, *(int*)(lvl + 0x24));
 		*(int*)(lvl + 0x34) = s.a;
+		break;
+	}
+	case S_OBJEV: {   // event b sent to the object of class (2, a) nearest Asterix
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(HERO_ASTERIX) : Hero();
+		if (!h) break;
+		char* best = nullptr;
+		float bd = 1e30f;
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, s.a); i < n; i++) {
+			char* o = (char*)GetLvlObject(2, s.a, i);
+			char* node = o ? *(char**)(o + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+			float d = (p - h.Pos()).len2();
+			if (d < bd) { bd = d; best = o; }
+		}
+		if (!best) { Log("autotest: no (2,%d) object", s.a); break; }
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		int r = ((SendEventFn)(*(void***)best)[5])(best, nullptr, s.b, nullptr);
+		Log("autotest: event %04X to (2,%d) %p, %.1f units away -> %d", s.b, s.a, best, sqrtf(bd), r);
 		break;
 	}
 	case S_NEAROBJ: {   // hero a put s.x units from the nearest object of class (2, b), facing it

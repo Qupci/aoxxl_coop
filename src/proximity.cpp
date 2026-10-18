@@ -951,6 +951,54 @@ bool GroupCommandsTrio(unsigned ev) {
 	return false;
 }
 
+// Event `ev`'s group: up to `max` targets and the message each gets.
+int GroupTargets(unsigned ev, char** objsOut, uint16_t* msgsOut, int max) {
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return 0;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return 0;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	uint16_t* msgs = *(uint16_t**)(es + 0x14);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	int k = 0;
+	for (unsigned i = 0; i < tab[group * 3] && k < max; i++, k++) {
+		objsOut[k] = objs[first + i];
+		msgsOut[k] = msgs[first + i];
+	}
+	return k;
+}
+
+// Diagnostics: an event group's targets (object, vtable, message), once per event.
+void DumpGroup(unsigned ev) {
+	static unsigned done[64];
+	static int nDone = 0;
+	for (int i = 0; i < nDone; i++) if (done[i] == (ev & 0xFFFF)) return;
+	if (nDone < 64) done[nDone++] = ev & 0xFFFF;
+	unsigned group = (ev & 0xFFFF) >> 3;
+	CKYellowPages* yp = YellowPages();
+	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!es || group == 0x1FFF) return;
+	unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+	if (group >= n) return;
+	uint8_t* tab = *(uint8_t**)(es + 0xC);
+	char** objs = *(char***)(es + 0x10);
+	uint16_t* msgs = *(uint16_t**)(es + 0x14);
+	unsigned first = 0;
+	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	char buf[1024];
+	LineBuf line(buf);
+	line.Add("proximity: event %04X's group %03X:", ev & 0xFFFF, group);
+	for (unsigned k = 0; k < tab[group * 3]; k++) {
+		char* o = objs[first + k];
+		line.Add(" %p(vt %06X)<-%04X", (void*)o, o ? (unsigned)*(uintptr_t*)o : 0, msgs[first + k]);
+	}
+	Log("%s", line.c_str());
+}
+
 // Does event `ev`'s group need both heroes: command the trio (above), or start a
 // ride / scripted mode for both (trio 0x4806, 0x4807, 0x480B..0x480F: the belly
 // slide's cross detector, LV2-2 z -903.8, sends 0x480B)?
@@ -1496,12 +1544,18 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
 		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
 	}
+	// (a blue circle's, a spinning platform's...: the level as it was, should
+	// the lock it starts need undoing)
+	static const bool dumpAll = getenv("XXL_DUMPGROUPS") != nullptr;   // diagnostics
+	if (dumpAll) DumpGroup(eventId);
+	if (GroupCommandsTrio(eventId)) { CoopNoteTrioEventFlagged(eventId); DumpGroup(eventId); }
 	g_origFlagEvent(self, edx, eventId);
 }
 
 } // namespace
 
 long ProximityP2Contacts() { return g_p2Contacts; }
+int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max) { return GroupTargets(ev, objs, msgs, max); }
 bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;

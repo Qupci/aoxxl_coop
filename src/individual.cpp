@@ -53,6 +53,7 @@ struct State {
 	DWORD    recentAt = 0;
 	Vector3  frameStart[2];   // each hero's place when the frame began
 	DWORD    noSafeUntil[2] = {};
+	DWORD    placedAt[2] = {};      // last put somewhere by this file
 	DWORD    onLauncherAt[2] = {};  // last seen where a launcher offers itself
 	DWORD    blockedAt[2] = {};     // last put back from something that needs both heroes
 	Vector3  blockedTo[2];          // ... to there   // just put back: no new safe spot (it would be the lifted place)
@@ -284,6 +285,7 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 		Log("indiv: %s's place before %s is %.0f units back -- the trail", HeroName(up), what, len);
 		return IndivBlockPartnerSpot(what);
 	}
+	if (len < 0.05f && GetTickCount() - g.placedAt[up] < 1000) return true;   // just put here by us: stays
 	if (len < 0.05f) {   // not moving in (already there): the trail
 		Log("indiv: %s did not move into %s (%.1f %.1f %.1f) -- the trail", HeroName(up), what, now.x, now.y, now.z);
 		return IndivBlockPartnerSpot(what);
@@ -293,6 +295,7 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	spot.y = before.y + 0.3f;
 	ForgetRecentSpots(up, GetTickCount());
 	PlaceHero(h, spot);
+	g.placedAt[up] = GetTickCount();
 	g.noSafeUntil[up] = GetTickCount() + 1000;
 	if (h.hook->node) {
 		float at[3] = { spot.x, spot.y, spot.z };
@@ -309,6 +312,7 @@ void IndivPutOnSafeGround(int hero) {
 	if (!h || !SafeSpotAway(hero, h.Pos(), &spot)) return;
 	spot.y += 0.5f;
 	PlaceHero(h, spot);
+	g.placedAt[hero] = GetTickCount();
 	if (h.hook->node) {
 		float at[3] = { spot.x, spot.y, spot.z };
 		ProximityForgetMove(h.hook->node, at);
@@ -334,6 +338,7 @@ bool IndivBlockPartnerSpot(const char* what) {
 	if (!h || !SafeSpotAway(up, h.Pos(), &spot)) return false;
 	spot.y += 0.5f;
 	PlaceHero(h, spot);
+	g.placedAt[up] = GetTickCount();
 	g.noSafeUntil[up] = GetTickCount() + 1000;
 	if (h.hook->node) {
 		float at[3] = { spot.x, spot.y, spot.z };

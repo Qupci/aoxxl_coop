@@ -14,6 +14,7 @@
 // unless the object itself changed it (a blue-circle switch).
 
 #pragma once
+#include <cstdint>
 
 bool ProximityInstallHooks();
 
@@ -27,6 +28,8 @@ bool ProximityBossRunDropsWalk(int ev);
 void ProximityForgetMove(void* heroNode, const float at[3]);
 // Does event `ev`'s group command the trio (switch the leader, order the companion)?
 bool ProximityGroupCommandsTrio(unsigned ev);
+// Event `ev`'s group: up to `max` targets and the message each gets; the count.
+int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max);
 // A Roman passed to hero `receiver` (LB): it ticks with that hero as the trio
 // leader while it flies (state 4).
 void ProximityPassTo(char* roman, int receiver);

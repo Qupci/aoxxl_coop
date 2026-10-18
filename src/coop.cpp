@@ -209,12 +209,29 @@ bool IsScriptedOrder(int o) {
 // byte entries, counts at +4, bit 0 of byte 4) are kept: the lock disables its
 // own box (a blue circle: "Disable Enter Bounding Box detector") and enables the
 // ones that finish it.
-struct LockState {
-	int     hero = -1;           // the locked hero
+// A locked sequence's "before" picture, so it can be undone (the waiting hero's
+// partner fell): the detectors' enable bits, the state flags (+8) of blue
+// circles (CKHkPressionStone 2,21) and spinning platforms (CKHkCorkscrew 2,44:
+// bit 0 "set off", cleared only when its turn ends), and the event that set it
+// off -- its group switched the circle's light (CKHkLightPillar 2,60: 0x900 on,
+// 0x901 off), switched back on undo. (Models aren't put back wholesale: crates
+// broken meanwhile came back.) Taken when an event that commands the trio is
+// flagged (FUN_00460C20), before its group runs; a lock noted soon after keeps
+// that picture.
+struct LockPicture {
 	size_t  n = 0;
 	uint8_t bits[4096];
-	DWORD   since = 0;
+	unsigned event = 0xFFFF;
+	struct Flags { char* hook; uint32_t f; } flags[256];
+	size_t  nFlags = 0;
+	DWORD   at = 0;
+};
+struct LockState {
+	int         hero = -1;           // the locked hero
+	DWORD       since = 0;
+	LockPicture pic;
 } g_lock;
+LockPicture g_prePic;
 
 static char* DetectionService() {
 	CKYellowPages* yp = YellowPages();
@@ -222,41 +239,81 @@ static char* DetectionService() {
 	return det && *(uintptr_t*)det == 0x62504C ? det : nullptr;
 }
 
-static void NoteLock(int hero, const char* why) {
-	char* det = DetectionService();
-	// (the same lock noted twice -- its 0x4802, then the held order -- keeps the
-	// first picture, taken before the lock turned its own box off)
-	if (!det || hero < 0 || (g_lock.hero == hero && GetTickCount() - g_lock.since < 60000)) return;
-	size_t k = 0;
-	const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
-	for (int b : bases) {
-		char* e = *(char**)(det + b);
-		unsigned n = *(uint16_t*)(det + b + 4);
-		for (unsigned i = 0; e && i < n && k < sizeof(g_lock.bits); i++) g_lock.bits[k++] = (uint8_t)e[8 * i + 4];
+static void TakePicture(LockPicture& p) {
+	p.n = p.nFlags = 0;
+	p.event = 0xFFFF;
+	p.at = GetTickCount();
+	if (char* det = DetectionService()) {
+		const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+		for (int b : bases) {
+			char* e = *(char**)(det + b);
+			unsigned n = *(uint16_t*)(det + b + 4);
+			for (unsigned i = 0; e && i < n && p.n < sizeof(p.bits); i++) p.bits[p.n++] = (uint8_t)e[8 * i + 4];
+		}
 	}
-	g_lock.n = k;
+	static const unsigned kCircleIds[] = { 21, 44 };
+	for (unsigned id : kCircleIds)
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n; i++) {
+			char* o = (char*)GetLvlObject(2, id, i);
+			if (!o) continue;
+			if (p.nFlags < 256) p.flags[p.nFlags++] = { o, *(uint32_t*)(o + 8) };
+		}
+}
+
+void NoteTrioEventFlagged(unsigned eventId) {
+	if (!g.p2Joined) return;
+	TakePicture(g_prePic);
+	g_prePic.event = eventId & 0xFFFF;
+}
+
+static void NoteLock(int hero, const char* why) {
+	// (the same lock noted twice -- its 0x4802, then the held order -- keeps the
+	// first picture)
+	if (hero < 0 || (g_lock.hero == hero && GetTickCount() - g_lock.since < 60000)) return;
+	bool pre = g_prePic.at && GetTickCount() - g_prePic.at < 3000;
+	if (pre) g_lock.pic = g_prePic;
+	else TakePicture(g_lock.pic);
+	g_prePic.at = 0;
 	g_lock.hero = hero;
 	g_lock.since = GetTickCount();
-	Log("coop: %s locked by the level (%s) -- %u detectors kept", HeroName(hero), why, (unsigned)k);
+	Log("coop: %s locked by the level (%s) -- %u detectors, %u circles kept (%s %04X)", HeroName(hero), why,
+	    (unsigned)g_lock.pic.n, (unsigned)g_lock.pic.nFlags, pre ? "as before its event" : "as now", g_lock.pic.event);
 }
 
 static void EndLock() { g_lock.hero = -1; }
 
-static void RestoreDetectors() {
-	char* det = DetectionService();
-	if (!det || !g_lock.n) return;
-	size_t k = 0;
-	int changed = 0;
-	const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
-	for (int b : bases) {
-		char* e = *(char**)(det + b);
-		unsigned n = *(uint16_t*)(det + b + 4);
-		for (unsigned i = 0; e && i < n && k < g_lock.n; i++, k++) {
-			uint8_t& f = *(uint8_t*)(e + 8 * i + 4);
-			if ((f & 1) != (g_lock.bits[k] & 1)) { f = (uint8_t)((f & ~1) | (g_lock.bits[k] & 1)); changed++; }
+static void RestoreLockPicture() {
+	const LockPicture& p = g_lock.pic;
+	int changed = 0, shown = 0, flags = 0;
+	if (char* det = DetectionService()) {
+		size_t k = 0;
+		const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+		for (int b : bases) {
+			char* e = *(char**)(det + b);
+			unsigned n = *(uint16_t*)(det + b + 4);
+			for (unsigned i = 0; e && i < n && k < p.n; i++, k++) {
+				uint8_t& f = *(uint8_t*)(e + 8 * i + 4);
+				if ((f & 1) != (p.bits[k] & 1)) { f = (uint8_t)((f & ~1) | (p.bits[k] & 1)); changed++; }
+			}
 		}
 	}
-	Log("coop: detectors as before the lock (%d switched back)", changed);
+	if (p.event != 0xFFFF) {
+		char* objs[64];
+		uint16_t msgs[64];
+		int n = ProximityGroupTargets(p.event, objs, msgs, 64);
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		for (int i = 0; i < n; i++)
+			if (objs[i] && *(uintptr_t*)objs[i] == 0x629030 && (msgs[i] == 0x900 || msgs[i] == 0x901)) {
+				((SendEventFn)(*(void***)objs[i])[5])(objs[i], nullptr, msgs[i] ^ 1, nullptr);
+				shown++;
+			}
+	}
+	for (size_t i = 0; i < p.nFlags; i++) {
+		uint32_t& f = *(uint32_t*)(p.flags[i].hook + 8);
+		if (f != p.flags[i].f) { f = p.flags[i].f; flags++; }
+	}
+	Log("coop: as before the lock: %d detectors, %d light pillars switched back, %d circles' states put back", changed, shown,
+	    flags);
 }
 
 void Hold(Trio t, int idx, const char* why) {
@@ -1292,6 +1349,8 @@ void CloseShopFor(const char* why) {
 	}
 }
 
+void CoopNoteTrioEventFlagged(unsigned eventId) { NoteTrioEventFlagged(eventId); }
+
 void CoopUndoLockFor(int fallen) {
 	int up = fallen == HERO_ASTERIX ? HERO_OBELIX : fallen == HERO_OBELIX ? HERO_ASTERIX : -1;
 	if (up < 0 || !g.p2Joined) return;
@@ -1313,11 +1372,19 @@ void CoopUndoLockFor(int fallen) {
 		Vector3 d = h.Pos() - Vector3(p[0], p[1], p[2]);
 		if (d.len2() > 12.0f * 12.0f) continue;
 		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		uint32_t f0 = *(uint32_t*)(node + 0x10), h0 = *(uint32_t*)(car + 0x7C);
 		((SendEventFn)(*(void***)car)[5])(car, nullptr, 0x512D, nullptr);
 		((void(__fastcall*)(char*, void*))(*(void***)car)[16])(car, nullptr);
-		Log("coop: the cable car %p let go of %s and went back to its start", car, HeroName(up));
+		node = *(char**)(car + 0x10);
+		fr = node ? *(char**)(node + 4) : nullptr;
+		// vf16 is its level-start init, which ends by hiding the car (node +0x10
+		// bit 1) -- the model was gone, the rope still there: shown again.
+		if (node && !(f0 & 2)) *(uint32_t*)(node + 0x10) &= ~2u;
+		Log("coop: the cable car %p let go of %s and went back to its start (node %p flags %08X -> %08X, hook +7C %08X -> %08X, "
+		    "now at %.1f %.1f %.1f)", car, HeroName(up), node, f0, node ? *(uint32_t*)(node + 0x10) : 0, h0,
+		    *(uint32_t*)(car + 0x7C), fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0, fr ? ((float*)(fr + 0x80))[2] : 0);
 	}
-	if (g_lock.hero == up) RestoreDetectors();
+	if (g_lock.hero == up) RestoreLockPicture();
 	EndLock();
 	// The hero freed: the companion moves again, it leads, and a reset pass.
 	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);

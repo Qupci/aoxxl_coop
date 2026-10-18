@@ -77,6 +77,9 @@ bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 // sequence waiting for it (a blue circle's "wait here", a cable car pulled by
 // it), the sequence is undone so the other can come and revive it.
 void CoopUndoLockFor(int fallen);
+// An event that commands the trio was just flagged (before its group runs): the
+// level's state is noted, should it lock a hero and need undoing.
+void CoopNoteTrioEventFlagged(unsigned eventId);
 uint8_t* CoopP2CameraValues();
 const uint8_t* CoopP2Values();       // player 2's hero input this frame (nullptr: none)   // player 2's input as the game camera reads it (nullptr: none)
 bool TraceInstallHooks();   // trace.cpp: event logging for interaction debugging
