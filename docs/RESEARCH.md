@@ -1568,3 +1568,20 @@ both halves).
   cars (CKHkTowedTelepher 2,159 only -- not the automatic CKHkTelepher) within 12 units get 0x512D and vf16 (back to
   the start), the detectors are set back, trio 0x4803 + the lead, the hero released (AI reset pass) and put on solid
   ground. Autotests swing / lockcircle with XXL_DOWNAT: both undone, the hero free.
+- Round 67 (crash_logs, Oct 16-17): (1) crash at level start (force_level) in CKInput_UpdateBinding 0x435A9A: a
+  binding's per-preset previous-value pointer (src +0x18 + preset*4; current one at +0x28, compared while +0x1C
+  "wait for release" is set) was null for preset 3 -- the pad-layout restore set only the value pointer (+0x10).
+  The binder (CKServiceManager::vf62) puts it one block on: device A (+4, 0xCC) +0x18, B (+8, 0x68) +0xE, C
+  (+0xC, 0x3FC) +0x90; the restore now sets both. (2) Four freezes (game thread in NtWaitForAlertByThreadId = a lock
+  wait, watchdog still logging; two right after a music stream started): cause not found -- the stall report now
+  dumps every thread (any module) and critical sections on the game thread's stack with their owner.
+  (3) A Roman agent's zone (group -> CKHkClueMan 0x5198) let through with a hero down made the spy ask the trio
+  (0x5120, dropped) and the zone never fired again -- now held back whole (GroupNeedsBoth). (4) Launcher: no longer
+  blocked; the fallen partner is revived beside the hero at it (user: a fallen hero can lie out of reach).
+  (5) Undo of locked sequences: blue circles' visual is a CKHkLightPillar (2,60; vt 0x629030) switched by the
+  circle's group (0x900 on, 0x901 off; the hearth in LV4 sector 2 sends 0x900, the circle zone 0x0008 0x901) --
+  the lock's starting event is kept (picture taken in FlagEventHook before the group runs) and its pillars get the
+  opposite message. CKHkCorkscrew (2,44) is its own circle: vf15 flags +0x40 when the leader is within +0x3C of its
+  sub node and sets +8 bit 0, cleared only when its turn ends (or 0x99C / vf20) -- its +8 is restored. Towed cable
+  car vf16 (= CKHkTelepher::vf16, its init) hides the node (+0x10 bit 1): shown again. Restoring all models'
+  hidden bits was tried and dropped (crates broken meanwhile came back).
