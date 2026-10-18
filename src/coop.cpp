@@ -1374,6 +1374,21 @@ void CloseShopFor(const char* why) {
 		((void(__fastcall*)(char*, void*, int))0x4C1040)(sh, nullptr, 0);
 		// its menu's pieces (item, price, legends: +0x28..+0x34) hidden, as its reset does
 		((void(__fastcall*)(char*, void*, int))0x4BF670)(sh, nullptr, 0);
+		// The camera back as the leaving state's entry gives it (FUN_004C1B90(1)): the
+		// camera service's +0x34 / +0xE0 from the shop's +0x11C / +0x120, its target
+		// (CKSrvCamera::SetTarget 0x459050, thiscall(target, seconds, cut)) the
+		// shop's +0x19C, the new track's position the one kept at the visit's start
+		// (+0x1B0). Without it the camera stayed the shop's: through the other
+		// player's save menu and after it (player 2's half, LV2-10).
+		if (char* cs = CameraService(); cs && *(void**)(sh + 0x118)) {
+			*(uint32_t*)(cs + 0xC) |= 0x400;
+			*(uint32_t*)(cs + 0xE0) = *(uint32_t*)(sh + 0x120);
+			*(uint32_t*)(cs + 0x34) = *(uint32_t*)(sh + 0x11C);
+			*(uint8_t*)(cs + 0xE4) = 0;
+			((void(__fastcall*)(char*, void*, void*, float, char))0x459050)(cs, nullptr, *(void**)(sh + 0x19C), 1.0f, 0);
+			if (char* tr = *(char**)(cs + 0x38)) memcpy(tr + 0x48, sh + 0x1B0, 12);
+			Log("coop: the merchant's camera handed back (track now %p)", *(void**)(cs + 0x38));
+		}
 		// and the leaving state's exit (state 5, FUN_004C1B90(2, x), thiscall ret 8),
 		// which the natural end goes through: the world unpaused and the game manager's
 		// "at the merchant" bit (+0x5C 0x4000000: the shop's screen, bars) cleared

@@ -1602,3 +1602,7 @@ both halves).
   not take the autotest's P1 values or keyboard keys: closed by hand). Joining while a shop is open is refused
   (CoopAllowedNow "at the merchant"; autotest shopjoin). Revive 5 s (was 8). Lifter "waits for" hint after 4 s.
   Keyboard P2: center_camera key (R3), default R in the shipped ini.
+  Then (user: camera still stuck): the forced close left the camera service on the shop's track, which the save menu
+  returned to. The shop's leaving-state entry (FUN_004C1B90(1)) hands it back: svc +0xC |= 0x400, +0xE0/+0x34 from
+  shop +0x120/+0x11C, +0xE4 = 0, SetTarget(shop +0x19C, 1 s) (0x459050 -- the index's "Node_FadeVisibility" is
+  CKSrvCamera::SetTarget), new track +0x48 = shop +0x1B0. Now done in CloseShopFor (user-verified with shopsave).
