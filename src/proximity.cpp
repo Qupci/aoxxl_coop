@@ -970,8 +970,12 @@ bool GroupNeedsBoth(unsigned ev) {
 	for (unsigned k = 0; k < tab[group * 3]; k++) {
 		uintptr_t vt = objs[first + k] ? *(uintptr_t*)objs[first + k] : 0;
 		if (vt == 0x6259E4) return true;   // CKAsterixSlideFP: the belly slide started (0x480B there)
-		if (vt != 0x6256A0) continue;
 		unsigned m = msgs[first + k];
+		// CKHkClueMan 0x5198: a Roman agent's talk set off by its zone. Let through
+		// with a hero down, the spy took it as its one start (its request to the
+		// trio dropped) and the zone never fired again.
+		if (vt == 0x6261F4 && m == 0x5198) return true;
+		if (vt != 0x6256A0) continue;
 		if (m == 0x4806 || m == 0x4807 || (m >= 0x480B && m <= 0x480F)) return true;
 	}
 	return false;
@@ -1471,8 +1475,10 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 					float* prevs = g_tickingDet ? *(float**)(g_tickingDet + 0x1C) : nullptr;
 					if (ni >= 0 && prevs && std::isfinite(prevs[3 * ni]))
 						IndivBlockPartnerSpotFrom("a zone that needs both heroes", prevs + 3 * ni);
-					else
+					else {
+						Log("proximity: no previous place for %s in this zone's pass (node %d, det %p) -- the trail", zh >= 0 ? HeroName(zh) : "?", ni, (void*)g_tickingDet);
 						IndivBlockPartnerSpot("a zone that needs both heroes");
+					}
 				}
 				static unsigned s_last = 0;
 				if (s_last != (eventId & 0xFFFF)) {

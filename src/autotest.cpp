@@ -2585,6 +2585,21 @@ const Step kSpyD2[] = {
 	END(16000),
 };
 
+// spyrev (level 2, XXL_DOWNAT=1:2800 XXL_UPAT=6000): the second spy's talk held
+// back while Obelix is down; revived, Asterix walks up again -- it must start.
+const Step kSpyRev[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	PLACEAT(1500, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	PLACEAT(2000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	PLACEAT(7000, HERO_ASTERIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(8000, HERO_ASTERIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(11000, "spyrev"),
+	END(13000),
+};
+
 // swing (level 2): Asterix walks onto the cable car, player 2's Obelix pulls.
 const Step kSwing[] = {
 	MARK(0, "baseline"),
@@ -2879,6 +2894,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("slideend", kSlideEnd),
 	SCENARIO("cabled2", kCableD2),
 	SCENARIO("spyd2", kSpyD2),
+	SCENARIO("spyrev", kSpyRev),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
@@ -3358,12 +3374,13 @@ void LogTick(float t) {
 		unsigned n = GetNumLvlClassInstances(2, 161);
 		for (unsigned i = 0; i < n && i < 6; i++) {
 			char* c = (char*)GetLvlObject(2, 161, i);
+			if (c && i < 3 && *(uint8_t*)(c + 0x14) & 0x80) continue;   // (the far, done ones: room for the rest)
 			char* node = c ? *(char**)(c + 0x10) : nullptr;
 			char* frame = node ? *(char**)(node + 4) : nullptr;
 			const float* p = frame ? (const float*)(frame + 0x80) : nullptr;
 			if (!c) continue;
-			line.Add(" %u:%s%s f14=%02X f15=%02X", i, node ? "node" : "-", node && (*(uint8_t*)(node + 0x10) & 2) ? "(hidden)" : "",
-			         *(uint8_t*)(c + 0x14), *(uint8_t*)(c + 0x15));
+			line.Add(" %u:%s%s f14=%02X f15=%02X f16=%02X", i, node ? "node" : "-", node && (*(uint8_t*)(node + 0x10) & 2) ? "(hidden)" : "",
+			         *(uint8_t*)(c + 0x14), *(uint8_t*)(c + 0x15), *(uint8_t*)(c + 0x16));
 			if (p) line.Add("@(%.0f %.0f %.0f)", p[0], p[1], p[2]);
 		}
 	}
@@ -4713,6 +4730,15 @@ void AutotestFrame() {
 			IndivLeave(prev);
 			bool down = IndivHeroDown(hero, "autotest XXL_DOWNAT");
 			Log("autotest: %s put down (%s)", HeroName(hero), down ? "fallen" : "not fallen");
+		}
+		// XXL_UPAT=<ms>: the fallen hero revived beside the other one then.
+		static int s_upAt = -2;
+		if (s_upAt == -2) s_upAt = getenv("XXL_UPAT") ? atoi(getenv("XXL_UPAT")) : -1;
+		if (s_upAt >= 0 && t >= s_upAt) {
+			s_upAt = -1;
+			int down = IndivFallenHero();
+			if (down >= 0) IndivReviveAtLauncher(down ^ 1);
+			Log("autotest: revive at XXL_UPAT (%s was down)", down >= 0 ? HeroName(down) : "nobody");
 		}
 	}
 	if (at.phase != AutotestState::RUN) return;

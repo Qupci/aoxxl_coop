@@ -280,7 +280,14 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	Vector3 back = before - now;
 	back.y = 0.0f;
 	float len = std::sqrt(back.len2());
-	if (len < 0.05f) return IndivBlockPartnerSpot(what);   // not moving in (already there): the trail
+	if (len > 8.0f) {   // not a frame's step: stale (a teleport) -- the trail
+		Log("indiv: %s's place before %s is %.0f units back -- the trail", HeroName(up), what, len);
+		return IndivBlockPartnerSpot(what);
+	}
+	if (len < 0.05f) {   // not moving in (already there): the trail
+		Log("indiv: %s did not move into %s (%.1f %.1f %.1f) -- the trail", HeroName(up), what, now.x, now.y, now.z);
+		return IndivBlockPartnerSpot(what);
+	}
 	Vector3 spot = before;
 	if (len > 0.001f) spot = before + back * (1.5f / len);   // a step further back than it came from
 	spot.y = before.y + 0.3f;
@@ -710,6 +717,22 @@ bool IndivStats(int hero, int* hp, int* shields, int* hits, float* gauge) {
 	if (hits) *hits = (int)s.hits;
 	if (gauge) *gauge = s.full ? s.gauge : -1.0f;
 	return true;
+}
+
+// A launcher needs both heroes and may stand where the fallen one can't be
+// reached: the hero at it revives its partner there and then.
+void IndivReviveAtLauncher(int up) {
+	if (!g.active || g.gameOver || (up != HERO_ASTERIX && up != HERO_OBELIX)) return;
+	int down = Other(up);
+	if (!g.fallen[down] || g.fallen[up]) return;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(down) : Hero();
+	Hero o = t ? t.GetHero(up) : Hero();
+	if (!h || !o) return;
+	Vector3 p = o.Pos();
+	p.y += 1.0f;
+	PlaceHero(h, p);
+	Revive(down, h, "its partner is at a launcher");
 }
 
 bool IndivHeroDown(int hero, const char* how) {

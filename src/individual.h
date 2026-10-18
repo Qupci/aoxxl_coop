@@ -66,6 +66,8 @@ bool IndivBlockPartnerSpotFrameStart(const char* what);
 void IndivPutOnSafeGround(int hero);
 // Hero `hero` stands where a launcher offers itself (its prompt): no safe spot there.
 void IndivNoteLauncherSpot(int hero);
+// Hero `hero` is at a launcher: a fallen partner is revived beside it.
+void IndivReviveAtLauncher(int hero);
 // Should this object (a hook) skip its tick now: it needs both heroes, one is
 // down, and the standing hero is at it (on its ground; within a Roman agent's
 // talk). That hero is put back too.

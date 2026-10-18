@@ -9,6 +9,8 @@ void CrashHandlerInstall();
 // Watchdog thread: call every ~2 s with the frame counter. If frames stop for
 // 6 s, the game thread is sampled once and its location logged.
 void StallCheck(long frameCounter);
+// Every thread's location and stack, and locks the game thread waits on (from StallCheck).
+void StallDumpThreads();
 
 // Game thread: call once from the frame hook so StallCheck knows whom to sample.
 void StallRegisterGameThread();

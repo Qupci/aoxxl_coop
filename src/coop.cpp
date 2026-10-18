@@ -660,11 +660,11 @@ static bool g_presetSeen = false;
 // with the face buttons shifted -- so the title's is kept in a file and put
 // back. Each binding's source (+0xC) holds a pointer per preset (+4..+0x10)
 // into the input's devices: A (+4, 0xCC each), B (+8, 0x68), C (+0xC, 0x3FC).
-struct PadDev { char* base; int count, stride; };
+struct PadDev { char* base; int count, stride, release; };
 static void PadDevices(char* in, PadDev d[3]) {
-	d[0] = { *(char**)(in + 0x04), *(uint8_t*)(in + 0x10), 0xCC };
-	d[1] = { *(char**)(in + 0x08), *(uint8_t*)(in + 0x11), 0x68 };
-	d[2] = { *(char**)(in + 0x0C), *(uint8_t*)(in + 0x12), 0x3FC };
+	d[0] = { *(char**)(in + 0x04), *(uint8_t*)(in + 0x10), 0xCC, 0x18 };
+	d[1] = { *(char**)(in + 0x08), *(uint8_t*)(in + 0x11), 0x68, 0x0E };
+	d[2] = { *(char**)(in + 0x0C), *(uint8_t*)(in + 0x12), 0x3FC, 0x90 };
 }
 
 static void SavePadLayout(char* in) {
@@ -713,7 +713,13 @@ static bool RestorePadLayout(char* in) {
 		char* b = im.Binding(i);
 		char* src = b ? *(char**)(b + 0xC) : nullptr;
 		if (!src) continue;
-		*(char**)(src + 0x10) = d[k].base + idx * d[k].stride + off;
+		// The value's pointer for preset 3, and its "previous value" pointer
+		// (+0x18 + preset * 4: the same byte one block on, as the binder sets them,
+		// CKServiceManager::vf62) -- left empty, the first frame waiting for a
+		// release reads through null (xxl_coop.crash_question_mark.log).
+		char* p = d[k].base + idx * d[k].stride + off;
+		*(char**)(src + 0x10) = p;
+		*(char**)(src + 0x24) = p + d[k].release;
 		put++;
 	}
 	fclose(f);
@@ -2096,23 +2102,13 @@ struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; }
 static void __fastcall PromptHook(char* hero, void* edx) {
 	g_origPrompt(hero, edx);
 	// Individual heroes: a launcher (hero +0x3F0 bit 0x4000, set in the hero's own
-	// tick: its "Activate") needs both heroes -- with one down the hero is put
-	// back before X can start it.
+	// tick: its "Activate") needs both heroes -- a fallen partner is revived next
+	// to the hero at it (it may lie where the other can't reach it).
 	if (*(uint32_t*)(hero + 0x3F0) & 0x4000) {
 		Trio tt = GetTrio();
-		if (tt) IndivNoteLauncherSpot(hero == tt.GetHero(HERO_ASTERIX).raw() ? HERO_ASTERIX : hero == tt.GetHero(HERO_OBELIX).raw() ? HERO_OBELIX : -1);
-	}
-	if ((*(uint32_t*)(hero + 0x3F0) & 0x4000) && IndivFallenHero() >= 0) {
-		Trio tt = GetTrio();
-		int fallen = IndivFallenHero();
-		if (tt && hero != tt.GetHero(fallen).raw() && !CoopSuspended() && CoopP2Joined()) {
-			IndivBlockPartnerSpot("a launcher");   // put back if it can be; never started either way
-			*(uint32_t*)(hero + 0x3F0) &= ~0x4000u;
-			CKYellowPages* yp = YellowPages();
-			char* gm = yp ? (char*)yp->gameManager : nullptr;
-			if (gm) *(uint32_t*)(gm + 0xCC) = (*(uint32_t*)(gm + 0xCC) & ~0xF0u) | (kPromptNone << 4);
-			return;
-		}
+		int idx = !tt ? -1 : hero == tt.GetHero(HERO_ASTERIX).raw() ? HERO_ASTERIX : hero == tt.GetHero(HERO_OBELIX).raw() ? HERO_OBELIX : -1;
+		IndivNoteLauncherSpot(idx);
+		if (idx >= 0 && IndivFallenHero() == (idx ^ 1)) IndivReviveAtLauncher(idx);
 	}
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;

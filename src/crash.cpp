@@ -5,6 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <psapi.h>
+#include <tlhelp32.h>
 #include <cstdio>
 
 namespace {
@@ -264,4 +265,77 @@ void StallCheck(long frames) {
 	}
 	CloseHandle(th);
 	LogHeroes("stall:");
+	StallDumpThreads();
+}
+
+// Every thread of the process: where it is, the return addresses on its stack in
+// any module, and -- for the game thread -- critical sections on its stack that
+// another thread owns (a freeze with the game thread in
+// NtWaitForAlertByThreadId is a wait on a lock; this names who holds it).
+// Each thread is suspended only to copy its registers and stack; the names are
+// looked up after it runs again (that takes the loader lock, which a suspended
+// thread could hold).
+void StallDumpThreads() {
+	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	if (snap == INVALID_HANDLE_VALUE) return;
+	DWORD pid = GetCurrentProcessId(), self = GetCurrentThreadId();
+	DWORD ids[64];
+	int nIds = 0;
+	THREADENTRY32 te = { sizeof(te) };
+	for (BOOL ok = Thread32First(snap, &te); ok && nIds < 64; ok = Thread32Next(snap, &te))
+		if (te.th32OwnerProcessID == pid) ids[nIds++] = te.th32ThreadID;
+	CloseHandle(snap);
+	static uintptr_t stack[1024];
+	for (int t = 0; t < nIds; t++) {
+		if (ids[t] == self) continue;
+		HANDLE h = OpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, ids[t]);
+		if (!h) continue;
+		CONTEXT c = {};
+		c.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+		int n = 0;
+		bool got = false;
+		if (SuspendThread(h) != (DWORD)-1) {
+			got = GetThreadContext(h, &c) != 0;
+			if (got) {
+				__try {
+					for (; n < 1024; n++) stack[n] = ((uintptr_t*)c.Esp)[n];
+				} __except (EXCEPTION_EXECUTE_HANDLER) {}
+			}
+			ResumeThread(h);
+		}
+		CloseHandle(h);
+		if (!got) continue;
+		char where[MAX_PATH];
+		Describe(c.Eip, where, sizeof(where));
+		char buf[1024];
+		LineBuf line(buf);
+		line.Add("stall: thread %lu%s at %s; stack:", ids[t], ids[t] == g_gameThreadId ? " (game)" : "", where);
+		int found = 0;
+		for (int i = 0; i < n && found < 20; i++) {
+			MEMORY_BASIC_INFORMATION mbi;
+			if (stack[i] < 0x10000 || !VirtualQuery((void*)stack[i], &mbi, sizeof(mbi)) || mbi.Type != MEM_IMAGE ||
+			    !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)))
+				continue;
+			char d[MAX_PATH];
+			Describe(stack[i], d, sizeof(d));
+			line.Add(" %s", d);
+			found++;
+		}
+		Log("%s", line.c_str());
+		if (ids[t] != g_gameThreadId) continue;
+		for (int i = 0; i < 64 && i < n; i++) {
+			RTL_CRITICAL_SECTION* cs = (RTL_CRITICAL_SECTION*)stack[i];
+			__try {
+				DWORD owner = (DWORD)(uintptr_t)cs->OwningThread;
+				if (!owner || owner == g_gameThreadId || cs->RecursionCount <= 0 || cs->RecursionCount > 1000) continue;
+				bool known = false;
+				for (int k = 0; k < nIds; k++) known |= ids[k] == owner;
+				if (!known) continue;
+				char d[MAX_PATH];
+				Describe((uintptr_t)cs, d, sizeof(d));
+				Log("stall: the game thread's stack names critical section %s, held by thread %lu (recursion %ld)",
+				    d, owner, cs->RecursionCount);
+			} __except (EXCEPTION_EXECUTE_HANDLER) {}
+		}
+	}
 }
