@@ -2072,6 +2072,20 @@ const Step kFight64[] = {
 	SHOT(88000, "fight64_end"),
 	END(89000),
 };
+// fight56 (-Level 5): Asterix alone fights LV5-6's squad 4 (pools 18, 40, 24 +
+// 8 leaders; the fight lock at -116.16 9.84 33.90), potion on, for 4 minutes.
+#define FIGHT20S(t) POTION(t), TAPS1(t + 500), TAPS1(t + 5500), TAPS1(t + 10500), TAPS1(t + 15500)
+const Step kFight56[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(200, 6),
+	{ 2500, S_WATCHENEMIES, 0, 0, 0, -116.16f, 9.84f, "watch romans", 33.90f },
+	PLACEAT(2600, HERO_ASTERIX, -116.16f, 10.3f, 33.90f),
+	FIGHT20S(3000), FIGHT20S(23000), FIGHT20S(43000), FIGHT20S(63000), FIGHT20S(83000), FIGHT20S(103000),
+	SHOT(123000, "fight56_2m"),
+	FIGHT20S(123500), FIGHT20S(143500), FIGHT20S(163500), FIGHT20S(183500), FIGHT20S(203500), FIGHT20S(223500),
+	SHOT(244000, "fight56_end"),
+	END(245000),
+};
 
 // reload2 (level 2): player 2 in, split screen with both game cameras, then
 // the same level loaded again (the Inspector's "go to level 2"): no crash.
@@ -3290,6 +3304,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
+	SCENARIO("fight56", kFight56),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("req410", kReq410),
@@ -3681,6 +3696,26 @@ void LogTick(float t) {
 					for (char* e = *(char**)(pool + 0xC); e && nHeld < 500; e = *(char**)(e + 4)) nHeld++;
 				} __except (EXCEPTION_EXECUTE_HANDLER) { nFree = -1; }
 				Log("autotest: Roman pool %u %p: %d free, %d in its +0C list", i, pool, nFree, nHeld);
+				// the squads' pool records drawing on it, with Romans alive / queued
+				char usersBuf[700];
+				LineBuf users(usersBuf);
+				const int squadClasses[2] = { 26, 64 };
+				for (int c : squadClasses)
+					for (unsigned k = 0, nk = GetNumLvlClassInstances(4, c); k < nk; k++) {
+						char* sq = (char*)GetLvlObject(4, c, k);
+						char* gr = sq ? *(char**)(sq + 0x144) : nullptr;
+						unsigned ng = sq ? *(unsigned*)(sq + 0x14C) : 0;
+						for (unsigned g2 = 0; gr && g2 < ng && g2 < 8; g2++) {
+							char* e = gr + g2 * 0x1C;
+							if (*(char**)e != pool) continue;
+							int members = 0;   // taken from the pool: the record's list (+8, chained +0x50)
+							for (char* m = *(char**)(e + 8); m && members < 500; m = *(char**)(m + 0x50)) members++;
+							if (!members && !*(uint8_t*)(e + 0x14)) continue;
+							users.Add(" sq%u/%u %p.%u members %d alive %u queued %u", c, k, sq, g2, members,
+							          *(uint8_t*)(e + 0x11), *(uint8_t*)(e + 0x14));
+						}
+					}
+				Log("autotest:   pool %u used by%s", i, users.c_str());
 			}
 		for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 			char* sq = (char*)GetLvlObject(4, 26, i);

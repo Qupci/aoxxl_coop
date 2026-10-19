@@ -1675,3 +1675,13 @@ both halves).
   Combo cheat (pad: R3 / Back + D-pad left, Inspector export): the stats set straight to full never moved the HUD's
   bar (it turns "Combo" only on seeing +0xB0 cross +0xC8 in its state 2); now hits are set one short and the hero
   lands two 0x4C0E hits 0.6 s later (CombosCheat(true); already full: gauge refilled). Autotest molefov.
+- Round 76 (user: xxl_coop.one_roman_at_a_time.log, LV5-6 squad 4, single player, x2 squads): squad 4 (pools 18 /
+  40 / 24 / 8 leaders; script: phase 2 "queue 4 of pool 1, 2 of pool 3; pool 1 alive <= 3 -> keep 4; pool 3 alive
+  <= 1 -> keep 2") sent pool 1's Romans in one at a time. Pool 1 draws on CKGrpPoolSquad 7 (7 Romans), which also
+  feeds squad 40 (box x -200..-94, z -23..70, the same arena; 3 placed when it wakes, 10 to defeat). The doubled
+  start (6) held 6 of the 7 for the whole fight -> 1 free. Pool record +8 is the member list (chained +0x50; the
+  taken pool element: +0xC the Roman, +0x54 the cpnt; FUN_00530380). Fix (CheckSharedPools, first frame of the
+  level, before any squad sends in): a pool record's U1/U2 go back to the level's numbers when its CKGrpPoolSquad
+  also feeds a scaled record of another squad whose box (max +0x11C, min +0x128) overlaps (LV5: 13 records).
+  Script numbers stay doubled. XXL_NOSQUADSHAREFIX: as before. Autotest fight56 (-Level 5, potion, 150 s; WATCHENEMIES
+  now lists each Roman pool's holders by real members): pool 1 1 alive / 6-8 queued -> 4 alive.

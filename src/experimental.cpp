@@ -29,6 +29,8 @@ struct SquadOrig {
 	bool     atOnce[8] = {};     // its numbers at once scaled (a pool its script sends Romans in for)
 	int16_t  origCount[8] = {};  // Romans to defeat as the level has them
 	bool     settled[8] = {};    // kept as is: its share of the doubling given to another pool of its gate
+	uint8_t  origU1[8] = {}, origU2[8] = {};
+	bool     shareChecked = false;
 };
 std::unordered_map<char*, SquadOrig> g_squads;
 
@@ -79,6 +81,8 @@ void ScaleSquad(char* sq) {
 		int16_t& count = *(int16_t*)(rec + 0x18);
 		int a0 = u1, s0 = u2, c0 = count;
 		o.origCount[i] = count;
+		o.origU1[i] = u1;
+		o.origU2[i] = u2;
 		// A set piece: all its Romans placed at the start, none sent in after (LV4-1's
 		// hiding Romans) -- as the level has it.
 		bool placedOnly = count > 0 && count <= (u2 > u1 ? u2 : u1);
@@ -250,6 +254,67 @@ void BalanceGates() {
 	    nLocked, deficit, targetSq, before, *target);
 }
 
+// Romans come from pools (CKGrpPoolSquad, pool record +0) that squads of the
+// same place share, and a pool holds what the level needs at once there
+// (LV5-6: pool of 7, squad 40 places 3, squad 4's script keeps 4 of its 40
+// alive). Doubled starting Romans of one squad (6) are taken for the whole
+// fight and left squad 4 one at a time. So a squad's starting Romans stay as
+// the level has them when its pool also feeds another squad whose box
+// overlaps its own and whose numbers are scaled. Done once the level is in,
+// before the squads wake (nothing sent in yet).
+void CheckSharedPools() {
+	static const bool noShareFix = getenv("XXL_NOSQUADSHAREFIX") != nullptr;   // diagnostics: as before
+	if (noShareFix || g_config.squadAliveFactor == 1.0f) return;
+	struct Sq { char* sq; SquadOrig* o; };
+	Sq all[128];
+	int nAll = 0;
+	bool fresh = false;
+	const int classes[2] = { 26, 64 };   // CKGrpSquadEnemy, CKGrpSquadJetPack
+	for (int c : classes)
+		for (unsigned i = 0, n = GetNumLvlClassInstances(4, c); i < n && nAll < 128; i++) {
+			char* sq = (char*)GetLvlObject(4, c, i);
+			auto it = sq ? g_squads.find(sq) : g_squads.end();
+			if (it == g_squads.end() || it->second.n != *(unsigned*)(sq + 0x14C)) continue;
+			all[nAll++] = { sq, &it->second };
+			fresh = fresh || !it->second.shareChecked;
+		}
+	if (!fresh) return;
+	auto overlap = [](char* a, char* b) {   // boxes: max +0x11C, min +0x128
+		const float* fa = (const float*)a;
+		const float* fb = (const float*)b;
+		for (int k = 0; k < 3; k++)
+			if (fa[0x47 + k] < fb[0x4A + k] || fb[0x47 + k] < fa[0x4A + k]) return false;
+		return true;
+	};
+	for (int s = 0; s < nAll; s++) {
+		SquadOrig& o = *all[s].o;
+		if (o.shareChecked) continue;
+		o.shareChecked = true;
+		char* rec0 = *(char**)(all[s].sq + 0x144);
+		for (unsigned i = 0; i < o.n; i++) {
+			char* rec = rec0 + i * 0x1C;
+			uint8_t& u1 = *(uint8_t*)(rec + 0x10);
+			uint8_t& u2 = *(uint8_t*)(rec + 0x11);
+			if (!o.atOnce[i] || (u1 == o.origU1[i] && u2 == o.origU2[i]) || *(int16_t*)(rec + 0x16) != 0) continue;
+			char* pool = *(char**)rec;
+			char* other = nullptr;
+			unsigned otherRec = 0;
+			for (int t = 0; t < nAll && !other; t++) {
+				if (t == s || !overlap(all[s].sq, all[t].sq)) continue;
+				char* r0 = *(char**)(all[t].sq + 0x144);
+				for (unsigned j = 0; j < all[t].o->n && !other; j++)
+					if (all[t].o->atOnce[j] && *(char**)(r0 + j * 0x1C) == pool) { other = all[t].sq; otherRec = j; }
+			}
+			if (!other) continue;
+			Log("experimental: squad %p pool %u: starting Romans %u/%u -> %u/%u as the level has them "
+			    "(their pool %p also feeds squad %p pool %u here)", all[s].sq, i, u1, u2, o.origU1[i], o.origU2[i],
+			    pool, other, otherRec);
+			u1 = o.origU1[i];
+			u2 = o.origU2[i];
+		}
+	}
+}
+
 // The combo bar fills with the hits at game manager +0xB0 (+1 a hit, +3 with
 // the potion, from four places); FUN_0048C860 sets its level from the
 // thresholds +0xB8..+0xBA (bytes) and fills it at +0xC8 (byte: "full" once the
@@ -303,6 +368,7 @@ void ExperimentalFrame() {
 			    g_config.squadAliveFactor);
 		s_atOnce = atOnce;
 	}
+	CheckSharedPools();
 	BalanceGates();
 	if (g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f)
 		ScaleCombo();
