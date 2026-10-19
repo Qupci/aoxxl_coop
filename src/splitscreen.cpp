@@ -1002,7 +1002,8 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 			Log("hudpos: camera proj %u window %.3f %.3f offset %.3f %.3f near %.3f far %.3f right %.3f %.3f %.3f up %.3f %.3f %.3f at %.3f %.3f %.3f pos %.3f %.3f %.3f",
 			    hud->projectionType, hud->viewWindow[0], hud->viewWindow[1], hud->viewOffset[0], hud->viewOffset[1],
 			    hud->nearPlane, hud->farPlane, cl[0], cl[1], cl[2], cl[4], cl[5], cl[6], cl[8], cl[9], cl[10], cl[12], cl[13], cl[14]);
-			const int offs[] = { 0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x54, 0x68, 0x7C, 0x90, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC };
+			const int offs[] = { 0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x54, 0x68, 0x7C, 0x90, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC,
+			                     0xD4, 0xD8, 0xDC, 0xE0, 0xE4, 0xE8, 0x110, 0x12C, 0x130 };
 			for (int o : offs) {
 				char* n = *(char**)(itf + o);
 				char* fr = n ? *(char**)(n + 4) : nullptr;
@@ -1013,10 +1014,18 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 				    d[0] * cl[0] + d[1] * cl[1] + d[2] * cl[2], d[0] * cl[4] + d[1] * cl[5] + d[2] * cl[6],
 				    d[0] * cl[8] + d[1] * cl[9] + d[2] * cl[10], sqrtf(l[0] * l[0] + l[1] * l[1] + l[2] * l[2]));
 			}
-			const int o2[] = { 0x134, 0x150, 0x154, 0x158 };
+			Log("hudpos: gate counter state %u at %.3f shown %.3f; requirement state %u at %.3f to %.3f shown %.3f, model at %.3f shown %.3f",
+			    (*(uint32_t*)(itf + 0x24) >> 17) & 3, *(float*)(itf + 0x3F4), *(float*)(itf + 0x3DC), (*(uint32_t*)(itf + 0x24) >> 8) & 3,
+			    *(float*)(itf + 0x388), *(float*)(itf + 0x380), *(float*)(itf + 0x318), *(float*)(itf + 0x394), *(float*)(itf + 0x33C));
+			const int o2[] = { 0x134, 0x138, 0x13C, 0x140, 0x144, 0x148, 0x14C, 0x150, 0x154, 0x158, 0x15C, 0x160, 0x164 };
 			for (int o : o2) {
 				float* e = *(float**)(itf + o);
-				if (e) Log("hudpos: 2d +%03X flags %08X at %.3f %.3f size %.3f %.3f", o, ((uint32_t*)e)[1], e[5], e[6], e[13], e[14]);
+				if (!e) continue;
+				Log("hudpos: 2d +%03X vt %p flags %08X at %.3f %.3f size %.3f %.3f | %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f", o, *(void**)e,
+				    ((uint32_t*)e)[1], e[5], e[6], e[13], e[14], e[2], e[3], e[7], e[8], e[9], e[10], e[11], e[12]);
+				if (*(uintptr_t*)e == 0x623B6C)   // CText2d: its text's box, glyphs, font (hud2.cpp Xf2d)
+					Log("hudpos:   text box %.3f %.3f glyphs %d (first %.3f %.3f) font %p size %.4f", e[10], e[11],
+					    *(int*)((char*)e + 0x2F4), e[0x3E8 / 4], e[0x3EC / 4], *(void**)((char*)e + 0x680), e[0x684 / 4]);
 			}
 		}
 	}

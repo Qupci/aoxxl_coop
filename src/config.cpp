@@ -89,6 +89,7 @@ void CoopConfig::Load(const char* iniPath) {
 
 	char buf[64] = {};
 	GetPrivateProfileStringA("coop", "split_mode", "vertical", buf, sizeof(buf), full);
+	if (const char* env = getenv("XXL_SPLITMODE")) lstrcpynA(buf, env, sizeof(buf));   // autotests: either split
 	splitMode = (buf[0] == 'v' || buf[0] == 'V') ? SPLIT_VERTICAL : SPLIT_HORIZONTAL;
 
 	keyboard = ReadBool("keyboard", "enabled", keyboard, full);

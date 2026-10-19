@@ -1050,6 +1050,51 @@ const Step kHudVanish[] = {
 	END(10000),
 };
 
+// hudlayout (-Level 4): every HUD piece up at once in split screen -- LV4-1's
+// fight gate counter (Asterix in its zone by the start), both combo bars, both
+// health rows (Back held on both pads) and the helmet counter (gm +0x5C bit 6,
+// "helmets changed"). XXL_SPLITMODE=horizontal for the stacked split.
+const Step kHudLayout[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(2000, HERO_ASTERIX, -289.92f, 0.5f, 117.8f, 1500),
+	{ 4000, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "hits" }, { 4000, S_GIVE, HERO_ASTERIX, 3, 0, 8.0f, 0, "hits" },
+	VPAD(4200, 1, PAD_BACK, 0, 0, "p2 holds back"), P1(4200, PAD_BACK, 0, 0, "p1 holds back"),
+	{ 4300, S_POKE8, -2, 0x5C, 0, 64.0f, 0, "helmets changed (gm +0x5C bit 6)" },
+	SHOT(5500, "hudlayout_1"),
+	{ 5600, S_POKE8, -2, 0x5C, 0, 64.0f, 0, "helmets changed (gm +0x5C bit 6)" },
+	SHOT(7000, "hudlayout_2"),
+	VPAD(7500, 1, 0, 0, 0, "p2 release"), P1(7500, 0, 0, 0, "p1 release"),
+	SHOT(9000, "hudlayout_3"),
+	END(9500),
+};
+
+// hudreq (-Level 4): the rest of the shared pieces with hudlayout's -- the
+// spy's helmet requirement (gm +0x5C bit 11; FUN_0051CD80) and the x3 / x10
+// sign (Asterix's stats +0x84 the multiplier, +0x98 its time: 8 s).
+const Step kHudReq[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(2000, HERO_ASTERIX, -289.92f, 0.5f, 117.8f, 1500),
+	{ 3800, S_POKE8, -2, 0x5D, 0, 8.0f, 0, "helmet requirement (gm +0x5C bit 11)" },
+	{ 3800, S_POKE8, -10, 0x84, 0, 3.0f, 0, "asterix x3" }, { 3800, S_POKE8, -10, 0x9B, 0, 65.0f, 0, "for 8 s" },
+	{ 4000, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "hits" }, { 4000, S_GIVE, HERO_ASTERIX, 3, 0, 8.0f, 0, "hits" },
+	VPAD(4200, 1, PAD_BACK, 0, 0, "p2 holds back"), P1(4200, PAD_BACK, 0, 0, "p1 holds back"),
+	{ 4300, S_POKE8, -2, 0x5C, 0, 64.0f, 0, "helmets changed (gm +0x5C bit 6)" },
+	SHOT(5500, "hudreq_1"),
+	SHOT(7000, "hudreq_2"),
+	END(7500),
+};
+// hudx3 (-Level 4): the x3 sign alone (its place is then the requirement's).
+const Step kHudX3[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 3800, S_POKE8, -10, 0x84, 0, 3.0f, 0, "asterix x3" }, { 3800, S_POKE8, -10, 0x9B, 0, 65.0f, 0, "for 8 s" },
+	{ 4300, S_POKE8, -2, 0x5C, 0, 64.0f, 0, "helmets changed (gm +0x5C bit 6)" },
+	SHOT(4200, "hudx3_1"), SHOT(5500, "hudx3_2"),
+	END(6000),
+};
+
 const Step kSpy3N[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 2),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3288,6 +3333,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("hintjoin", kHintJoin),
 	SCENARIO("spy3n", kSpy3N),
 	SCENARIO("hudvanish", kHudVanish),
+	SCENARIO("hudlayout", kHudLayout),
+	SCENARIO("hudreq", kHudReq),
+	SCENARIO("hudx3", kHudX3),
 	SCENARIO("spy3p", kSpy3P),
 	SCENARIO("catapultp", kCatapultP),
 	SCENARIO("catapulta", kCatapultA),

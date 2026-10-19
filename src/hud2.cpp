@@ -6,6 +6,7 @@
 #include "kal.h"
 #include "log.h"
 #include "render.h"
+#include "splitscreen.h"
 #include "trio.h"
 
 #include <cstdlib>
@@ -60,11 +61,16 @@ struct State {
 	// a change while it slides away is shown once it is hidden (as the game's
 	// own flag stays up for it).
 	bool     pending[2] = {};
-	// Render: what was moved or hidden for a pass.
-	struct Moved { char* p; float x, y; } moved2d[8];
-	int      nMoved2d = 0;
-	struct MovedFrame { float* f; float lt[3], md[3]; } movedFrames[4];
-	int      nMovedFrames = 0;
+	// Render: what was moved, scaled or hidden for a pass.
+	struct Saved2d {
+		float*   e;
+		float    place[2], size[2];   // +0x14, +0x34 (billboards)
+		bool     text;
+		float    box[2], font;        // CText2d: +0x28, +0x684
+		int      nGlyphs;
+		float    glyphs[2 * 60];      // +0x3E8
+	} saved2d[12];
+	int      nSaved2d = 0;
 	struct Hidden { char* node; uint32_t f10; } hidden[64];
 	int      nHidden = 0;
 	bool     p2Pass = false;
@@ -73,8 +79,8 @@ struct State {
 	float*   mirrorCamModelling = nullptr;
 	void**   renderStateSlot = nullptr;   // engine +0x20 while the mirrored render state function is in
 	float*   flipped[8] = {};          // frames turned round on their own for the pass (the combo bar's)
-	// Player 1's shield models scaled down for the game's pass (ScaleHealth), to put back after it.
-	struct SavedLtm { float* f; float m[16]; } scaled[31];
+	// Models moved or scaled for the game's pass (ScaleHealth, the layout), to put back after it.
+	struct SavedLtm { float* f; float m[16]; } scaled[64];
 	int      nScaled = 0;
 	int      nFlipped = 0;
 	bool     loggedP2 = false;
@@ -192,17 +198,129 @@ const PartFn kHealthPart = (PartFn)0x51A140, kComboPart = (PartFn)0x518190, kCom
 
 const uint32_t kShowFlags = 0x4000 | 0x1000000;   // game manager +0x5C: health changed, HUD button held
 
-// A frame's place moved by `d` along the HUD camera's right axis (LTM only:
-// what the render reads; the next sync or Apply puts it back).
-void MoveAlong(float* frame, const float* right, float d, bool remember) {
-	float* lt = (float*)((char*)frame + 0x80);
-	if (remember && g.nMovedFrames < 4) {
-		State::MovedFrame& m = g.movedFrames[g.nMovedFrames++];
-		m.f = frame;
-		memcpy(m.lt, lt, sizeof(m.lt));
-		memcpy(m.md, (char*)frame + 0x40, sizeof(m.md));
+// The HUD's layout for a pass: a piece scaled by `s` about a pivot, then moved
+// by (dx, dy) -- places in the 2D elements' terms, x 0..1 from the left edge,
+// y 0..1 from the bottom. Models: on the HUD camera (frame right +0, up +4,
+// place +12) x is 0.5 minus the camera-space x and y 0.5 plus the camera's y.
+struct Xform { float px, py, s, dx, dy; };
+void XfPoint(const Xform& t, float& x, float& y) {
+	x = t.px + (x - t.px) * t.s + t.dx;
+	y = t.py + (y - t.py) * t.s + t.dy;
+}
+
+const uintptr_t kVtBillboard2d = 0x6235C0, kVtText2d = 0x623B6C;
+
+char* NodeAt(char* itf, int o) {
+	char* n = *(char**)(itf + o);
+	return n && !IsBadReadPtr(n, 0x14) && IsNodeVt(*(uintptr_t*)n) ? n : nullptr;
+}
+
+// A model's place and size (LTM only: what the render reads; `save` keeps it
+// to put back after the pass, otherwise the next Apply's sync does).
+void Xf3d(char* n, const float* cl, const Xform& t, bool save) {
+	float* fr = n ? FrameOf(n) : nullptr;
+	if (!fr) return;
+	float* lt = (float*)((char*)fr + 0x50);
+	if (save) {
+		if (g.nScaled >= 64) return;
+		g.scaled[g.nScaled].f = fr;
+		memcpy(g.scaled[g.nScaled].m, lt, sizeof(g.scaled[0].m));
+		g.nScaled++;
 	}
-	for (int k = 0; k < 3; k++) lt[k] += d * right[k];
+	float d[3] = { lt[12] - cl[12], lt[13] - cl[13], lt[14] - cl[14] };
+	float x = 0.5f - (d[0] * cl[0] + d[1] * cl[1] + d[2] * cl[2]), y = 0.5f + (d[0] * cl[4] + d[1] * cl[5] + d[2] * cl[6]);
+	float nx = x, ny = y;
+	XfPoint(t, nx, ny);
+	for (int k = 0; k < 3; k++) {
+		lt[12 + k] += -(nx - x) * cl[k] + (ny - y) * cl[4 + k];
+		lt[k] *= t.s; lt[4 + k] *= t.s; lt[8 + k] *= t.s;
+	}
+}
+
+// A 2D element's place and size, kept to put back after the pass. A text
+// (CText2d; its text at +0x20, drawn by 0x42F430) is drawn from its place,
+// aligned in its box (+0x28 / +0x2C), each glyph at its place in the box
+// (+0x3E8: x, then y counted down from 1; +0x2F4 glyphs) in the font's size
+// (+0x684): all of them scaled.
+void Xf2d(char* itf, int o, const Xform& t) {
+	float* e = *(float**)(itf + o);
+	if (!e || IsBadReadPtr(e, 0x6A0) || g.nSaved2d >= 12) return;
+	uintptr_t vt = *(uintptr_t*)e;
+	if (vt != kVtBillboard2d && vt != kVtText2d) return;
+	State::Saved2d& sv = g.saved2d[g.nSaved2d++];
+	sv.e = e;
+	sv.text = vt == kVtText2d;
+	memcpy(sv.place, e + 5, sizeof(sv.place));
+	XfPoint(t, e[5], e[6]);
+	if (!sv.text) {
+		memcpy(sv.size, e + 13, sizeof(sv.size));
+		e[13] *= t.s;
+		e[14] *= t.s;
+		return;
+	}
+	char* c = (char*)e;
+	float* font = (float*)(c + 0x684);
+	float* gl = (float*)(c + 0x3E8);
+	int n = *(int*)(c + 0x2F4);
+	sv.nGlyphs = n < 0 ? 0 : n > 60 ? 60 : n;
+	memcpy(sv.box, c + 0x28, sizeof(sv.box));
+	sv.font = *font;
+	memcpy(sv.glyphs, gl, sv.nGlyphs * 2 * sizeof(float));
+	((float*)(c + 0x28))[0] *= t.s;
+	((float*)(c + 0x28))[1] *= t.s;
+	*font *= t.s;
+	for (int i = 0; i < sv.nGlyphs; i++) {
+		gl[2 * i] *= t.s;
+		gl[2 * i + 1] = 1.0f + (gl[2 * i + 1] - 1.0f) * t.s;
+	}
+}
+
+void Restore2d() {
+	for (int i = g.nSaved2d - 1; i >= 0; i--) {
+		State::Saved2d& sv = g.saved2d[i];
+		memcpy(sv.e + 5, sv.place, sizeof(sv.place));
+		if (!sv.text) { memcpy(sv.e + 13, sv.size, sizeof(sv.size)); continue; }
+		char* c = (char*)sv.e;
+		memcpy(c + 0x28, sv.box, sizeof(sv.box));
+		*(float*)(c + 0x684) = sv.font;
+		memcpy(c + 0x3E8, sv.glyphs, sv.nGlyphs * 2 * sizeof(float));
+	}
+	g.nSaved2d = 0;
+}
+
+static const bool g_noLayout = getenv("XXL_NOHUDLAYOUT") != nullptr;   // the HUD laid out as before round 79
+
+// Stacked split (player 1 on top): each player's HUD in their own half, as
+// the single player HUD -- health at the top left, the combo bar's column
+// below it at the left edge, at 3/4 size (its bottom at 0.35 on the full
+// screen, 0.47 down from a half's top).
+bool Stacked() {
+	return !g_noLayout && SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL;
+}
+const int kComboNodes[] = { 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC };
+void ComboToHalf(char* itf, const float* cl, int player, bool save) {
+	char* bottom = NodeAt(itf, 0xBC);
+	float* fr = bottom ? FrameOf(bottom) : nullptr;
+	if (!fr) return;
+	const float* lt = (const float*)((char*)fr + 0x50);
+	float d[3] = { lt[12] - cl[12], lt[13] - cl[13], lt[14] - cl[14] };
+	float x = 0.5f - (d[0] * cl[0] + d[1] * cl[1] + d[2] * cl[2]);
+	Xform t = { x, 0.35f, 0.75f, 0.0f, (player == 0 ? 0.53f : 0.03f) - 0.35f };
+	for (int o : kComboNodes) Xf3d(NodeAt(itf, o), cl, t, save);
+}
+
+// The fight gate's counter (FUN_0051F3C0: state +0x24 bits 17-18; the gate's
+// picture, model +0xD4 + 4 * gm +0x68, and model +0x110 over the plate +0x144
+// and number +0x160; it slides in from the right edge to +0x3DC): side by
+// side, at 3/4 size in the middle, over both halves; stacked, at the right
+// edge as in single player, its middle on the halves' border.
+void LayoutGate(char* itf, const float* cl, bool stacked) {
+	float shown = *(float*)(itf + 0x3DC);
+	if (!(shown > 0.3f && shown < 1.0f)) shown = 0.879f;
+	Xform t = stacked ? Xform{ shown, 0.475f, 1.0f, 0.0f, 0.025f } : Xform{ shown, 0.475f, 0.75f, 0.5f - shown, 0.0f };
+	for (int o = 0xD4; o <= 0x110; o += 4) Xf3d(NodeAt(itf, o), cl, t, true);
+	Xf2d(itf, 0x144, t);
+	Xf2d(itf, 0x160, t);
 }
 
 // The interface's own health readers outside its tick: FUN_0051B550 (which
@@ -251,7 +369,7 @@ void ScaleHealth(char* itf, const float* cl, int shields, bool save) {
 		float* fr = n ? FrameOf(n) : nullptr;
 		if (!fr) continue;
 		float* lt = (float*)((char*)fr + 0x50);
-		if (save && g.nScaled < 31) {
+		if (save && g.nScaled < 64) {
 			g.scaled[g.nScaled].f = fr;
 			memcpy(g.scaled[g.nScaled].m, lt, sizeof(g.scaled[0].m));
 			g.nScaled++;
@@ -371,64 +489,68 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 }
 
 void Hud2BeginP1(RwCamera* hud) {
-	g.nMoved2d = 0;
-	g.nMovedFrames = 0;
+	g.nSaved2d = 0;
+	g.nScaled = 0;
 	char* itf = g.itf;
 	if (!On() || !hud || !itf || itf != (char*)GetLvlObject(2, 132, 0)) return;
-	// The helmet counter (plate +0x134 drawn leftwards from its place, texts,
-	// helmet model +0xA8; the x3 / x10 sign +0x13C / +0x130 beside it) to the
-	// top middle: player 2's health takes the top right.
-	float* plate = *(float**)(itf + 0x134);
-	if (!plate) return;
-	float dx = 0.5f - (plate[5] - plate[13] * 0.5f);
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);   // right +0, up +4
-	auto move2d = [&](int o, float ddx, float ddy) {
-		char* e = *(char**)(itf + o);
-		if (!e || g.nMoved2d >= 8) return;
-		float* f = (float*)e;
-		g.moved2d[g.nMoved2d++] = { e, f[5], f[6] };
-		f[5] += ddx;
-		f[6] += ddy;
-	};
-	auto move3d = [&](int o, float ddx, float ddy) {
-		char* n = *(char**)(itf + o);
-		float* fr = n && !IsBadReadPtr(n, 8) ? FrameOf(n) : nullptr;
-		if (!fr) return;
-		MoveAlong(fr, cl, -ddx, true);   // screen x is minus the camera's
-		MoveAlong(fr, cl + 4, ddy, false);
-	};
-	// (+0x154 is the slide's helmet requirement text, under its own plate +0x138
-	// at the right: it stays.)
-	const int helmet2d[] = { 0x134, 0x150 };
-	for (int o : helmet2d) move2d(o, dx, 0.0f);
-	move3d(0xA8, dx, 0.0f);
-	// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01, off the right
-	// edge, to +0x31C and back) goes up off the top instead, like the helmets.
-	float shown = *(float*)(itf + 0x31C), cur = *(float*)(itf + 0x3A0);
-	float off = cur - shown;
-	float p = 1.01f - shown > 0.01f ? off / (1.01f - shown) : 0.0f;
-	if (p < 0.0f) p = 0.0f;
-	if (p > 1.0f) p = 1.0f;
-	move2d(0x13C, dx - off, p * 0.5f);
-	move2d(0x158, dx - off, p * 0.5f);
-	move3d(0x130, dx - off, p * 0.5f);
+	bool stacked = Stacked();
+	// The helmet counter (plate +0x134 drawn leftwards from its place, text
+	// +0x150, helmet model +0xA8), and under it the spy's helmet requirement
+	// and the x3 / x10 sign, side by side: to the top middle, player 2's health
+	// taking the top right -- at 3/4 size under the health rows (at full size it
+	// met six shields' rows). Stacked: where single player has them (the right).
+	float* plate = *(float**)(itf + 0x134);
+	if (plate && !stacked) {
+		float mid = plate[5] - plate[13] * 0.5f;
+		float s = g_noLayout ? 1.0f : 0.75f;
+		Xform t = { mid, plate[6], s, 0.5f - mid, g_noLayout ? 0.0f : -0.1f };
+		Xf2d(itf, 0x134, t);
+		Xf2d(itf, 0x150, t);
+		Xf3d(NodeAt(itf, 0xA8), cl, t, true);
+		// The pieces under it slide in from the right edge and out again; in the
+		// middle that crossed player 2's half: they come down from the top
+		// instead, like the helmets. `off` is how far a piece is from its place
+		// (0.0 - 1.0 of its way).
+		auto fromTop = [&](float off, float way) {
+			float p = way > 0.01f ? off / way : 0.0f;
+			p = p < 0.0f ? 0.0f : p > 1.0f ? 1.0f : p;
+			Xform u = t;
+			u.dx -= s * off;
+			u.dy += g_noLayout ? p * 0.5f : s * p * 0.6f;
+			return u;
+		};
+		// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01 to +0x31C;
+		// plate +0x13C, text +0x158, model +0x130).
+		float shown = *(float*)(itf + 0x31C);
+		Xform ts = fromTop(*(float*)(itf + 0x3A0) - shown, 1.01f - shown);
+		Xf2d(itf, 0x13C, ts);
+		Xf2d(itf, 0x158, ts);
+		Xf3d(NodeAt(itf, 0x130), cl, ts, true);
+		// The spy's helmet requirement (FUN_0051CD80, gm +0x5C bit 11; text
+		// +0x154 and plate +0x138 slide on +0x388 from off the right edge to
+		// +0x318, its model +0x12C on +0x394 to +0x33C). Natively it stays at
+		// the right; side by side that was on player 2's combo bar.
+		if (!g_noLayout) {
+			float rShown = *(float*)(itf + 0x318);
+			Xform tr = fromTop(*(float*)(itf + 0x388) - rShown, 1.01f - rShown);
+			Xf2d(itf, 0x138, tr);
+			Xf2d(itf, 0x154, tr);
+			Xform tm = fromTop(*(float*)(itf + 0x394) - *(float*)(itf + 0x33C), 1.01f - rShown);
+			tm.dy = tr.dy;
+			Xf3d(NodeAt(itf, 0x12C), cl, tm, true);
+		}
+	}
+	if (!g_noLayout) LayoutGate(itf, cl, stacked);
+	if (stacked) ComboToHalf(itf, cl, 0, true);
 	int hp = 0, shields = 3;
 	if (IndivStats(CoopP1Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, true);
 }
 
 void Hud2EndP1() {
-	for (int i = 0; i < g.nScaled; i++) memcpy((char*)g.scaled[i].f + 0x50, g.scaled[i].m, sizeof(g.scaled[i].m));
+	for (int i = g.nScaled - 1; i >= 0; i--) memcpy((char*)g.scaled[i].f + 0x50, g.scaled[i].m, sizeof(g.scaled[i].m));
 	g.nScaled = 0;
-	for (int i = 0; i < g.nMoved2d; i++) {
-		((float*)g.moved2d[i].p)[5] = g.moved2d[i].x;
-		((float*)g.moved2d[i].p)[6] = g.moved2d[i].y;
-	}
-	for (int i = 0; i < g.nMovedFrames; i++) {
-		State::MovedFrame& m = g.movedFrames[i];
-		memcpy((char*)m.f + 0x80, m.lt, sizeof(m.lt));
-		memcpy((char*)m.f + 0x40, m.md, sizeof(m.md));
-	}
-	g.nMoved2d = g.nMovedFrames = 0;
+	Restore2d();
 }
 
 bool Hud2BeginP2(RwCamera* hud, int part) {
@@ -487,6 +609,16 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	if (part == 0) {   // as many shields as player 1's row fits (before the mirror; Apply puts them back)
 		int hp = 0, shields = 3;
 		if (IndivStats(CoopP2Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, false);
+	}
+	if (Stacked()) {   // stacked split: player 1's layout in the bottom half, not mirrored (Apply puts them back)
+		if (part == 0) {
+			Xform t = { 0.0f, 0.0f, 1.0f, 0.0f, -0.5f };
+			for (int i = 0; i < 31; i++) Xf3d(ElemPtr(itf, i), cl, t, false);
+		} else {
+			ComboToHalf(itf, cl, 1, false);
+		}
+		g.p2Pass = true;
+		return true;
 	}
 	g.mirrorCam = cl;
 	g.mirrorCamModelling = cm;
