@@ -1703,3 +1703,26 @@ both halves).
   Romans (U1/U2) are set at load, as with held heroes. XXL_NOATONCEDOWNFIX: as before. Autotest sq36c with
   XXL_DOWNAT=1:12000 XXL_UPAT=20000 XXL_SQUADCMDS=1: "keep 2 alive" sent as 4, as 2 while Obelix is down, x2 again
   after the revive.
+- Round 79 (user: Snipaste_2026-10-19_17-34-39 / 17-49-27 / 17-54-22, xxl_coop.lv3-2_p2_hud.log). (1) P2's combo bar /
+  shields stayed on a dialogue's screen (LV3-2 agent): for cutscenes and dialogues the game vanishes its HUD --
+  CKHook_GoVanish (0x515CB0) sets gm +0x5C bit 20 and hides the models of the parts showing (P1's, the ones in the
+  interface), FUN_005154A0 shows them again when bit 20 clears; vf18 ticks no part meanwhile. P2's passes are now
+  skipped while bit 20 is set (XXL_NOHUDVANISHFIX: as before; autotest hudvanish -Level 3). (2)+(3) HUD layout
+  (hud2.cpp Xform: scale about a pivot then move; models' LTMs, 2D places/sizes, put back after the pass;
+  XXL_NOHUDLAYOUT: as before). 2D elements: x 0..1 from the left, y 0..1 from the bottom; HUD camera space x =
+  0.5 - 2D x, y = 2D y - 0.5. Flags byte 2 = horizontal alignment (0 left, 1 centre, 2 right: drawn leftwards).
+  CText2d: text object inline at +0x20 (vt 0x623BCC = CText2d vt slot 24; draw 0x42F430, layout 0x42E840): box
+  +0x28/+0x2C, font +0x680, font size +0x684 (font base x +0x6C4 / 512), +0x2F4 entries (words) placed at +0x3E8
+  (x, then y counted down from 1) -- scaling box, size and places scales a text about its place. Pieces: gate
+  counter FUN_0051F3C0 (bits 17-18; picture model +0xD4 + 4 x gm +0x68, model +0x110, plate +0x144, number
+  +0x160 = gm +0x64; slides on +0x3F4 from the right to +0x3DC = 0.879; the gate's zone LV4-1 (-289.9 0 117.8));
+  spy's helmet requirement FUN_0051CD80 (gm +0x5C bit 11; plate +0x138, text +0x154 slide on +0x388 to +0x318,
+  model +0x12C on +0x394 to +0x33C; y 0.789); x3/x10 sign at y 0.789, or 0.635 under the requirement (hero stats
+  +0x84 value, +0x98 time). Side by side: helmet counter (3/4 size, 0.1 lower, under the health rows), the
+  requirement and the x3 sign under it in the top middle, both coming down from the top instead of sliding across
+  P2's half; gate counter 3/4 size in the middle (it slides 0.1 into place). Stacked (split_mode horizontal):
+  each player's HUD single player's way in their own half -- P1 as the game's, P2 not mirrored, moved down 0.5;
+  combo columns 3/4 size, bottoms at 0.47 / 0.97 from the top (column bottom = model +0xBC, 0.35 up); helmet
+  counter, requirement and x3 sign at the right as in single player; gate counter at the right edge, its middle
+  on the halves' border. Autotests hudlayout / hudreq / hudx3 (-Level 4; Back held on both pads, gm +0x5C bit 6
+  "helmets changed", bit 11 and the stats poked); env XXL_SPLITMODE=horizontal|vertical overrides the ini.
