@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <intrin.h>
 #include <cstring>
+#include <unordered_map>
 #include <utility>
 
 #define WIN32_LEAN_AND_MEAN
@@ -527,6 +528,81 @@ bool InSquadBox(const char* sq, const Vector3& p) {
 	return f[0x4A] < p.x && p.x <= f[0x47] && f[0x4C] < p.z && p.z <= f[0x49] && f[0x4B] < p.y && p.y <= f[0x48];
 }
 
+// The squad's fight zone (vf46's test): max +0x104..+0x10C, min +0x110..+0x118.
+int InFightZone(const char* sq, const Vector3& p) {
+	const float* f = (const float*)sq;
+	return f[0x44] <= p.x && p.x <= f[0x41] && f[0x46] <= p.z && p.z <= f[0x43] && f[0x45] <= p.y && p.y <= f[0x42];
+}
+
+// Romans of a squad shared between both heroes. The squad runs for one hero:
+// its formation centre (node squad +0x30, position +0x30) goes after that hero
+// (vf31 -> FUN_0052BAB0) and each Roman is given a slot around the centre
+// (FUN_0052B670: the Roman's component 0x46, +0 slot, +0xC facing, +0x18 the
+// step towards the slot: (slot - Roman) in x/z over max(distance, squad
+// +0xC0)). The Romans' own ticks attack the nearest hero, but they only go
+// where their slots are: the other hero was never chased. With both heroes in
+// the fight zone, half the Romans have their slots moved around the other hero
+// (same place relative to him as to the centre). Who goes for whom is kept
+// from frame to frame; a newcomer joins the smaller side (the nearer hero on a
+// tie) and one Roman a frame changes side while they are uneven.
+std::unordered_map<char*, uint8_t> g_romanSide;   // Roman -> the hero (index) its slot is around
+volatile long g_splitLogs = 0;
+
+void SplitSquad(char* sq, int target, Hero targetHero, int other, Hero otherHero) {
+	char* centre = *(char**)(sq + 0x30);
+	char* rec0 = *(char**)(sq + 0x144);
+	unsigned nRec = *(unsigned*)(sq + 0x14C);
+	if (!centre || !rec0 || nRec > 8) return;
+	Vector3 c(*(float*)(centre + 0x30), *(float*)(centre + 0x34), *(float*)(centre + 0x38));
+	Vector3 heroPos[2] = { targetHero.Pos(), otherHero.Pos() };
+	struct Member { char* m; Vector3 p; int side; };
+	Member mem[64];
+	int n = 0, count[2] = {};
+	for (unsigned r = 0; r < nRec; r++)
+		for (char* m = *(char**)(rec0 + r * 0x1C + 8); m && n < 64; m = *(char**)(m + 0x50)) {
+			Vector3 p;
+			if (!NodePos(*(void**)(m + 0x10), &p)) continue;
+			auto it = g_romanSide.find(m);
+			int side = it == g_romanSide.end() ? -1 : it->second == (uint8_t)target ? 0 : it->second == (uint8_t)other ? 1 : -1;
+			mem[n++] = { m, p, side };
+			if (side >= 0) count[side]++;
+		}
+	int half = (n + 1) / 2;
+	for (int i = 0; i < n; i++) {
+		if (mem[i].side >= 0) continue;
+		int s = (mem[i].p - heroPos[1]).len2() < (mem[i].p - heroPos[0]).len2() ? 1 : 0;
+		if (count[s] >= half) s ^= 1;
+		mem[i].side = s;
+		count[s]++;
+	}
+	if (count[0] > count[1] + 1 || count[1] > count[0] + 1) {
+		int from = count[0] > count[1] ? 0 : 1, best = -1;
+		float bestD = 1e30f;
+		for (int i = 0; i < n; i++)
+			if (mem[i].side == from && (mem[i].p - heroPos[from ^ 1]).len2() < bestD) {
+				bestD = (mem[i].p - heroPos[from ^ 1]).len2();
+				best = i;
+			}
+		if (best >= 0) { mem[best].side = from ^ 1; count[from]--; count[from ^ 1]++; }
+	}
+	typedef char*(__fastcall* CpntFn)(char* self, void* edx, int id);
+	float minStep = *(float*)(sq + 0xC0);
+	for (int i = 0; i < n; i++) {
+		g_romanSide[mem[i].m] = (uint8_t)(mem[i].side ? other : target);
+		if (!mem[i].side) continue;
+		float* slot = (float*)((CpntFn)(*(void***)mem[i].m)[12])(mem[i].m, nullptr, 0x46);
+		if (!slot) continue;
+		Vector3 s(slot[0] - c.x + heroPos[1].x, slot[1] - c.y + heroPos[1].y, slot[2] - c.z + heroPos[1].z);
+		slot[0] = s.x; slot[1] = s.y; slot[2] = s.z;
+		float dx = s.x - mem[i].p.x, dz = s.z - mem[i].p.z, len = sqrtf(dx * dx + dz * dz);
+		float k = len <= 0.01f ? 0.0f : 1.0f / (len > minStep ? len : minStep);
+		slot[6] = dx * k; slot[7] = 0.0f; slot[8] = dz * k;
+	}
+	if (InterlockedIncrement(&g_splitLogs) % 600 == 1)
+		Log("proximity: squad %p shared: %d Romans go for %s, %d for %s", sq, count[0], HeroName(target), count[1],
+		    HeroName(other));
+}
+
 // Out of Romans. A squad coming alive takes its Romans from the shared pool
 // (vf33); when the pool runs dry it calls vf36 (0x52F850), which sends back to
 // the pool (vf34) every active squad of its enemy group whose box does not hold
@@ -582,19 +658,42 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 	typedef void(__fastcall* DtFn)(void* self, void* edx, char* dt);
 	Vector3 pl = lead.Pos(), po = other.Pos();
 	uint8_t* tr = (uint8_t*)t.raw();
+	static const bool noZoneFix = getenv("XXL_NOSQUADZONEFIX") != nullptr;   // diagnostics: as before
 	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
 		void** vt = *(void***)sq;
 		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604)) continue;
 		((VoidFn)kSquadPrep)(sq, nullptr);
 		if (*(uint8_t*)(grp + 0x10) & 4) continue;
 		bool inL = InSquadBox(sq, pl), inO = InSquadBox(sq, po);
-		if (inL && inO) {   // big boxes hold both: the hero nearer the box's middle
-			const float* f = (const float*)sq;
-			Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
-			if ((po - c).len2() < (pl - c).len2()) inL = false;
+		// both heroes in the box and the fight zone of a squad after the trio's leader (target 5)
+		bool shared = inL && inO && !noZoneFix && ((*(uint8_t*)(sq + 0x152) >> 2) & 7) == 5 && InFightZone(sq, pl) &&
+		              InFightZone(sq, po) && !HeroOut(t.Leader());
+		if (inL && inO) {
+			// Big boxes hold both. The squad's script starts the fight on its target
+			// being in the fight zone (+0x104..+0x10C max, +0x110..+0x118 min; vf46,
+			// events 0x4D10/0x4D11): run for a hero inside it. LV3-6's Romans stood
+			// in formation by Asterix while the squad ran for Obelix behind the
+			// bars, nearer the box's middle. Else the hero nearer the middle.
+			int zl = InFightZone(sq, pl), zo = InFightZone(sq, po);
+			if (zl != zo && !noZoneFix) {
+				inL = zl > zo;
+				static char* s_lastSq = nullptr;
+				static int s_logged = 0;
+				if (sq != s_lastSq && s_logged < 40) {
+					s_lastSq = sq;
+					s_logged++;
+					Log("proximity: squad %p: both heroes in its box, only %s in its fight zone: run for that hero", sq,
+					    HeroName(inL ? t.Leader() : nl));
+				}
+			} else {
+				const float* f = (const float*)sq;
+				Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
+				if ((po - c).len2() < (pl - c).len2()) inL = false;
+			}
 		}
 		if (inL) {
 			((DtFn)vt[31])(sq, nullptr, dt);
+			if (shared) SplitSquad(sq, t.Leader(), lead, nl, other);
 		} else if (inO) {
 			uint8_t leader = tr[0x2C], companion = tr[0x2D];
 			tr[0x2C] = (uint8_t)nl;
@@ -605,6 +704,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			g_squadForNonLeader = false;
 			if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = leader; tr[0x2D] = companion; }
 			*(uint32_t*)(tr + 0x3F4) &= ~1u;
+			if (shared) SplitSquad(sq, nl, other, t.Leader(), lead);
 			if (InterlockedIncrement(&g_p2Squads) % 300 == 1)
 				Log("proximity: squad %p active for %s (not leading)", sq, HeroName(nl));
 		} else if (*(uint8_t*)(sq + 0x152) & 2) {

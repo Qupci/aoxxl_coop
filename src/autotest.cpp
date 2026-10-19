@@ -2087,6 +2087,28 @@ const Step kFight56[] = {
 	END(245000),
 };
 
+// sq36a / sq36b (-Level 3): LV3-6's Romans in the open by the bars. a: Asterix
+// in the open (-187.2 2.6 -233.2), then player 2's Obelix behind the bars
+// (-183.5 5.5 -200.1); b: the other way round. Nobody moves; who the Romans go
+// for is logged (Romans within 7 units of each hero); at 16 s the hero in the
+// open walks off for 1.5 s.
+#define SQ36(first, second, walk, stop) 	MARK(0, "baseline"), 	LOADSECTOR(200, 6), 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), 	{ 1500, S_WATCHENEMIES, 0, 0, 0, -187.225f, 2.583f, "watch romans", -233.172f }, 	PLACEAT(2000, first, -187.225f, 3.0f, -233.172f), 	PLACEAT(3000, second, -183.501f, 6.0f, -200.060f), 	SHOT(8000, "sq36_1"), SHOT(15000, "sq36_2"), walk, stop, SHOT(25000, "sq36_3"), 	END(26000)
+const Step kSq36a[] = { SQ36(HERO_ASTERIX, HERO_OBELIX, P1(16000, 0, 0, -1.0f, "p1 walks"), P1(17500, 0, 0, 0, "p1 stops")) };
+// sq36c: both heroes in the open, then player 2's Obelix walks off: half the Romans go with him.
+const Step kSq36c[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_WATCHENEMIES, 0, 0, 0, -187.225f, 2.583f, "watch romans", -233.172f },
+	PLACEAT(2000, HERO_ASTERIX, -187.225f, 3.0f, -233.172f),
+	PLACEAT(2100, HERO_OBELIX, -178.0f, 3.0f, -222.0f),
+	SHOT(8000, "sq36_1"), SHOT(15000, "sq36_2"),
+	VPAD(16000, 1, 0, 0, -1.0f, "p2 walks"), VPAD(18000, 1, 0, 0, 0, "p2 stops"),
+	SHOT(20000, "sq36_3"), SHOT(25000, "sq36_4"),
+	END(26000),
+};
+const Step kSq36b[] = { SQ36(HERO_OBELIX, HERO_ASTERIX, VPAD(16000, 1, 0, 0, -1.0f, "p2 walks"), VPAD(17500, 1, 0, 0, 0, "p2 stops")) };
+
 // reload2 (level 2): player 2 in, split screen with both game cameras, then
 // the same level loaded again (the Inspector's "go to level 2"): no crash.
 const Step kReload2[] = {
@@ -3305,6 +3327,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
 	SCENARIO("fight56", kFight56),
+	SCENARIO("sq36a", kSq36a),
+	SCENARIO("sq36b", kSq36b),
+	SCENARIO("sq36c", kSq36c),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("req410", kReq410),
@@ -3647,7 +3672,9 @@ void LogTick(float t) {
 		}
 	}
 	if (at.watchEnemies) {   // live Romans near the point; squads near it (flags, member groups)
-		int live = 0;
+		int live = 0, nearA = 0, nearO = 0;   // within 7 units of each hero: fighting / chasing it
+		Trio wt = GetTrio();
+		Hero wa = wt ? wt.GetHero(HERO_ASTERIX) : Hero(), wo = wt ? wt.GetHero(HERO_OBELIX) : Hero();
 		const int ids[2] = { 93, 148 };
 		static char* seen[256];
 		static int nSeen = 0;
@@ -3662,6 +3689,8 @@ void LogTick(float t) {
 				Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
 				if ((p - at.enemyPoint).len2() >= 30.0f * 30.0f) continue;
 				live++;
+				if (wa && (p - wa.Pos()).len2() < 7.0f * 7.0f) nearA++;
+				if (wo && (p - wo.Pos()).len2() < 7.0f * 7.0f) nearO++;
 				if (nNow < 256) now[nNow++] = e;
 				bool old = false;
 				for (int k = 0; k < nSeen; k++) old = old || seen[k] == e;
@@ -3672,7 +3701,7 @@ void LogTick(float t) {
 		nSeen = nNow;
 		bool primed = at.enemiesPrimed;
 		at.enemiesPrimed = true;
-		line.Add(" | romans near %d", live);
+		line.Add(" | romans near %d (by A %d, by O %d)", live, nearA, nearO);
 		static int s_classTick = 0;
 		if (!primed || ++s_classTick % 50 == 0)
 			for (int id : ids) {
@@ -3689,13 +3718,21 @@ void LogTick(float t) {
 				char* pool = (char*)GetLvlObject(4, 44, i);
 				if (!pool) continue;
 				int nFree = 0, nHeld = 0;
+				uintptr_t vt = 0;
+				char* node = nullptr;
 				__try {
 					typedef char** (__fastcall* ListFn)(char* self, void* edx);
 					char** head = ((ListFn)(*(void***)pool)[0x30 / 4])(pool, nullptr);
-					for (char* e = head ? *head : nullptr; e && nFree < 500; e = *(char**)(e + 4)) nFree++;
+					for (char* e = head ? *head : nullptr; e && nFree < 500; e = *(char**)(e + 4)) {
+						if (!nFree) { vt = *(uintptr_t*)e; node = *(char**)(e + 0x10); }
+						nFree++;
+					}
 					for (char* e = *(char**)(pool + 0xC); e && nHeld < 500; e = *(char**)(e + 4)) nHeld++;
 				} __except (EXCEPTION_EXECUTE_HANDLER) { nFree = -1; }
-				Log("autotest: Roman pool %u %p: %d free, %d in its +0C list", i, pool, nFree, nHeld);
+				Log("autotest: Roman pool %u %p: %d free, %d in its +0C list; first free vt %X node %p; pool +04 %p "
+				    "+10 %X +14 %p %p %p +24 %X +28 %p", i, pool, nFree, nHeld, (unsigned)vt, node, *(void**)(pool + 4),
+				    *(unsigned*)(pool + 0x10), *(void**)(pool + 0x14), *(void**)(pool + 0x18), *(void**)(pool + 0x1C),
+				    *(unsigned*)(pool + 0x24), *(void**)(pool + 0x28));
 				// the squads' pool records drawing on it, with Romans alive / queued
 				char usersBuf[700];
 				LineBuf users(usersBuf);
@@ -3717,6 +3754,8 @@ void LogTick(float t) {
 					}
 				Log("autotest:   pool %u used by%s", i, users.c_str());
 			}
+		static int s_sqTick = 0;
+		bool sqDetail = (s_sqTick++ % 20) == 0;
 		for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 			char* sq = (char*)GetLvlObject(4, 26, i);
 			if (!sq) continue;
@@ -3724,9 +3763,12 @@ void LogTick(float t) {
 			Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
 			if ((c - at.enemyPoint).len2() > 60.0f * 60.0f) continue;
 			line.Add(" sq%u %p f%04X", i, sq, *(uint16_t*)(sq + 0x152));
-			if (!primed)
+			if (!primed) {
 				Log("autotest: squad %u %p box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f", i, sq, f[0x4A], f[0x47], f[0x4B],
 				    f[0x48], f[0x4C], f[0x49]);
+				Log("autotest: squad %u fight zone x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f", i, f[0x44], f[0x41], f[0x45],
+				    f[0x42], f[0x46], f[0x43]);
+			}
 			unsigned ng = *(unsigned*)(sq + 0x14C);
 			char* gr = *(char**)(sq + 0x144);
 			for (unsigned g2 = 0; gr && g2 < ng && g2 < 4; g2++) {
@@ -3734,6 +3776,34 @@ void LogTick(float t) {
 				line.Add(" [%u %u %u %u %d]", *(uint8_t*)(e + 0x11), *(uint8_t*)(e + 0x14), *(uint8_t*)(e + 0x15),
 				         *(uint16_t*)(e + 0x16), *(int16_t*)(e + 0x18));
 			}
+			// every 2 s: target mode (+0x152 bits 2-4; 5 = the trio's leader), formation centre
+			// (node +0x30), the heroes in the fight zone (max +0x104, min +0x110), each member
+			// Roman (pool records' lists) with its slot (component 0x46 +0) and distance to each hero
+			if (!sqDetail) continue;
+			char detailBuf[1500];
+			LineBuf d(detailBuf);
+			char* centre = *(char**)(sq + 0x30);
+			auto inZone = [&](Hero h) {
+				if (!h) return false;
+				Vector3 p = h.Pos();
+				return p.x >= f[0x44] && p.x <= f[0x41] && p.y >= f[0x45] && p.y <= f[0x42] && p.z >= f[0x46] && p.z <= f[0x43];
+			};
+			d.Add("autotest: sq%u f%04X target %u centre (%.1f %.1f %.1f) zone A%d O%d:", i, *(uint16_t*)(sq + 0x152),
+			      (*(uint8_t*)(sq + 0x152) >> 2) & 7, centre ? *(float*)(centre + 0x30) : 0.0f,
+			      centre ? *(float*)(centre + 0x34) : 0.0f, centre ? *(float*)(centre + 0x38) : 0.0f, inZone(wa), inZone(wo));
+			for (unsigned g2 = 0; gr && g2 < ng && g2 < 8; g2++)
+				for (char* m = *(char**)(gr + g2 * 0x1C + 8); m; m = *(char**)(m + 0x50)) {
+					typedef char*(__fastcall* CpntFn)(char* self, void* edx, int id);
+					char* slot = ((CpntFn)(*(void***)m)[12])(m, nullptr, 0x46);
+					Vector3 rp;
+					char* node = *(char**)(m + 0x10);
+					char* fr = node ? *(char**)(node + 4) : nullptr;
+					if (fr) rp = Vector3(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+					d.Add(" %u:(%.0f %.0f)A%.0fO%.0f", g2, rp.x, rp.z, wa ? sqrtf((rp - wa.Pos()).len2()) : -1.0f,
+					      wo ? sqrtf((rp - wo.Pos()).len2()) : -1.0f);
+					if (slot) d.Add("s(%.0f %.0f)", *(float*)slot, *(float*)(slot + 8));
+				}
+			Log("%s", d.c_str());
 		}
 	}
 	if (at.watchBeacons) {   // bonuses the pools placed on beacons: near the watched point / all

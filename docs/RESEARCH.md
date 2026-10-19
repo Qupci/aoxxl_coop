@@ -1685,3 +1685,16 @@ both halves).
   also feeds a scaled record of another squad whose box (max +0x11C, min +0x128) overlaps (LV5: 13 records).
   Script numbers stay doubled. XXL_NOSQUADSHAREFIX: as before. Autotest fight56 (-Level 5, potion, 150 s; WATCHENEMIES
   now lists each Roman pool's holders by real members): pool 1 1 alive / 6-8 queued -> 4 alive.
+- Round 77 (user: xxl_coop.lv3-6_asterix_then_obelix.log / _obelix_then_asterix.log, LV3-6): Romans ignored the hero
+  in the open while the other stood behind the bars. Squad 4 (14 Romans; box x -201..-132 z -251..-168, fight zone
+  x -194.4..-170.6 y -2.4..8.4 z -234.8..-208.0 = squad +0x104..+0x10C max, +0x110..+0x118 min) held both heroes
+  and was run for the one nearer the box middle -- the one behind the bars, outside the fight zone: its script
+  kept target mode 4 (+0x152 bits 2-4; 4 = fixed point +0x84, 5 = trio leader) and the Romans in formation round a
+  fixed centre. Squad pursuit: vf31 (CKGrpSquad::vf31 0x52B2E0) moves the formation centre (node +0x30, pos +0x30)
+  towards vf45's target (FUN_0052BAB0) and gives each Roman a slot (FUN_0052B670: Roman vf12(0x46) component, +0
+  slot, +0xC facing, +0x18 step = (slot - Roman) x/z / max(dist, squad +0xC0)); the Romans' own (sliced) ticks only
+  attack the nearest hero. Fix (proximity.cpp EnemyTickHook): both heroes in the box -> run for the one in the fight
+  zone (else the box middle rule); both in the zone of a target-5 squad -> SplitSquad: half the members (records' +8
+  lists) get their slots moved round the other hero (slot - centre + hero; side kept per Roman, newcomers to the
+  smaller side, one Roman a frame rebalanced). XXL_NOSQUADZONEFIX: as before. Autotests sq36a / sq36b (one hero
+  behind the bars; 3 -> 14 Romans on the open hero), sq36c (both in the open: 7 / 7, Obelix's 7 follow him).
