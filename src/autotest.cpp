@@ -1036,6 +1036,20 @@ const Step kSpy3P[] = {
 	END(30000),
 };
 
+// hudvanish (-Level 3): player 2's Obelix lands hits by the sector 2 agent (his
+// combo bar shows), then player 1's Asterix talks to the agent: the dialogue's
+// screen has no HUD (XXL_NOHUDVANISHFIX=1: player 2's bar stays on it).
+const Step kHudVanish[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 176.43f, 6.7f, -218.37f), PLACEAT(3000, HERO_OBELIX, 175.57f, 11.0f, -239.11f),
+	{ 4000, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "obelix hits" },
+	SHOT(4600, "hudvanish_1"),
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(6500, "hudvanish_2"), SHOT(9000, "hudvanish_3"),
+	END(10000),
+};
+
 const Step kSpy3N[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 2),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3273,6 +3287,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("boat49a", kBoat49A),
 	SCENARIO("hintjoin", kHintJoin),
 	SCENARIO("spy3n", kSpy3N),
+	SCENARIO("hudvanish", kHudVanish),
 	SCENARIO("spy3p", kSpy3P),
 	SCENARIO("catapultp", kCatapultP),
 	SCENARIO("catapulta", kCatapultA),

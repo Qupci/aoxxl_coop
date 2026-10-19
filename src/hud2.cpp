@@ -449,6 +449,13 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 		    cur ? *(uint8_t*)(cur + 0x28) : -1, cur == itf ? " -- the in-game one" : " -- player 2's HUD hidden");
 	}
 	if (!gm || cur != itf || (*(uint32_t*)(gm + 0x5C) & 0x8000000)) return false;
+	// The HUD vanished for a cutscene or a dialogue (gm +0x5C bit 20:
+	// CKHook_GoVanish 0x515CB0 hides the models of the parts showing, and
+	// FUN_005154A0 shows them again) -- the models in the interface then are
+	// player 1's; player 2's copy kept its combo bar or shields up on the
+	// cutscene's screen.
+	static const bool noVanishFix = getenv("XXL_NOHUDVANISHFIX") != nullptr;
+	if (!noVanishFix && (*(uint32_t*)(gm + 0x5C) & 0x100000)) return false;
 	// Part 0: the health (shields, sparkles: elements 0-30); part 1: the combo
 	// bar (31-). The shields and the combo bar are in the same draw list (0),
 	// and each needs its own culling (below), so each is a pass of its own.
