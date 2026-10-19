@@ -293,7 +293,8 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 		if (std::isfinite(r) && r * r > range2) range2 = r * r;
 	}
 	bool pushed = hook && *(uintptr_t*)hook == kPushPullVtbl && (*(uint8_t*)(hook + 0x18) & 0x10);
-	if (pushed) {
+	static const bool pushLog = getenv("XXL_PUSHLOG") != nullptr;   // diagnostics: who a pushed block ticks with
+	if (pushed && pushLog) {
 		static DWORD lastLog = 0;
 		if (GetTickCount() - lastLog > 500) {
 			lastLog = GetTickCount();
