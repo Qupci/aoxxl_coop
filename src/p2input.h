@@ -30,4 +30,4 @@ void BuildActionsFromPad(const PadState& p, uint8_t* out, int numActions);
 // `bindings` carrying player 2's hold times; returns the number of combos.
 int P2RecognizeCombos(uint8_t* values, int numActions, char* bindings);
 // Cheat: all combos learned, combo bar full.
-void CombosCheat();
+bool CombosCheat(bool viaHits = false);

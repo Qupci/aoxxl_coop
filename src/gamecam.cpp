@@ -124,10 +124,19 @@ struct Extras {
 	float window[2];
 	float nearP, farP, fogP;
 	float node[2][3];
+	float fov;   // the renderer's (svc +0x18) last field of view, +0x28
 };
 // The service's camera object (+0x1C) has the frame the tick places; the view
 // window and clip planes are set on the main RwCamera (CalcProjCamera,
-// FUN_00414B10 on the renderer +0x10).
+// FUN_00414B10 on the renderer +0x10). CalcProjCamera (0x414B70) keeps the
+// field of view it last set (renderer +0x28) and sets nothing when asked for
+// the same one: with the other player's tick's value left there, Asterix's
+// mole combo (a wider field of view, then back) found "back" already set and
+// both halves stayed wide. It goes back with the window.
+float* RendererFov(char* svc) {
+	char* r = *(char**)(svc + 0x18);
+	return r ? (float*)(r + 0x28) : nullptr;
+}
 float* Modelling(RwCamera* cam) { return (float*)(*(char**)((char*)cam + 4) + 0x10); }
 float* NodePos(char* svc, int off) {
 	char* node = *(char**)(svc + off);
@@ -146,6 +155,16 @@ void SaveExtras(char* svc, RwCamera* obj, Extras& e) {
 		float* p = NodePos(svc, 0x5D0 + 4 * i);
 		if (p) memcpy(e.node[i], p, sizeof(e.node[i]));
 	}
+	if (float* f = RendererFov(svc)) {
+		e.fov = *f;
+		static float lastFov = 0.0f;
+		static int n = 0;
+		if (fabsf(e.fov - lastFov) > 1.0f && n < 40) {   // the game's field of view (e.g. the mole combo's)
+			n++;
+			Log("gamecam: the game's field of view %.1f -> %.1f (window %.3f %.3f)", lastFov, e.fov, e.window[0], e.window[1]);
+			lastFov = e.fov;
+		}
+	}
 }
 void RestoreExtras(char* svc, RwCamera* obj, Extras& e) {
 	memcpy(Modelling(obj), e.modelling, sizeof(e.modelling));
@@ -155,6 +174,8 @@ void RestoreExtras(char* svc, RwCamera* obj, Extras& e) {
 	if (cam->nearPlane != e.nearP) ((SetClipFn)axr::kRwCameraSetNearClip)(cam, e.nearP);
 	if (cam->farPlane != e.farP) ((SetClipFn)axr::kRwCameraSetFarClip)(cam, e.farP);
 	cam->fogPlane = e.fogP;
+	static const bool noFovFix = getenv("XXL_NOFOVFIX") != nullptr;   // diagnostics: as before
+	if (float* f = RendererFov(svc); f && !noFovFix) *f = e.fov;
 	for (int i = 0; i < 2; i++) {
 		float* p = NodePos(svc, 0x5D0 + 4 * i);
 		if (p) memcpy(p, e.node[i], sizeof(e.node[i]));

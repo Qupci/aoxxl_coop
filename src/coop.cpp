@@ -74,6 +74,8 @@ struct CoopState {
 	bool    p2ValuesReady = false;
 	uint8_t p2CamValues[kP2ValuesSize] = {};   // p2Values plus the right stick, for the game camera's ticks
 	int     p2Combos = 0;             // combo bytes after the actions (P2RecognizeCombos)
+	int     comboHitsHero = -1;       // the combo cheat: the hero landing two hits soon (CombosCheat)
+	DWORD   comboHitsAt = 0;
 
 	uint8_t* savedValues = nullptr;   // CKInput's own array while player 2's is in
 	char*    savedBindings = nullptr; // CKInput+0x18 likewise (hold time in seconds at +0x18 each)
@@ -1798,6 +1800,21 @@ void CoopFrame() {
 
 	PadsPoll();
 	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
+
+	// The combo cheat's two hits ("a hit landed", 0x4C0E, through the hero's
+	// sendEvent), once the HUD's bar has seen the hits one short of full.
+	if (g.comboHitsHero >= 0 && now - g.comboHitsAt > 600) {
+		int who = g.comboHitsHero;
+		g.comboHitsHero = -1;
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(who) : Hero();
+		if (h) {
+			typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+			int prev = IndivEnter(who);
+			for (int k = 0; k < 2; k++) ((SendFn)(*(void***)h.raw())[5])(h.raw(), nullptr, 0x4C0E, nullptr);
+			IndivLeave(prev);
+		}
+	}
 	IndivFrame();
 	ExperimentalFrame();
 	SendDeferredSwitch();
@@ -1965,7 +1982,7 @@ void CoopFrame() {
 			if ((pressed & PAD_DPAD_DOWN) && g_config.cheats) CoopTorchCheat(false);
 			if ((pressed & PAD_DPAD_LEFT) && g_config.cheats) {
 				int prevStats = IndivEnter(me);   // individual heroes: this hero's own combo bar
-				CombosCheat();
+				if (CombosCheat(true)) { g.comboHitsHero = me; g.comboHitsAt = GetTickCount(); }
 				IndivLeave(prevStats);
 				Log("coop: cheat: every combo learned and %s's combo bar filled by %s", HeroName(me), player);
 			}
@@ -2587,7 +2604,12 @@ static bool FusionOn(Hero h1, Hero h2) {
 extern "C" __declspec(dllexport) void __cdecl XXLCoopTorchCheat(int give) { CoopTorchCheat(give != 0); }
 // Every combo learned and the combo bar full (Inspector's Cheats window).
 extern "C" __declspec(dllexport) void __cdecl XXLCoopCombosCheat() {
-	CombosCheat();
+	Trio t = GetTrio();
+	int lead = t ? t.Leader() : -1;
+	int me = g.p2Joined ? g.p1Hero : lead;
+	int prevStats = IndivEnter(me);
+	if (CombosCheat(true) && me >= 0) { g.comboHitsHero = me; g.comboHitsAt = GetTickCount(); }
+	IndivLeave(prevStats);
 	Log("coop: cheat: every combo learned and the combo bar filled (Inspector)");
 }
 

@@ -175,17 +175,34 @@ int P2RecognizeCombos(uint8_t* values, int numActions, char* bindings) {
 // Twister, 8 Twister Fusion, 0x10 Mole) and the combo bar full, as
 // FUN_0048C860 fills it (that object +0x10 bit 0x4000; +0xA4 = +0xA0, +0xC4 =
 // byte +0xBB).
-void CombosCheat() {
+// The HUD's bar only turns "full" (FUN_00518190 state 2 -> 4, "Combo") when it
+// sees the hits (+0xB0) go past the full mark (+0xC8) -- set straight to full,
+// the stats were full while the bar went on as before (the HUD looked frozen).
+// viaHits: the hits are put one short of the mark instead, and the caller has
+// the hero land two hits a moment later (CoopFrame): the game fills the bar.
+// Returns true when those hits are wanted.
+bool CombosCheat(bool viaHits) {
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	char* sg = gm ? *(char**)(gm + 0x40) : nullptr;
-	if (!sg) return;
+	if (!sg) return false;
 	*(uint32_t*)(sg + 0x10) |= 0x1F;
+	if (viaHits) {
+		if (*(uint32_t*)(sg + 0x10) & 0x4000) {   // already full: the gauge refilled
+			*(uint32_t*)(gm + 0xA4) = *(uint32_t*)(gm + 0xA0);
+			return false;
+		}
+		uint32_t mark = *(uint8_t*)(gm + 0xC8);
+		if (mark && *(uint32_t*)(gm + 0xB0) + 1 < mark) *(uint32_t*)(gm + 0xB0) = mark - 1;
+		*(float*)(gm + 0xA8) = *(float*)(gm + 0x9C);   // the decay timer from the start
+		return true;
+	}
 	if (!(*(uint32_t*)(sg + 0x10) & 0x4000)) {
 		*(uint32_t*)(gm + 0xA4) = *(uint32_t*)(gm + 0xA0);
 		*(uint32_t*)(gm + 0xC4) = *(uint8_t*)(gm + 0xBB);
 		*(uint32_t*)(sg + 0x10) |= 0x4000;
 	}
+	return false;
 }
 
 // Which actions are physically held right now (level, for edge-triggered

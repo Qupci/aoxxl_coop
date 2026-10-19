@@ -1667,3 +1667,11 @@ both halves).
   that hero as the leader (PusherOf). Autotest pushkeg5 (-Level 5): P1 X lights the keg at (-346.7 19.8 369.8)
   with the torch cheat (S_TORCH 0 then 6), P2 turns, holds X and pushes; Asterix glides beside the sliding block.
   XXL_NOPUSHFIX=1 reproduces the stuck push; XXL_PUSHLOG logs the distances.
+- Round 75 (user: xxl_coop.mole_fov.log): Asterix's mole combo (P1 combo 3 in autotests) widens the field of view
+  70 -> 100 and back. Render_CalcProjCamera (0x414B70, thiscall on the renderer = camera service +0x18) keeps the
+  last FOV at renderer +0x28 and sets no view window when asked for the same; P2's camera tick (gamecam TickCopy)
+  left its own 70 there while RestoreExtras put the live (wide) window back, so the mole's "back to 70" was skipped
+  and both halves stayed wide. Renderer +0x28 is now saved / restored with the window (XXL_NOFOVFIX: as before).
+  Combo cheat (pad: R3 / Back + D-pad left, Inspector export): the stats set straight to full never moved the HUD's
+  bar (it turns "Combo" only on seeing +0xB0 cross +0xC8 in its state 2); now hits are set one short and the hero
+  lands two 0x4C0E hits 0.6 s later (CombosCheat(true); already full: gauge refilled). Autotest molefov.

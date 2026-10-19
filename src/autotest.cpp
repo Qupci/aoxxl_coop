@@ -1436,6 +1436,25 @@ const Step kPushKeg5[] = {
 	END(35000),
 };
 
+// molefov (level 2, individual heroes): player 1's Asterix does the mole
+// combo -- the field of view widens and must come back for both halves after
+// it; then player 2's combo cheat (Back + D-pad left) brings up "Combo" on
+// player 2's bar.
+const Step kMoleFov[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	SHOT(2500, "molefov_1"),
+	{ 3000, S_P1COMBO, 5, 0, 0, 0, 0, "mole?" },
+	SHOT(4000, "molefov_2"),
+	{ 9000, S_P1COMBO, 3, 0, 0, 0, 0, "combo 3" },
+	SHOT(12000, "molefov_3"),
+	SHOT(20000, "molefov_4"),
+	VPAD(21000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(21100, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 combo cheat"), VPAD(21300, 1, 0, 0, 0, "p2 release"),
+	SHOT(22500, "molefov_5"), SHOT(24000, "molefov_6"),
+	END(25000),
+};
+
 // shields6 (level 2, individual heroes): both heroes with six shields -- both
 // HUDs fit their halves.
 const Step kShields6[] = {
@@ -3237,6 +3256,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("combofull2", kComboFull2),
 	SCENARIO("combomix", kComboMix),
 	SCENARIO("pushkeg5", kPushKeg5),
+	SCENARIO("molefov", kMoleFov),
 	SCENARIO("shields6", kShields6),
 	SCENARIO("shieldfull", kShieldFull),
 	SCENARIO("hudorder", kHudOrder),
