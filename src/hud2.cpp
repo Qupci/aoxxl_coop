@@ -339,18 +339,21 @@ int HudOwner() {
 // it before it takes the refresh flag: at a game over's respawn (0 -> 15, the
 // pulse of the hero who died last still on) it read row 0xFF and crashed (LV5-6,
 // both heroes down, twice). Kept inside the table; the refresh puts it right.
-void KeepHealthIndex(char* itf) {
+// fromGame: just after FUN_0051B550 wrote it (logged when that changes).
+void KeepHealthIndex(char* itf, bool fromGame) {
 	static const bool noFix = getenv("XXL_NOHUDINDEXFIX") != nullptr;   // diagnostics: as before
 	uint8_t& row = *(uint8_t*)(itf + 0x274);
 	uint8_t& col = *(uint8_t*)(itf + 0x275);
-	static bool wasOut = false;
-	static int logged = 0;
 	bool out = row > 5 || col > 4;
-	if (out && !wasOut && logged < 20) {
-		logged++;
-		Log("hud2: the health's place in the HUD is %u/%u (no health)%s", row, col, noFix ? "" : " -- kept at 0/0");
+	if (fromGame) {
+		static bool wasOut = false;
+		static int logged = 0;
+		if (out && !wasOut && logged < 20) {
+			logged++;
+			Log("hud2: the health's place in the HUD is %u/%u (no health)%s", row, col, noFix ? "" : " -- kept at 0/0");
+		}
+		wasOut = out;
 	}
-	wasOut = out;
 	if (noFix || !out) return;
 	row = 0;
 	col = 0;
@@ -363,10 +366,10 @@ void __fastcall ShieldsShownHook(char* self, void* edx) {
 	int prev = IndivEnter(HudOwner());
 	g_origShieldsShown(self, edx);
 	IndivLeave(prev);
-	KeepHealthIndex(self);
+	KeepHealthIndex(self, true);
 }
 void __fastcall ItfVf15Hook(char* self, void* edx) {
-	KeepHealthIndex(self);
+	KeepHealthIndex(self, false);
 	int prev = IndivEnter(HudOwner());
 	g_origItfVf15(self, edx);
 	IndivLeave(prev);
