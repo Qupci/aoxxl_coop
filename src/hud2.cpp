@@ -333,6 +333,29 @@ int HudOwner() {
 	int shopper = CoopShopper();
 	return shopper >= 0 ? shopper : CoopP1Hero();
 }
+// The health's place among the 6 x 5 shield models (+0x274 row, +0x275 in it):
+// FUN_0051B550 sets it from the health, row health / 5 - 1 on a whole shield --
+// 0xFF with no health. The low-health pulse (FUN_0051A140, state 2) draws from
+// it before it takes the refresh flag: at a game over's respawn (0 -> 15, the
+// pulse of the hero who died last still on) it read row 0xFF and crashed (LV5-6,
+// both heroes down, twice). Kept inside the table; the refresh puts it right.
+void KeepHealthIndex(char* itf) {
+	static const bool noFix = getenv("XXL_NOHUDINDEXFIX") != nullptr;   // diagnostics: as before
+	uint8_t& row = *(uint8_t*)(itf + 0x274);
+	uint8_t& col = *(uint8_t*)(itf + 0x275);
+	static bool wasOut = false;
+	static int logged = 0;
+	bool out = row > 5 || col > 4;
+	if (out && !wasOut && logged < 20) {
+		logged++;
+		Log("hud2: the health's place in the HUD is %u/%u (no health)%s", row, col, noFix ? "" : " -- kept at 0/0");
+	}
+	wasOut = out;
+	if (noFix || !out) return;
+	row = 0;
+	col = 0;
+}
+
 typedef void(__fastcall* VoidFn)(char* self, void* edx);
 VoidFn g_origShieldsShown = nullptr, g_origItfVf15 = nullptr;
 const uint8_t kShieldsShownPrologue[8] = { 0x83, 0xEC, 0x10, 0xA1, 0xF4, 0x21, 0x66, 0x00 };
@@ -340,8 +363,10 @@ void __fastcall ShieldsShownHook(char* self, void* edx) {
 	int prev = IndivEnter(HudOwner());
 	g_origShieldsShown(self, edx);
 	IndivLeave(prev);
+	KeepHealthIndex(self);
 }
 void __fastcall ItfVf15Hook(char* self, void* edx) {
+	KeepHealthIndex(self);
 	int prev = IndivEnter(HudOwner());
 	g_origItfVf15(self, edx);
 	IndivLeave(prev);

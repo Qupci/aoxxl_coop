@@ -1734,3 +1734,13 @@ both halves).
   Hud2ShopSides, LTMs, put back in Hud2EndP1); no frame shift. The restore of the view window now checks x too (left
   doubled each frame it went to inf and nothing of the HUD drew). XXL_NOSHOPHUDFIX = the old way. Autotests
   shopsplit / shopsplita with XXL_SPLITMODE=horizontal; vertical unchanged.
+- Round 81 (user + friend, LV5-6: both heroes down -> crash, twice; logs from the friend's PC over ssh, saved as
+  userlogs/friendpc-crash1/2.log; Windows: axxl.exe C0000005 at +0x11A9A0): the in-game HUD's health part keeps
+  its place among the 6 x 5 shield models at +0x274 (row) / +0x275, set by FUN_0051B550 from the health: row =
+  health / 5, minus 1 on a whole shield -> 0xFF with no health. The low-health pulse (FUN_0051A140 state 2,
+  0x51A996: [itf + 0x2C + (row * 5 + col) * 4]) draws from it before taking the refresh flag (gm +0x5C 0x4000);
+  at the game over's respawn (0 -> 15, the last hero's pulse still on) it read row 0xFF -> crash. LV2-1's game
+  over did not crash (no pulse on). Fix (hud2.cpp KeepHealthIndex): row/col kept inside the table before the HUD
+  tick (vf15 hook) and after each FUN_0051B550 (detour); XXL_NOHUDINDEXFIX: as before. Autotest over56 (-Level 5)
+  with XXL_DOWNAT=0:5000 XXL_HPAT=1:6000:2 XXL_DOWNAT2=1:9000 (new: XXL_DOWNAT2 second hero down, XXL_HPAT
+  <hero>:<ms>:<hp>): crash at the respawn with the fix off, none with it on.

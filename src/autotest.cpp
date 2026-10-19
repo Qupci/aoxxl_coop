@@ -2168,6 +2168,18 @@ const Step kSq36c[] = {
 };
 const Step kSq36b[] = { SQ36(HERO_OBELIX, HERO_ASTERIX, VPAD(16000, 1, 0, 0, -1.0f, "p2 walks"), VPAD(17500, 1, 0, 0, 0, "p2 stops")) };
 
+// over56 (-Level 5, XXL_DOWNAT=1:6000 XXL_DOWNAT2=0:9000): both heroes go down
+// at LV5-6's squad 4 fight lock: the game over and the respawn after it.
+const Step kOver56[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2600, HERO_ASTERIX, -116.16f, 10.3f, 33.90f), PLACEAT(2700, HERO_OBELIX, -113.0f, 10.3f, 36.0f),
+	SHOT(8000, "over56_1"), SHOT(12000, "over56_2"), SHOT(20000, "over56_3"), SHOT(30000, "over56_4"),
+	SHOT(40000, "over56_5"),
+	END(42000),
+};
+
 // reload2 (level 2): player 2 in, split screen with both game cameras, then
 // the same level loaded again (the Inspector's "go to level 2"): no crash.
 const Step kReload2[] = {
@@ -3391,6 +3403,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight64", kFight64),
 	SCENARIO("fight56", kFight56),
 	SCENARIO("sq36a", kSq36a),
+	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),
 	SCENARIO("sq36c", kSq36c),
 	SCENARIO("twistroman", kTwistRoman),
@@ -5313,23 +5326,45 @@ void AutotestFrame() {
 	{
 		// XXL_DOWNAT=<hero>:<ms>: that hero (0 Asterix, 1 Obelix) goes down that long
 		// into the run (individual heroes): any scenario with a fallen ally.
-		static int s_downHero = -2, s_downAt = 0;
-		if (s_downHero == -2) {
-			const char* e = getenv("XXL_DOWNAT");
-			s_downHero = -1;
-			if (e && sscanf(e, "%d:%d", &s_downHero, &s_downAt) != 2) s_downHero = -1;
+		// XXL_DOWNAT2 likewise for a second one (both down: the game over).
+		static int s_downHero[2] = { -2, -2 }, s_downAt[2] = {};
+		for (int k = 0; k < 2; k++) {
+			if (s_downHero[k] == -2) {
+				const char* e = getenv(k ? "XXL_DOWNAT2" : "XXL_DOWNAT");
+				s_downHero[k] = -1;
+				if (e && sscanf(e, "%d:%d", &s_downHero[k], &s_downAt[k]) != 2) s_downHero[k] = -1;
+			}
+			if (s_downHero[k] >= 0 && t >= s_downAt[k]) {
+				int hero = s_downHero[k];
+				s_downHero[k] = -1;
+				int prev = IndivEnter(hero);
+				CKYellowPages* yp = YellowPages();
+				char* gm = yp ? (char*)yp->gameManager : nullptr;
+				char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+				if (cb) *(uint8_t*)(cb + 0x50) = 0;
+				IndivLeave(prev);
+				bool down = IndivHeroDown(hero, "autotest XXL_DOWNAT");
+				Log("autotest: %s put down (%s)", HeroName(hero), down ? "fallen" : "not fallen");
+			}
 		}
-		if (s_downHero >= 0 && t >= s_downAt) {
-			int hero = s_downHero;
-			s_downHero = -1;
+		// XXL_HPAT=<hero>:<ms>:<hp>: that hero's health set then (low health: the HUD's pulse).
+		static int s_hpHero = -2, s_hpAt = 0, s_hp = 0;
+		if (s_hpHero == -2) {
+			const char* e = getenv("XXL_HPAT");
+			s_hpHero = -1;
+			if (e && sscanf(e, "%d:%d:%d", &s_hpHero, &s_hpAt, &s_hp) != 3) s_hpHero = -1;
+		}
+		if (s_hpHero >= 0 && t >= s_hpAt) {
+			int hero = s_hpHero;
+			s_hpHero = -1;
 			int prev = IndivEnter(hero);
 			CKYellowPages* yp = YellowPages();
 			char* gm = yp ? (char*)yp->gameManager : nullptr;
 			char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
-			if (cb) *(uint8_t*)(cb + 0x50) = 0;
+			if (cb) *(uint8_t*)(cb + 0x50) = (uint8_t)s_hp;
+			if (gm) *(uint32_t*)(gm + 0x5C) |= 0x4000;   // the HUD shows it
 			IndivLeave(prev);
-			bool down = IndivHeroDown(hero, "autotest XXL_DOWNAT");
-			Log("autotest: %s put down (%s)", HeroName(hero), down ? "fallen" : "not fallen");
+			Log("autotest: %s's health set to %d", HeroName(hero), s_hp);
 		}
 		// XXL_UPAT=<ms>: the fallen hero revived beside the other one then.
 		static int s_upAt = -2;
