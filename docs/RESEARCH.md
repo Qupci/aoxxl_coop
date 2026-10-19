@@ -1644,3 +1644,10 @@ both halves).
   stays (autotest shoplift). Closing the window could hang in the game's own shutdown (game thread waiting in its C
   runtime / DirectSound teardown, seen in older sessions too): the watchdog ends the process after 10 s with the game
   manager gone and no frames.
+- Round 73 (user: xxl_coop.combo_bar.log, LV6): one player's bar going full left the other's held at the top, red,
+  never reaching "Combo". The combo bar's level bounce is in interface +0x24 bits 27-28 (FUN_00519B00, run in
+  state 2; count +0x2EC), set to 3 on entering the full state (FUN_00441B60(3,0x1B,2)); P2's HUD copy swapped
+  bits 4-5, 12-14, 23-24 only, so the bounce went to the other bar (bounce 3 sets 0xC4's fill to the top; its own
+  count 0 ran past 0 = 255 bounces). Bits 27-28 now per HUD (autotest combomix: hits given in batches, S_GIVE b=3).
+  Pause menu: gm +0x5C bit 26 = pause asked, bit 27 = HUD hidden for it (FUN_00515830 hides, FUN_00515A30 shows);
+  P2's HUD passes are skipped while bit 27 is set (combomix flips bit 26 with S_POKE8 a=-2).

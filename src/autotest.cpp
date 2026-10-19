@@ -1384,6 +1384,27 @@ const Step kComboFull2[] = {
 	END(6500),
 };
 
+// combomix (level 2, individual heroes): player 2's Obelix fills his combo bar
+// hit by hit ("Combo"), then player 1's Asterix -- his bar must fill on its own
+// (not a full red bar without "Combo"); the pause menu hides both HUDs.
+#define HITS(t, hero, n) { t, S_GIVE, hero, 3, 0, (float)(n), 0, "hits" }
+const Step kComboMix[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	HITS(2000, HERO_OBELIX, 8), HITS(2300, HERO_OBELIX, 8), HITS(2600, HERO_OBELIX, 8), HITS(2900, HERO_OBELIX, 8),
+	HITS(3200, HERO_OBELIX, 8),
+	SHOT(4500, "combomix_1"),
+	HITS(5000, HERO_ASTERIX, 6), HITS(5300, HERO_ASTERIX, 6), HITS(5600, HERO_ASTERIX, 6),
+	SHOT(6500, "combomix_2"),
+	HITS(6900, HERO_ASTERIX, 6), HITS(7200, HERO_ASTERIX, 6),
+	SHOT(8000, "combomix_3"),
+	{ 9500, S_POKE8, -2, 0x5F, 0, 4.0f, 0, "the pause's HUD hiding (game manager +0x5C bit 26)" },
+	SHOT(11000, "combomix_4"),
+	{ 12000, S_POKE8, -2, 0x5F, 0, 4.0f, 0, "the pause's HUD back" },
+	SHOT(13500, "combomix_5"),
+	END(14500),
+};
+
 // shields6 (level 2, individual heroes): both heroes with six shields -- both
 // HUDs fit their halves.
 const Step kShields6[] = {
@@ -3183,6 +3204,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shield2o", kShield2O),
 	SCENARIO("revshield", kRevShield),
 	SCENARIO("combofull2", kComboFull2),
+	SCENARIO("combomix", kComboMix),
 	SCENARIO("shields6", kShields6),
 	SCENARIO("shieldfull", kShieldFull),
 	SCENARIO("hudorder", kHudOrder),
@@ -4149,6 +4171,15 @@ void RunStep(const Step& s) {
 			IndivLeave(prev);
 			break;
 		}
+		if (s.a == -2) {   // the game manager's own byte +b, bits x flipped
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			if (gm) {
+				Log("autotest: game manager +%03X %02X ^ %02X", s.b, *(uint8_t*)(gm + s.b), (int)s.x);
+				*(uint8_t*)(gm + s.b) ^= (uint8_t)(int)s.x;
+			}
+			break;
+		}
 		if (s.a < 0) {
 			CKYellowPages* yp = YellowPages();
 			char* gm = yp ? (char*)yp->gameManager : nullptr;
@@ -4943,11 +4974,12 @@ void RunStep(const Step& s) {
 		if (!gm) break;
 		typedef char(__fastcall* GmFn)(char* gm, void* edx, int arg);
 		int prev = IndivEnter(s.a);
-		if (s.b == 2) {   // the combo bar filled the game's way: the hero's "a hit landed" event (0x4C0E), 40 times
+		if (s.b == 2 || s.b == 3) {   // the combo bar filled the game's way: the hero's "a hit landed" event (0x4C0E), 40 times (3: x times)
 			Trio t = GetTrio();
 			Hero h = t ? t.GetHero(s.a) : Hero();
 			typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
-			for (int k = 0; h && k < 40; k++) ((SendFn)(*(void***)h.raw())[5])(h.raw(), nullptr, 0x4C0E, nullptr);
+			int n = s.b == 3 ? (int)s.x : 40;
+			for (int k = 0; h && k < n; k++) ((SendFn)(*(void***)h.raw())[5])(h.raw(), nullptr, 0x4C0E, nullptr);
 		} else if (s.b == 1) ((GmFn)0x507210)(gm, nullptr, 5);
 		else ((GmFn)0x4BB260)(gm, nullptr, (int)s.x);
 		char* cb = *(char**)(gm + 0x40);

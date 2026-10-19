@@ -21,8 +21,12 @@ const int kP2Elems[] = {
 	0xA4, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC,
 };
 const int kNumP2Elems = sizeof(kP2Elems) / sizeof(kP2Elems[0]);
-// Their state in the interface: +0x24 bits, and three ranges.
-const uint32_t kStateBits = 0x30 | 0x7000 | 0x1800000;
+// Their state in the interface: +0x24 bits, and three ranges. Bits 27-28 are
+// the combo bar's bounce at a new level (FUN_00519B00, counted down in +0x2EC);
+// left shared, a bar going full (bounce 3) bounced the other player's bar too
+// -- held at its top, red, with its own count run past 0 (255 bounces), and
+// no "Combo" when it did fill.
+const uint32_t kStateBits = 0x30 | 0x7000 | 0x1800000 | 0x18000000;
 struct Range { int from, to; };
 const Range kRanges[] = { { 0x1E4, 0x278 }, { 0x2A0, 0x310 }, { 0x494, 0x4A0 } };
 
@@ -326,6 +330,17 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 		Log("hud2: p1 bits %08X 270 %u 274 %u/%u (p1 hp %d) shown %s", *(uint32_t*)(itf + 0x24), *(uint32_t*)(itf + 0x270),
 		    *(uint8_t*)(itf + 0x274), *(uint8_t*)(itf + 0x275), hp, vis);
 	}
+	{   // the combo bars' states (bits 12-14 the bar, 23-24 the "Combo" word, 27-28 a level's bounce) and the pause's HUD flags
+		static uint32_t lastKey = ~0u;
+		static int logged = 0;
+		uint32_t key = (g.s1.bits & 0x19807000) | (g.s2.valid ? (g.s2.bits & 0x19807000) >> 1 : 0) | (*(uint32_t*)(gm + 0x5C) & 0x1C000000) >> 26;
+		if (key != lastKey && logged < 60) {
+			lastKey = key;
+			logged++;
+			Log("hud2: bars p1 %08X p2 %08X, gm+5C %08X", *(uint32_t*)(itf + 0x24) & 0x19807000,
+			    g.s2.valid ? g.s2.bits & 0x19807000 : 0, *(uint32_t*)(gm + 0x5C));
+		}
+	}
 	if (!g.s2.valid) {
 		g.s2 = g.s1;
 		Log("hud2: player 2's HUD (health, combo bar) set up from the interface %p", itf);
@@ -421,6 +436,11 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	g.nHidden = 0;
 	char* itf = g.itf;
 	if (!On() || !hud || !itf || !g.s2.valid || itf != (char*)GetLvlObject(2, 132, 0)) return false;
+	// The pause menu: the game hid its HUD (game manager +0x5C bit 27, set
+	// with FUN_00515830's hiding, cleared with FUN_00515A30's showing) --
+	// player 2's too.
+	char* gm = GM();
+	if (gm && (*(uint32_t*)(gm + 0x5C) & 0x8000000)) return false;
 	// Part 0: the health (shields, sparkles: elements 0-30); part 1: the combo
 	// bar (31-). The shields and the combo bar are in the same draw list (0),
 	// and each needs its own culling (below), so each is a pass of its own.
