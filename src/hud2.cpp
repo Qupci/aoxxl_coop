@@ -345,14 +345,17 @@ void KeepHealthIndex(char* itf, bool fromGame) {
 	uint8_t& row = *(uint8_t*)(itf + 0x274);
 	uint8_t& col = *(uint8_t*)(itf + 0x275);
 	bool out = row > 5 || col > 4;
-	if (fromGame) {
-		static bool wasOut = false;
+	if (fromGame) {   // per HUD owner: both players' HUDs are refreshed each frame
+		static bool wasOut[3] = {};
 		static int logged = 0;
-		if (out && !wasOut && logged < 20) {
+		int owner = HudOwner();
+		bool& was = wasOut[owner >= 0 && owner < 2 ? owner : 2];
+		if (out && !was && logged < 20) {
 			logged++;
-			Log("hud2: the health's place in the HUD is %u/%u (no health)%s", row, col, noFix ? "" : " -- kept at 0/0");
+			Log("hud2: the health's place in %s's HUD is %u/%u (no health)%s", HeroName(owner), row, col,
+			    noFix ? "" : " -- kept at 0/0");
 		}
-		wasOut = out;
+		was = out;
 	}
 	if (noFix || !out) return;
 	row = 0;
