@@ -1409,6 +1409,33 @@ const Step kComboMix[] = {
 	END(18500),
 };
 
+// pushkeg5 (-Level 5, sector 3): Asterix lights the powder keg (the level
+// hands the lead to Obelix), player 2's Obelix pushes the big block (the level
+// then makes it slide on its own: 09A7), and Asterix walks past the block --
+// Obelix must get his controls back when the slide ends.
+const Step kPushKeg5[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -346.19f, 19.705f, 370.093f), PLACEAT(3000, HERO_OBELIX, -346.5f, 19.7f, 365.0f),
+	{ 3800, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4000, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	PLACEAT(5000, HERO_ASTERIX, -346.72f, 19.81f, 369.79f),
+	P1(5500, PAD_X, 0, 0, "p1 X (keg)"), P1(5700, 0, 0, 0, "p1 release"),
+	P1(7000, PAD_B, 0, 0, "p1 B (keg)"), P1(7200, 0, 0, 0, "p1 release"),
+	PLACEAT(10500, HERO_OBELIX, -344.226f, 19.634f, 335.444f),
+	VPAD(12000, 1, 0, -0.65f, 0.76f, "p2 turns to the block"), VPAD(12150, 1, 0, 0, 0, "p2 release"),
+	VPAD(12500, 1, PAD_X, 0, 0, "p2 holds X (grabs the block)"),
+	VPAD(14000, 1, PAD_X, -0.65f, 0.76f, "p2 pushes (X held)"),
+	PLACEAT(14500, HERO_ASTERIX, -343.0f, 19.63f, 341.0f),
+	SHOT(15000, "pushkeg5_1"),
+	GLIDEAT(15000, HERO_ASTERIX, -344.0f, 19.63f, 338.2f, 1000),
+	GLIDEAT(17000, HERO_ASTERIX, -350.0f, 19.70f, 328.0f, 2000),
+	SHOT(20000, "pushkeg5_2"), SHOT(28000, "pushkeg5_3"),
+	VPAD(30000, 1, 0, 0, 0, "p2 lets go"),
+	VPAD(31000, 1, 0, 0, -1.0f, "p2 walks back"), VPAD(33000, 1, 0, 0, 0, "p2 stops"),
+	SHOT(33500, "pushkeg5_4"),
+	END(35000),
+};
+
 // shields6 (level 2, individual heroes): both heroes with six shields -- both
 // HUDs fit their halves.
 const Step kShields6[] = {
@@ -3209,6 +3236,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("revshield", kRevShield),
 	SCENARIO("combofull2", kComboFull2),
 	SCENARIO("combomix", kComboMix),
+	SCENARIO("pushkeg5", kPushKeg5),
 	SCENARIO("shields6", kShields6),
 	SCENARIO("shieldfull", kShieldFull),
 	SCENARIO("hudorder", kHudOrder),

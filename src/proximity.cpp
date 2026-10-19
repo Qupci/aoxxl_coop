@@ -65,6 +65,25 @@ const uintptr_t kLifterVtbl = 0x625E2C;          // CKHkLifter (2,47)
 // the leader goes out of that range. While no spy is spawned there is no node,
 // so its tick was never sliced: only the leader made it appear.
 const uintptr_t kClueManVtbl = 0x6261F4;
+// Blocks to push (CKHkPushPullAsterix, 2,147). Their tick (vf15, 0x4B5140)
+// lets go of the hero pushing them (+0x18 bit 4 cleared, vf27 0x6C) when the
+// trio's leader (trio vfA0) is a hero the block is not for (+0x14 bits 6/7).
+// Ticked with Asterix posing as the leader -- walking past the big block LV5-3
+// while Obelix pushed it --, the block dropped Obelix in the middle of the
+// level's "the block slides on its own" (09A7: the pusher's +0x3F0 bit 6, sent
+// through the trio as 090C): the second 09A7 found nobody pushing and never
+// sent the 090C(0) that ends it, and Obelix pushed in place for good. A block
+// a hero pushes ticks with that hero as the leader.
+const uintptr_t kPushPullVtbl = 0x626110;
+// The hero pushing `block`: its push state (hero +0x3EC bits 25-30, FUN_0049A670)
+// is on and its pushed object (+0x484, which it sends 0x0901 to) is the block.
+static int PusherOf(char* block, Trio t, int p1, int p2) {
+	for (int i : { p1, p2 }) {
+		Hero h = t.GetHero(i);
+		if (h && *(char**)(h.raw() + 0x484) == block && ((*(uint32_t*)(h.raw() + 0x3EC) >> 25) & 0x3F) != 0) return i;
+	}
+	return -1;
+}
 
 // Bonus pools (helmets and the like). CKGrpBonusPool::vf27 updates every active
 // bonus, then attracts those within the pool's radius of the leader's position
@@ -263,14 +282,41 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 		if (th && *(uint8_t*)(hook + 0x21) == 4 && (at - th.Pos()).len2() < 3.0f * 3.0f)
 			*(uint32_t*)(hook + 0x24) &= ~0x80u;
 	}
+	static const bool noPushFix = getenv("XXL_NOPUSHFIX") != nullptr;   // diagnostics: the old slicing
+	int pusher = hook && *(uintptr_t*)hook == kPushPullVtbl && !noPushFix ? PusherOf(hook, t, p1, p2) : -1;
+	if (pusher >= 0) {
+		nearest = pusher;
+		range2 = 1e30f;
+	}
 	if (hook && *(uintptr_t*)hook == kClueManVtbl) {
 		float r = *(const float*)(hook + 0x68);
 		if (std::isfinite(r) && r * r > range2) range2 = r * r;
 	}
+	bool pushed = hook && *(uintptr_t*)hook == kPushPullVtbl && (*(uint8_t*)(hook + 0x18) & 0x10);
+	if (pushed) {
+		static DWORD lastLog = 0;
+		if (GetTickCount() - lastLog > 500) {
+			lastLog = GetTickCount();
+			Log("proximity: pushed block %p at (%.2f %.2f %.2f): %s %.2f away, %s %.2f; ticks as %s", hook, at.x, at.y, at.z,
+			    HeroName(p1), sqrtf(d1), HeroName(p2), sqrtf(d2), HeroName(nearest));
+		}
+	}
+	struct LetGo {   // a block letting go of its pusher, logged (a few times)
+		char* hook; bool was; uint8_t leader;
+		~LetGo() {
+			static int n = 0;
+			if (was && !(*(uint8_t*)(hook + 0x18) & 0x10) && n < 20) {
+				n++;
+				Log("proximity: block %p let go of its pusher (ticked with %s as the leader)", hook, HeroName(leader));
+			}
+		}
+	} letGo{ hook, pushed, 0 };
 	if ((d1 > range2 && d2 > range2) || tr[0x2C] == nearest) {
+		letGo.leader = tr[0x2C];
 		tick(life, nullptr, dt);
 		return;
 	}
+	letGo.leader = (uint8_t)nearest;
 	uint8_t leader = tr[0x2C], companion = tr[0x2D];
 	int other = nearest == p1 ? p2 : p1;
 	tr[0x2C] = (uint8_t)nearest;

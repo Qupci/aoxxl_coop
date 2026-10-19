@@ -1656,3 +1656,14 @@ both halves).
   puts the pause interface (vt 6287C0, type 4) in gm +0xF8 -- bit 27 of +0x5C is not involved. P2's HUD passes now
   need gm +0xF8 == the in-game interface (type 9). Autotest combomix opens it with S_POKE8 a=-3 (state b); Escape
   and P1's injected Start do not reach the game's pause in autotests.
+- Round 74 (user: xxl_coop.lv5-3-block*.log): LV5-3's big block (CKHkPushPullAsterix 2,147, vt 626110) after the
+  powder keg: once Obelix pushes, the level sends the block 09A7 (toggle +0x14 bit 0; with a hero pushing, +0x18 bit
+  4, the trio gets 090C(bit): the leader's +0x3F0 bit 6, "pushed object slides on its own" -- FUN_0049A670 state 3
+  then moves the hero at +0x470 without input) and 4 s later 09A7 again (090C(0) ends it). The block's tick
+  (vf15 0x4B5140) clears +0x18 bit 4 when the trio's leader (trio vfA0) is a hero it is not for (+0x14 bits 6/7);
+  proximity slicing ticked it with Asterix as the leader whenever Asterix was nearer its origin (the block slides
+  away from Obelix: 6.6 -> 10.7 units), so the second 09A7 found nobody pushing, never sent 090C(0), and Obelix
+  pushed in place for good. A block a hero pushes (hero +0x484 == block, +0x3EC bits 25-30 != 0) now ticks with
+  that hero as the leader (PusherOf). Autotest pushkeg5 (-Level 5): P1 X lights the keg at (-346.7 19.8 369.8)
+  with the torch cheat (S_TORCH 0 then 6), P2 turns, holds X and pushes; Asterix glides beside the sliding block.
+  XXL_NOPUSHFIX=1 reproduces the stuck push; XXL_PUSHLOG logs the distances.
