@@ -9,6 +9,7 @@
 #include "splitscreen.h"
 #include "trio.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -289,6 +290,7 @@ void Restore2d() {
 }
 
 static const bool g_noLayout = getenv("XXL_NOHUDLAYOUT") != nullptr;   // the HUD laid out as before round 79
+static const bool g_noGateSlideFix = getenv("XXL_NOGATESLIDEFIX") != nullptr;   // the gate counter's slide as in round 79
 
 // Stacked split (player 1 on top): each player's HUD in their own half, as
 // the single player HUD -- health at the top left, the combo bar's column
@@ -314,13 +316,52 @@ void ComboToHalf(char* itf, const float* cl, int player, bool save) {
 // and number +0x160; it slides in from the right edge to +0x3DC): side by
 // side, at 3/4 size in the middle, over both halves; stacked, at the right
 // edge as in single player, its middle on the halves' border.
+// Side by side it slides in and out (+0x3F4, from / to the picture's width
+// + 1) up from / down to the bottom instead: sideways it crossed player 2's
+// half, and its way out ended off nowhere. Its sparkle at the end (particles
+// +0x114, set off when the fight is won) sits with it.
 void LayoutGate(char* itf, const float* cl, bool stacked) {
 	float shown = *(float*)(itf + 0x3DC);
 	if (!(shown > 0.3f && shown < 1.0f)) shown = 0.879f;
 	Xform t = stacked ? Xform{ shown, 0.475f, 1.0f, 0.0f, 0.025f } : Xform{ shown, 0.475f, 0.75f, 0.5f - shown, 0.0f };
-	for (int o = 0xD4; o <= 0x110; o += 4) Xf3d(NodeAt(itf, o), cl, t, true);
-	Xf2d(itf, 0x144, t);
-	Xf2d(itf, 0x160, t);
+	Xform u = t;
+	if (!stacked && !g_noGateSlideFix) {
+		float way = 0.4f;
+		char* pic = NodeAt(itf, 0xD4 + 4 * *(uint8_t*)(itf + 0x3F8));
+		char* a = pic ? *(char**)(pic + 0x1C) : nullptr;
+		char* b = a && !IsBadReadPtr(a, 0xC) ? *(char**)(a + 8) : nullptr;
+		if (b && !IsBadReadPtr(b, 0x3C)) way = *(float*)(b + 0x38) + 1.0f - shown;
+		if (!(way > 0.05f && way < 3.0f)) way = 0.4f;
+		float off = *(float*)(itf + 0x3F4) - shown;
+		float p = off / way;
+		p = p < 0.0f ? 0.0f : p > 1.0f ? 1.0f : p;
+		u.dx -= t.s * off;
+		u.dy -= p * 0.6f;
+	}
+	for (int o = 0xD4; o <= 0x110; o += 4) Xf3d(NodeAt(itf, o), cl, u, true);
+	Xf2d(itf, 0x144, u);
+	Xf2d(itf, 0x160, u);
+}
+
+// The gate counter's sparkle (particles +0x114) is placed once, at the
+// interface's start (frame modelling +0x40 = +0x3DC, 0.5): its particles leave
+// from there whatever the pass does with the node. Side by side it is put on
+// the counter in the middle for good (HUD camera space = 2D places), and back
+// when that layout is off.
+void PlaceGateSparkle(char* itf, bool middle) {
+	char* n = *(char**)(itf + 0x114);
+	float* fr = n && !IsBadReadPtr(n, 0x50) ? *(float**)(n + 4) : nullptr;
+	if (!fr || IsBadReadPtr(fr, 0x90)) return;
+	float shown = *(float*)(itf + 0x3DC);
+	if (!(shown > 0.3f && shown < 1.0f)) return;
+	// The game's place, or the counter's middle (scaled 3/4 about (shown, 0.475), at x 0.5).
+	float x = middle ? 0.5f : shown, y = middle ? 0.475f + (0.5f - 0.475f) * 0.75f : 0.5f;
+	float dx = x - fr[0x80 / 4], dy = y - fr[0x84 / 4];
+	if (fabsf(dx) < 0.001f && fabsf(dy) < 0.001f) return;
+	fr[0x40 / 4] += dx; fr[0x44 / 4] += dy;   // modelling
+	fr[0x80 / 4] += dx; fr[0x84 / 4] += dy;   // LTM
+	static int logged = 0;
+	if (logged++ < 20) Log("hud2: gate counter's sparkle %s (%.3f %.3f)", middle ? "to the middle" : "back", x, y);
 }
 
 // The interface's own health readers outside its tick: FUN_0051B550 (which
@@ -456,6 +497,7 @@ void Hud2BeforeInterfaceTick(char* itf) {
 }
 
 void Hud2AfterInterfaceTick(char* itf, void* time) {
+	if (itf) PlaceGateSparkle(itf, On() && SplitActive() && g_config.splitMode == SPLIT_VERTICAL && !g_noLayout && !g_noGateSlideFix);
 	if (!On() || !itf) return;
 	char* gm = GM();
 	if (!gm) return;

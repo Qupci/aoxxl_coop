@@ -2146,6 +2146,29 @@ const Step kFight56[] = {
 	END(245000),
 };
 
+// gatedone (-Level 5): LV5-6's fight lock (squad 4) cleared by Asterix's
+// Twister, both heroes in it -- the gate counter's end: its sparkle and its
+// way out (XXL_GATESHOTS: shots then; the run ends 3 s after it has gone).
+#define TWIST1(t) { t, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix combo bar full" }, { t + 300, S_P1COMBO, 4, 0, 0, 0, 0, "twister" }, \
+	P1(t + 1200, 0, 0, 1.0f, "p1 forward"), P1(t + 3500, 0, 0, -1.0f, "p1 back"), P1(t + 5800, 0, 0, 0, "p1 stop")
+const Step kGateDone[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	LOADSECTOR(600, 6),
+	{ 1000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 2500, S_WATCHENEMIES, 0, 0, 0, -116.16f, 9.84f, "watch romans", 33.90f },
+	PLACEAT(2600, HERO_ASTERIX, -116.16f, 10.3f, 33.90f), PLACEAT(2600, HERO_OBELIX, -114.16f, 10.3f, 33.90f),
+	SHOT(4000, "gatedone_start"),
+	TWIST1(4000), TWIST1(10500), TWIST1(17000), TWIST1(23500), TWIST1(30000), TWIST1(36500), TWIST1(43000),
+	TWIST1(49500), TWIST1(56000), TWIST1(62500), TWIST1(69000), TWIST1(75500), TWIST1(82000), TWIST1(88500),
+	TWIST1(95000), TWIST1(101500), TWIST1(108000), TWIST1(114500), TWIST1(121000), TWIST1(127500), TWIST1(134000),
+	TWIST1(140500), TWIST1(147000), TWIST1(153500), TWIST1(160000), TWIST1(166500), TWIST1(173000), TWIST1(179500),
+	TWIST1(186000), TWIST1(192500), TWIST1(199000), TWIST1(205500), TWIST1(212000), TWIST1(218500), TWIST1(225000),
+	TWIST1(231500), TWIST1(238000), TWIST1(244500), TWIST1(251000), TWIST1(257500), TWIST1(264000), TWIST1(270500),
+	TWIST1(277000), TWIST1(283500), TWIST1(290000), TWIST1(296500),
+	END(305000),
+};
+
 // sq36a / sq36b (-Level 3): LV3-6's Romans in the open by the bars. a: Asterix
 // in the open (-187.2 2.6 -233.2), then player 2's Obelix behind the bars
 // (-183.5 5.5 -200.1); b: the other way round. Nobody moves; who the Romans go
@@ -3402,6 +3425,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
 	SCENARIO("fight56", kFight56),
+	SCENARIO("gatedone", kGateDone),
 	SCENARIO("sq36a", kSq36a),
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),
@@ -5381,6 +5405,30 @@ void AutotestFrame() {
 	RunGlides(now);
 	InjectP1();
 	HudDiffFrame();
+	// XXL_GATESHOTS: shots as the fight gate's counter (interface +0x24 bits
+	// 17-18) slides in and when it goes (state 3, its sparkle); the run ends 3 s
+	// after it has gone.
+	static const bool gateShots = getenv("XXL_GATESHOTS") != nullptr;
+	if (gateShots) {
+		static unsigned lastState = 0, shotN = 0;
+		static int since = -1, endAt = -1;
+		char* itf = (char*)GetLvlObject(2, 132, 0);
+		unsigned st = itf ? (*(uint32_t*)(itf + 0x24) >> 17) & 3 : 0;
+		if (st != lastState) {
+			Log("autotest: gate counter state %u -> %u", lastState, st);
+			if (st == 1 || st == 3) since = t;
+			if (st == 0 && lastState == 3) endAt = t + 3000;
+			lastState = st;
+		}
+		static const int kAt[] = { 0, 150, 300, 500, 800, 1200, 1700 };
+		if (since >= 0 && shotN < 7 && t - since >= kAt[shotN]) {
+			char name[40];
+			_snprintf_s(name, sizeof(name), _TRUNCATE, "gate_s%u_%d", st, kAt[shotN]);
+			Shot(name);
+			if (++shotN == 7) { shotN = 0; since = -1; }
+		}
+		if (endAt >= 0 && t >= endAt) { Finish("gate counter gone"); return; }
+	}
 	if ((int)(now - at.lastLog) >= 100) {
 		at.lastLog = now;
 		LogTick(t / 1000.0f);

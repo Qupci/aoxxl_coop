@@ -1744,3 +1744,15 @@ both halves).
   tick (vf15 hook) and after each FUN_0051B550 (detour); XXL_NOHUDINDEXFIX: as before. Autotest over56 (-Level 5)
   with XXL_DOWNAT=0:5000 XXL_HPAT=1:6000:2 XXL_DOWNAT2=1:9000 (new: XXL_DOWNAT2 second hero down, XXL_HPAT
   <hero>:<ms>:<hp>): crash at the respawn with the fix off, none with it on.
+- Round 82 (user, LV5-6 squad 4 at -116.16 9.84 33.90, Twister): (1) side by side the gate counter (FUN_0051F3C0)
+  slid out to the right (state 3: +0x3F4 from +0x3DC to the picture's width + 1, width = picture node +0x1C -> +8
+  -> +0x38) and in from there (state 1) across player 2's half: now it drops down / rises from the bottom
+  (hud2.cpp LayoutGate; XXL_NOGATESLIDEFIX). (2) Its sparkle (particles +0x114, vt 622FCC) is placed once at the
+  interface's start (frame modelling +0x40 = +0x3DC, 0.5; set off by +0x10 |= 0x40 when state 2 sees gm +0x5C
+  bit 0 drop) -- particles leave from the frame, so moving the node for the pass did nothing: PlaceGateSparkle
+  moves its modelling + LTM to the counter's middle (0.5, 0.494) while the side-by-side layout is on, back
+  otherwise. (3) The fight never ended, counter at 0 (test with both heroes in the arena): the marker spawn hook
+  (proximity.cpp, vf38 0x52FB80) returned without a call when every marker was in a player's view, but its caller
+  had counted the Romans as sent in (pool record +0x16 went to 80/80 with none alive) -- so the lock waited for
+  Romans that never came. Now the farthest marker from both heroes is used (XXL_NOMARKERDROPFIX: as before).
+  Autotest gatedone (-Level 5; XXL_GATESHOTS: shots as the counter comes / goes, ends 3 s after): won in ~15 s.

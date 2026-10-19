@@ -1019,7 +1019,7 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 			    hud->projectionType, hud->viewWindow[0], hud->viewWindow[1], hud->viewOffset[0], hud->viewOffset[1],
 			    hud->nearPlane, hud->farPlane, cl[0], cl[1], cl[2], cl[4], cl[5], cl[6], cl[8], cl[9], cl[10], cl[12], cl[13], cl[14]);
 			const int offs[] = { 0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x54, 0x68, 0x7C, 0x90, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC,
-			                     0xD4, 0xD8, 0xDC, 0xE0, 0xE4, 0xE8, 0x110, 0x12C, 0x130 };
+			                     0xD4, 0xD8, 0xDC, 0xE0, 0xE4, 0xE8, 0x110, 0x114, 0x12C, 0x130 };
 			for (int o : offs) {
 				char* n = *(char**)(itf + o);
 				char* fr = n ? *(char**)(n + 4) : nullptr;
@@ -1029,6 +1029,10 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 				Log("hudpos: +%02X vt %p flags %04X cam xyz %.3f %.3f %.3f (scale %.3f)", o, *(void**)n, *(uint16_t*)(n + 0x10),
 				    d[0] * cl[0] + d[1] * cl[1] + d[2] * cl[2], d[0] * cl[4] + d[1] * cl[5] + d[2] * cl[6],
 				    d[0] * cl[8] + d[1] * cl[9] + d[2] * cl[10], sqrtf(l[0] * l[0] + l[1] * l[1] + l[2] * l[2]));
+			}
+			if (CKYellowPages* yp = YellowPages()) {
+				char* gm = (char*)yp->gameManager;
+				Log("hudpos: gm +5C %08X count +64 %d picture +68 %u", *(uint32_t*)(gm + 0x5C), *(int*)(gm + 0x64), *(uint8_t*)(gm + 0x68));
 			}
 			Log("hudpos: gate counter state %u at %.3f shown %.3f; requirement state %u at %.3f to %.3f shown %.3f, model at %.3f shown %.3f",
 			    (*(uint32_t*)(itf + 0x24) >> 17) & 3, *(float*)(itf + 0x3F4), *(float*)(itf + 0x3DC), (*(uint32_t*)(itf + 0x24) >> 8) & 3,

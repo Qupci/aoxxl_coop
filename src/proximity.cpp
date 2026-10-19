@@ -506,7 +506,24 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 			    p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), have, d, dot);
 		}
 	}
-	if (m == 0) return;   // all in sight: nobody comes this frame
+	// All in sight: the call's Romans still come (its caller has counted them as
+	// sent in; skipped, a fight lock's Romans ran out with none of them there --
+	// LV5-6 squad 4, both heroes in the arena, the counter at 0 for good): from
+	// the marker farthest from both heroes.
+	static const bool noDropFix = getenv("XXL_NOMARKERDROPFIX") != nullptr;
+	if (m == 0 && noDropFix) return;
+	if (m == 0) {
+		float best = -1.0f;
+		for (unsigned i = 0; i < n; i++) {
+			const float* p = *(const float**)(list + i * 8);
+			if (!p) continue;
+			Vector3 pv(p[0], p[1], p[2]);
+			float da = ha ? (ha.Pos() - pv).len2() : 1e12f, dd = ho ? (ho.Pos() - pv).len2() : 1e12f;
+			float d = da < dd ? da : dd;
+			if (d > best) { best = d; memcpy(keep, list + i * 8, 8); m = 1; }
+		}
+		if (m == 0) { g_origMarkerSpawn(squad, edx, count, group); return; }
+	}
 	float saved[6], mtx[16];
 	bool swapped = g_squadForNonLeader && OtherViewMatrix(mtx);
 	if (swapped) {
