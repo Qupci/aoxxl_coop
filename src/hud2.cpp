@@ -436,11 +436,19 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	g.nHidden = 0;
 	char* itf = g.itf;
 	if (!On() || !hud || !itf || !g.s2.valid || itf != (char*)GetLvlObject(2, 132, 0)) return false;
-	// The pause menu: the game hid its HUD (game manager +0x5C bit 27, set
-	// with FUN_00515830's hiding, cleared with FUN_00515A30's showing) --
-	// player 2's too.
+	// The game's HUD hidden: a menu's interface in the game manager's place
+	// for the current one (+0xF8: the pause menu's -- the in-game interface,
+	// type +0x28 == 9, is the one the HUD's pieces run for), or its HUD hidden
+	// for a pause (+0x5C bit 27, FUN_00515830 / FUN_00515A30) -- player 2's too.
 	char* gm = GM();
-	if (gm && (*(uint32_t*)(gm + 0x5C) & 0x8000000)) return false;
+	char* cur = gm ? *(char**)(gm + 0xF8) : nullptr;
+	static char* lastCur = nullptr;
+	if (cur != lastCur) {
+		lastCur = cur;
+		Log("hud2: the game's interface is now %p (vt %p, type %d)%s", cur, cur ? *(void**)cur : nullptr,
+		    cur ? *(uint8_t*)(cur + 0x28) : -1, cur == itf ? " -- the in-game one" : " -- player 2's HUD hidden");
+	}
+	if (!gm || cur != itf || (*(uint32_t*)(gm + 0x5C) & 0x8000000)) return false;
 	// Part 0: the health (shields, sparkles: elements 0-30); part 1: the combo
 	// bar (31-). The shields and the combo bar are in the same draw list (0),
 	// and each needs its own culling (below), so each is a pass of its own.

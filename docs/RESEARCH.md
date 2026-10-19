@@ -1651,3 +1651,8 @@ both halves).
   count 0 ran past 0 = 255 bounces). Bits 27-28 now per HUD (autotest combomix: hits given in batches, S_GIVE b=3).
   Pause menu: gm +0x5C bit 26 = pause asked, bit 27 = HUD hidden for it (FUN_00515830 hides, FUN_00515A30 shows);
   P2's HUD passes are skipped while bit 27 is set (combomix flips bit 26 with S_POKE8 a=-2).
+- Round 73b (user: P2's bar and shields still over the real pause menu): the pause menu is game manager state 2
+  (gm +0xCC bits 0-1, FUN_00503D80(2) after action 0x0C, with CKHook_GoVanish hiding the in-game HUD first) and
+  puts the pause interface (vt 6287C0, type 4) in gm +0xF8 -- bit 27 of +0x5C is not involved. P2's HUD passes now
+  need gm +0xF8 == the in-game interface (type 9). Autotest combomix opens it with S_POKE8 a=-3 (state b); Escape
+  and P1's injected Start do not reach the game's pause in autotests.

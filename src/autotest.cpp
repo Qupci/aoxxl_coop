@@ -1401,8 +1401,12 @@ const Step kComboMix[] = {
 	{ 9500, S_POKE8, -2, 0x5F, 0, 4.0f, 0, "the pause's HUD hiding (game manager +0x5C bit 26)" },
 	SHOT(11000, "combomix_4"),
 	{ 12000, S_POKE8, -2, 0x5F, 0, 4.0f, 0, "the pause's HUD back" },
+	{ 13600, S_POKE8, -3, 2, 0, 0, 0, "the pause menu (game manager state 2)" },
+	SHOT(15500, "combomix_6"),
+	{ 16000, S_POKE8, -3, 1, 0, 0, 0, "back to the game (state 1)" },
+	SHOT(17500, "combomix_7"),
 	SHOT(13500, "combomix_5"),
-	END(14500),
+	END(18500),
 };
 
 // shields6 (level 2, individual heroes): both heroes with six shields -- both
@@ -4169,6 +4173,15 @@ void RunStep(const Step& s) {
 				*(uint8_t*)(cb + s.b) = (uint8_t)(int)s.x;
 			}
 			IndivLeave(prev);
+			break;
+		}
+		if (s.a == -3) {   // the game manager's state (+0xCC bits 0-1; FUN_00503D80, thiscall(gm, state), ret 4): 2 = the pause menu
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			if (gm) {
+				Log("autotest: game manager state %u -> %d", *(uint8_t*)(gm + 0xCC) & 3, s.b);
+				((void(__fastcall*)(char*, void*, unsigned))0x503D80)(gm, nullptr, (unsigned)s.b);
+			}
 			break;
 		}
 		if (s.a == -2) {   // the game manager's own byte +b, bits x flipped
