@@ -1,6 +1,7 @@
 #include "experimental.h"
 #include "config.h"
 #include "coop.h"
+#include "individual.h"
 #include "kal.h"
 #include "detour.h"
 #include "log.h"
@@ -52,9 +53,12 @@ bool KeptAsIs(char* cpnt) {
 }
 
 // Numbers at once doubled only while both players play: not while one
-// player's hero is held by the level (a cable car ride...).
+// player's hero is held by the level (a cable car ride...) or is down waiting
+// to be revived (individual heroes) -- the one left fights the level's numbers.
+// Romans to defeat stay scaled.
 bool AtOnceNow() {
-	return !(CoopP2Joined() && (CoopHeroHeld(0) || CoopHeroHeld(1)));
+	static const bool noDownFix = getenv("XXL_NOATONCEDOWNFIX") != nullptr;   // diagnostics: as before
+	return !(CoopP2Joined() && (CoopHeroHeld(0) || CoopHeroHeld(1) || (!noDownFix && (IndivFallen(0) || IndivFallen(1)))));
 }
 
 int Scaled(int v, float f, int maxV) {
@@ -364,7 +368,7 @@ void ExperimentalFrame() {
 	if (atOnce != s_atOnce && g_config.squadAliveFactor != 1.0f) {
 		if (s_atOnce >= 0)
 			Log(atOnce ? "experimental: Romans at once x%.2f again (both players play)"
-			           : "experimental: Romans at once as the level has them (a player's hero is held; x%.2f off)",
+			           : "experimental: Romans at once as the level has them (a player's hero is held or down; x%.2f off)",
 			    g_config.squadAliveFactor);
 		s_atOnce = atOnce;
 	}

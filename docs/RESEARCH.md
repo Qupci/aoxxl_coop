@@ -1698,3 +1698,8 @@ both halves).
   lists) get their slots moved round the other hero (slot - centre + hero; side kept per Roman, newcomers to the
   smaller side, one Roman a frame rebalanced). XXL_NOSQUADZONEFIX: as before. Autotests sq36a / sq36b (one hero
   behind the bars; 3 -> 14 Romans on the open hero), sq36c (both in the open: 7 / 7, Obelix's 7 follow him).
+- Round 78 (user request): Romans at once (squad scripts' numbers, AtOnceNow) also go back to the level's while a
+  hero is down (individual heroes, IndivFallen) and come back on the revive; Romans to defeat stay scaled. Starting
+  Romans (U1/U2) are set at load, as with held heroes. XXL_NOATONCEDOWNFIX: as before. Autotest sq36c with
+  XXL_DOWNAT=1:12000 XXL_UPAT=20000 XXL_SQUADCMDS=1: "keep 2 alive" sent as 4, as 2 while Obelix is down, x2 again
+  after the revive.
