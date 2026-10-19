@@ -547,6 +547,24 @@ void Hud2BeginP1(RwCamera* hud) {
 	if (IndivStats(CoopP1Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, true);
 }
 
+// The shop's HUD in a stacked half (splitscreen.cpp ShopHudSideways): at half
+// size across the half's middle, its models -- health at the left, the helmet
+// at the right -- moved out by half a HUD to the half's edges, as its 2D elements.
+void Hud2ShopSides(RwCamera* hud) {
+	char* itf = (char*)GetLvlObject(2, 132, 0);
+	if (!hud || !itf) return;
+	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);
+	for (int o = 0x2C; o <= 0x130; o += 4) {
+		char* n = NodeAt(itf, o);
+		float* fr = n ? FrameOf(n) : nullptr;
+		if (!fr) continue;
+		const float* lt = (const float*)((char*)fr + 0x50);
+		float d[3] = { lt[12] - cl[12], lt[13] - cl[13], lt[14] - cl[14] };
+		float x = 0.5f - (d[0] * cl[0] + d[1] * cl[1] + d[2] * cl[2]);
+		Xf3d(n, cl, Xform{ x, 0.0f, 1.0f, x < 0.5f ? -0.5f : 0.5f, 0.0f }, true);
+	}
+}
+
 void Hud2EndP1() {
 	for (int i = g.nScaled - 1; i >= 0; i--) memcpy((char*)g.scaled[i].f + 0x50, g.scaled[i].m, sizeof(g.scaled[i].m));
 	g.nScaled = 0;

@@ -29,5 +29,6 @@ void Hud2AfterInterfaceTick(char* itf, void* time);
 // the HUD lists and draws them) and Hud2EndP2.
 void Hud2BeginP1(RwCamera* hud);
 void Hud2EndP1();
+void Hud2ShopSides(RwCamera* hud);   // the shop's HUD in a stacked half: models out to its edges
 bool Hud2BeginP2(RwCamera* hud, int part);   // part 0: health, 1: combo bar
 void Hud2EndP2();

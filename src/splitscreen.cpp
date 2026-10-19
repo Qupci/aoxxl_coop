@@ -532,6 +532,19 @@ void Dump2d(char* p, int depth) {
 		for (char* c = *(char**)(list + 4); c && k < 60 && Kind2d(c); c = *(char**)(c + 0x10), k++) Dump2d(c, depth + 1);
 	}
 }
+int ShopHudMode() {
+	static int mode = getenv("XXL_SHOPHUD") ? atoi(getenv("XXL_SHOPHUD")) : 3;   // 1 squeezed, 2 half size, 3 spread
+	return mode;
+}
+// Stacked halves are as wide as the screen and half as high: the half-size
+// HUD's band runs across the middle of the half instead (horizontal view window
+// doubled), and is spread sideways. Before round 80 it was the vertical's -- every
+// letter half as high as wide.
+bool ShopHudSideways() {
+	static const bool noFix = getenv("XXL_NOSHOPHUDFIX") != nullptr;
+	return !noFix && g_config.splitMode != SPLIT_VERTICAL && ShopHudMode() >= 2;
+}
+
 // The shop's HUD at half size in the shopper's half (the HUD camera's vertical
 // view window doubled: the HUD fills a band in the middle of the half), pushed
 // out to the half's edges: every 2D element of the 2D managers (yellow pages
@@ -572,6 +585,13 @@ void SpreadTree(char* p, int depth) {
 	// HUD, what sits near the bottom down half a HUD, to the half's edges; the
 	// middle -- the item shown on the merchant's board -- stays over the board.
 	bool wide = vt == 0x6235C0 && f[13] >= 0.99f;
+	if (ShopHudSideways()) {   // stacked halves: the same, sideways -- out to the half's left and right edges
+		m.y = &f[5]; m.y0 = f[5];
+		if (wide) { m.h = &f[13]; m.h0 = f[13]; f[13] *= 2.0f; }
+		if (f[5] > 0.75f) f[5] += 0.5f;
+		else if (f[5] < 0.25f) f[5] -= 0.5f;
+		return;
+	}
 	if (wide && (f[14] >= 0.99f || f[6] <= 0.01f || f[6] >= 0.99f)) { m.h = &f[14]; m.h0 = f[14]; f[14] *= 2.0f; }
 	if (f[6] > 0.75f) f[6] += 0.5f;
 	else if (f[6] < 0.25f) f[6] -= 0.5f;
@@ -593,11 +613,6 @@ void UnspreadShopHud() {
 		if (g_moved[i].h) *g_moved[i].h = g_moved[i].h0;
 	}
 	g_nMoved = 0;
-}
-
-int ShopHudMode() {
-	static int mode = getenv("XXL_SHOPHUD") ? atoi(getenv("XXL_SHOPHUD")) : 3;   // 1 squeezed, 2 half size, 3 spread
-	return mode;
 }
 
 void DumpShopScreen() {
@@ -965,9 +980,10 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 		}
 		if (mode >= 2) {   // half size, same scale both ways
 			float wnd[2] = { hudWindow[0], hudWindow[1] * 2.0f };
+			if (ShopHudSideways()) { wnd[0] = hudWindow[0] * 2.0f; wnd[1] = hudWindow[1]; }
 			RwCameraSetViewWindow(hud, wnd);
 		}
-		if (mode == 3) {   // ... the HUD's 3D models (life shields, helmet) to the half's top: the camera's frame moved down
+		if (mode == 3 && !ShopHudSideways()) {   // ... the HUD's 3D models (life shields, helmet) to the half's top: the camera's frame moved down
 			static float dy = getenv("XXL_HUDOFF") ? (float)atof(getenv("XXL_HUDOFF")) : -0.5f;
 			float* lt = FrameLtm(hud);
 			float* md = FrameModelling(hud);
@@ -1030,13 +1046,14 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 		}
 	}
 	Hud2BeginP1(hud);
+	if (shopper >= 0 && ShopHudMode() == 3 && ShopHudSideways()) Hud2ShopSides(hud);
 	DrawHud(view, nullptr, dt);
 	UnspreadShopHud();
 	Hud2EndP1();
 	DrawP2Hud(view, dt);
 	if (g_hudVpActive) {
 		g_hudVpActive = false;
-		if (hud->viewWindow[1] != hudWindow[1]) RwCameraSetViewWindow(hud, hudWindow);
+		if (hud->viewWindow[0] != hudWindow[0] || hud->viewWindow[1] != hudWindow[1]) RwCameraSetViewWindow(hud, hudWindow);
 		if (movedOffset) {
 			memcpy(FrameLtm(hud) + 12, hudOffset, sizeof(hudOffset));
 			memcpy(FrameModelling(hud) + 12, hudModel, sizeof(hudModel));

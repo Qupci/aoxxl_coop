@@ -1726,3 +1726,11 @@ both halves).
   counter, requirement and x3 sign at the right as in single player; gate counter at the right edge, its middle
   on the halves' border. Autotests hudlayout / hudreq / hudx3 (-Level 4; Back held on both pads, gm +0x5C bit 6
   "helmets changed", bit 11 and the stats poked); env XXL_SPLITMODE=horizontal|vertical overrides the ini.
+- Round 80 (user: Snipaste_2026-10-19_22-14-52, horizontal split): the shop's HUD in a stacked half had every letter
+  half as high as wide -- mode 3 doubled the HUD camera's vertical view window, right for side-by-side halves only.
+  Stacked (splitscreen.cpp ShopHudSideways) doubles the horizontal one instead: half size across the half's middle;
+  2D elements spread sideways (x < 0.25 / > 0.75 moved by 0.5, full-width billboards twice as wide), the interface's
+  models (+0x2C..+0x130: shields left, helmet right) moved by half a HUD along the camera's right axis (hud2.cpp
+  Hud2ShopSides, LTMs, put back in Hud2EndP1); no frame shift. The restore of the view window now checks x too (left
+  doubled each frame it went to inf and nothing of the HUD drew). XXL_NOSHOPHUDFIX = the old way. Autotests
+  shopsplit / shopsplita with XXL_SPLITMODE=horizontal; vertical unchanged.
