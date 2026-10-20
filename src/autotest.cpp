@@ -1202,6 +1202,23 @@ const Step kShopOX[] = {
 	END(32000),
 };
 
+// shoppause (level 2): player 2's Obelix at the merchant's menu, then player 1
+// pauses: the pause menu shows player 1's buttons, the shop again player 2's.
+const Step kShopPause[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	VPAD(7500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(7700, 1, 0, 0, 0, "p2 release"),
+	SHOT(9500, "shoppause_1"),
+	{ 10000, S_POKE8, -3, 2, 0, 0, 0, "the pause menu (game manager state 2)" },
+	SHOT(12000, "shoppause_2"),
+	{ 13000, S_POKE8, -3, 1, 0, 0, 0, "back to the game (state 1)" },
+	SHOT(15000, "shoppause_3"),
+	END(15500),
+};
+
 // shopsplit (level 2): player 2's Obelix shops in his half while player 1's
 // Asterix runs and presses A / X (which must not reach the shop); player 2
 // browses with the stick, then leaves with B.
@@ -3580,6 +3597,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopo", kShopO),
 	SCENARIO("shopox", kShopOX),
 	SCENARIO("shopsplit", kShopSplit),
+	SCENARIO("shoppause", kShopPause),
 	SCENARIO("shopsplita", kShopSplitA),
 	SCENARIO("pit26o", kPit26O),
 	SCENARIO("hit2o", kHit2O),

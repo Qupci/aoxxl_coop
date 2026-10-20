@@ -1881,3 +1881,13 @@ both halves).
   text +0x14 (and +0x42C / +0x434) now follows the measured width every tick. Autotests: mgun33o -L3 (plate inside),
   down2a (revive bar), shopsplit / shopsplita with XXL_ICONP2KB (shop: P2's G / Space; P1's B / A), icons21 (spy:
   still X/F), menus logged "for player 1". The revive bar's text has the hero icon too.
+- Round 92 (2026-10-21, user: the merchant fixed; the pause menu while the other shops left to do): a text
+  object keeps its own copy of its string (FUN_0042E590 copies it to +0x18) from its last refresh, and the pause
+  menu's are not refreshed when it opens. The game refreshes all texts whenever a loc variable changes
+  (CLocManager::vf12 -> FUN_0042A220, thiscall(CManager2d = yellow pages +0x34, 3, 0), ret 8; it did so when the
+  merchant opened -- the in-game interface FUN_0051E47F -> FUN_0051C860 -> CLocManager::vf12 --, with whoever's
+  buttons were due then, so the pause and controls texts got the shopper's). Whose buttons are due: the game
+  state (gm +0xCC bits 0-1, 2 = the pause menu and its pages) first -- player 1's --, then a shopper, then player
+  1. HintsFrame refreshes all texts the game's way when that changes (P2 in/out, pause menu, shopper, P2 on the
+  keyboard). Autotest shoppause (XXL_ICONP2KB XXL_ICONLOG=1): P2 at the merchant's menu, game state 2 for 3 s, back:
+  at the pause "Back"/"Confirm" (ids 0x21/0x20) fetched for player 1, after it the shop shows G Back / Space Buy.

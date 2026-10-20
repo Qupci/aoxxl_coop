@@ -64,8 +64,7 @@ int PlayerOfHero(int hero) { return hero == CoopP1Hero() ? 0 : 1; }
 // (only player 1 drives them) player 1's. At the merchant everything else is
 // the shopper's: the shop's buttons ("Back", "Buy") are refreshed from shared
 // 2D code (FUN_0042E680) with the pause menu's string ids, so only the time
-// tells them apart (player 1 pausing while player 2 shops would show player
-// 2's).
+// tells them apart: the game's state (pause menu or not).
 const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (id == kHintStringId) return g_shown;
 	const wchar_t* s = g_origLocString(loc, edx, id);
@@ -73,7 +72,12 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	void** ra = (void**)_AddressOfReturnAddress();
 	uintptr_t from = (uintptr_t)ra[0];
 	if (from == kTextSetReturn) from = (uintptr_t)ra[4];
-	int shopper = CoopShopper();
+	// The pause menu and the pages under it (game manager +0xCC bits 0-1 = 2)
+	// are player 1's, a shopper or not.
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
+	int shopper = paused ? -1 : CoopShopper();
 	int who = shopper >= 0 ? PlayerOfHero(shopper) : 0;
 	bool prompt = false;
 	for (int k = 0; k < 15 && !prompt; k++)
@@ -83,12 +87,12 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	static int logs = 0;
 	if (getenv("XXL_ICONLOG") && logs < 60 && IconsRewrite(s, who) != s) {
 		static uint64_t seen[60];
-		uint64_t key = (uint64_t)id << 32 | from;
+		uint64_t key = (uint64_t)id << 32 | from ^ (uint32_t)(who + 1) << 30 ^ (uint32_t)paused << 29;
 		bool known = false;
 		for (int i = 0; i < logs; i++) known |= seen[i] == key;
 		if (!known) {
 			seen[logs++] = key;
-			Log("icons: string %X asked for from %08X (shopper %d) -> %s", id, (unsigned)from, shopper,
+			Log("icons: string %X asked for from %08X (shopper %d, paused %d) -> %s", id, (unsigned)from, shopper, paused,
 			    who < 0 ? "both" : who ? "player 2" : "player 1");
 		}
 	}
@@ -437,6 +441,24 @@ void HintsFrame() {
 	for (int i = 0; i < g_nHints;)
 		if ((int)(g_hints[i].until - now) <= 0) g_hints[i] = g_hints[--g_nHints];
 		else i++;
+	// A text keeps a copy of its string from its last refresh, and the pause
+	// menu's are not refreshed when it opens (the game refreshes all texts when
+	// a loc variable changes: CManager2d FUN_0042A220, thiscall(3, 0), ret 8 --
+	// the merchant's opening did, with whoever's buttons were due then). When
+	// whose buttons are due changes (player 2 in or out, the pause menu, a
+	// shopper), all texts are refreshed the same way.
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	if (!gm || !m2d || *(uintptr_t*)m2d != 0x623A28) return;
+	bool paused = (*(uint8_t*)(gm + 0xCC) & 3) == 2;
+	int ctx = !CoopP2Joined() ? 0 : 1 | (paused ? 2 : 0) | (paused ? 0 : (CoopShopper() + 1) << 2) |
+	          (CoopP2Pad() == kKeyboardPad ? 0x10 : 0);
+	static int lastCtx = 0;
+	if (ctx == lastCtx) return;
+	lastCtx = ctx;
+	((void(__fastcall*)(char*, void*, int, int))0x42A220)(m2d, nullptr, 3, 0);
+	LogV("hints: texts refreshed for whose buttons are due (%X)", ctx);
 }
 
 bool HintsInstallHooks() {
