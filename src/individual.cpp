@@ -67,6 +67,10 @@ struct State {
 	int      lastLead = -1;            // the trio's leader as the frame began
 	bool     fellLeading[2] = {};      // it was the leader when it fell
 	int      leadBack = -1;            // revived, it was leading: the lead goes back to it
+	// The hero brought to a fallen leader (BringToFallenLeader): where from, where to.
+	bool     brought[2] = {};
+	Vector3  broughtFrom[2], broughtTo[2];
+	int      sendBack = -1;            // revived its leader: that hero goes back where it came from
 	DWORD    fellAt[2] = {};
 	DWORD    reachAt[2] = {};          // last asked whether the other hero can walk to it
 	int      cutOff[2] = {};           // ... and was told no that many times in a row
@@ -529,6 +533,11 @@ void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	g.cutOff[down] = 0;
 	Vector3 spot = PfSpotBeside(h.Pos());
 	spot.y += 0.5f;
+	if (!g.brought[up]) {   // the first move's start: where it goes back to
+		g.brought[up] = true;
+		g.broughtFrom[up] = o.Pos();
+	}
+	g.broughtTo[up] = spot;
 	PlaceHero(o, spot);
 	g.placedAt[up] = now;
 	if (o.hook->node) {
@@ -552,6 +561,9 @@ void Revive(int idx, Hero h, const char* how) {
 	// back to it (next frame -- a launcher's revive is inside a hero's tick).
 	if (g.fellLeading[idx]) g.leadBack = idx;
 	g.fellLeading[idx] = false;
+	// The other hero was brought to it: back where it came from (the leader's
+	// place can be one only Asterix gets out of).
+	if (g.brought[Other(idx)]) g.sendBack = Other(idx);
 	HintHide(HINT_REVIVE);
 	Log("indiv: %s is back on its feet (%s), health %d", HeroName(idx), how, s.hp);
 }
@@ -563,8 +575,9 @@ void Respawned() {
 	g.st[0] = g.st[1] = s;
 	g.gameOver = false;
 	Trio t = GetTrio();
-	g.leadBack = -1;   // the respawn's lead is the game's
+	g.leadBack = g.sendBack = -1;   // the respawn's lead and places are the game's
 	for (int i = 0; i < 2; i++) {
+		g.brought[i] = false;
 		g.fallen[i] = false;
 		g.fellLeading[i] = false;
 		g.revive[i] = 0;
@@ -895,7 +908,8 @@ void IndivFrame() {
 		g.gameOver = false;
 		memset(g.fallen, 0, sizeof(g.fallen));
 		memset(g.fellLeading, 0, sizeof(g.fellLeading));
-		g.leadBack = -1;
+		memset(g.brought, 0, sizeof(g.brought));
+		g.leadBack = g.sendBack = -1;
 	}
 	Trio t = GetTrio();
 	bool want = g_config.individual && CoopP2Joined() && t && t.GetHero(HERO_ASTERIX) && t.GetHero(HERO_OBELIX);
@@ -926,6 +940,32 @@ void IndivFrame() {
 
 	// A hero revived that led when it fell gets the lead back (XXL_NOLEADBACKFIX:
 	// the one who stood keeps it, as before).
+	// The hero brought to its fallen leader goes back once it has revived it --
+	// unless it has gone on more than 10 units from where it was put (a sector
+	// change's revive, a launcher). XXL_NOSENDBACKFIX: it stays.
+	static const bool noSendBack = getenv("XXL_NOSENDBACKFIX") != nullptr;
+	if (g.sendBack >= 0) {
+		int who = g.sendBack;
+		g.sendBack = -1;
+		g.brought[who] = false;
+		Hero b = t.GetHero(who);
+		Vector3 d = b ? b.Pos() - g.broughtTo[who] : Vector3();
+		if (!b || noSendBack || g.fallen[who] || CoopSuspended()) {
+		} else if (d.len2() > 10.0f * 10.0f) {
+			Log("indiv: %s has gone on from where it was brought (%.0f units) -- stays", HeroName(who), sqrtf(d.len2()));
+		} else {
+			Vector3 back = g.broughtFrom[who];
+			back.y += 0.5f;
+			PlaceHero(b, back);
+			g.placedAt[who] = now;
+			if (b.hook->node) {
+				float at[3] = { back.x, back.y, back.z };
+				ProximityForgetMove(b.hook->node, at);
+			}
+			Log("indiv: %s revived its leader -- back where it was brought from (%.1f %.1f %.1f)", HeroName(who), back.x,
+			    back.y, back.z);
+		}
+	}
 	static const bool noLeadBack = getenv("XXL_NOLEADBACKFIX") != nullptr;
 	if (g.leadBack >= 0 && !CoopSuspended()) {
 		int back = g.leadBack;

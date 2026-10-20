@@ -1788,3 +1788,9 @@ both halves).
   only if the other hero still leads. Cleared at a level change and at the respawn (the game's lead).
   XXL_NOLEADBACKFIX: as before. Autotests reach26 / reach26o with XXL_DOWNAT=0:5000 XXL_UPAT=9000: Asterix leads
   again (fix off: Obelix keeps it); not leading when he fell: Obelix keeps it.
+- Round 85 (user's idea: the hero brought to its fallen leader may not get out of the leader's place -- Obelix's
+  size): BringToFallenLeader keeps where the hero stood before its first move (broughtFrom) and where it was put;
+  the leader's revive (any way) sends it back there next IndivFrame, unless it has gone on more than 10 units from
+  where it was put (a sector change's revive, a launcher). Cleared at a level change and the respawn.
+  XXL_NOSENDBACKFIX: it stays. Autotests (XXL_DOWNAT + XXL_UPAT): reach26 -- back to the cliff 114.5 2.6 -387.5
+  (fix off: stays by Asterix); reach23 (XXL_DOWNAT=0:8000 XXL_UPAT=12000) -- out of the hearth room again.
