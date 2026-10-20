@@ -15,6 +15,9 @@ void StallDumpThreads();
 // Game thread: call once from the frame hook so StallCheck knows whom to sample.
 void StallRegisterGameThread();
 
+// Diagnostics (env XXL_PROFILE): a sampling profile of the game thread every 10 s.
+void ProfileStart();
+
 // Diagnostics: log every write to up to four bytes (hardware watchpoints on the
 // game thread, applied by the watchdog within ~2 s); writes by code in
 // [ignoreLo, ignoreHi) are not logged.

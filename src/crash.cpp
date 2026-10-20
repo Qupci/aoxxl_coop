@@ -7,6 +7,7 @@
 #include <psapi.h>
 #include <tlhelp32.h>
 #include <cstdio>
+#include <cstdlib>
 
 namespace {
 
@@ -338,4 +339,94 @@ void StallDumpThreads() {
 			} __except (EXCEPTION_EXECUTE_HANDLER) {}
 		}
 	}
+}
+
+// Diagnostics (env XXL_PROFILE): samples the game thread every ~1 ms and, every
+// 10 s, logs where its time went: the module it was in, and the innermost game
+// code return address on its stack (which game call led there). Suspends the
+// thread only to copy registers and stack, as StallDumpThreads does.
+namespace {
+
+struct ProfBucket { uintptr_t base; uintptr_t gameRet; long hits; };
+
+DWORD WINAPI ProfileThread(LPVOID) {
+	static ProfBucket b[512];
+	int nb = 0;
+	long total = 0, reports = 0;
+	DWORD start = GetTickCount();
+	while (reports < 12) {
+		Sleep(1);
+		if (!g_gameThreadId) continue;
+		HANDLE h = OpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, g_gameThreadId);
+		if (!h) continue;
+		CONTEXT c = {};
+		c.ContextFlags = CONTEXT_CONTROL;
+		uintptr_t stack[256];
+		int n = 0;
+		bool got = false;
+		if (SuspendThread(h) != (DWORD)-1) {
+			got = GetThreadContext(h, &c) != 0;
+			if (got) {
+				__try {
+					for (; n < 256; n++) stack[n] = ((uintptr_t*)c.Esp)[n];
+				} __except (EXCEPTION_EXECUTE_HANDLER) {}
+			}
+			ResumeThread(h);
+		}
+		CloseHandle(h);
+		if (!got) continue;
+		MEMORY_BASIC_INFORMATION mbi;
+		uintptr_t base = VirtualQuery((void*)(uintptr_t)c.Eip, &mbi, sizeof(mbi)) ? (uintptr_t)mbi.AllocationBase : 0;
+		uintptr_t gameRet = c.Eip >= kTextStart && c.Eip < kTextEnd ? c.Eip : 0;
+		for (int i = 0; i < n && !gameRet; i++)
+			if (stack[i] >= kTextStart && stack[i] < kTextEnd) gameRet = stack[i];
+		if (base == 0x400000) gameRet &= ~0xFFu;   // game code itself: by 256-byte block
+		int k = 0;
+		while (k < nb && (b[k].base != base || b[k].gameRet != gameRet)) k++;
+		if (k == nb && nb < 512) b[nb++] = { base, gameRet, 0 };
+		if (k < nb) b[k].hits++;
+		total++;
+		if (GetTickCount() - start < 10000) continue;
+		// Per module first, then the top call sites.
+		uintptr_t mods[32]; long modHits[32]; int nm = 0;
+		for (int i = 0; i < nb; i++) {
+			int m = 0;
+			while (m < nm && mods[m] != b[i].base) m++;
+			if (m == nm && nm < 32) { mods[nm] = b[i].base; modHits[nm++] = 0; }
+			if (m < nm) modHits[m] += b[i].hits;
+		}
+		char buf[1024];
+		LineBuf line(buf);
+		line.Add("profile: %ld samples; modules:", total);
+		for (int m = 0; m < nm; m++) {
+			char name[MAX_PATH] = "?";
+			if (mods[m]) GetModuleFileNameA((HMODULE)mods[m], name, MAX_PATH);
+			const char* s = strrchr(name, '\\');
+			if (modHits[m] * 100 >= total) line.Add(" %s %.0f%%", s ? s + 1 : name, modHits[m] * 100.0 / total);
+		}
+		Log("%s", line.c_str());
+		for (int top = 0; top < 15; top++) {
+			int best = -1;
+			for (int i = 0; i < nb; i++)
+				if (b[i].hits > 0 && (best < 0 || b[i].hits > b[best].hits)) best = i;
+			if (best < 0 || b[best].hits * 200 < total) break;
+			char name[MAX_PATH] = "?";
+			if (b[best].base) GetModuleFileNameA((HMODULE)b[best].base, name, MAX_PATH);
+			const char* s = strrchr(name, '\\');
+			Log("profile:   %5.1f%% in %s, game code %06X", b[best].hits * 100.0 / total, s ? s + 1 : name,
+			    (unsigned)b[best].gameRet);
+			b[best].hits = -b[best].hits;
+		}
+		nb = 0;
+		total = 0;
+		reports++;
+		start = GetTickCount();
+	}
+	return 0;
+}
+
+} // namespace
+
+void ProfileStart() {
+	if (getenv("XXL_PROFILE")) CloseHandle(CreateThread(nullptr, 0, ProfileThread, nullptr, 0, nullptr));
 }

@@ -147,6 +147,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID) {
 		GameDirPath(ini, sizeof(ini), "xxl_coop.ini");
 		g_config.Load(ini);
 		CrashHandlerInstall();
+		ProfileStart();
 		// Test runs may pick the level: XXL_LEVEL overrides force_level.
 		char lvl[16] = {};
 		if (GetEnvironmentVariableA("XXL_LEVEL", lvl, sizeof(lvl)) && lvl[0]) {
