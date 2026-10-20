@@ -33,7 +33,12 @@ enum HintKey {
 
 enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_COUNT };
 // The name of `b` on player `player`'s (0 = player 1, 1 = player 2) controller:
-// the pad button, or the keyboard key it is on.
+// its icon (pad button, keycap), else the pad button's or the key's name.
 const wchar_t* HintButtonName(int player, HintButton b);
-// A keyboard key's name ("Space", "K").
+// A keyboard key's name ("Space", "K"), or its keycap icon.
 const wchar_t* HintKeyName(int vk);
+// With the co-op icons: the hero's icon and name ("Asterix"), the hero and its
+// player's icon ("Asterix (P1)" without), player's icon ("Player 2:" without).
+const wchar_t* HintHeroName(int hero);
+const wchar_t* HintHero(int hero, int player);
+const wchar_t* HintPlayer(int player);

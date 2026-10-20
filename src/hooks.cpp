@@ -22,6 +22,7 @@
 #include "log.h"
 #include "shared.h"
 #include "hints.h"
+#include "icons.h"
 
 namespace {
 
@@ -50,6 +51,7 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	CoopFrame();
 	SharedFrame();
 	HintsFrame();
+	IconsFrame();
 }
 
 int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) {

@@ -2396,7 +2396,7 @@ const uintptr_t kHeroPrompt = 0x49A1A0;
 const uint8_t   kHeroPromptPrologue[8] = { 0xA1, 0xF4, 0x21, 0x66, 0x00, 0x56, 0x8B, 0xF1 };
 const unsigned  kPromptNone = 0xE;
 PromptFn g_origPrompt = nullptr;
-struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; } g_prompt;
+struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; int hero = -1; bool both = false; } g_prompt;
 
 static void __fastcall PromptHook(char* hero, void* edx) {
 	g_origPrompt(hero, edx);
@@ -2415,16 +2415,31 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	if (!gm || !t || !g.p2Joined || g.suspended) return;
 	int idx = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
 	if (idx < 0) return;
-	if (g_prompt.frame != g.frameNo) { g_prompt.frame = g.frameNo; g_prompt.kind = kPromptNone; g_prompt.leader = false; }
+	if (g_prompt.frame != g.frameNo) { g_prompt.frame = g.frameNo; g_prompt.kind = kPromptNone; g_prompt.leader = false; g_prompt.hero = -1; g_prompt.both = false; }
 	uint32_t& cc = *(uint32_t*)(gm + 0xCC);
 	unsigned kind = (cc >> 4) & 0xF;
 	bool leads = idx == t.Leader();
 	if (kind != kPromptNone) {
-		if (g_prompt.kind == kPromptNone || (leads && !g_prompt.leader)) { g_prompt.kind = kind; g_prompt.leader = leads; }
+		if (g_prompt.kind == kind && g_prompt.hero != idx) g_prompt.both = true;   // offered to both heroes
+		if (g_prompt.kind == kPromptNone || (leads && !g_prompt.leader)) { g_prompt.kind = kind; g_prompt.leader = leads; g_prompt.hero = idx; }
 		else cc = (cc & ~0xF0u) | (g_prompt.kind << 4);
 	} else if (g_prompt.kind != kPromptNone) {
 		cc = (cc & ~0xF0u) | (g_prompt.kind << 4);
 	}
+}
+
+int CoopPromptPlayer() {
+	int r = !g.p2Joined || g_prompt.hero < 0 || g_prompt.both || g.frameNo - g_prompt.frame > 2 ? -1
+	        : g_prompt.hero == g.p1Hero ? 0 : 1;
+	static int last = -2, logs = 0;
+	if (r != last && logs < 30) {
+		logs++;
+		Log("coop: the action prompt (kind %X) is for %s (hero %d%s, frame %u, now %u)", g_prompt.kind,
+		    r < 0 ? "both players" : r ? "player 2" : "player 1", g_prompt.hero, g_prompt.both ? ", both offered" : "",
+		    g_prompt.frame, g.frameNo);
+	}
+	last = r;
+	return r;
 }
 
 // The Twister for both. A hero's attack state machine (table +0x130, current
@@ -2833,8 +2848,8 @@ static void WatchSpinHint(int idx, Hero h) {
 	g.spinHints++;
 	int player = idx == g.p1Hero ? 0 : 1;
 	wchar_t text[96];
-	swprintf(text, 96, L"Player %d: %s passes\nthe Roman to %s", player + 1, HintButtonName(player, HB_LB),
-	         other == HERO_ASTERIX ? L"Asterix" : L"Obelix");
+	swprintf(text, 96, L"%s %s passes\nthe Roman to %s", HintPlayer(player), HintButtonName(player, HB_LB),
+	         HintHeroName(other));
 	HintShow(HINT_PASS, text, 8000);
 	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints, HeroName(idx));
 }
@@ -3115,10 +3130,10 @@ static void ShowJoinHint(Trio t) {
 	g.joinHintPending = false;
 	wchar_t text[96];
 	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
-		swprintf(text, 96, L"Player 2: press Start to join co-op\n(keyboard: %s), again to leave",
-		         HintKeyName(g_config.keys[CoopConfig::KEY_START]));
+		swprintf(text, 96, L"%s press %s to join co-op\n(keyboard: %s), again to leave", HintPlayer(1),
+		         HintButtonName(1, HB_START), HintKeyName(g_config.keys[CoopConfig::KEY_START]));
 	else
-		swprintf(text, 96, L"Player 2: press Start to join co-op\nand again to leave");
+		swprintf(text, 96, L"%s press %s to join co-op\nand again to leave", HintPlayer(1), HintButtonName(1, HB_START));
 	HintShow(HINT_JOIN, text, 10000);
 }
 
@@ -3142,8 +3157,9 @@ static void WatchLifterHint(Trio t) {
 		if (on[0] == on[1]) continue;
 		if (waiting != l) { waiting = l; since = GetTickCount(); }
 		if (GetTickCount() - since < 4000) return;
-		HintShow(HINT_LIFTER, on[0] ? L"The lifter waits for Obelix\nto go up" : L"The lifter waits for Asterix\nto go up",
-		         300);
+		wchar_t text[64];
+		swprintf(text, 64, L"The lifter waits for %s\nto go up", HintHeroName(on[0] ? HERO_OBELIX : HERO_ASTERIX));
+		HintShow(HINT_LIFTER, text, 300);
 		return;
 	}
 	waiting = nullptr;

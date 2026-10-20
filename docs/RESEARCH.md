@@ -1830,3 +1830,37 @@ both halves).
   switch's) gone. From now on a switch lives until the user confirms its fix (CLAUDE.md). Reproducing an old
   bug: build the fix commit's parent; the round entries above keep each "fix off" result. Checked after the
   cleanup: reach26 (XXL_DOWNAT=0:5000 XXL_UPAT=9000) and pausedown behave as with the fixes on.
+- Round 90 (2026-10-20): button icons. The game's action icons are characters of its font "arial24-windows"
+  (Rt2d bitmap font, CManager2d 13/16 vtable 0x623A28, fonts at +8 + id*4, ids 0-9; read from xxGLOC.KWN by
+  Rt2dFontStreamRead FUN_005FC970, cdecl(stream), chunk 0x199): U+E000 action (CKInput action 5), E001 Dogmatix
+  (10), E002 jump (4), E003 pause (12), E005-E008 up/down/right/left (0/1/3/2), E009 targeted attack (7), E00A grab
+  (6), E00B launch Obelix (8), E00E confirm (20), E00F cancel (21); E004/E00C/E00D empty cells. English = 01GLOC.
+  Loc strings embed them ("Use \xE000"; spies' texts in GLOC). Pages arial24-windows0/1 (256x256, 28 px cells);
+  the images precede their texture chunks (string-named RW textures). Font in memory: +0x0C intergap, +0x10 flags
+  (2 = wide), +0x14 4 page textures (RwTextureDestroy'd with the font), +0x24 128 shorts (ASCII -> glyph),
+  +0x124 first wide char, +0x128 count, +0x12C shorts (RwMalloc'd), +0x130 glyph count, +0x134 RwSList of 0x20
+  glyphs (+0 width/height, +4 texture, +8 u0 v0 u1 v1, +0x18 0, +0x1C page byte). The renderer (FUN_005FCF20)
+  binds each glyph's own texture (state 1 = *tex, 9 = tex +0x50 filter), width FUN_005FDAB0 sums width+intergap.
+  RW (cdecl): RwRasterCreate 0x591160(w,h,depth,flags 0x504), RwRasterLock 0x591200(r,level,1) -> pixels (stride
+  r+0x18, A8R8G8B8), Unlock 0x590F60, RwTextureCreate 0x5889B0(raster) (+0x50 filter, +0x51 addressing, +0x54 refs),
+  RwSListGetNewEntries 0x617AF0(list,n,hint), RwMalloc/Free = [0x66885C]+0x134/+0x138; PI texdict read 0x572A90.
+  icons.cpp: the PNGs of Game Files\coop_icons (coop\icons, tools\make_icons.ps1) go on a 1024x512 page (64 px
+  cells, GDI+), one RW texture in a free page slot of each font with U+E000, glyphs U+E100.. added (wide map grown
+  to U+E1FF); keycaps (key.png / key_wide.png + the key's name) drawn on demand. Fonts loaded before the hooks
+  (title screen) are found through CManager2d. With player 2 in, LocString (hints.cpp hook) rewrites action icons:
+  a HUD prompt string (interface +0x1A4 ids) -> the buttons of the player whose hero has the prompt (coop.cpp
+  PromptHook: g_prompt.hero; offered to both heroes -> both); any other string -> one icon when both players press
+  the same, else "P1/P2"; runs of direction icons ("[Left] [Right]") -> one stick glyph (ls_leftright...).
+  Player 1's buttons come from its binding (binding +0xC -> +0x14 into the pad, offset 6-9 left stick, 14+n button
+  n (A B X Y LB RB Back Start L3 R3), 26-29 D-pad; or the keyboard byte -> vk); player 2's from the mod's layout /
+  the ini keys. Both players on one keyboard is impossible (P2's keyboard slot only exists with P1 on a pad).
+  Co-op hints use the icons too (HintHero / HintHeroName / HintPlayer). The game's prompt text is fetched every
+  frame in its shown state (FUN_00520CC0 case 2 -> FUN_0042E590 -> FUN_00411780), so an owner change shows at once.
+  Note: the gun (LV3-3) is only ever offered to the leader in reach, so its "Use" is the leader's player's.
+  XXL_NOICONS: no icons at all (temporary switch); XXL_ICONP2KB: player 2's icons as on the keyboard (tests).
+  Autotests icons21 (LV2-1 spy pages, X; on pads: "press X"; ICONP2KB: "press X/F"; NOICONS: the game's icon),
+  catapulta / catapultp (launcher "Activate": P1's X / P2's F), iconsgun -L3, mgun33o -L3 (hint icons).
+  Found on the way, not fixed: a co-op hint replaced by another with the same key (gun solo -> shared gun hint)
+  runs past the screen's right edge (plate +0x14 1.04), with or without icons.
+  Tools: tools\kwn_textures.py (RW images of any .KWN), tools\export_game_icons.py (the font's icons),
+  tools\icon_sheet.ps1 (contact sheet). The designer's export is F:\XXL COOP MOD\icons_export.

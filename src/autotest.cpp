@@ -423,6 +423,21 @@ const Step kSpyA[] = {
 	END(40000),
 };
 
+// icons21: player 2's Obelix walks to the first spy (LV2-1, the cable car's
+// "press [action] for Obelix to grab the rope") and clicks through the
+// dialogue with X, a shot of each page: its action icons are the players'
+// buttons.
+#define PAGE(t, n) SHOT(t, "icons21_" #n), VPAD(t + 300, 1, PAD_X, 0, 0, "p2 X"), VPAD(t + 500, 1, 0, 0, 0, "p2 r")
+const Step kIcons21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	GLIDE(1500, HERO_OBELIX, 7, 4000),
+	PAGE(6000, 1), PAGE(8500, 2), PAGE(11000, 3), PAGE(13500, 4), PAGE(16000, 5), PAGE(18500, 6),
+	PAGE(21000, 7), PAGE(23500, 8), PAGE(26000, 9), PAGE(28500, 10), PAGE(31000, 11), PAGE(33500, 12),
+	END(35000),
+};
+#undef PAGE
+
 // spy2o: player 2's Obelix goes on alone to the lifter area's spy (Asterix
 // stays at the start); the spy has to appear for him.
 const Step kSpy2O[] = {
@@ -947,6 +962,18 @@ const Step kMgun3O[] = {
 // 289.0 31.9 -326.1); player 2's Obelix (o) or player 1's Asterix (a) presses X
 // beside it, the other hero a few steps away.
 #define MGUN33_SETUP 	MARK(0, "baseline"), LOADSECTOR(200, 3), 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), 	PLACEAT(3000, HERO_ASTERIX, 284.4f, 31.92f, -325.9f), PLACEAT(3000, HERO_OBELIX, 289.3f, 31.92f, -325.6f), 	SECTORS(3500)
+// iconsgun (-Level 3): the LV3-3 gun's "Use" prompt with only player 2's Obelix
+// by it (his button), both heroes (both buttons), only player 1's Asterix (his).
+const Step kIconsGun[] = {
+	MGUN33_SETUP,
+	PLACEAT(4000, HERO_ASTERIX, 262.0f, 31.92f, -325.9f),
+	SHOT(5500, "iconsgun_p2"),
+	PLACEAT(6000, HERO_ASTERIX, 284.4f, 31.92f, -325.9f),
+	SHOT(7500, "iconsgun_both"),
+	PLACEAT(8000, HERO_OBELIX, 262.0f, 31.92f, -325.6f),
+	SHOT(9500, "iconsgun_p1"),
+	END(10000),
+};
 const Step kMgun33O[] = {
 	MGUN33_SETUP,
 	SHOT(5000, "mgun33_1"),
@@ -3479,6 +3506,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("joinlead2", kJoinLead2),
 	SCENARIO("regions", kRegions),
 	SCENARIO("spyo", kSpyO),
+	SCENARIO("icons21", kIcons21),
+	SCENARIO("iconsgun", kIconsGun),
 	SCENARIO("spya", kSpyA),
 	SCENARIO("spy2o", kSpy2O),
 	SCENARIO("spywalk", kSpyWalk),

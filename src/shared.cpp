@@ -163,19 +163,22 @@ void ShowModeHint(SharedMode m) {
 	wchar_t text[96];
 	switch (m) {
 	case SHARED_GUN:
-		swprintf(text, 96, L"Obelix (P%d): turn the gun\nAsterix (P%d): fire with %s", o + 1, a + 1, HintButtonName(a, HB_X));
+		swprintf(text, 96, L"%s: turn the gun\n%s: fire with %s", HintHero(HERO_OBELIX, o), HintHero(HERO_ASTERIX, a),
+		         HintButtonName(a, HB_X));
 		break;
 	case SHARED_GUN_SOLO:
-		swprintf(text, 96, L"Obelix (P%d): %s at the gun's handles\nto turn it for Asterix", o + 1, HintButtonName(o, HB_X));
+		swprintf(text, 96, L"%s: %s at the gun's handles\nto turn it for %s", HintHero(HERO_OBELIX, o),
+		         HintButtonName(o, HB_X), HintHeroName(HERO_ASTERIX));
 		HintShow(HINT_MODE, text, 6000);
 		return;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
-		swprintf(text, 96, L"Obelix (P%d): steer and camera\nAsterix (P%d): jump with %s", o + 1, a + 1,
+		swprintf(text, 96, L"%s: steer and camera\n%s: jump with %s", HintHero(HERO_OBELIX, o), HintHero(HERO_ASTERIX, a),
 		         HintButtonName(a, HB_A));
 		break;
 	default:
-		swprintf(text, 96, L"Asterix (P%d): forward and back\nObelix (P%d): left, right and camera", a + 1, o + 1);
+		swprintf(text, 96, L"%s: forward and back\n%s: left, right and camera", HintHero(HERO_ASTERIX, a),
+		         HintHero(HERO_OBELIX, o));
 		break;
 	}
 	HintShow(HINT_MODE, text, m == SHARED_FUSION ? 5000 : 10000);

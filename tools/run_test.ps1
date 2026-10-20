@@ -32,7 +32,14 @@ foreach ($name in "xxl_coop.log", "xxl_coop.1.log", "xxl_coop.2.log") {
     $dest = Join-Path $userLogs "$stamp-$name"
     if (-not (Test-Path $dest)) { Copy-Item $f $dest; "saved play log: $dest" }
 }
-if (-not $NoDeploy) { Copy-Item (Join-Path $coop "build\xxl_coop.asi") $game -Force }
+if (-not $NoDeploy) {
+    Copy-Item (Join-Path $coop "build\xxl_coop.asi") $game -Force
+    # The co-op icons; a PNG already there (a designer's) is kept.
+    $icons = Join-Path $game "coop_icons"
+    New-Item -ItemType Directory -Force $icons | Out-Null
+    Get-ChildItem (Join-Path $coop "icons") -Filter *.png | Where-Object { -not (Test-Path (Join-Path $icons $_.Name)) } |
+        Copy-Item -Destination $icons
+}
 if (Test-Path $shots) { Remove-Item (Join-Path $shots "*") -Force -ErrorAction SilentlyContinue }
 
 $env:XXL_AUTOTEST = $Scenario

@@ -3,6 +3,7 @@
 #include "config.h"
 #include "detour.h"
 #include "hud2.h"
+#include "icons.h"
 #include "individual.h"
 #include "inputmgr.h"
 #include "log.h"
@@ -46,9 +47,18 @@ float   g_lineDir = 1.0f;        // XXL_HINTDIR=-1: lines go up
 float   g_unitsPerScreen = 1.75f; // text layout units across the screen (XXL_HINTUNITS)
 float   g_boxShift = -0.39f;      // where the text starts, from the prompt's place (XXL_HINTSHIFT)
 
+uint32_t g_promptIds[15];          // the prompt kinds' strings (interface +0x1A4)
+
+// With player 2 in, the game's action icons in a string become the buttons
+// each player presses: a prompt's those of the player whose hero it is for.
 const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (id == kHintStringId) return g_shown;
-	return g_origLocString(loc, edx, id);
+	const wchar_t* s = g_origLocString(loc, edx, id);
+	if (!CoopP2Joined() || !s) return s;
+	int who = -1;
+	for (int k = 0; k < 15 && who < 0; k++)
+		if (g_promptIds[k] == id && id) who = CoopPromptPlayer();
+	return IconsRewrite(s, who);
 }
 
 const Hint* Current() {
@@ -138,6 +148,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	if (cc && getenv("XXL_HINTLOG")) LogKinds(self);
 	uint32_t* slot = (uint32_t*)(self + 0x1A4 + kHintKind * 4);
 	uint32_t savedId = *slot;
+	memcpy(g_promptIds, self + 0x1A4, sizeof(g_promptIds));
 	if (use && wcscmp(g_source, h->text) != 0) {
 		// A new hint: its lines become one ('\n' -> ' '), the first word of each
 		// line noted.
@@ -274,71 +285,68 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	}
 }
 
-// Keyboard keys: the game's keyboard device (CKInput +0x0C, 0x3FC bytes) keeps
-// one byte per key, written by its window-message handler (vtable slot 5,
-// thiscall(vk, lparam, down), ret 0xC). Which byte a virtual key lands on is
-// found by pressing each key once on the device with its bytes saved and put
-// back.
-uint8_t g_vkOfByte[0x400];
-bool    g_vkMapped = false;
-
-void MapKeyboard(char* kb) {
-	g_vkMapped = true;
-	static uint8_t saved[0x3FC];
-	typedef void(__fastcall* KeyFn)(char* dev, void* edx, uint32_t vk, uint32_t lparam, uint32_t down);
-	KeyFn key = (KeyFn)(*(void***)kb)[5];
-	for (uint32_t vk = 1; vk < 255; vk++) {
-		memcpy(saved, kb, sizeof(saved));
-		key(kb, nullptr, vk, 0, 1);
-		for (int i = 4; i < 0x3FC; i++)   // past the vtable
-			if (kb[i] != (char)saved[i] && !g_vkOfByte[i]) { g_vkOfByte[i] = (uint8_t)vk; break; }
-		memcpy(kb, saved, sizeof(saved));
-	}
-}
-
-void KeyName(int vk, wchar_t* out, int n) {
-	UINT sc = MapVirtualKeyW(vk, 0 /* MAPVK_VK_TO_VSC */);
-	LONG lp = (LONG)(sc << 16);
-	if (vk == VK_LEFT || vk == VK_RIGHT || vk == VK_UP || vk == VK_DOWN || vk == VK_PRIOR || vk == VK_NEXT ||
-	    vk == VK_HOME || vk == VK_END || vk == VK_INSERT || vk == VK_DELETE)
-		lp |= 1 << 24;
-	if (!sc || !GetKeyNameTextW(lp, out, n)) swprintf(out, n, L"key %02X", vk);
-}
-
 } // namespace
 
 const wchar_t* HintButtonName(int player, HintButton b) {
 	static const wchar_t* const kPad[HB_COUNT] = { L"A", L"X", L"LB", L"Start", L"Back", L"B" };
+	static const char* const kPadIcon[HB_COUNT] = { "pad_a", "pad_x", "pad_lb", "pad_start", "pad_back", "pad_b" };
 	static wchar_t buf[HB_COUNT][2][32];
 	if (b < 0 || b >= HB_COUNT) return L"?";
+	wchar_t* out = buf[b][player == 1];
+	wchar_t g = 0;
+	int vk = 0;
 	if (player == 1) {
-		if (CoopP2Pad() != kKeyboardPad) return kPad[b];
 		static const int kKey[HB_COUNT] = { CoopConfig::KEY_JUMP, CoopConfig::KEY_ATTACK, CoopConfig::KEY_LB,
 		                                    CoopConfig::KEY_START, CoopConfig::KEY_BACK, CoopConfig::KEY_GRAB };
-		KeyName(g_config.keys[kKey[b]], buf[b][1], 32);
-		return buf[b][1];
+		if (CoopP2Pad() != kKeyboardPad) g = IconGlyph(kPadIcon[b]);
+		else g = IconKeyGlyph(vk = g_config.keys[kKey[b]]);
+	} else {
+		// Player 1: the device the game's binding for that button reads.
+		static const int kAction[HB_COUNT] = { 4, 5, 8, 15, 12, 6 };
+		g = IconActionGlyph(0, kAction[b]);
+		if (!g) vk = IconsP1Vk(kAction[b]);
 	}
-	// Player 1: the device the game's binding for that button reads.
-	static const int kAction[HB_COUNT] = { 4, 5, 8, 15, 12, 6 };
-	InputManager im = GetInputManager();
-	char* in = im ? im.raw() : nullptr;
-	if (!in || kAction[b] >= im.NumActions()) return kPad[b];
-	char* src = *(char**)(im.Binding(kAction[b]) + 0xC);
-	char* cur = src ? *(char**)(src + 0x14) : nullptr;
-	char* kb = *(char**)(in + 0x0C);
-	unsigned nkb = *(uint8_t*)(in + 0x12);
-	if (!cur || !kb || !nkb || cur < kb || cur >= kb + 0x3FC) return kPad[b];
-	if (!g_vkMapped) MapKeyboard(kb);
-	int vk = g_vkOfByte[cur - kb];
+	if (g) { out[0] = g; out[1] = 0; return out; }
 	if (!vk) return kPad[b];
-	KeyName(vk, buf[b][0], 32);
-	return buf[b][0];
+	IconsKeyName(vk, out, 32);
+	return out;
 }
 
 const wchar_t* HintKeyName(int vk) {
 	static wchar_t buf[32];
-	KeyName(vk, buf, 32);
+	wchar_t g = IconKeyGlyph(vk);
+	if (g) { buf[0] = g; buf[1] = 0; return buf; }
+	IconsKeyName(vk, buf, 32);
 	return buf;
+}
+
+const wchar_t* HintHeroName(int hero) {
+	static wchar_t buf[4][24];
+	static int n = 0;
+	wchar_t* out = buf[n++ & 3];
+	wchar_t g = IconGlyph(hero == HERO_ASTERIX ? "asterix" : "obelix");
+	const wchar_t* name = hero == HERO_ASTERIX ? L"Asterix" : L"Obelix";
+	if (g) swprintf(out, 24, L"%c%s", g, name);
+	else swprintf(out, 24, L"%s", name);
+	return out;
+}
+
+const wchar_t* HintHero(int hero, int player) {
+	static wchar_t buf[4][32];
+	static int n = 0;
+	wchar_t* out = buf[n++ & 3];
+	wchar_t g = IconGlyph(player ? "p2" : "p1");
+	if (g) swprintf(out, 32, L"%s %c", HintHeroName(hero), g);
+	else swprintf(out, 32, L"%s (P%d)", HintHeroName(hero), player + 1);
+	return out;
+}
+
+const wchar_t* HintPlayer(int player) {
+	static wchar_t buf[2][16];
+	wchar_t g = IconGlyph(player ? "p2" : "p1");
+	if (g) swprintf(buf[player != 0], 16, L"%c", g);
+	else swprintf(buf[player != 0], 16, L"Player %d:", player + 1);
+	return buf[player != 0];
 }
 
 void HintShow(int key, const wchar_t* text, DWORD ms) {

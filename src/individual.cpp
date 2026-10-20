@@ -502,9 +502,8 @@ void BlockPartnerGrounds() {
 void ShowDownHint(int down) {
 	int up = Other(down);
 	wchar_t text[160];
-	swprintf(text, 160, L"%s (P%d) is down! %s (P%d):\nhold %s by him for %d s to revive",
-	         down == HERO_ASTERIX ? L"Asterix" : L"Obelix", PlayerOf(down) + 1, up == HERO_ASTERIX ? L"Asterix" : L"Obelix",
-	         PlayerOf(up) + 1, HintButtonName(PlayerOf(up), HB_B), (int)kReviveSeconds);
+	swprintf(text, 160, L"%s is down! %s:\nhold %s by him for %d s to revive", HintHero(down, PlayerOf(down)),
+	         HintHero(up, PlayerOf(up)), HintButtonName(PlayerOf(up), HB_B), (int)kReviveSeconds);
 	HintShow(HINT_REVIVE, text, 8000);
 }
 
@@ -1057,8 +1056,8 @@ void IndivFrame() {
 			if (close && now - g.hintAt > 400) {
 				g.hintAt = now;
 				wchar_t text[128];
-				swprintf(text, 128, L"%s (P%d): hold %s to revive %s", up == HERO_ASTERIX ? L"Asterix" : L"Obelix",
-				         PlayerOf(up) + 1, HintButtonName(PlayerOf(up), HB_B), i == HERO_ASTERIX ? L"Asterix" : L"Obelix");
+				swprintf(text, 128, L"%s: hold %s to revive %s", HintHero(up, PlayerOf(up)),
+				         HintButtonName(PlayerOf(up), HB_B), HintHeroName(i));
 				HintShow(HINT_REVIVE, text, 600);
 			}
 		}
