@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <intrin.h>
 #include <cstring>
 #include <cwchar>
 
@@ -49,15 +50,48 @@ float   g_boxShift = -0.39f;      // where the text starts, from the prompt's pl
 
 uint32_t g_promptIds[15];          // the prompt kinds' strings (interface +0x1A4)
 
+// Who reads a text, by the code that asks for it: text objects take their
+// strings through FUN_0042E590 (thiscall(id), push esi / push edi, its call
+// returns to 0x42E5A6), so its own caller's return address is 0x10 past ours.
+const uintptr_t kTextSetReturn = 0x42E5A6;
+bool In(uintptr_t a, uintptr_t from, uintptr_t to) { return a >= from && a < to; }
+
+int PlayerOfHero(int hero) { return hero == CoopP1Hero() ? 0 : 1; }
+
 // With player 2 in, the game's action icons in a string become the buttons
-// each player presses: a prompt's those of the player whose hero it is for.
+// each player presses: a prompt's those of the player whose hero it is for, a
+// dialogue's (CKSekens, either player moves it on) both players', a menu's
+// (only player 1 drives them) player 1's. At the merchant everything else is
+// the shopper's: the shop's buttons ("Back", "Buy") are refreshed from shared
+// 2D code (FUN_0042E680) with the pause menu's string ids, so only the time
+// tells them apart (player 1 pausing while player 2 shops would show player
+// 2's).
 const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (id == kHintStringId) return g_shown;
 	const wchar_t* s = g_origLocString(loc, edx, id);
 	if (!CoopP2Joined() || !s) return s;
-	int who = -1;
-	for (int k = 0; k < 15 && who < 0; k++)
-		if (g_promptIds[k] == id && id) who = CoopPromptPlayer();
+	void** ra = (void**)_AddressOfReturnAddress();
+	uintptr_t from = (uintptr_t)ra[0];
+	if (from == kTextSetReturn) from = (uintptr_t)ra[4];
+	int shopper = CoopShopper();
+	int who = shopper >= 0 ? PlayerOfHero(shopper) : 0;
+	bool prompt = false;
+	for (int k = 0; k < 15 && !prompt; k++)
+		if (g_promptIds[k] == id && id) { who = CoopPromptPlayer(); prompt = true; }
+	if (!prompt && shopper < 0 && In(from, 0x46E940, 0x46ECF0))   // CKSekens vf17-vf21
+		who = -1;
+	static int logs = 0;
+	if (getenv("XXL_ICONLOG") && logs < 60 && IconsRewrite(s, who) != s) {
+		static uint64_t seen[60];
+		uint64_t key = (uint64_t)id << 32 | from;
+		bool known = false;
+		for (int i = 0; i < logs; i++) known |= seen[i] == key;
+		if (!known) {
+			seen[logs++] = key;
+			Log("icons: string %X asked for from %08X (shopper %d) -> %s", id, (unsigned)from, shopper,
+			    who < 0 ? "both" : who ? "player 2" : "player 1");
+		}
+	}
 	return IconsRewrite(s, who);
 }
 
@@ -241,6 +275,14 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 			            scale * ((WidthFn)0x5FDAB0)(font, *(const wchar_t**)(t20 + 0x2D8 + 4 * (n - 1)), *(uint32_t*)(t20 + 0x664));
 			for (unsigned i = 0; i < n; i++) pos[2 * i] -= first;
 		}
+	}
+	// Shown (state 2), the game leaves the text where its slide ended: a hint
+	// that changed width since (the revive's bar, a hint replaced under the same
+	// key) ran off the screen's right edge. Its place follows its width.
+	if (((*(uint32_t*)(self + 0x24) >> 21) & 3) == 2) {
+		float w = (g_longest > 0.0f ? g_longest : 0.9f) / g_unitsPerScreen;
+		float x = 0.95f - w - g_boxShift;
+		*(float*)(text + 0x14) = *(float*)(self + 0x42C) = *(float*)(self + 0x434) = x;
 	}
 	static DWORD lastLog = 0;
 	if (getenv("XXL_HINTLOG") && GetTickCount() - lastLog > 1000) {

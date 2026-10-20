@@ -1864,3 +1864,20 @@ both halves).
   runs past the screen's right edge (plate +0x14 1.04), with or without icons.
   Tools: tools\kwn_textures.py (RW images of any .KWN), tools\export_game_icons.py (the font's icons),
   tools\icon_sheet.ps1 (contact sheet). The designer's export is F:\XXL COOP MOD\icons_export.
+- Round 91 (2026-10-21, user's screenshots: the controls menu showed "X/F" etc., P2's shop showed nothing of
+  his): whose buttons a text gets, in LocStringHook (hints.cpp) by what asks for it. Text objects take strings
+  through FUN_0042E590 (thiscall(id), push esi/edi; its call returns to 0x42E5A6, so its caller's return address
+  is 0x10 past the hook's) or FUN_0042E680 (re-fetches the object's id +0x14, called from shared 2D code:
+  Shared_Class_0_0_sendEvent_x3, CColorTextButton2d vf16). Rules: a HUD prompt id -> its hero's player; while a
+  hero shops (CoopShopper) everything else -> the shopper (the shop's "Back"/"Buy" buttons, ids 0x21 / 0x36C, are
+  refreshed through FUN_0042E680 with the pause menu's ids, so only the time tells them apart; CKHkInterfaceShop
+  vtable 0x628818 slot 15 = set-up, 18 = tick, but neither fetches them); CKSekens vf17-vf21 (0x46E940-0x46ECF0,
+  dialogues) -> both; anything else (menus: only player 1 drives them) -> player 1. Known gap: player 1 pausing
+  while player 2 shops would show player 2's buttons in the pause menu. XXL_ICONLOG=1 logs (string, caller,
+  shopper, whose) once each.
+  Hint overflow: the prompt box's text is placed only while it slides in (FUN_00520CC0 case 1 writes text +0x14
+  from +0x434); shown (case 2) the game leaves it, so a hint that got wider afterwards (the revive bar's text, a
+  hint replaced under the same key: gun solo -> shared gun) ran past the right edge (plate +0x14 1.04). Shown, the
+  text +0x14 (and +0x42C / +0x434) now follows the measured width every tick. Autotests: mgun33o -L3 (plate inside),
+  down2a (revive bar), shopsplit / shopsplita with XXL_ICONP2KB (shop: P2's G / Space; P1's B / A), icons21 (spy:
+  still X/F), menus logged "for player 1". The revive bar's text has the hero icon too.

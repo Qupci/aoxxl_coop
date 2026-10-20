@@ -1047,7 +1047,7 @@ void IndivFrame() {
 			// The game's font has '=' and '-' (no '|', '#' or '%').
 			for (int k = 0; k < 20; k++) bar[k] = k < n ? L'=' : L'-';
 			bar[20] = 0;
-			swprintf(text, 128, L"Reviving %s\n%s", i == HERO_ASTERIX ? L"Asterix" : L"Obelix", bar);
+			swprintf(text, 128, L"Reviving %s\n%s", HintHeroName(i), bar);
 			HintShow(HINT_REVIVE, text, 500);
 			if (g.revive[i] >= kReviveSeconds) Revive(i, h, "revived");
 		} else {
