@@ -537,8 +537,6 @@ void FindFonts() {
 } // namespace
 
 void IconsFrame() {
-	static bool off = getenv("XXL_NOICONS") != nullptr;   // no icons at all: the game's own, the hints' names
-	if (off) return;
 	FindFonts();
 	bool pending = false;
 	for (const Font& ft : g_fonts) if (!ft.tried) pending = true;

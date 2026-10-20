@@ -1857,7 +1857,7 @@ both halves).
   Co-op hints use the icons too (HintHero / HintHeroName / HintPlayer). The game's prompt text is fetched every
   frame in its shown state (FUN_00520CC0 case 2 -> FUN_0042E590 -> FUN_00411780), so an owner change shows at once.
   Note: the gun (LV3-3) is only ever offered to the leader in reach, so its "Use" is the leader's player's.
-  XXL_NOICONS: no icons at all (temporary switch); XXL_ICONP2KB: player 2's icons as on the keyboard (tests).
+  No on/off switch (user, Oct 20: fixes get none from now on; build the previous commit instead). XXL_ICONP2KB: player 2's icons as on the keyboard (tests).
   Autotests icons21 (LV2-1 spy pages, X; on pads: "press X"; ICONP2KB: "press X/F"; NOICONS: the game's icon),
   catapulta / catapultp (launcher "Activate": P1's X / P2's F), iconsgun -L3, mgun33o -L3 (hint icons).
   Found on the way, not fixed: a co-op hint replaced by another with the same key (gun solo -> shared gun hint)
