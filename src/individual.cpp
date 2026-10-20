@@ -524,6 +524,29 @@ void RefreshHud() {
 // not lead stays where it is -- the level brings the leader back to it.
 // Asked every 0.5 s from 2 s after the fall; three noes in a row (not a hero in
 // mid-jump over a gap's cells) before the move. XXL_NOREACHFIX: never.
+// Where to put the hero brought beside fallen `down`: one of the fallen hero's
+// own last solid grounds 1 to 3 units from where it lies (the nearest to 1.5),
+// else where it lies. Not the graph's cells: those of LV2-6's bridge read as
+// walkable with the bridge in -- Obelix was put over the pit and fell
+// (lv2-6_obelix_tps_to_death.log). XXL_NOBESIDEFIX: the graph's cell, as before.
+Vector3 SpotBesideFallen(int down, const Vector3& at) {
+	static const bool off = getenv("XXL_NOBESIDEFIX") != nullptr;
+	if (off) return PfSpotBeside(at);
+	const Vector3* best = nullptr;
+	float bestD = 1e30f;
+	auto consider = [&](const Vector3& p) {
+		Vector3 d = p - at;
+		float h2 = d.x * d.x + d.z * d.z;
+		if (h2 < 1.0f || h2 > 9.0f || fabsf(d.y) > 1.5f) return;
+		float score = fabsf(sqrtf(h2) - 1.5f);
+		if (score < bestD) { bestD = score; best = &p; }
+	};
+	for (int i = 0; i < kSafeSpots; i++)
+		if (g.safe[down][i].at) consider(g.safe[down][i].pos);
+	for (int k = 0; k < g.trailN[down]; k++) consider(g.trail[down][k]);
+	return best ? *best : at;
+}
+
 void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	static const bool off = getenv("XXL_NOREACHFIX") != nullptr;
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
@@ -542,7 +565,7 @@ void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	}
 	if (!g.fellLeading[down] || off || ++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
-	Vector3 spot = PfSpotBeside(h.Pos());
+	Vector3 spot = SpotBesideFallen(down, h.Pos());
 	spot.y += 0.5f;
 	if (!g.brought[up]) {   // the first move's start: where it goes back to
 		g.brought[up] = true;

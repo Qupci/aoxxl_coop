@@ -1809,3 +1809,18 @@ both halves).
   before. Autotest reach26w (XXL_DOWNAT=0:5000; trio 4802, Asterix down on the far side, P2 holds B): fix off ->
   -854.0 508.5 -1073.2 as in the user's log; on -> put back where he waited (117.8 3.1 -389.0), brought once, back to
   117.5 3.1 -387.2.
+- Round 88 (user: (1) Obelix brought to Asterix fell into LV2-6's pit, xxl_coop.lv2-6_obelix_tps_to_death.log; (2) old:
+  after a pause the fallen hero walked over to the other and fell again there, into a gap if one was on the way).
+  (1) Asterix lay at the pit's edge (93.2 2.2 -391.1), inside the bridge's node (39), whose cells read walkable
+  with the bridge in: PfSpotBeside chose 94.5 -- over the pit. Now SpotBesideFallen: one of the fallen hero's own
+  safe spots / trail points 1-3 units from where it lies (nearest 1.5), else where it lies (the heroes ease
+  apart). XXL_NOBESIDEFIX: the graph's cell. Autotest reach26p (Asterix stands at 93.2, walks into the pit): off ->
+  Obelix at 94.5, falls, game over; on -> put at 93.2, eased to 92.9 -392.6, alive.
+  (2) The pause menu's bars (gm +0x5C bit 20, world paused) suspend co-op, and while suspended every non-leading
+  hero was made the AI companion (coop.cpp) -- a fallen one too: at the unpause, before the resume, it ran its AI
+  life (situation 0xFF, walking: 20261014-190940 log at 538.4) toward the leader, then dropped into its death
+  again where it got to. A fallen hero is no longer made the companion. XXL_NOFALLENAIFIX: as before. Autotest
+  pausedown (XXL_DOWNAT=0:3000; pause state 2 + gm +0x5E ^ 0x10, back to state 1 -- the game clears the bars): off
+  -> walks -854.9 -> -851.5; on -> stays at -854.90, co-op and the split screen resume.
+  Also autotests relight23 / relight23n (LV2-3 hearth lit again after the send-back; the level's own wait): the
+  "locked" Obelix of 20261020-190948 was LV5-5-like level behaviour per the user, closed.

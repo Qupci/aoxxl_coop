@@ -2118,12 +2118,17 @@ void CoopFrame() {
 	// work that way: on the belly slide (mode 3) Obelix leads and Asterix rides
 	// along as the AI variant, whose handler carries him with Obelix; left in the
 	// player variant he stayed at the top of the slide.
+	// A fallen hero (individual heroes) is not: as the AI companion it got out of
+	// its death (situation 0xFF, AI life) and walked toward the leader for the
+	// frames a pause menu's bars took to go -- into a gap if one was on the way
+	// (20261014-190940 log: each pause). XXL_NOFALLENAIFIX: as before.
+	static const bool noFallenAiFix = getenv("XXL_NOFALLENAIFIX") != nullptr;
 	if (g.suspended) {
 		const int both[2] = { g.p1Hero, g.p2Hero };
 		for (int idx : both) {
 			Hero h = idx == g.p1Hero ? h1 : h2;
 			uint8_t f = *F18(h);
-			if (idx != t.Leader() && HeroIsPlayerVariant(f)) {
+			if (idx != t.Leader() && HeroIsPlayerVariant(f) && (noFallenAiFix || !IndivFallen(idx))) {
 				*F18(h) = HeroAiVariant(f);
 				Log("coop: %s is the game's companion while suspended (f18 %02X -> %02X)", HeroName(idx), f,
 				    *F18(h));

@@ -1469,6 +1469,21 @@ const Step kComboMix[] = {
 	END(18500),
 };
 
+// pausedown (level 2, XXL_DOWNAT=0:3000): Asterix down 8 units from Obelix; the
+// pause menu open and shut (user: the fallen hero walked over to the other as
+// the sidekick, then fell again there -- into a gap if one was on the way).
+const Step kPauseDown[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -854.9f, 508.5f, -1072.2f), PLACEAT(1500, HERO_OBELIX, -846.9f, 508.5f, -1072.2f),
+	SHOT(5500, "pausedown_0"),
+	{ 6000, S_POKE8, -3, 2, 0, 0, 0, "the pause menu (game manager state 2)" },
+	{ 6000, S_POKE8, -2, 0x5E, 0, (float)0x10, 0, "its bars (game manager +0x5C bit 20) on" },
+	{ 8000, S_POKE8, -3, 1, 0, 0, 0, "back to the game (state 1; the game clears the bars itself)" },
+	SHOT(9000, "pausedown_1"), SHOT(12000, "pausedown_2"),
+	END(12500),
+};
+
 // pushkeg5 (-Level 5, sector 3): Asterix lights the powder keg (the level
 // hands the lead to Obelix), player 2's Obelix pushes the big block (the level
 // then makes it slide on its own: 09A7), and Asterix walks past the block --
@@ -1965,6 +1980,19 @@ const Step kReach26W[] = {
 	END(18000),
 };
 
+// reach26p (-Level 2): the user's LV2-6 fall -- Asterix (leading) walks off the
+// far edge into the pit and is laid on his last solid ground at its edge;
+// Obelix, brought beside him, must land on ground, not over the pit
+// (lv2-6_obelix_tps_to_death.log; XXL_NOBESIDEFIX: he fell too).
+const Step kReach26P[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 117.82f, 3.0f, -389.01f), PLACEAT(3000, HERO_ASTERIX, 93.2f, 2.6f, -391.1f),
+	GLIDEAT(4500, HERO_ASTERIX, 97.0f, 2.2f, -391.1f, 300),
+	SHOT(9000, "reach26p_0"), SHOT(11000, "reach26p_1"), REACH(11200),
+	END(12000),
+};
+
 // reach23g (-Level 2, XXL_DOWNAT=0:8000): reach23, then player 2's Obelix
 // revives Asterix by holding B by him (the user's way: the revive suspends co-op
 // for a frame) -- Obelix must go back out of the room.
@@ -1978,6 +2006,41 @@ const Step kReach23G[] = {
 	VPAD(12000, 1, PAD_B, 0, 0, "p2 hold B"), VPAD(18500, 1, 0, 0, 0, "p2 release"),
 	SHOT(19500, "reach23g_1"), REACH(19700),
 	END(20500),
+};
+
+// relight23 (-Level 2, XXL_DOWNAT=0:8000): reach23g, then Asterix takes fire
+// at the hearth again (the user's log: Obelix would not move after that) and
+// player 2 walks Obelix about. relight23n: no fall -- Asterix lights the
+// hearth twice, player 2 walks.
+const Step kRelight23[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	VPAD(12000, 1, PAD_B, 0, 0, "p2 hold B"), VPAD(18500, 1, 0, 0, 0, "p2 release"),
+	VPAD(19500, 1, 0, 0, 1, "p2 up"), VPAD(20500, 1, 0, 0, 0, "p2 neutral"),
+	{ 20600, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 20800, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch again" },
+	PLACEAT(21000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f),
+	P1(21500, PAD_X, 0, 0, "p1 X (hearth again)"), P1(21650, 0, 0, 0, "p1 release"),
+	SHOT(23500, "relight23_0"),
+	VPAD(24000, 1, 0, 0, 1, "p2 up"), VPAD(26000, 1, 0, 1, 0, "p2 right"), VPAD(28000, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(28200, "relight23_1"),
+	END(29000),
+};
+const Step kRelight23N[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	VPAD(12000, 1, 0, 0, 1, "p2 up"), VPAD(13000, 1, 0, 0, 0, "p2 neutral"),
+	PLACEAT(14000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f),
+	P1(14500, PAD_X, 0, 0, "p1 X (hearth again)"), P1(14650, 0, 0, 0, "p1 release"),
+	SHOT(16500, "relight23n_0"),
+	VPAD(17000, 1, 0, 0, 1, "p2 up"), VPAD(19000, 1, 0, 1, 0, "p2 right"), VPAD(21000, 1, 0, 0, 0, "p2 neutral"),
+	SHOT(21200, "relight23n_1"),
+	END(22000),
 };
 
 // pf23 (-Level 2): LV2-3's hearth room -- the graph around its door, then
@@ -3544,6 +3607,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),
 	SCENARIO("reach26w", kReach26W),
+	SCENARIO("relight23", kRelight23),
+	SCENARIO("relight23n", kRelight23N),
+	SCENARIO("pausedown", kPauseDown),
+	SCENARIO("reach26p", kReach26P),
 	SCENARIO("sq36a", kSq36a),
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),
