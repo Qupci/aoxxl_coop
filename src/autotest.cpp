@@ -1949,6 +1949,21 @@ const Step kReach23[] = {
 	END(14500),
 };
 
+// reach23g (-Level 2, XXL_DOWNAT=0:8000): reach23, then player 2's Obelix
+// revives Asterix by holding B by him (the user's way: the revive suspends co-op
+// for a frame) -- Obelix must go back out of the room.
+const Step kReach23G[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	SHOT(11800, "reach23g_0"),
+	VPAD(12000, 1, PAD_B, 0, 0, "p2 hold B"), VPAD(18500, 1, 0, 0, 0, "p2 release"),
+	SHOT(19500, "reach23g_1"), REACH(19700),
+	END(20500),
+};
+
 // pf23 (-Level 2): LV2-3's hearth room -- the graph around its door, then
 // Asterix lights the hearth (-44.0 0.3 -541.3) with a lit torch: event #423
 // shuts the door (CKHkSwingDoor) behind him.
@@ -3511,6 +3526,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach26o", kReach26O),
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
+	SCENARIO("reach23g", kReach23G),
 	SCENARIO("sq36a", kSq36a),
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),

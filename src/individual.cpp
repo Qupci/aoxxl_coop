@@ -943,14 +943,17 @@ void IndivFrame() {
 	// The hero brought to its fallen leader goes back once it has revived it --
 	// unless it has gone on more than 10 units from where it was put (a sector
 	// change's revive, a launcher). XXL_NOSENDBACKFIX: it stays.
+	// Waits out a suspension (the revive by the grab suspends co-op for a frame as
+	// the hero gets up -- lv2-3_tp_back.log: dropped there).
 	static const bool noSendBack = getenv("XXL_NOSENDBACKFIX") != nullptr;
-	if (g.sendBack >= 0) {
+	if (g.sendBack >= 0 && !CoopSuspended()) {
 		int who = g.sendBack;
 		g.sendBack = -1;
 		g.brought[who] = false;
 		Hero b = t.GetHero(who);
 		Vector3 d = b ? b.Pos() - g.broughtTo[who] : Vector3();
-		if (!b || noSendBack || g.fallen[who] || CoopSuspended()) {
+		if (!b || noSendBack || g.fallen[who]) {
+			Log("indiv: %s stays where it was brought%s", HeroName(who), noSendBack ? " (XXL_NOSENDBACKFIX)" : "");
 		} else if (d.len2() > 10.0f * 10.0f) {
 			Log("indiv: %s has gone on from where it was brought (%.0f units) -- stays", HeroName(who), sqrtf(d.len2()));
 		} else {

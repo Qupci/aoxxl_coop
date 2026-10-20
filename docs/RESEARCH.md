@@ -1794,3 +1794,9 @@ both halves).
   where it was put (a sector change's revive, a launcher). Cleared at a level change and the respawn.
   XXL_NOSENDBACKFIX: it stays. Autotests (XXL_DOWNAT + XXL_UPAT): reach26 -- back to the cliff 114.5 2.6 -387.5
   (fix off: stays by Asterix); reach23 (XXL_DOWNAT=0:8000 XXL_UPAT=12000) -- out of the hearth room again.
+- Round 86 (user, xxl_coop.lv2-3_tp_back.log: Obelix not sent back after reviving Asterix by the grab): the
+  grab's revive suspends co-op for one frame (67.079 -> 67.094, "a scripted mode" as the hero gets up), and the
+  send-back was taken and dropped in that frame (the lead's give-back waited it out). Now the send-back waits for
+  co-op to resume too, and says why when the hero stays. Autotest reach23g (XXL_DOWNAT=0:8000): player 2 holds B
+  by Asterix -- suspended / resumed, then back to -72.4 -1.6 -590.4. (The XXL_UPAT revive, as at a launcher, has
+  no such frame: why reach23 passed.)
