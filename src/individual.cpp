@@ -185,7 +185,11 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 	char* ground = *(char**)(h.raw() + 0x280);
 	if (!ground || IsBadReadPtr(ground, 0x2C) || *(uintptr_t*)ground != 0x624258) return;
 	if ((*(uint8_t*)(ground + 0x2A) & 4) || (*(uint8_t*)(h.raw() + 0x384) & 7) != 0) return;
-	if (*(uint8_t*)(h.raw() + 0x3E9) != 0) return;
+	// in no situation but walking (0), or the AI companion's none (0xFF: one that
+	// only ever followed had no spot since the level's start -- lv2-6_tp_back.log)
+	static const bool noFarSpot = getenv("XXL_NOFARSPOTFIX") != nullptr;
+	uint8_t sit = *(uint8_t*)(h.raw() + 0x3E9);
+	if (sit != 0 && (noFarSpot || !(sit == 0xFF && (*(uint8_t*)(h.raw() + 0x18) & 3) == 3))) return;
 	if (*(uint8_t*)(ground + 0x2A) & 8) return;   // slide ground (the belly slide)
 	const char* partner = nullptr;
 	if (OnPartnerGround(h, &partner)) return;   // a blue circle's plate: not a place to be put back on
@@ -204,11 +208,17 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 // Put back from something that needs both heroes: the newest safe spot at
 // least 4 units from where the hero stands (the last one can be right at the
 // thing's edge, walked back onto at once), else the farthest one known.
+// Spots further than this are not "the last solid ground" any more (left from
+// an earlier part of the level): not gone back to.
+// (XXL_NOFARSPOTFIX: any distance, and no spots of the AI companion's, as before.)
+const float kSpotReach = getenv("XXL_NOFARSPOTFIX") ? 1e6f : 40.0f;
+
 bool SafeSpotAway(int idx, const Vector3& from, Vector3* out) {
 	// The trail first: the newest of its spots 6 units or more away.
 	for (int k = 1; k <= g.trailN[idx]; k++) {
 		const Vector3& p = g.trail[idx][(g.trailNext[idx] + 16 - k) % 16];
-		if ((p - from).len2() >= 6.0f * 6.0f) { *out = p; return true; }
+		float d = (p - from).len2();
+		if (d >= 6.0f * 6.0f && d <= kSpotReach * kSpotReach) { *out = p; return true; }
 	}
 	const SafeSpot* best = nullptr;
 	const SafeSpot* farthest = nullptr;
@@ -217,6 +227,7 @@ bool SafeSpotAway(int idx, const Vector3& from, Vector3* out) {
 		const SafeSpot& s = g.safe[idx][i];
 		if (!s.at) continue;
 		float d = (s.pos - from).len2();
+		if (d > kSpotReach * kSpotReach) continue;
 		if (d > farD) { farD = d; farthest = &s; }
 		if (d >= 4.0f * 4.0f && (!best || (int)(s.at - best->at) > 0)) best = &s;
 	}

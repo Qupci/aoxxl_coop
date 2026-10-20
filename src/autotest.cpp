@@ -1949,6 +1949,22 @@ const Step kReach23[] = {
 	END(14500),
 };
 
+// reach26w (-Level 2, XXL_DOWNAT=0:5000): the user's LV2-6 run -- Obelix the
+// waiting AI companion (trio 4802) from before the pit (no safe spot of his
+// since the level's start), Asterix falls on the far side: the lock's undo must
+// not put Obelix back at the level's start (-854 508 -1073); brought to Asterix,
+// he revives him by holding B and goes back to his side of the pit.
+const Step kReach26W[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "companion waits" },
+	PLACEAT(3000, HERO_OBELIX, 117.82f, 3.0f, -389.01f), PLACEAT(3000, HERO_ASTERIX, 91.4f, 2.8f, -392.7f),
+	SHOT(7000, "reach26w_0"),
+	VPAD(9500, 1, PAD_B, 0, 0, "p2 hold B"), VPAD(16000, 1, 0, 0, 0, "p2 release"),
+	SHOT(17000, "reach26w_1"), REACH(17200),
+	END(18000),
+};
+
 // reach23g (-Level 2, XXL_DOWNAT=0:8000): reach23, then player 2's Obelix
 // revives Asterix by holding B by him (the user's way: the revive suspends co-op
 // for a frame) -- Obelix must go back out of the room.
@@ -3527,6 +3543,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),
+	SCENARIO("reach26w", kReach26W),
 	SCENARIO("sq36a", kSq36a),
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),

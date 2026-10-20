@@ -1800,3 +1800,12 @@ both halves).
   co-op to resume too, and says why when the hero stays. Autotest reach23g (XXL_DOWNAT=0:8000): player 2 holds B
   by Asterix -- suspended / resumed, then back to -72.4 -1.6 -590.4. (The XXL_UPAT revive, as at a launcher, has
   no such frame: why reach23 passed.)
+- Round 87 (user, xxl_coop.lv2-6_tp_back.log: after the revive Obelix went to the level's start, -854 508 -1073;
+  two moves to get to Asterix): Obelix had been the waiting AI companion (trio 4802) -- NoteSafeSpot took spots only
+  in situation 0, the AI's is 0xFF, so his newest was from the level's start. Asterix's fall undid the lock and
+  IndivPutOnSafeGround put Obelix there (move 1); BringToFallenLeader brought him from there (move 2) and kept it as
+  where he came from. Now an AI hero (+0x18 & 3 == 3) in situation 0xFF on solid ground takes spots too, and
+  put-backs (SafeSpotAway) ignore spots more than 40 units away (none: the hero stays). XXL_NOFARSPOTFIX: as
+  before. Autotest reach26w (XXL_DOWNAT=0:5000; trio 4802, Asterix down on the far side, P2 holds B): fix off ->
+  -854.0 508.5 -1073.2 as in the user's log; on -> put back where he waited (117.8 3.1 -389.0), brought once, back to
+  117.5 3.1 -387.2.
