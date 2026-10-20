@@ -1756,3 +1756,29 @@ both halves).
   had counted the Romans as sent in (pool record +0x16 went to 80/80 with none alive) -- so the lock waited for
   Romans that never came. Now the farthest marker from both heroes is used (XXL_NOMARKERDROPFIX: as before).
   Autotest gatedone (-Level 5; XXL_GATESHOTS: shots as the counter comes / goes, ends 3 s after): won in ~15 s.
+- Round 83 (user: a fallen hero can lie where the other can't get to -- LV2-6's big pit, Asterix carried over by
+  the CKHkTelepher; LV2-3's hearth room, its door shut by the hearth's #423): the level's pathfinding graph tells.
+  CKSrvPathFinding = yellow pages +0x64 (vt 0x62483C): +0xC nodes, +0x10 count. CKPFGraphNode (vt 0x6247DC): +8
+  box max, +0x14 box min, grid at +0x20 (+0x24 cells, 4 bits, even index in the high half; +0x28/+0x29 nx/nz;
+  +0x2A mask 0xFF/0xF7), +0x2C transitions (+0x30 u16 count), +0x32 own index. Cell table 0x665240 by mover type
+  (FUN_0045B830; heroes' AI 1, Romans 2): 7 wall, 0 (XXL-Editor cyan) Romans only, 4 (yellow) sidekick only, bit 3
+  set over a box by objects (FUN_0045A880: crates, crumbly zones, rolling stones, push blocks). CKPFGraphTransition
+  (vt 0x62480C): +4 0 walk over / else jump, +8 target node, +0xC flags (bit 31 on: event 0xA00 on, 0xA01 off,
+  level start copies bit 30; bits 0-1 who may: 1 sidekick, 2 Romans), +0x10 doors 0x38 each (+4 take-off box
+  max/min, +0x1C landing box, +0x34 u32), +0x14 count. Search: FUN_0045D890 (A* over nodes, FUN_0045E100 = the
+  flags test), FUN_0045E1F0 (over one node's cells). LV2-6: bridge = node 39, its jumps to the cliff (39<->46)
+  3FFFFFFD until the lever (86.2 2.4 -396.5) -> BFFFFFFD. LV2-3: the hearth room (node 94) <-> door node 58 walk
+  over 3FFFFFFE (Romans only, off): the sidekick is never to go in; the door's cells are cyan. CKHkSwingDoor
+  (2,98): +0x18 open 0..1, +0x28 steps, +0x2A target step, +0x2C/+0x30 leaves (frame +0x10 = cos of the angle);
+  LV2-3 has 8 objects for 2 doors (copies on the same leaves, never moving) -- the leaves tell.
+  pathfind.cpp: one BFS over (node, cell) for a hero on foot: cells not 7 and not bit 3, cyan shut within 3 units
+  of a closed door's leaf; walk-overs unless the sidekick's and off; jumps the sidekick's and on (from within a
+  cell of the take-off box's centre). A place is seeded in the node it is deepest in (the bridge node reaches a
+  cell onto the cliff), on its cell or the walkable ring nearest (up to 3). individual.cpp BringToFallenLeader:
+  fallen while leading (leader as the frame began) and the other can't walk to it -- asked every 0.5 s from 2 s
+  after the fall, three noes -- the other is put 1.5 units beside it on a walkable cell. Not leading: stays (the
+  user's rule: the level brings the leader to its sidekick, not the other way). XXL_NOREACHFIX: never.
+  Autotests pf26 / pf23 (graph dumps, REACH verdicts: pit no -> lever -> yes; door open yes -> shut no; the 5-cell
+  gap -49.6 45.2 -182.5 / -37.0 45.1 -182.6 yes), reach26 (XXL_DOWNAT=0:5000: brought; with XXL_NOREACHFIX
+  stays), reach26o (Obelix leading: stays), reach26b (bridge out: yes, stays), reach23 (XXL_DOWNAT=0:8000:
+  brought into the hearth room).

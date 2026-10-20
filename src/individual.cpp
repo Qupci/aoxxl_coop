@@ -7,6 +7,7 @@
 #include "kal.h"
 #include "life.h"
 #include "log.h"
+#include "pathfind.h"
 #include "trio.h"
 
 #include <cmath>
@@ -63,6 +64,12 @@ struct State {
 	DWORD    blockedAt[2] = {};     // last put back from something that needs both heroes
 	Vector3  blockedTo[2];          // ... to there   // just put back: no new safe spot (it would be the lifted place)
 	int      lastSector = -1;
+	int      lastLead = -1;            // the trio's leader as the frame began
+	bool     fellLeading[2] = {};      // it was the leader when it fell
+	DWORD    fellAt[2] = {};
+	DWORD    reachAt[2] = {};          // last asked whether the other hero can walk to it
+	int      cutOff[2] = {};           // ... and was told no that many times in a row
+	int      reachTold[2] = { -2, -2 };
 	DWORD    lastFrame = 0;
 	DWORD    hintAt = 0;
 	int      p2Hero = -1;              // player 2's hero while individual heroes are on
@@ -494,6 +501,43 @@ void RefreshHud() {
 	if (gm) *(uint32_t*)(gm + 0x5C) |= 0x4000;
 }
 
+// A fallen hero the other can't walk to (the level's pathfinding graph,
+// pathfind.cpp: LV2-6's pit before its bridge is out, LV2-3's hearth room once
+// its door has shut): if it led when it fell, the other hero is brought to it,
+// as the AI sidekick is brought to the player in single player. One that did
+// not lead stays where it is -- the level brings the leader back to it.
+// Asked every 0.5 s from 2 s after the fall; three noes in a row (not a hero in
+// mid-jump over a gap's cells) before the move. XXL_NOREACHFIX: never.
+void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
+	static const bool off = getenv("XXL_NOREACHFIX") != nullptr;
+	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
+	g.reachAt[down] = now;
+	int r = PfReachable(o.Pos(), h.Pos());
+	if (r != g.reachTold[down]) {
+		static int s_told;
+		if (s_told++ < 40)
+			Log("indiv: can %s walk to fallen %s (%s when it fell)? %s", HeroName(up), HeroName(down),
+			    g.fellLeading[down] ? "leading" : "not leading", r == PF_YES ? "yes" : r == PF_NO ? "no" : "not known");
+		g.reachTold[down] = r;
+	}
+	if (r != PF_NO) {
+		g.cutOff[down] = 0;
+		return;
+	}
+	if (!g.fellLeading[down] || off || ++g.cutOff[down] < 3) return;
+	g.cutOff[down] = 0;
+	Vector3 spot = PfSpotBeside(h.Pos());
+	spot.y += 0.5f;
+	PlaceHero(o, spot);
+	g.placedAt[up] = now;
+	if (o.hook->node) {
+		float at[3] = { spot.x, spot.y, spot.z };
+		ProximityForgetMove(o.hook->node, at);
+	}
+	Log("indiv: %s can't walk to %s, who led when it fell -- brought beside it (%.1f %.1f %.1f)", HeroName(up),
+	    HeroName(down), spot.x, spot.y, spot.z);
+}
+
 void Revive(int idx, Hero h, const char* how) {
 	Stats& s = Current(idx);
 	int hp = (s.shields * 5 + 1) / 2;   // half the health back (1.5 of 3 shields)
@@ -776,6 +820,10 @@ bool IndivHeroDown(int hero, const char* how) {
 	}
 	g.fallen[hero] = true;
 	g.revive[hero] = 0;
+	g.fellLeading[hero] = g.lastLead == hero;
+	g.fellAt[hero] = GetTickCount();
+	g.cutOff[hero] = 0;
+	g.reachTold[hero] = -2;
 	Vector3 spot;
 	if (OnDeathGround(h) && SafeSpotFor(hero, &spot)) {
 		Log("indiv: %s fell into a pit at (%.1f %.1f %.1f) -- laid on its last solid ground (%.1f %.1f %.1f)",
@@ -783,7 +831,8 @@ bool IndivHeroDown(int hero, const char* how) {
 		spot.y += 0.5f;
 		PlaceHero(h, spot);
 	}
-	Log("indiv: %s is down (%s) -- %s plays on and can revive it", HeroName(hero), how, HeroName(other));
+	Log("indiv: %s is down (%s)%s -- %s plays on and can revive it", HeroName(hero), how,
+	    g.fellLeading[hero] ? " leading" : "", HeroName(other));
 	CoopUndoLockFor(hero);
 	ShowDownHint(hero);
 	return true;
@@ -857,6 +906,7 @@ void IndivFrame() {
 
 	int lead = t.Leader();
 	if (lead != HERO_ASTERIX && lead != HERO_OBELIX) return;
+	g.lastLead = lead;
 	char* cb = CB();
 	if (g.gameOver) {   // the game's values are everyone's until the respawn
 		if (cb && *(uint8_t*)(cb + 0x50) > 0) Respawned();
@@ -895,6 +945,7 @@ void IndivFrame() {
 			Revive(i, h, "the other hero went on into another area");
 			continue;
 		}
+		BringToFallenLeader(i, h, up, o, now);
 		Vector3 d = h.Pos() - o.Pos();
 		bool close = d.x * d.x + d.z * d.z < kReviveRange * kReviveRange && fabsf(d.y) < kReviveHeight;
 		bool holding = close && CoopHoldTime(PlayerOf(up), 6) > 0.0f;

@@ -12,6 +12,7 @@
 #include "gamecam.h"
 #include "crash.h"
 #include "individual.h"
+#include "pathfind.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -23,7 +24,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -1885,6 +1886,84 @@ const Step kPit26A[] = {
 	END(18000),
 };
 
+// pf26 (-Level 2): the pathfinding graph at LV2-6's big pit (user's spots):
+// Obelix on the near side (115.5 2.6 -389.6), Asterix carried over to the far
+// side (91.6 2.0 -389.2) -- no way over for Obelix; then Asterix hits the
+// lever (86.2 2.4 -396.5) and the bridge comes out -- a way over.
+#define PFDUMP(t, hero, r) { t, S_PFDUMP, hero, 0, 0, r, 0, "pf dump" }
+#define REACH(t)           { t, S_REACH, 0, 0, 0, 0, 0, "reach" }
+const Step kPf26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 115.53f, 3.0f, -389.57f), PLACEAT(3000, HERO_ASTERIX, 91.62f, 2.5f, -389.18f),
+	SHOT(4000, "pf26_0"), PFDUMP(4200, HERO_ASTERIX, 16.0f), REACH(4400),
+	PLACEAT(5000, HERO_ASTERIX, 86.232f, 2.8f, -396.479f),
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6150, 0, 0, 0, "p1 release"),
+	SHOT(7000, "pf26_1"), SHOT(10000, "pf26_2"),
+	PLACEAT(10500, HERO_ASTERIX, 91.62f, 2.5f, -389.18f), PLACEAT(10500, HERO_OBELIX, 115.53f, 3.0f, -389.57f),
+	PFDUMP(11000, HERO_ASTERIX, 16.0f), PFDUMP(11000, HERO_OBELIX, 6.0f), REACH(11200),
+	// the user's gap the sidekick jumps (-49.6 45.2 -182.5 / -37.0 45.1 -182.6): a way
+	PLACEAT(11500, HERO_ASTERIX, -49.562f, 45.6f, -182.527f), PLACEAT(11500, HERO_OBELIX, -36.996f, 45.4f, -182.608f),
+	REACH(11530), PFDUMP(11560, HERO_ASTERIX, 10.0f),
+	END(12500),
+};
+
+// reach26 (-Level 2, XXL_DOWNAT=0:5000): LV2-6, Asterix (leading) falls on the
+// pit's far side, Obelix on the near side can't walk to him: Obelix is brought
+// beside him (XXL_NOREACHFIX=1: he stays). reach26o: Obelix leads when Asterix
+// falls -- nobody moves. reach26b: the bridge is out first -- nobody moves.
+const Step kReach26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 115.53f, 3.0f, -389.57f), PLACEAT(3000, HERO_ASTERIX, 91.62f, 2.5f, -389.18f),
+	SHOT(4500, "reach26_0"), SHOT(7000, "reach26_1"), SHOT(10000, "reach26_2"), REACH(10200),
+	END(11000),
+};
+const Step kReach26O[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 115.53f, 3.0f, -389.57f), PLACEAT(3000, HERO_ASTERIX, 91.62f, 2.5f, -389.18f),
+	{ 4000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	SHOT(4500, "reach26o_0"), SHOT(10000, "reach26o_1"), REACH(10200),
+	END(11000),
+};
+const Step kReach26B[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, 115.53f, 3.0f, -389.57f), PLACEAT(2500, HERO_ASTERIX, 86.232f, 2.8f, -396.479f),
+	P1(3000, PAD_X, 0, 0, "p1 X (lever)"), P1(3150, 0, 0, 0, "p1 release"),
+	PLACEAT(4500, HERO_ASTERIX, 91.62f, 2.5f, -389.18f), PLACEAT(4500, HERO_OBELIX, 115.53f, 3.0f, -389.57f),
+	SHOT(5000, "reach26b_0"), SHOT(10000, "reach26b_1"), REACH(10200),
+	END(11000),
+};
+
+// reach23 (-Level 2, XXL_DOWNAT=0:8000): LV2-3, Asterix lights the hearth and
+// the door shuts behind him; he falls (leading): Obelix is brought in.
+const Step kReach23[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	SHOT(7500, "reach23_0"), SHOT(11000, "reach23_1"), SHOT(13500, "reach23_2"), REACH(13700),
+	END(14500),
+};
+
+// pf23 (-Level 2): LV2-3's hearth room -- the graph around its door, then
+// Asterix lights the hearth (-44.0 0.3 -541.3) with a lit torch: event #423
+// shuts the door (CKHkSwingDoor) behind him.
+const Step kPf23[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	SHOT(3800, "pf23_0"), PFDUMP(4000, HERO_ASTERIX, 20.0f), REACH(4200),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	SHOT(7000, "pf23_1"), SHOT(10000, "pf23_2"),
+	PFDUMP(11000, HERO_ASTERIX, 20.0f), REACH(11200),
+	END(12000),
+};
+
 // shopo (level 2): player 2's Obelix (not leading) opens the merchant with X.
 const Step kShopO[] = {
 	MARK(0, "baseline"),
@@ -3426,6 +3505,12 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight64", kFight64),
 	SCENARIO("fight56", kFight56),
 	SCENARIO("gatedone", kGateDone),
+	SCENARIO("pf26", kPf26),
+	SCENARIO("pf23", kPf23),
+	SCENARIO("reach26", kReach26),
+	SCENARIO("reach26o", kReach26O),
+	SCENARIO("reach26b", kReach26B),
+	SCENARIO("reach23", kReach23),
 	SCENARIO("sq36a", kSq36a),
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),
@@ -4142,6 +4227,24 @@ void RunStep(const Step& s) {
 		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 		int r = ((SendEventFn)(*(void***)best)[5])(best, nullptr, s.b, nullptr);
 		Log("autotest: event %04X to (2,%d) %p, %.1f units away -> %d", s.b, s.a, best, sqrtf(bd), r);
+		break;
+	}
+	case S_PFDUMP: {   // the pathfinding graph, with the cells within s.x units of hero a as a map
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) { PfDump(nullptr, 0.0f); break; }
+		Vector3 p = h.Pos();
+		PfDump(&p, s.x);
+		break;
+	}
+	case S_REACH: {   // can each hero walk to the other (the graph)
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+		if (!a || !o) break;
+		static const char* kName[] = { "unknown", "no", "yes" };
+		Log("autotest: reach obelix->asterix %s, asterix->obelix %s (asterix %.1f %.1f %.1f, obelix %.1f %.1f %.1f)",
+		    kName[PfReachable(o.Pos(), a.Pos()) + 1], kName[PfReachable(a.Pos(), o.Pos()) + 1], a.Pos().x, a.Pos().y,
+		    a.Pos().z, o.Pos().x, o.Pos().y, o.Pos().z);
 		break;
 	}
 	case S_NEAROBJ: {   // hero a put s.x units from the nearest object of class (2, b), facing it
