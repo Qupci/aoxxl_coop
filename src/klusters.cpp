@@ -123,8 +123,7 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 	static float fd[kMaxFair][kViews + 1];
 	static uint32_t fr[kMaxFair];
 	int nf = 0;
-	static const bool noFair = getenv("XXL_NOFAIR") != nullptr;   // autotest comparison
-	bool fair = !ref && (flags & 2) && !noFair;
+	bool fair = !ref && (flags & 2);
 	for (char* sector = next(mgr, nullptr, nullptr); sector; sector = next(mgr, nullptr, sector)) {
 		for (char* k = *(char**)(sector + 0x34); k; k = *(char**)(k + 4)) {
 			signed char idx = *(signed char*)(*(char**)(k + 0x20) + slot);

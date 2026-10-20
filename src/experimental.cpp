@@ -57,8 +57,7 @@ bool KeptAsIs(char* cpnt) {
 // to be revived (individual heroes) -- the one left fights the level's numbers.
 // Romans to defeat stay scaled.
 bool AtOnceNow() {
-	static const bool noDownFix = getenv("XXL_NOATONCEDOWNFIX") != nullptr;   // diagnostics: as before
-	return !(CoopP2Joined() && (CoopHeroHeld(0) || CoopHeroHeld(1) || (!noDownFix && (IndivFallen(0) || IndivFallen(1)))));
+	return !(CoopP2Joined() && (CoopHeroHeld(0) || CoopHeroHeld(1) || IndivFallen(0) || IndivFallen(1)));
 }
 
 int Scaled(int v, float f, int maxV) {
@@ -267,8 +266,7 @@ void BalanceGates() {
 // overlaps its own and whose numbers are scaled. Done once the level is in,
 // before the squads wake (nothing sent in yet).
 void CheckSharedPools() {
-	static const bool noShareFix = getenv("XXL_NOSQUADSHAREFIX") != nullptr;   // diagnostics: as before
-	if (noShareFix || g_config.squadAliveFactor == 1.0f) return;
+	if (g_config.squadAliveFactor == 1.0f) return;
 	struct Sq { char* sq; SquadOrig* o; };
 	Sq all[128];
 	int nAll = 0;

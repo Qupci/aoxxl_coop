@@ -187,9 +187,8 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 	if ((*(uint8_t*)(ground + 0x2A) & 4) || (*(uint8_t*)(h.raw() + 0x384) & 7) != 0) return;
 	// in no situation but walking (0), or the AI companion's none (0xFF: one that
 	// only ever followed had no spot since the level's start -- lv2-6_tp_back.log)
-	static const bool noFarSpot = getenv("XXL_NOFARSPOTFIX") != nullptr;
 	uint8_t sit = *(uint8_t*)(h.raw() + 0x3E9);
-	if (sit != 0 && (noFarSpot || !(sit == 0xFF && (*(uint8_t*)(h.raw() + 0x18) & 3) == 3))) return;
+	if (sit != 0 && !(sit == 0xFF && (*(uint8_t*)(h.raw() + 0x18) & 3) == 3)) return;
 	if (*(uint8_t*)(ground + 0x2A) & 8) return;   // slide ground (the belly slide)
 	const char* partner = nullptr;
 	if (OnPartnerGround(h, &partner)) return;   // a blue circle's plate: not a place to be put back on
@@ -210,8 +209,7 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 // thing's edge, walked back onto at once), else the farthest one known.
 // Spots further than this are not "the last solid ground" any more (left from
 // an earlier part of the level): not gone back to.
-// (XXL_NOFARSPOTFIX: any distance, and no spots of the AI companion's, as before.)
-const float kSpotReach = getenv("XXL_NOFARSPOTFIX") ? 1e6f : 40.0f;
+const float kSpotReach = 40.0f;
 
 bool SafeSpotAway(int idx, const Vector3& from, Vector3* out) {
 	// The trail first: the newest of its spots 6 units or more away.
@@ -517,21 +515,12 @@ void RefreshHud() {
 	if (gm) *(uint32_t*)(gm + 0x5C) |= 0x4000;
 }
 
-// A fallen hero the other can't walk to (the level's pathfinding graph,
-// pathfind.cpp: LV2-6's pit before its bridge is out, LV2-3's hearth room once
-// its door has shut): if it led when it fell, the other hero is brought to it,
-// as the AI sidekick is brought to the player in single player. One that did
-// not lead stays where it is -- the level brings the leader back to it.
-// Asked every 0.5 s from 2 s after the fall; three noes in a row (not a hero in
-// mid-jump over a gap's cells) before the move. XXL_NOREACHFIX: never.
 // Where to put the hero brought beside fallen `down`: one of the fallen hero's
 // own last solid grounds 1 to 3 units from where it lies (the nearest to 1.5),
 // else where it lies. Not the graph's cells: those of LV2-6's bridge read as
 // walkable with the bridge in -- Obelix was put over the pit and fell
-// (lv2-6_obelix_tps_to_death.log). XXL_NOBESIDEFIX: the graph's cell, as before.
+// (lv2-6_obelix_tps_to_death.log).
 Vector3 SpotBesideFallen(int down, const Vector3& at) {
-	static const bool off = getenv("XXL_NOBESIDEFIX") != nullptr;
-	if (off) return PfSpotBeside(at);
 	const Vector3* best = nullptr;
 	float bestD = 1e30f;
 	auto consider = [&](const Vector3& p) {
@@ -547,8 +536,14 @@ Vector3 SpotBesideFallen(int down, const Vector3& at) {
 	return best ? *best : at;
 }
 
+// A fallen hero the other can't walk to (the level's pathfinding graph,
+// pathfind.cpp: LV2-6's pit before its bridge is out, LV2-3's hearth room once
+// its door has shut): if it led when it fell, the other hero is brought to it,
+// as the AI sidekick is brought to the player in single player. One that did
+// not lead stays where it is -- the level brings the leader back to it.
+// Asked every 0.5 s from 2 s after the fall; three noes in a row (not a hero in
+// mid-jump over a gap's cells) before the move.
 void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
-	static const bool off = getenv("XXL_NOREACHFIX") != nullptr;
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
 	g.reachAt[down] = now;
 	int r = PfReachable(o.Pos(), h.Pos());
@@ -563,7 +558,7 @@ void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 		g.cutOff[down] = 0;
 		return;
 	}
-	if (!g.fellLeading[down] || off || ++g.cutOff[down] < 3) return;
+	if (!g.fellLeading[down] || ++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
 	Vector3 spot = SpotBesideFallen(down, h.Pos());
 	spot.y += 0.5f;
@@ -972,22 +967,19 @@ void IndivFrame() {
 	Use(StandingOr(lead));   // the game manager, the HUD and the rest see the leader's (standing)
 	RunDownCombo(Other(lead));
 
-	// A hero revived that led when it fell gets the lead back (XXL_NOLEADBACKFIX:
-	// the one who stood keeps it, as before).
 	// The hero brought to its fallen leader goes back once it has revived it --
 	// unless it has gone on more than 10 units from where it was put (a sector
-	// change's revive, a launcher). XXL_NOSENDBACKFIX: it stays.
-	// Waits out a suspension (the revive by the grab suspends co-op for a frame as
-	// the hero gets up -- lv2-3_tp_back.log: dropped there).
-	static const bool noSendBack = getenv("XXL_NOSENDBACKFIX") != nullptr;
+	// change's revive, a launcher). Waits out a suspension (the revive by the grab
+	// suspends co-op for a frame as the hero gets up -- lv2-3_tp_back.log: dropped
+	// there).
 	if (g.sendBack >= 0 && !CoopSuspended()) {
 		int who = g.sendBack;
 		g.sendBack = -1;
 		g.brought[who] = false;
 		Hero b = t.GetHero(who);
 		Vector3 d = b ? b.Pos() - g.broughtTo[who] : Vector3();
-		if (!b || noSendBack || g.fallen[who]) {
-			Log("indiv: %s stays where it was brought%s", HeroName(who), noSendBack ? " (XXL_NOSENDBACKFIX)" : "");
+		if (!b || g.fallen[who]) {
+			Log("indiv: %s stays where it was brought", HeroName(who));
 		} else if (d.len2() > 10.0f * 10.0f) {
 			Log("indiv: %s has gone on from where it was brought (%.0f units) -- stays", HeroName(who), sqrtf(d.len2()));
 		} else {
@@ -1003,11 +995,11 @@ void IndivFrame() {
 			    back.y, back.z);
 		}
 	}
-	static const bool noLeadBack = getenv("XXL_NOLEADBACKFIX") != nullptr;
+	// A hero revived that led when it fell gets the lead back.
 	if (g.leadBack >= 0 && !CoopSuspended()) {
 		int back = g.leadBack;
 		g.leadBack = -1;
-		if (!noLeadBack && !g.fallen[back] && lead == Other(back)) {
+		if (!g.fallen[back] && lead == Other(back)) {
 			CoopGiveLead(back, "revived, it led when it fell");
 			lead = t.Leader();
 			Use(StandingOr(lead));

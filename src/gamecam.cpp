@@ -174,8 +174,7 @@ void RestoreExtras(char* svc, RwCamera* obj, Extras& e) {
 	if (cam->nearPlane != e.nearP) ((SetClipFn)axr::kRwCameraSetNearClip)(cam, e.nearP);
 	if (cam->farPlane != e.farP) ((SetClipFn)axr::kRwCameraSetFarClip)(cam, e.farP);
 	cam->fogPlane = e.fogP;
-	static const bool noFovFix = getenv("XXL_NOFOVFIX") != nullptr;   // diagnostics: as before
-	if (float* f = RendererFov(svc); f && !noFovFix) *f = e.fov;
+	if (float* f = RendererFov(svc)) *f = e.fov;
 	for (int i = 0; i < 2; i++) {
 		float* p = NodePos(svc, 0x5D0 + 4 * i);
 		if (p) memcpy(p, e.node[i], sizeof(e.node[i]));

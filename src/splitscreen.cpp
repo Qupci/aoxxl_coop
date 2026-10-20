@@ -541,8 +541,7 @@ int ShopHudMode() {
 // doubled), and is spread sideways. Before round 80 it was the vertical's -- every
 // letter half as high as wide.
 bool ShopHudSideways() {
-	static const bool noFix = getenv("XXL_NOSHOPHUDFIX") != nullptr;
-	return !noFix && g_config.splitMode != SPLIT_VERTICAL && ShopHudMode() >= 2;
+	return g_config.splitMode != SPLIT_VERTICAL && ShopHudMode() >= 2;
 }
 
 // The shop's HUD at half size in the shopper's half (the HUD camera's vertical

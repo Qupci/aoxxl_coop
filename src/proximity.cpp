@@ -283,8 +283,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 		if (th && *(uint8_t*)(hook + 0x21) == 4 && (at - th.Pos()).len2() < 3.0f * 3.0f)
 			*(uint32_t*)(hook + 0x24) &= ~0x80u;
 	}
-	static const bool noPushFix = getenv("XXL_NOPUSHFIX") != nullptr;   // diagnostics: the old slicing
-	int pusher = hook && *(uintptr_t*)hook == kPushPullVtbl && !noPushFix ? PusherOf(hook, t, p1, p2) : -1;
+	int pusher = hook && *(uintptr_t*)hook == kPushPullVtbl ? PusherOf(hook, t, p1, p2) : -1;
 	if (pusher >= 0) {
 		nearest = pusher;
 		range2 = 1e30f;
@@ -510,8 +509,6 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 	// sent in; skipped, a fight lock's Romans ran out with none of them there --
 	// LV5-6 squad 4, both heroes in the arena, the counter at 0 for good): from
 	// the marker farthest from both heroes.
-	static const bool noDropFix = getenv("XXL_NOMARKERDROPFIX") != nullptr;
-	if (m == 0 && noDropFix) return;
 	if (m == 0) {
 		float best = -1.0f;
 		for (unsigned i = 0; i < n; i++) {
@@ -675,7 +672,6 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 	typedef void(__fastcall* DtFn)(void* self, void* edx, char* dt);
 	Vector3 pl = lead.Pos(), po = other.Pos();
 	uint8_t* tr = (uint8_t*)t.raw();
-	static const bool noZoneFix = getenv("XXL_NOSQUADZONEFIX") != nullptr;   // diagnostics: as before
 	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
 		void** vt = *(void***)sq;
 		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604)) continue;
@@ -683,7 +679,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 		if (*(uint8_t*)(grp + 0x10) & 4) continue;
 		bool inL = InSquadBox(sq, pl), inO = InSquadBox(sq, po);
 		// both heroes in the box and the fight zone of a squad after the trio's leader (target 5)
-		bool shared = inL && inO && !noZoneFix && ((*(uint8_t*)(sq + 0x152) >> 2) & 7) == 5 && InFightZone(sq, pl) &&
+		bool shared = inL && inO && ((*(uint8_t*)(sq + 0x152) >> 2) & 7) == 5 && InFightZone(sq, pl) &&
 		              InFightZone(sq, po) && !HeroOut(t.Leader());
 		if (inL && inO) {
 			// Big boxes hold both. The squad's script starts the fight on its target
@@ -692,7 +688,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			// in formation by Asterix while the squad ran for Obelix behind the
 			// bars, nearer the box's middle. Else the hero nearer the middle.
 			int zl = InFightZone(sq, pl), zo = InFightZone(sq, po);
-			if (zl != zo && !noZoneFix) {
+			if (zl != zo) {
 				inL = zl > zo;
 				static char* s_lastSq = nullptr;
 				static int s_logged = 0;

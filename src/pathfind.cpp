@@ -303,30 +303,6 @@ int PfReachable(const Vector3& from, const Vector3& to) {
 	return PF_NO;
 }
 
-Vector3 PfSpotBeside(const Vector3& to) {
-	Graph g;
-	if (!Load(&g)) return to;
-	for (int ni = 0; ni < (int)g.nodes.size(); ni++) {
-		const Node& n = g.nodes[ni];
-		if (!Inside(n, to, 2.0f)) continue;
-		int cx, cz;
-		CellOf(n, to.x, to.z, &cx, &cz);
-		for (int z = cz - 1; z <= cz + 1; z++)
-			for (int x = cx - 1; x <= cx + 1; x++) {
-				if ((x == cx && z == cz) || x < 0 || z < 0 || x >= n.nx || z >= n.nz || !Walkable(g, ni, x, z)) continue;
-				Vector3 c = Centre(n, x, z);
-				Vector3 d = c - to;
-				d.y = 0.0f;
-				float len = sqrtf(d.len2());
-				if (len < 0.01f) continue;
-				Vector3 at = to + d * (1.5f / len);   // 1.5 units toward it: well within the revive's reach
-				at.y = to.y;
-				return at;
-			}
-	}
-	return to;
-}
-
 void PfDump(const Vector3* around, float radius) {
 	Graph g;
 	if (!Load(&g)) {

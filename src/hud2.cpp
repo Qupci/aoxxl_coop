@@ -289,15 +289,12 @@ void Restore2d() {
 	g.nSaved2d = 0;
 }
 
-static const bool g_noLayout = getenv("XXL_NOHUDLAYOUT") != nullptr;   // the HUD laid out as before round 79
-static const bool g_noGateSlideFix = getenv("XXL_NOGATESLIDEFIX") != nullptr;   // the gate counter's slide as in round 79
-
 // Stacked split (player 1 on top): each player's HUD in their own half, as
 // the single player HUD -- health at the top left, the combo bar's column
 // below it at the left edge, at 3/4 size (its bottom at 0.35 on the full
 // screen, 0.47 down from a half's top).
 bool Stacked() {
-	return !g_noLayout && SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL;
+	return SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL;
 }
 const int kComboNodes[] = { 0xB4, 0xB8, 0xBC, 0xC0, 0xC4, 0xCC };
 void ComboToHalf(char* itf, const float* cl, int player, bool save) {
@@ -325,7 +322,7 @@ void LayoutGate(char* itf, const float* cl, bool stacked) {
 	if (!(shown > 0.3f && shown < 1.0f)) shown = 0.879f;
 	Xform t = stacked ? Xform{ shown, 0.475f, 1.0f, 0.0f, 0.025f } : Xform{ shown, 0.475f, 0.75f, 0.5f - shown, 0.0f };
 	Xform u = t;
-	if (!stacked && !g_noGateSlideFix) {
+	if (!stacked) {
 		float way = 0.4f;
 		char* pic = NodeAt(itf, 0xD4 + 4 * *(uint8_t*)(itf + 0x3F8));
 		char* a = pic ? *(char**)(pic + 0x1C) : nullptr;
@@ -382,7 +379,6 @@ int HudOwner() {
 // both heroes down, twice). Kept inside the table; the refresh puts it right.
 // fromGame: just after FUN_0051B550 wrote it (logged when that changes).
 void KeepHealthIndex(char* itf, bool fromGame) {
-	static const bool noFix = getenv("XXL_NOHUDINDEXFIX") != nullptr;   // diagnostics: as before
 	uint8_t& row = *(uint8_t*)(itf + 0x274);
 	uint8_t& col = *(uint8_t*)(itf + 0x275);
 	bool out = row > 5 || col > 4;
@@ -393,12 +389,11 @@ void KeepHealthIndex(char* itf, bool fromGame) {
 		bool& was = wasOut[owner >= 0 && owner < 2 ? owner : 2];
 		if (out && !was && logged < 20) {
 			logged++;
-			Log("hud2: the health's place in %s's HUD is %u/%u (no health)%s", HeroName(owner), row, col,
-			    noFix ? "" : " -- kept at 0/0");
+			Log("hud2: the health's place in %s's HUD is %u/%u (no health) -- kept at 0/0", HeroName(owner), row, col);
 		}
 		was = out;
 	}
-	if (noFix || !out) return;
+	if (!out) return;
 	row = 0;
 	col = 0;
 }
@@ -497,7 +492,7 @@ void Hud2BeforeInterfaceTick(char* itf) {
 }
 
 void Hud2AfterInterfaceTick(char* itf, void* time) {
-	if (itf) PlaceGateSparkle(itf, On() && SplitActive() && g_config.splitMode == SPLIT_VERTICAL && !g_noLayout && !g_noGateSlideFix);
+	if (itf) PlaceGateSparkle(itf, On() && SplitActive() && g_config.splitMode == SPLIT_VERTICAL);
 	if (!On() || !itf) return;
 	char* gm = GM();
 	if (!gm) return;
@@ -576,8 +571,8 @@ void Hud2BeginP1(RwCamera* hud) {
 	float* plate = *(float**)(itf + 0x134);
 	if (plate && !stacked) {
 		float mid = plate[5] - plate[13] * 0.5f;
-		float s = g_noLayout ? 1.0f : 0.75f;
-		Xform t = { mid, plate[6], s, 0.5f - mid, g_noLayout ? 0.0f : -0.1f };
+		float s = 0.75f;
+		Xform t = { mid, plate[6], s, 0.5f - mid, -0.1f };
 		Xf2d(itf, 0x134, t);
 		Xf2d(itf, 0x150, t);
 		Xf3d(NodeAt(itf, 0xA8), cl, t, true);
@@ -590,7 +585,7 @@ void Hud2BeginP1(RwCamera* hud) {
 			p = p < 0.0f ? 0.0f : p > 1.0f ? 1.0f : p;
 			Xform u = t;
 			u.dx -= s * off;
-			u.dy += g_noLayout ? p * 0.5f : s * p * 0.6f;
+			u.dy += s * p * 0.6f;
 			return u;
 		};
 		// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01 to +0x31C;
@@ -604,17 +599,15 @@ void Hud2BeginP1(RwCamera* hud) {
 		// +0x154 and plate +0x138 slide on +0x388 from off the right edge to
 		// +0x318, its model +0x12C on +0x394 to +0x33C). Natively it stays at
 		// the right; side by side that was on player 2's combo bar.
-		if (!g_noLayout) {
-			float rShown = *(float*)(itf + 0x318);
-			Xform tr = fromTop(*(float*)(itf + 0x388) - rShown, 1.01f - rShown);
-			Xf2d(itf, 0x138, tr);
-			Xf2d(itf, 0x154, tr);
-			Xform tm = fromTop(*(float*)(itf + 0x394) - *(float*)(itf + 0x33C), 1.01f - rShown);
-			tm.dy = tr.dy;
-			Xf3d(NodeAt(itf, 0x12C), cl, tm, true);
-		}
+		float rShown = *(float*)(itf + 0x318);
+		Xform tr = fromTop(*(float*)(itf + 0x388) - rShown, 1.01f - rShown);
+		Xf2d(itf, 0x138, tr);
+		Xf2d(itf, 0x154, tr);
+		Xform tm = fromTop(*(float*)(itf + 0x394) - *(float*)(itf + 0x33C), 1.01f - rShown);
+		tm.dy = tr.dy;
+		Xf3d(NodeAt(itf, 0x12C), cl, tm, true);
 	}
-	if (!g_noLayout) LayoutGate(itf, cl, stacked);
+	LayoutGate(itf, cl, stacked);
 	if (stacked) ComboToHalf(itf, cl, 0, true);
 	int hp = 0, shields = 3;
 	if (IndivStats(CoopP1Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, true);
@@ -667,8 +660,7 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	// FUN_005154A0 shows them again) -- the models in the interface then are
 	// player 1's; player 2's copy kept its combo bar or shields up on the
 	// cutscene's screen.
-	static const bool noVanishFix = getenv("XXL_NOHUDVANISHFIX") != nullptr;
-	if (!noVanishFix && (*(uint32_t*)(gm + 0x5C) & 0x100000)) return false;
+	if (*(uint32_t*)(gm + 0x5C) & 0x100000) return false;
 	// Part 0: the health (shields, sparkles: elements 0-30); part 1: the combo
 	// bar (31-). The shields and the combo bar are in the same draw list (0),
 	// and each needs its own culling (below), so each is a pass of its own.

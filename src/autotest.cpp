@@ -1039,7 +1039,7 @@ const Step kSpy3P[] = {
 
 // hudvanish (-Level 3): player 2's Obelix lands hits by the sector 2 agent (his
 // combo bar shows), then player 1's Asterix talks to the agent: the dialogue's
-// screen has no HUD (XXL_NOHUDVANISHFIX=1: player 2's bar stays on it).
+// screen has no HUD (before the fix player 2's bar stayed on it).
 const Step kHudVanish[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 2),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -1925,7 +1925,7 @@ const Step kPf26[] = {
 
 // reach26 (-Level 2, XXL_DOWNAT=0:5000): LV2-6, Asterix (leading) falls on the
 // pit's far side, Obelix on the near side can't walk to him: Obelix is brought
-// beside him (XXL_NOREACHFIX=1: he stays). reach26o: Obelix leads when Asterix
+// beside him. reach26o: Obelix leads when Asterix
 // falls -- nobody moves. reach26b: the bridge is out first -- nobody moves.
 const Step kReach26[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
@@ -1983,7 +1983,7 @@ const Step kReach26W[] = {
 // reach26p (-Level 2): the user's LV2-6 fall -- Asterix (leading) walks off the
 // far edge into the pit and is laid on his last solid ground at its edge;
 // Obelix, brought beside him, must land on ground, not over the pit
-// (lv2-6_obelix_tps_to_death.log; XXL_NOBESIDEFIX: he fell too).
+// (lv2-6_obelix_tps_to_death.log: he fell too).
 const Step kReach26P[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),

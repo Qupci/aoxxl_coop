@@ -1824,3 +1824,9 @@ both halves).
   -> walks -854.9 -> -851.5; on -> stays at -854.90, co-op and the split screen resume.
   Also autotests relight23 / relight23n (LV2-3 hearth lit again after the send-back; the level's own wait): the
   "locked" Obelix of 20261020-190948 was LV5-5-like level behaviour per the user, closed.
+- Round 89 (user: every fix so far confirmed on the pad): all 19 XXL_NO...FIX switches removed, each fix keeping only
+  its own path (REACH, LEADBACK, SENDBACK, FARSPOT, BESIDE, FALLENAI, SHOPHUD, PUSH, FOV, NOFAIR, HUDLAYOUT,
+  GATESLIDE, HUDINDEX, HUDVANISH, SQUADZONE, SQUADSHARE, ATONCEDOWN, MARKERDROP); PfSpotBeside (only the BESIDE
+  switch's) gone. From now on a switch lives until the user confirms its fix (CLAUDE.md). Reproducing an old
+  bug: build the fix commit's parent; the round entries above keep each "fix off" result. Checked after the
+  cleanup: reach26 (XXL_DOWNAT=0:5000 XXL_UPAT=9000) and pausedown behave as with the fixes on.
