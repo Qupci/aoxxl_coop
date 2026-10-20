@@ -1782,3 +1782,9 @@ both halves).
   gap -49.6 45.2 -182.5 / -37.0 45.1 -182.6 yes), reach26 (XXL_DOWNAT=0:5000: brought; with XXL_NOREACHFIX
   stays), reach26o (Obelix leading: stays), reach26b (bridge out: yes, stays), reach23 (XXL_DOWNAT=0:8000:
   brought into the hearth room).
+- Round 84 (user: after a revive the lead stayed with the hero who had stood): a hero that led when it fell
+  (fellLeading, round 83) gets the lead back once revived -- by the grab, a launcher, XXL_UPAT -- through
+  CoopGiveLead in the next IndivFrame (a launcher's revive runs inside a hero's tick, where the switch is refused),
+  only if the other hero still leads. Cleared at a level change and at the respawn (the game's lead).
+  XXL_NOLEADBACKFIX: as before. Autotests reach26 / reach26o with XXL_DOWNAT=0:5000 XXL_UPAT=9000: Asterix leads
+  again (fix off: Obelix keeps it); not leading when he fell: Obelix keeps it.

@@ -66,6 +66,7 @@ struct State {
 	int      lastSector = -1;
 	int      lastLead = -1;            // the trio's leader as the frame began
 	bool     fellLeading[2] = {};      // it was the leader when it fell
+	int      leadBack = -1;            // revived, it was leading: the lead goes back to it
 	DWORD    fellAt[2] = {};
 	DWORD    reachAt[2] = {};          // last asked whether the other hero can walk to it
 	int      cutOff[2] = {};           // ... and was told no that many times in a row
@@ -547,6 +548,10 @@ void Revive(int idx, Hero h, const char* how) {
 	Raise(h);
 	g.fallen[idx] = false;
 	g.revive[idx] = 0;
+	// It led when it fell: the lead went to the other hero meanwhile, and comes
+	// back to it (next frame -- a launcher's revive is inside a hero's tick).
+	if (g.fellLeading[idx]) g.leadBack = idx;
+	g.fellLeading[idx] = false;
 	HintHide(HINT_REVIVE);
 	Log("indiv: %s is back on its feet (%s), health %d", HeroName(idx), how, s.hp);
 }
@@ -558,8 +563,10 @@ void Respawned() {
 	g.st[0] = g.st[1] = s;
 	g.gameOver = false;
 	Trio t = GetTrio();
+	g.leadBack = -1;   // the respawn's lead is the game's
 	for (int i = 0; i < 2; i++) {
 		g.fallen[i] = false;
+		g.fellLeading[i] = false;
 		g.revive[i] = 0;
 		Hero h = t ? t.GetHero(i) : Hero();
 		if (h) Raise(h);
@@ -887,6 +894,8 @@ void IndivFrame() {
 		g.ctx = -1;
 		g.gameOver = false;
 		memset(g.fallen, 0, sizeof(g.fallen));
+		memset(g.fellLeading, 0, sizeof(g.fellLeading));
+		g.leadBack = -1;
 	}
 	Trio t = GetTrio();
 	bool want = g_config.individual && CoopP2Joined() && t && t.GetHero(HERO_ASTERIX) && t.GetHero(HERO_OBELIX);
@@ -914,6 +923,19 @@ void IndivFrame() {
 	}
 	Use(StandingOr(lead));   // the game manager, the HUD and the rest see the leader's (standing)
 	RunDownCombo(Other(lead));
+
+	// A hero revived that led when it fell gets the lead back (XXL_NOLEADBACKFIX:
+	// the one who stood keeps it, as before).
+	static const bool noLeadBack = getenv("XXL_NOLEADBACKFIX") != nullptr;
+	if (g.leadBack >= 0 && !CoopSuspended()) {
+		int back = g.leadBack;
+		g.leadBack = -1;
+		if (!noLeadBack && !g.fallen[back] && lead == Other(back)) {
+			CoopGiveLead(back, "revived, it led when it fell");
+			lead = t.Leader();
+			Use(StandingOr(lead));
+		}
+	}
 
 	// The lead stays with a hero still standing.
 	if (g.fallen[lead] && !g.fallen[Other(lead)] && !CoopSuspended()) {
