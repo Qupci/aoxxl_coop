@@ -58,6 +58,10 @@ Copy into the game folder next to `axxl.exe`:
 
 Both are already installed in `Game Files\`. The mod writes `xxl_coop.log` there.
 
+With DSOAL as the sound wrapper, also copy `xxl_timerfix.asi` (`coop\timerfix\build.bat`). It is
+separate from the mod. Without it the game runs at ~45 fps instead of 62: the frame limiter's `Sleep`
+needs a 1 ms timer, which IndirectSound's XAudio2 requests but DSOAL doesn't.
+
 ## Controls
 
 | | |

@@ -1891,3 +1891,19 @@ both halves).
   1. HintsFrame refreshes all texts the game's way when that changes (P2 in/out, pause menu, shopper, P2 on the
   keyboard). Autotest shoppause (XXL_ICONP2KB XXL_ICONLOG=1): P2 at the merchant's menu, game state 2 for 3 s, back:
   at the pause "Back"/"Confirm" (ids 0x21/0x20) fetched for player 1, after it the shop shows G Back / Space Buy.
+- Round 93 (2026-10-21, user: freeze xxl_coop.crsah-10-20.log; then DSOAL cost 62 -> 48 fps). (1) The freeze is a
+  deadlock inside IndirectSound 0.20 (dsound.dll -> XAudio2_7): the game thread creates a voice (sound start
+  FUN_0043B730 -> FUN_005F0ED0 -> FUN_005F36A0: IDirectSound::DuplicateSoundBuffer, then FUN_005F3610 QI for
+  IID_IDirectSound3DBuffer) and waits on XAudio2's critical section, which XAudio2's worker thread holds while it
+  waits inside IndirectSound's voice callback (DSOUND+0xCED2). The xxl_coop.asi+0x258D6 frame in that stack is a
+  stale return address (KlusterSetP2Camera's epilogue in build 6dddc2e, checked with a /MAP build). Co-op only
+  starts more voices (P2's range checks), so it hits the race more often. Replaced by DSOAL r696 (Game Files;
+  IndirectSound kept in IndirectSound_backup, use_dsoal.bat / use_indirectsound.bat). (2) DSOAL's fps drop: the
+  frame limiter at 0x4016D2 is Sleep(15 - the frame's ms so far); since Windows 10 2004 a process's Sleep has
+  1 ms steps only if it calls timeBeginPeriod itself (NtQueryTimerResolution shows the system-wide 1 ms set by
+  other programs and is no evidence). IndirectSound's XAudio2 requests it, DSOAL doesn't, so sleeps round up to
+  15.6 ms. Fix: a separate coop\timerfix\xxl_timerfix.asi (timeBeginPeriod(1) at load), kept out of the mod at
+  the user's request. Diagnostic: env XXL_PROFILE samples the game thread every ~1 ms and logs where its time
+  went every 10 s (module, innermost game return address). Its own 1 ms Sleep loop does not change the game's
+  timer, but an earlier version called timeBeginPeriod and so hid the drop. Autotest soak: DSOAL 45 fps, DSOAL +
+  timerfix 62, IndirectSound 61.5.
