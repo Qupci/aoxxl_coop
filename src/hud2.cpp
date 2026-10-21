@@ -586,21 +586,52 @@ void Hud2BeginP1(RwCamera* hud) {
 		float mid = plate[5] - plate[13] * PlateDrawScale() * 0.5f;   // the plate's middle as drawn
 		float s = 0.75f;
 		Xform t = { mid, plate[6], s, 0.5f - mid, -0.1f };
-		Xf2d(itf, 0x134, t);
-		Xf2d(itf, 0x150, t);
-		Xf3d(NodeAt(itf, 0xA8), cl, t, true);
 		// The pieces under it, centred each on its own plate's middle as drawn
 		// at rest (its place +0x14 less `off`, how far it has slid; width +0x34;
 		// byte +6: 0 drawn rightwards from the place, 1 about it, 2 leftwards),
 		// scaled with the counter.
-		auto centred = [&](int plateOff, float off) {
+		auto centred = [&](int plateOff, float off, float dy) {
 			float* pl = *(float**)(itf + plateOff);
 			if (!pl) return t;
 			uint8_t align = *(uint8_t*)((char*)pl + 6);
 			float w = pl[13] * PlateDrawScale();
 			float m = pl[5] - off + (align == 2 ? -0.5f : align == 0 ? 0.5f : 0.0f) * w;
-			return Xform{ m, plate[6], s, 0.5f - m, -0.1f };
+			return Xform{ m, t.py + t.dy, s, 0.5f - m, dy };
 		};
+		// Heights: the pieces shown (not slid all the way out) keep the game's
+		// order under the counter, each gap (plate to plate, after the 3/4) cut
+		// to kGapScale of it -- tighter, in the same ratio. A plate's middle: its
+		// place +0x18, height +0x38, byte +7: 0 drawn downwards from the place,
+		// 1 about it, 2 upwards.
+		const float kGapScale = 0.5f;
+		auto middleY = [](const float* pl) {
+			uint8_t va = *(const uint8_t*)((const char*)pl + 7);
+			return pl[6] + (va == 0 ? -0.5f : va == 2 ? 0.5f : 0.0f) * pl[14];
+		};
+		float shown = *(float*)(itf + 0x31C), rShown = *(float*)(itf + 0x318);
+		float sOff = *(float*)(itf + 0x3A0) - shown, rOff = *(float*)(itf + 0x388) - rShown;
+		struct Piece { float* pl; bool in; float dy; } x3 = { *(float**)(itf + 0x13C), sOff < 1.0f - shown, -0.1f },
+			req = { *(float**)(itf + 0x138), rOff < 1.0f - rShown, -0.1f };
+		Piece* order[2] = { &req, &x3 };
+		if (x3.pl && req.pl && middleY(x3.pl) > middleY(req.pl)) { order[0] = &x3; order[1] = &req; }
+		// (the pieces are scaled about the counter's place as moved, as they were
+		// when this layout was settled)
+		float pivot = t.py + t.dy;
+		auto scaledMiddle = [&](const float* pl) { return pivot + (middleY(pl) - pivot) * s; };
+		float bottomWas = t.py + (middleY(plate) - t.py) * s + t.dy - plate[14] * s * 0.5f, bottom = bottomWas;
+		for (Piece* p : order) {
+			if (!p->pl || !p->in) continue;
+			float half = p->pl[14] * s * 0.5f;
+			float cWas = scaledMiddle(p->pl) + p->dy;
+			float gap = bottomWas - (cWas + half);
+			float c = bottom - (gap > 0.0f ? gap * kGapScale : gap) - half;
+			p->dy += c - cWas;
+			bottomWas = cWas - half;
+			bottom = c - half;
+		}
+		Xf2d(itf, 0x134, t);   // the counter, measured above before it is moved
+		Xf2d(itf, 0x150, t);
+		Xf3d(NodeAt(itf, 0xA8), cl, t, true);
 		// They slide in from the right edge and out again; in the middle that
 		// crossed player 2's half: they come down from the top instead, like the
 		// helmets. `off` is how far a piece is from its place (0.0 - 1.0 of its
@@ -615,9 +646,7 @@ void Hud2BeginP1(RwCamera* hud) {
 		};
 		// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01 to +0x31C;
 		// plate +0x13C, text +0x158, model +0x130).
-		float shown = *(float*)(itf + 0x31C);
-		float sOff = *(float*)(itf + 0x3A0) - shown;
-		Xform ts = fromTop(centred(0x13C, sOff), sOff, 1.01f - shown);
+		Xform ts = fromTop(centred(0x13C, sOff, x3.dy), sOff, 1.01f - shown);
 		Xf2d(itf, 0x13C, ts);
 		Xf2d(itf, 0x158, ts);
 		Xf3d(NodeAt(itf, 0x130), cl, ts, true);
@@ -625,9 +654,7 @@ void Hud2BeginP1(RwCamera* hud) {
 		// +0x154 and plate +0x138 slide on +0x388 from off the right edge to
 		// +0x318, its model +0x12C on +0x394 to +0x33C). Natively it stays at
 		// the right; side by side that was on player 2's combo bar.
-		float rShown = *(float*)(itf + 0x318);
-		float rOff = *(float*)(itf + 0x388) - rShown;
-		Xform tc = centred(0x138, rOff);
+		Xform tc = centred(0x138, rOff, req.dy);
 		Xform tr = fromTop(tc, rOff, 1.01f - rShown);
 		Xf2d(itf, 0x138, tr);
 		Xf2d(itf, 0x154, tr);

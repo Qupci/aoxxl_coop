@@ -2296,3 +2296,10 @@ both halves).
   are not drawn leftwards like the helmet counter's). Scale 3/4 and the vertical pivot (the counter's) as before.
   Autotests hudreq / hudx3 -Level 4, with the asi and with it moved aside: all three plates' middles on the
   split line.
+- Round 126 (2026-10-22, user: the x3 / x10 sign and the spy's requirement a bit tighter under the helmet counter,
+  keeping their unequal spacing in the same ratio). Side by side, the pieces shown (place not slid all the way out)
+  keep the game's order; each gap, plate edge to plate edge as round 125 drew them, is cut to kGapScale = 0.5.
+  Plate middles from place +0x18, height +0x38, alignment byte +7 (0 downwards, 1 about, 2 upwards); the counter is
+  measured before its own Xf2d (it had been read after, which also made round 125's pieces pivot on its moved
+  place -- kept as the pivot so the look is round 125's, tighter). Autotests hudreq / hudx3 -Level 4: helmet to
+  requirement 35 -> 17 px, helmet to x3 35 -> 17 px (960 x 540).
