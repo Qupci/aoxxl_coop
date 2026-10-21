@@ -109,7 +109,9 @@ static class R {
 				var sheet = new Bitmap(a[2]);
 				int S = sheet.Height / 24;
 				Bitmap dst;
-				using (var b = a[1] == "blank" ? new Bitmap(256 * S, 256 * S, PixelFormat.Format32bppArgb) : new Bitmap(a[1]))
+				// (read from memory: OUT may be BASE, and a Bitmap keeps its file locked)
+				using (var b = a[1] == "blank" ? new Bitmap(256 * S, 256 * S, PixelFormat.Format32bppArgb)
+				                               : new Bitmap(new MemoryStream(File.ReadAllBytes(a[1]))))
 					dst = b.Clone(new Rectangle(0, 0, b.Width, b.Height), PixelFormat.Format32bppArgb);
 				var cells = new List<Rectangle>();
 				using (var gd = Graphics.FromImage(dst)) {

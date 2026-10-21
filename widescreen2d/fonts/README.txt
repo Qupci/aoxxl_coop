@@ -40,4 +40,8 @@ tools\render.cs  the renderer (.NET Framework csc, System.Drawing):
   render.exe ink spec_LL.tsv                                      (outline bounds = Figma's)
   render.exe icons arial24-windows0_LL.png icons\sheet_x4.png icons\list0_LL.txt arial24-windows0_LL.png
   render.exe icons blank icons\sheet_x4.png icons\list1_LL.txt arial24-windows1_LL.png
+New icon designs: export the Figma frame "Action icons" as PNG at 4x (1456 x 96),
+keeping its layout (13 plates of 24 px at 28 px steps, glows inside the plates), then
+  powershell -ExecutionPolicy Bypass -File tools\update_icons.ps1 EXPORT.png
+rebuilds both pages of all five packs and copies them to Game Files\xxl_widescreen2d.
 The original pages: python ..\..\tools\export_game_icons.py "Game Files\LLGLOC.KWN" OUT
