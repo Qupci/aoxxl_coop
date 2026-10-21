@@ -2214,6 +2214,29 @@ const Step kTwistRomanA[] = {
 	END(9000),
 };
 
+// twistend / twistenda (with XXL_SHAKELOG=1): player 2's Obelix / player 1's
+// Asterix does the Twister to its end; its camera shake (asked for 24 s) must
+// stop with it, on that player's camera only.
+const Step kTwistEnd[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(2000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(2100, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (combo cheat)"),
+	VPAD(2300, 1, 0, 0, 0, "p2 release"),
+	TAP_P2(3000, PAD_A, "p2 A"), TAP_P2(3650, PAD_X, "p2 X"), TAP_P2(3760, PAD_B, "p2 B"), TAP_P2(3870, PAD_Y, "p2 Y"),
+	SHOT(6000, "twistend_1"),
+	END(30000),
+};
+const Step kTwistEndA[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(2000, 1, PAD_BACK, 0, 0, "p2 back"), VPAD(2100, 1, PAD_BACK | PAD_DPAD_LEFT, 0, 0, "p2 back+left (combo cheat)"),
+	VPAD(2300, 1, 0, 0, 0, "p2 release"),
+	{ 2500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix combo bar full" },
+	{ 3000, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SHOT(6000, "twistenda_1"),
+	END(30000),
+};
+
 const Step kComboP1[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -4475,6 +4498,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("sq36c", kSq36c),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
+	SCENARIO("twistend", kTwistEnd),
+	SCENARIO("twistenda", kTwistEndA),
 	SCENARIO("req410", kReq410),
 	SCENARIO("bump2l", kBump2L),
 	SCENARIO("bump2w", kBump2W),

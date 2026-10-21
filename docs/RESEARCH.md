@@ -2131,3 +2131,12 @@ both halves).
   of TickHook): bit on with count 0 = a fresh request -> bit and +0x668..+0x683 into the copy. The boss sends 0.01 s /
   0.08 every frame while it rolls. Autotest boss36s (-Level 3): both drop on #46 and glide to x -248; the log shows the
   shake handed to Obelix's camera each frame.
+- Round 113 (user pad test of 112: modded LV1-4 camera confirmed fixed): the Twister shakes the camera too -- P1's
+  Twister shook P2's screen as well, and longer than P1's; P2's Twister shook P2's screen only. The Twister asks for
+  a 24 s shake (strength 0.05) from the hero's own Life tick and stops it when the spin ends (~12 s; bit cleared,
+  elapsed 12.03). The leader's tick runs on the game's state, so round 112's ShareShake passed the start to the copy
+  but not the stop; the non-leader's tick runs with its copy swapped in (GameCamBeginHeroTick), so its shake was only
+  its own. Now a shake asked for during the leading hero's own tick (GameCamBegin/EndHeroTick compare +0xC bit
+  0x1000 and +0x668..+0x683) is that player's (g_shakeOwn): ShareShake skips it. World shakes (the boss) still reach
+  both. Env XXL_SHAKELOG=1 traces both states' shake. Autotests twistend (P2) / twistenda (P1): each shakes only its
+  own camera and stops at the Twister's end; boss36s still shared.

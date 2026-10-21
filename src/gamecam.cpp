@@ -388,9 +388,28 @@ bool CopyStale(char* svc, void* trio) {
 // bit 0x1000 and the shake's length, strength, frequency and fade at
 // +0x668..+0x67C, and its tick counter +0x680 to 0 -- the tick counts it up.
 // Requests made outside a tick land in the game's state only: a fresh one (bit
-// on, count 0) goes to the copy too.
+// on, count 0) goes to the copy too -- unless the leading hero's own tick made
+// it (the Twister): a hero's shake is its player's, as the non-leader's lands
+// in its copy only.
+bool g_shakeOwn = false;
 void ShareShake(char* svc) {
-	if (!g_copy.valid || !(*(uint32_t*)(svc + 0xC) & 0x1000) || *(uint32_t*)(svc + 0x680)) return;
+	bool own = g_shakeOwn;
+	g_shakeOwn = false;
+	static const bool trace = getenv("XXL_SHAKELOG") != nullptr;
+	if (trace) {
+		static uint32_t s_last[2] = { ~0u, ~0u };
+		const char* st[2] = { svc, (const char*)g_copy.svc };
+		for (int i = 0; i < 2; i++) {
+			uint32_t on = (*(const uint32_t*)(st[i] + 0xC) & 0x1000) ? 1 : 0;
+			uint32_t key = on | *(const uint32_t*)(st[i] + 0x680) << 1;
+			if (key == s_last[i] || (!on && !(s_last[i] & 1))) { s_last[i] = key; continue; }
+			s_last[i] = key;
+			Log("gamecam: shake %s: on %u length %.2f elapsed %.2f strength %.2f count %u%s", i ? "copy" : "game", on,
+			    *(const float*)(st[i] + 0x668), *(const float*)(st[i] + 0x66C), *(const float*)(st[i] + 0x670),
+			    *(const uint32_t*)(st[i] + 0x680), i == 0 && own ? " (the leading hero's own)" : "");
+		}
+	}
+	if (own || !g_copy.valid || !(*(uint32_t*)(svc + 0xC) & 0x1000) || *(uint32_t*)(svc + 0x680)) return;
 	*(uint32_t*)(g_copy.svc + 0xC) |= 0x1000;
 	memcpy(g_copy.svc + 0x668, svc + 0x668, 0x680 + 4 - 0x668);
 	static int s_logged = 0;
@@ -471,11 +490,19 @@ bool       g_heroSwapped = false;
 uint8_t    g_heroLiveSvc[kSrvSize];
 TrackBytes g_heroLiveTracks[3];
 int        g_heroNumTracks = 0;
+bool       g_heroShakeWatch = false;   // the leading hero's tick: did it ask for a shake?
+uint8_t    g_heroShake[0x680 + 4 - 0x668];
+bool       g_heroShakeOn = false;
 }
 
 void GameCamBeginHeroTick(int hero) {
 	g_heroSwapped = false;
 	char* svc = g_svc;
+	g_heroShakeWatch = g_active && !g_inCopy && svc && hero == g_liveOwner;
+	if (g_heroShakeWatch) {
+		g_heroShakeOn = (*(uint32_t*)(svc + 0xC) & 0x1000) != 0;
+		memcpy(g_heroShake, svc + 0x668, sizeof(g_heroShake));
+	}
 	if (!g_active || g_inCopy || !svc || !g_copy.valid || g_copy.hero != hero || hero == g_liveOwner) return;
 	{
 		Trio t = GetTrio();
@@ -497,6 +524,13 @@ void GameCamBeginHeroTick(int hero) {
 }
 
 void GameCamEndHeroTick() {
+	if (g_heroShakeWatch) {
+		g_heroShakeWatch = false;
+		char* svc = g_svc;
+		if ((*(uint32_t*)(svc + 0xC) & 0x1000) && !*(uint32_t*)(svc + 0x680) &&
+		    (!g_heroShakeOn || memcmp(g_heroShake, svc + 0x668, sizeof(g_heroShake))))
+			g_shakeOwn = true;
+	}
 	if (!g_heroSwapped) return;
 	g_heroSwapped = false;
 	g_inCopy = false;
