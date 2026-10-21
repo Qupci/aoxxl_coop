@@ -749,6 +749,21 @@ const Step kBoss36[] = {
 	END(22000),
 };
 
+// boss36s (-Level 3): the user's run -- the boss loaded (-208.3 -> -226), both
+// heroes drop onto #46 (-232.0 11.0 -173.9) and go on towards x -248, the boss
+// rolls after them: both players' cameras shake.
+const Step kBoss36s[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -208.28f, 11.5f, -200.22f), PLACEAT(3000, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	GLIDEAT(4000, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	PLACEAT(7000, HERO_ASTERIX, -232.5f, 16.0f, -174.4f), PLACEAT(7000, HERO_OBELIX, -232.0f, 16.0f, -173.9f),
+	SHOT(8500, "boss36s_0"),
+	GLIDEAT(9000, HERO_ASTERIX, -248.0f, 11.0f, -174.4f, 3000), GLIDEAT(9000, HERO_OBELIX, -248.0f, 11.0f, -173.4f, 3000),
+	SHOT(10500, "boss36s_1"), SHOT(10600, "boss36s_2"), SHOT(12000, "boss36s_3"), SHOT(12100, "boss36s_4"),
+	END(16000),
+};
+
 // sky2: player 2 turns their camera half around (right stick), then both
 // cameras hold still facing opposite ways; XXL_SKYLOG logs the sky's scroll.
 const Step kSky2[] = {
@@ -3855,6 +3870,21 @@ const Step kPillar36[] = {
 	SHOT(20000, "pillar36_1"), SHOT(31000, "pillar36_2"), SHOT(36000, "pillar36_3"),
 	END(40000),
 };
+// cam14 (-Level 1, sector 4; the modded "Caesar's Challenge" levels, -GameDir):
+// Obelix walks from the user's spot onto their camera trigger -- P2's copy of
+// the game camera must keep its track, not start over every frame.
+const Step kCam14[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 998.42f, 200.08f, -23.08f), PLACEAT(2500, HERO_OBELIX, 1000.209f, 200.072f, -21.697f),
+	{ 3500, S_CAMDUMP, 0, 0, 0, 0, 0, "camera" },
+	GLIDEAT(4000, HERO_OBELIX, 1002.575f, 200.053f, -17.638f, 1500),
+	SHOT(6000, "cam14_0"),
+	{ 6500, S_CAMDUMP, 0, 0, 0, 0, 0, "camera" },
+	SHOT(8000, "cam14_1"),
+	END(9000),
+};
+
 // pillar36l: the same circle's lock (4801, 4802 sent as its group does) with
 // Asterix on it: freedom mode keeps it (a corkscrew's circle; off with
 // XXL_FREEDOMCORK=0); R3 + B still frees him.
@@ -4316,6 +4346,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("boss210", kBoss210),
 	SCENARIO("boss210t", kBoss210t),
 	SCENARIO("boss36", kBoss36),
+	SCENARIO("boss36s", kBoss36s),
 	SCENARIO("sky2", kSky2),
 	SCENARIO("shadow33", kShadow33),
 	SCENARIO("shadow3s", kShadow3S),
@@ -4411,6 +4442,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("freeromans23", kFreeRomans23),
 	SCENARIO("pillar36", kPillar36),
 	SCENARIO("pillar36l", kPillar36l),
+	SCENARIO("cam14", kCam14),
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("carpause", kCarPause),
@@ -5806,6 +5838,10 @@ void RunStep(const Step& s) {
 				    *(void**)(sec + 0x20) ? *(uint32_t*)*(void**)(sec + 0x20) : 0, *(float*)(sec + 0x24), *(uint8_t*)(sec + 0x28));
 			}
 			Log("autotest: %d camera sectors (+20 list %p)", n, *(void**)(cs + 0x20));
+			n = 0;
+			for (char* tr = *(char**)(cs + 0x20); tr && n < 200; tr = *(char**)(tr + 4), n++)
+				Log("autotest: track list %p vt %08X", tr, *(uint32_t*)tr);
+			Log("autotest: %d tracks in the list", n);
 		} __except (EXCEPTION_EXECUTE_HANDLER) {
 			Log("autotest: (camera service unreadable)");
 		}

@@ -10,14 +10,19 @@ param(
     [Parameter(Mandatory = $true, Position = 0)][string]$Scenario,
     [int]$TimeoutSec = 150,
     [int]$Level = -1,
-    [switch]$NoDeploy
+    [switch]$NoDeploy,
+    # Another game folder, relative to F:\XXL COOP MOD, e.g. "SPQR\Caesars Challenge" (the modded levels).
+    [string]$GameDir = ""
 )
 $ErrorActionPreference = "Stop"
 $coop = Split-Path -Parent $PSScriptRoot
 $game = Join-Path (Split-Path -Parent $coop) "Game Files"
+if ($GameDir) { $game = (Resolve-Path (Join-Path (Split-Path -Parent $coop) $GameDir)).Path }
+$exe = Join-Path $game "axxl.exe"
+if (-not (Test-Path $exe)) { $exe = Join-Path $game "Cesar's Challenge - Windowed.exe" }
 $shots = Join-Path $game "shots"
 
-Get-Process axxl -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
+Get-Process axxl, "Cesar's Challenge - Windowed" -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
 
 # The game keeps only three logs (xxl_coop.log, .1, .2) and every test run
 # rotates them: save any log from a real play session (no "autotest:" line in
@@ -45,7 +50,7 @@ if (Test-Path $shots) { Remove-Item (Join-Path $shots "*") -Force -ErrorAction S
 $env:XXL_AUTOTEST = $Scenario
 if ($Level -ge 0) { $env:XXL_LEVEL = "$Level" }
 try {
-    $p = Start-Process -FilePath (Join-Path $game "axxl.exe") -WorkingDirectory $game -PassThru
+    $p = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
 } finally {
     Remove-Item Env:XXL_AUTOTEST -ErrorAction SilentlyContinue
     Remove-Item Env:XXL_LEVEL -ErrorAction SilentlyContinue

@@ -2115,3 +2115,19 @@ both halves).
   outside the title also rebuilds preset 3 as the default table (A0+0F/10/11/12, face buttons shifted), so the file
   is always restored. Autotest presetopts (S_SETPRESET a=-1 runs FUN_00503B00 in play): before, stayed on 1; now 3 with
   all 48 bindings as the file (no table change logged against the title's); preset1 (XXL_PRESETNOPAD=1) still OK.
+- Round 112 (user, two P2 camera reports, game camera copy = gamecam.cpp):
+  (a) Modded levels ("Caesar's Challenge", SPQR\Caesars Challenge, same exe build; log userlogs\xxl_coop.bad_camera_p2.log),
+  LV1-4: Obelix walking 1000.2 200.1 -21.7 -> 1002.6 200.1 -17.6, P2's camera stuttered in and out close to him. The copy
+  had switched to camera sector 04385A04's track 03F32148 and from the next frame on CopyStale said "the level was loaded
+  again" 295 times: it only knew the tracks in the service's list (+0x20), and that sector's track is not in it (made with
+  the XXL Editor, it seems). The game takes tracks from the camera sectors (+0x24, track +0x20; tick ~0x456xxx) and its
+  default one (+0x10) as well. Now TrackKnown accepts all three, SnapshotTracks also snapshots the sector tracks, and the
+  "loaded again" line is capped. Autotest cam14 (-Level 1 -GameDir "SPQR\Caesars Challenge"; run_test.ps1 has -GameDir now,
+  the exe there is "Cesar's Challenge - Windowed.exe"; S_CAMDUMP lists the +0x20 tracks too) -- not run yet by me.
+  (b) Vanilla LV3-6 boss: the rolling machine's camera shake showed for P1 only. A shake request (boss FUN_004F05C0, ~30
+  other writers: stomps, explosions...) sets svc +0xC bit 0x1000, +0x668 length s, +0x66C elapsed, +0x670 strength,
+  +0x674 floor, +0x678 frequency, +0x67C fade, and +0x680 = 0 (the tick's shake counter; the tick ~0x45A0xx counts it
+  up, clears the bit when elapsed >= length). Requests outside a tick reached only the game's state. Now ShareShake (start
+  of TickHook): bit on with count 0 = a fresh request -> bit and +0x668..+0x683 into the copy. The boss sends 0.01 s /
+  0.08 every frame while it rolls. Autotest boss36s (-Level 3): both drop on #46 and glide to x -248; the log shows the
+  shake handed to Obelix's camera each frame.

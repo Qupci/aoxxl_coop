@@ -94,6 +94,22 @@ void SnapshotTracks(char* svc) {
 	for (char* t = *(char**)(svc + 0x20); t && n < kMaxTracks; t = *(char**)(t + 4), n++) AddSnap(t);
 	for (int off = 0x34; off <= 0x3C; off += 4) AddSnap(*(char**)(svc + off));
 	for (int i = 0; i < g_copy.numTracks; i++) AddSnap(g_copy.tracks[i].track);
+	n = 0;
+	for (char* sec = *(char**)(svc + 0x24); sec && n < kMaxTracks; sec = *(char**)(sec + 4), n++)
+		AddSnap(*(char**)(sec + 0x20));
+}
+// A track of this service: in its list (+0x20), a camera sector's (list +0x24,
+// track +0x20 -- levels made with the XXL Editor have sector tracks missing
+// from the list) or its default one (+0x10).
+bool TrackKnown(char* svc, const char* t) {
+	if (t == *(char**)(svc + 0x10)) return true;
+	int n = 0;
+	for (char* tr = *(char**)(svc + 0x20); tr && n < kMaxTracks; tr = *(char**)(tr + 4), n++)
+		if (tr == t) return true;
+	n = 0;
+	for (char* sec = *(char**)(svc + 0x24); sec && n < kMaxTracks; sec = *(char**)(sec + 4), n++)
+		if (*(char**)(sec + 0x20) == t) return true;
+	return false;
 }
 void RestoreTracks() {
 	for (int i = 0; i < g_numSnap; i++) memcpy(g_snap[i].track, g_snap[i].b, g_snap[i].size);
@@ -356,19 +372,31 @@ void* g_copyTrio = nullptr;
 bool CopyStale(char* svc, void* trio) {
 	bool stale = svc != g_svc || trio != g_copyTrio;
 	if (!stale && g_copy.valid)
-		for (int i = 0; i < g_copy.numTracks && !stale; i++) {
-			bool known = false;
-			int n = 0;
-			for (char* tr = *(char**)(svc + 0x20); tr && n < kMaxTracks && !known; tr = *(char**)(tr + 4), n++)
-				known = tr == g_copy.tracks[i].track;
-			stale = !known;
-		}
+		for (int i = 0; i < g_copy.numTracks && !stale; i++) stale = !TrackKnown(svc, g_copy.tracks[i].track);
 	if (!stale) return false;
-	if (g_copy.valid && svc == g_svc) Log("gamecam: the level was loaded again -- the copy starts over from the game's camera");
+	if (g_copy.valid && svc == g_svc) {
+		static int s_logged = 0;
+		if (s_logged++ < 20) Log("gamecam: the level was loaded again -- the copy starts over from the game's camera");
+	}
 	g_copy.valid = false;
 	g_copy.haveView = false;
 	g_copy.numTracks = 0;
 	return true;
+}
+
+// Camera shake (the LV3-6 boss rolling on, explosions...): a request sets +0xC
+// bit 0x1000 and the shake's length, strength, frequency and fade at
+// +0x668..+0x67C, and its tick counter +0x680 to 0 -- the tick counts it up.
+// Requests made outside a tick land in the game's state only: a fresh one (bit
+// on, count 0) goes to the copy too.
+void ShareShake(char* svc) {
+	if (!g_copy.valid || !(*(uint32_t*)(svc + 0xC) & 0x1000) || *(uint32_t*)(svc + 0x680)) return;
+	*(uint32_t*)(g_copy.svc + 0xC) |= 0x1000;
+	memcpy(g_copy.svc + 0x668, svc + 0x668, 0x680 + 4 - 0x668);
+	static int s_logged = 0;
+	if (s_logged++ < 20)
+		Log("gamecam: camera shake for both cameras (%.2f s, strength %.2f)", *(float*)(svc + 0x668),
+		    *(float*)(svc + 0x670));
 }
 
 bool Wanted() {
@@ -402,6 +430,7 @@ void __fastcall TickHook(char* svc, void* edx, void* frame) {
 		void* target = TargetOf(lead);
 		if (target) g_origSetTarget(svc, nullptr, target, 0.0f, 1);
 	}
+	ShareShake(svc);
 	InputSwap s;
 	UseInputOf(lead, s);
 	ApplyFight(svc, lead);
