@@ -2061,3 +2061,13 @@ both halves).
   lifted. LV2-3 (freeromans23): the hearth (#423) gives Obelix 4826 (order 1); Romans come; the powder keg (#327) sends
   4803 -> no more. Autotest steps S_NEAROBJ for the keg (CKHkPowderKeg 2,77; #20 at -51.2 0.8 -521.4); test steps must
   be in time order (steps run in list order).
+- Round 106 (2026-10-21, user: the beam's catch could come sooner; a carried torch burned on while Obelix led, unlike
+  single player). (1) CKHkRotaryBeam::vf15 (0x53F170) state 4 (over the circle) waits out +0x20, then until it has
+  stopped swinging (|+0x2C| < 0.2, |+0x28 - +0x3C| < 0.02), then sends 0x0C02 and goes to state 2 (bits 0/2: &~5 | 2).
+  WatchFreedomBeam: a player's jump under the beam in state 4 sets +0x20 = 0; a jump up to 1 s before the order 8
+  still hands the hero over (no "over" bit needed -- the pending order means the beam waits). beam42f: caught on the
+  first pass. (2) CKHkTorch::vf15 (0x4AF790): carried (+0x3E & 3 == 1) and lit (bits 2-4), its timer +0x1C runs only
+  while trio vf40 (0xA0: the leader is Asterix); the HUD reads the real leader. Objects are ticked as their nearest
+  player's hero posing as the leader (proximity TickLife), so Asterix's torch burned while Obelix led. A carried
+  torch now ticks with the real leader (as the corkscrew / plates). beam42f: timer 2.73 held while Obelix led.
+  XXL_LIFTLOG logs carried torches.

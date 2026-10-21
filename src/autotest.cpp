@@ -4718,6 +4718,12 @@ void LogTick(float t) {
 				cars.Add(" | box13 %u cross1B %u", *(uint8_t*)(*(char**)(det + 0x2C) + 8 * 0x13 + 4) & 1,
 				         *(uint8_t*)(*(char**)(det + 0x3C) + 8 * 0x1B + 4) & 1);
 		}
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 32); i < n && i < 16; i++) {   // carried torches (CKHkTorch 2,32)
+			char* tc = (char*)GetLvlObject(2, 32, i);
+			if (tc && (*(uint8_t*)(tc + 0x3E) & 3) == 1)
+				cars.Add(" | torch %u 3E %02X fire %d timer %.2f lead %d", i, *(uint8_t*)(tc + 0x3E), (*(uint8_t*)(tc + 0x3E) >> 2) & 7,
+				         *(float*)(tc + 0x1C), tr.Leader());
+		}
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n && i < 2; i++) {   // rotary beams (CKHkRotaryBeam 2,57)
 			char* b = (char*)GetLvlObject(2, 57, i);
 			char* node = b ? *(char**)(b + 0x10) : nullptr;

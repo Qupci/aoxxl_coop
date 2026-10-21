@@ -1695,20 +1695,32 @@ static void WatchPendingLead(Trio t) {
 // Freedom mode and the rotary beam (CKHkRotaryBeam 2,57; LV4-2): the level asks
 // the hero on its circle to hang on it (beam event 0x0C02 -> AI order 8) when the
 // beam is over him (+8 bit 2). A player's jump never catches it -- only the AI's
-// order 8 does. So the player's jump (body 0x0E) while the beam is over him hands
-// the hero to the game for that ride; it comes back when the beam lets go.
+// order 8 does. So the player's jump (body 0x0E) hands the hero to the game for
+// that ride; it comes back when the beam lets go. The beam over the circle
+// (state +8 & 7 == 4) first waits out a delay (+0x20), then until it has stopped
+// swinging (+0x2C speed < 0.2, +0x28 angle within 0.02 of +0x3C), and only then
+// sends 0x0C02 (state 2) -- the order came long after the beam was there. A jump
+// under it cuts the delay; a jump up to 1 s before the order still counts.
 static void WatchFreedomBeam(Trio t) {
 	if (!g_config.freedom || !t || !g.p2Joined || g.suspended) return;
-	bool over = false;
-	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n && !over; i++) {
-		char* b = (char*)GetLvlObject(2, 57, i);
-		over = b && (*(uint32_t*)(b + 8) & 4);
-	}
-	if (!over) return;
+	static DWORD s_jumpAt[2] = {};
 	const int players[2] = { g.p1Hero, g.p2Hero };
 	for (int idx : players) {
 		Hero h = t.GetHero(idx);
-		if (!h || g.held[idx] || h.Order() != AI_HANG_ON_BEAM || *(uint8_t*)(h.raw() + 0xE5) != 0x0E) continue;
+		if (h && *(uint8_t*)(h.raw() + 0xE5) == 0x0E) s_jumpAt[idx] = GetTickCount();
+	}
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n; i++) {
+		char* b = (char*)GetLvlObject(2, 57, i);
+		if (!b || (*(uint32_t*)(b + 8) & 7) != 4 || *(float*)(b + 0x20) <= 0.0f) continue;
+		for (int idx : players)
+			if (GetTickCount() - s_jumpAt[idx] < 300 && !g.held[idx]) {
+				Log("coop: freedom: %s jumped under the rotary beam -- its wait (%.2f s) cut", HeroName(idx), *(float*)(b + 0x20));
+				*(float*)(b + 0x20) = 0.0f;
+			}
+	}
+	for (int idx : players) {
+		Hero h = t.GetHero(idx);
+		if (!h || g.held[idx] || h.Order() != AI_HANG_ON_BEAM || GetTickCount() - s_jumpAt[idx] > 1000) continue;
 		Log("coop: freedom: %s jumped for the rotary beam -- the game's for the ride", HeroName(idx));
 		Hold(t, idx, "jumped for the rotary beam", true);
 	}

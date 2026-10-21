@@ -51,6 +51,7 @@ const uintptr_t kPressionStoneVtbl = 0x628EE4;   // CKHkPressionStone (2,21)
 // switched when Obelix stepped on it and left Asterix waiting off the platform
 // -- a softlock. It keeps to the real leader too.
 const uintptr_t kCorkscrewVtbl = 0x628E0C;       // CKHkCorkscrew (2,44)
+const uintptr_t kTorchVtbl = 0x625F08;           // CKHkTorch (2,32)
 const uintptr_t kBoatVtbl = 0x627EB8;            // CKHkBoat (2,39)
 // Lifters (CKHkLifter::vf15, 0x4AD670) waiting at the bottom with "wait for
 // trio" (flags +8 bit 0) count the time the leader stands on them without the
@@ -262,8 +263,13 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 		return;
 	}
 	bool plate = hook && (*(uintptr_t*)hook == kPressionStoneVtbl || *(uintptr_t*)hook == kCorkscrewVtbl);
+	// A carried torch (CKHkTorch 2,32, +0x3E state 1) burns down only while the
+	// trio's leader is Asterix (trio vf40, its tick at 0x4AF790); the HUD reads the
+	// real leader. Ticked as Asterix's nearest with him posing as the leader, it
+	// burned at his rate while Obelix led (single player: it waits).
+	bool carriedTorch = hook && *(uintptr_t*)hook == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 1;
 	if (vt == kAsterixLifeVtbl || vt == kObelixLifeVtbl || vt == kIdefixLifeVtbl ||
-	    vt == kBonusGroupLife || vt == kTrioGroupLife || vt == kCheckpointLife || plate ||
+	    vt == kBonusGroupLife || vt == kTrioGroupLife || vt == kCheckpointLife || plate || carriedTorch ||
 	    !LifePos(life, isGroup, &at)) {
 		tick(life, nullptr, dt);
 		return;
