@@ -64,7 +64,8 @@ needs a 1 ms timer, which IndirectSound's XAudio2 requests but DSOAL doesn't.
 
 `xxl_widescreen2d.asi` (`coop\widescreen2d\build.bat`), also separate, draws 2D text (dialogues,
 hints, menus, the font's button icons) at its true shape: the game widens it by aspect / (4/3), a third
-too wide at 16:9.
+too wide at 16:9. It also draws the HUD's 3D models (health shields, helmet, combo columns) without
+the stretch, in their places; a row of them (the shields) closes up towards its outer end.
 
 ## Controls
 

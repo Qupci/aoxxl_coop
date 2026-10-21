@@ -2192,7 +2192,7 @@ both halves).
   Obelix got the lead back, the circle answers only the leader). Autotests: turnstile21 / 21c reach 0058 with the
   4803 held back; turnstile21b still set back and Asterix locked again; corkdown restored, no lead back, Asterix
   locked again after the revive; turnstile21e as round 115; pillar36l (LV3-6, R3 + B) as before.
-- Round 94 (2026-10-21, user's designer: dialogue text and icons ~30% too wide at 16:9). CText2d widths are
+- Round 117 (2026-10-21, user's designer: dialogue text and icons ~30% too wide at 16:9). CText2d widths are
   aspect (2D manager = yellow pages +0x34, +4: width / height, 1.778 at 16:9) times the float 0.75 at 0x623C64,
   read only by the text layouts 0x42DF40 / 0x42E840 / 0x42EF80 and the glyph draw 0x42F430 (Rt2dCTMScale(aspect *
   0.75, 1) per glyph; positions are x * aspect): 1 at 4:3, 1.33 at 16:9. Separate coop\widescreen2d\
@@ -2202,3 +2202,15 @@ both halves).
   i.e. stretched, vs square units). Not covered: the HUD's 3D models (shields, helmet; HUD camera renderer +0x14,
   view window 0.5 x 0.5 over the whole screen) and stretched billboards. Autotests spy21a / hintjoin / shop
   before and after: subtitles and hints narrower, centred / right-aligned, round icons round.
+- Round 118 (2026-10-21, user: the HUD shields and helmet are still wide; then: the shields far apart). The HUD's
+  3D models come from the three HUD lists (view +0x4C/+0x50/+0x54 = statics 0x662DDC / 0x662BC0 / 0x662E00;
+  vtables 0x622B24 / 0x622B94 / 0x622BB0, slot 3 draw-and-empty 0x412C00 / 0x4130D0 / 0x4131D0, thiscall, no
+  args; list +4 first entry; entry +8 RpAtomic (header 0x00050001), its frame atomic +4, next entry +0x24; drawn
+  by the atomic's render callback +0x48 from the frame's LTM +0x50 -- entry +4 is not a frame). The HUD camera
+  (0x662EBC, ortho 0.5 x 0.5) spans the viewport, so models are a third too wide at 16:9. xxl_widescreen2d.asi
+  wraps those slots: squeeze = window x / y * viewport h / w * 4/3 (D3D GetViewport, vtable 48: the co-op split
+  sets the viewport on the device, not the raster), each atomic's LTM axes squeezed along the camera's right axis
+  about its own position, put back after the draw. Rows (same line within 0.03, neighbours within 0.15) also get
+  their spacing squeezed towards the row's outer end; single models keep their centres (they sit in 2D plates).
+  The co-op mod's P2 HUD pass calls the same slots, so both HUDs get it. Autotest hudlayout -Level 4 before /
+  after: shields and combo columns narrow and in place, rows closed up.

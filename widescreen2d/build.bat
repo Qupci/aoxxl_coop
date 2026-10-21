@@ -15,7 +15,7 @@ set OUT=%ROOT%build
 if not exist "%OUT%" mkdir "%OUT%"
 pushd "%OUT%" || exit /b 1
 
-cl /nologo /O2 /MT /W3 /LD "%ROOT%widescreen2d.cpp" /Fe:xxl_widescreen2d.asi /link kernel32.lib
+cl /nologo /O2 /MT /W3 /LD "%ROOT%widescreen2d.cpp" /Fe:xxl_widescreen2d.asi /link kernel32.lib user32.lib
 if errorlevel 1 goto :fail
 
 popd
