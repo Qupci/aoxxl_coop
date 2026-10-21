@@ -1952,3 +1952,15 @@ both halves).
   circle and gives the lead back. (3) A re-lock while the lifter still waits is undone 2 s after the lock
   (g_lock.since), not at once. Autotests lifterlock (now also walks back onto the circle), lifterlock2 (through
   03C8), corkdown / lockagain (the circle answers again after the revive).
+- Round 97 (2026-10-21, user: xxl_coop.lv2-1_pillar_after_lifter_leave.log): Asterix on the circle, Obelix stepped off
+  the lifter and crossed zone 03C8 (Asterix freed, the platform off until its turn reaches the top box), then walked
+  away: the pillar stayed dark (no lifter waiting, so round 96 did not run). The user: the platform is turned by
+  Obelix hitting CKHkTurnstile (2,45) with X from about -775.9 515.6 -983.6 (the turnstile 3.8 units from the circle,
+  -775.6 515.5 -980.7) until Asterix crosses a box at the top (its frame +0x80 is not world: the turnstiles listed
+  at 44.7 52.6 -67.8 etc.). Now WatchUnfinishedSequence: a sequence under way (g_seqLive, SequenceUnderWay) with the
+  partner more than 25 units from where the locked hero stood (g_lock.at -> g_seqAt) for 3 s is set back
+  (UndoSequence, lead back via GiveLeadLater) -- Asterix on the circle is locked again at once (user's choice:
+  "unlock, then instantly locked by the re-activated pillar"). Round 96's lifter-only branch for this case is
+  dropped (it moved Asterix off the circle). 3 s: walking through 03C8 to the turnstile is 1.5 s past 25 units.
+  Platform +0x28 = its rise (0 -> 8 at the top). Autotests turnstile21 (the platform as meant: risen, top reached,
+  the level's next zones 0528 / 0530 / 0058, nothing set back), lifterlock2, corkdown.

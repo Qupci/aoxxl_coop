@@ -3352,6 +3352,41 @@ const Step kLifterLock[] = {
 	END(44000),
 };
 
+// turnstile21 (level 2, XXL_LIFTLOG=1): the spinning platform as meant -- Asterix
+// on its circle, Obelix through zone 03C8 to the turnstile (the user's spot) and
+// X again and again: the platform rises with Asterix, nothing set back.
+const Step kTurnstile21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(5300, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 1500),   // through zone 03C8 (as lifterlock2)
+	GLIDEAT(6900, HERO_OBELIX, -775.878f, 515.614f, -990.0f, 2000),
+	GLIDEAT(9000, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),   // the user's spot, walking towards the turnstile
+	SHOT(9500, "turnstile21_1"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X"), VPAD(10150, 1, 0, 0, 0, "p2 release"),
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X"), VPAD(10650, 1, 0, 0, 0, "p2 release"),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"), VPAD(11150, 1, 0, 0, 0, "p2 release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "p2 X"), VPAD(11650, 1, 0, 0, 0, "p2 release"),
+	VPAD(12000, 1, PAD_X, 0, 0, "p2 X"), VPAD(12150, 1, 0, 0, 0, "p2 release"),
+	VPAD(12500, 1, PAD_X, 0, 0, "p2 X"), VPAD(12650, 1, 0, 0, 0, "p2 release"),
+	VPAD(13000, 1, PAD_X, 0, 0, "p2 X"), VPAD(13150, 1, 0, 0, 0, "p2 release"),
+	VPAD(13500, 1, PAD_X, 0, 0, "p2 X"), VPAD(13650, 1, 0, 0, 0, "p2 release"),
+	SHOT(14000, "turnstile21_2"),
+	VPAD(14500, 1, PAD_X, 0, 0, "p2 X"), VPAD(14650, 1, 0, 0, 0, "p2 release"),
+	VPAD(15000, 1, PAD_X, 0, 0, "p2 X"), VPAD(15150, 1, 0, 0, 0, "p2 release"),
+	VPAD(15500, 1, PAD_X, 0, 0, "p2 X"), VPAD(15650, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16150, 1, 0, 0, 0, "p2 release"),
+	VPAD(16500, 1, PAD_X, 0, 0, "p2 X"), VPAD(16650, 1, 0, 0, 0, "p2 release"),
+	VPAD(17000, 1, PAD_X, 0, 0, "p2 X"), VPAD(17150, 1, 0, 0, 0, "p2 release"),
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17650, 1, 0, 0, 0, "p2 release"),
+	VPAD(18000, 1, PAD_X, 0, 0, "p2 X"), VPAD(18150, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "turnstile21_3"), SHOT(23000, "turnstile21_4"),
+	END(24000),
+};
+
 // lifterlock2 (level 2, XXL_LIFTLOG=1): lifterlock, but Obelix walks off through
 // the turnstile's zone (03C8: Asterix freed, the platform switched off until its
 // turn ends) and then onto the lifter -- the user's first session; then the
@@ -3806,6 +3841,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("corkdown", kCorkDown),
 	SCENARIO("lifterlock", kLifterLock),
 	SCENARIO("lifterlock2", kLifterLock2),
+	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
@@ -4151,6 +4187,19 @@ void LogTick(float t) {
 			if (c) cars.Add(" | car %u 7C %08X 20 %p 84 %p 30 %.2f at %.1f %.1f %.1f", i, *(uint32_t*)(c + 0x7C), *(void**)(c + 0x20),
 			                *(void**)(c + 0x84), *(float*)(c + 0x30), fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0,
 			                fr ? ((float*)(fr + 0x80))[2] : 0);
+		}
+		// turnstiles (CKHkTurnstile 2,45): flags +8; spinning platforms (2,44) near: flags +8, +0x28
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 45); i < n && i < 4; i++) {
+			char* k = (char*)GetLvlObject(2, 45, i);
+			char* node = k ? *(char**)(k + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			const float* m = (const float*)(fr + 0x80);
+			cars.Add(" | turnstile %u f8 %08X at %.1f %.1f %.1f", i, *(uint32_t*)(k + 8), m[0], m[1], m[2]);
+		}
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 44); i < n && i < 8; i++) {
+			char* c = (char*)GetLvlObject(2, 44, i);
+			if (c && (*(uint32_t*)(c + 8) & 3)) cars.Add(" | cork %u f8 %08X 28 %.2f", i, *(uint32_t*)(c + 8), *(float*)(c + 0x28));
 		}
 		Log("%s", cars.c_str());
 	}

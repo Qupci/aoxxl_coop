@@ -241,15 +241,20 @@ struct LockState {
 	int         hero = -1;           // the locked hero
 	char*       car = nullptr;       // the rope-pulled cable car it rides (CKHkTowedTelepher 2,159)
 	DWORD       since = 0;
+	Vector3     at;                  // where the locked hero stood (the circle)
 	LockPicture pic;
 } g_lock;
 LockPicture g_prePic;
 // A lock that ended (0x4803) while its sequence goes on: the spinning platform
 // frees Asterix once Obelix is at the turnstile, but it stays switched off
 // (0x99A) and its pillar dark until Asterix reaches the box at its top. Kept
-// until then.
+// until then. Obelix spins the platform at its turnstile (X, 3.8 units from the
+// circle); gone off (the lifter) it never turns, and the pillar stays dark:
+// WatchUnfinishedSequence sets it back.
 LockPicture g_seqPic;
 int g_seqHero = -1;   // the hero that lock held
+Vector3 g_seqAt;      // where it stood
+DWORD g_seqAwaySince = 0;
 bool g_seqLive = false;
 // A rope-pulled cable car boarded under a lock, and where it stood then (its
 // start): the car rolls back there by itself once let go -- unless the pull
@@ -320,6 +325,7 @@ static void NoteLock(int hero, const char* why) {
 	float best = 12.0f * 12.0f;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(hero) : Hero();
+	if (h) g_lock.at = h.Pos();
 	for (unsigned i = 0, n = h ? GetNumLvlClassInstances(2, 159) : 0; i < n; i++) {
 		char* car = (char*)GetLvlObject(2, 159, i);
 		char* node = car ? *(char**)(car + 0x10) : nullptr;
@@ -335,7 +341,13 @@ static void NoteLock(int hero, const char* why) {
 }
 
 static void EndLock(bool goesOn = false) {
-	if (goesOn && g_lock.hero >= 0) { g_seqPic = g_lock.pic; g_seqHero = g_lock.hero; g_seqLive = true; }
+	if (goesOn && g_lock.hero >= 0) {
+		g_seqPic = g_lock.pic;
+		g_seqHero = g_lock.hero;
+		g_seqAt = g_lock.at;
+		g_seqAwaySince = 0;
+		g_seqLive = true;
+	}
 	g_lock.hero = -1;
 }
 
@@ -1669,6 +1681,28 @@ static void UndoLock(Trio t, int up, bool lead) {
 	IndivPutOnSafeGround(up);
 }
 
+// The spinning platform's sequence under way (Obelix crossed 03C8: Asterix
+// freed, the platform off until its turn reaches the top) with the partner more
+// than 25 units from the circle -- the turnstile is beside it -- for 3 s: set
+// back (platform down, pillar on, the lead to who had it), so that Asterix on
+// the circle is locked again at once.
+static void WatchUnfinishedSequence(Trio t) {
+	if (!g_seqLive || g_seqHero < 0 || !t || !g.p2Joined || g.suspended || g_lock.hero >= 0 || IndivFallenHero() >= 0) {
+		g_seqAwaySince = 0;
+		return;
+	}
+	Hero o = t.GetHero(OtherHero(g_seqHero));
+	if (!o || (o.Pos() - g_seqAt).len2() <= 25.0f * 25.0f || !SequenceUnderWay()) { g_seqAwaySince = 0; return; }
+	if (!g_seqAwaySince) g_seqAwaySince = GetTickCount();
+	if (GetTickCount() - g_seqAwaySince < 3000) return;   // (walking through 03C8 to the turnstile: 1.5 s past 25)
+	Log("coop: %s went off (%.0f units) before turning the spinning platform -- its sequence set back", HeroName(OtherHero(g_seqHero)),
+	    sqrtf((o.Pos() - g_seqAt).len2()));
+	int before = g_seqPic.leader;
+	UndoSequence();
+	GiveLeadLater(before);
+	g_seqAwaySince = 0;
+}
+
 // The watched car stands still (+0x30 speed) away from its start, not free to
 // board (+0x7C bit 0x80), its rope not held (bit 0x4000), and nobody locked in
 // it: after 1 s it goes back to its start (as after a ride it rolls back).
@@ -2253,6 +2287,7 @@ void CoopFrame() {
 	ServeMachineRequest(t);
 	WatchLifterHint(t);
 	WatchPendingLead(t);
+	WatchUnfinishedSequence(t);
 	WatchStrandedCar();
 	WatchSpyWalk(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
@@ -3322,19 +3357,8 @@ static void WatchLifterHint(Trio t) {
 			since = GetTickCount();
 			return;
 		}
-		// Freed already but its sequence not over: LV2-1, Obelix on his way to the
-		// lifter crosses the turnstile's zone (03C8), which frees Asterix and switches
-		// the platform off until the turn's end -- pillar dark for good.
-		if (GetTickCount() - since >= 2000 && g_seqHero == missing && SequenceUnderWay()) {
-			Log("coop: the lifter waits for %s, whose spinning platform's turn never came -- the sequence undone",
-			    HeroName(missing));
-			int before = g_seqPic.leader;
-			UndoSequence();
-			IndivPutOnSafeGround(missing);
-			GiveLeadLater(before);
-			since = GetTickCount();
-			return;
-		}
+		// (Freed already with its spinning platform's turn not done -- Obelix crossed
+		// the turnstile's zone 03C8 on his way here: WatchUnfinishedSequence.)
 		if (GetTickCount() - since < 4000) return;
 		wchar_t text[64];
 		swprintf(text, 64, L"The lifter waits for %s\nto go up", HintHeroName(on[0] ? HERO_OBELIX : HERO_ASTERIX));
