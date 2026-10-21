@@ -2667,6 +2667,8 @@ const Step kLiftCab33W[] = {
 const Step kCross33[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 3),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1200, HERO_ASTERIX, 296.0f, 10.9f, -209.1f),   // walked over: a trail of safe spots
+	GLIDEAT(1300, HERO_ASTERIX, 306.0f, 10.9f, -209.1f, 1000),
 	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
 	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
 	GLIDEAT(5500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2000),
@@ -3532,9 +3534,64 @@ const Step kSwing[] = {
 	END(9000),
 };
 
-// carpause (level 2, XXL_HELDMAX=15000 XXL_LIFTLOG=1): Asterix sits in the cable
-// car, nobody pulls; the pause menu 20 s, then play past the held limit -- the
-// safety valve (walk orders only) must leave him in the car (order 9) throughout.
+// unlockpillar / unlockcar / unlockseq (level 2, XXL_P2HERO=asterix XXL_LIFTLOG=1):
+// player 2's Asterix, locked by the level, presses R3 + B -- undone as for a
+// fallen partner, Asterix on his last solid ground; then it works again.
+#define UNLOCK(t) VPAD(t, 1, PAD_RTHUMB, 0, 0, "p2 R3"), VPAD(t + 200, 1, PAD_RTHUMB | PAD_B, 0, 0, "p2 R3+B"), \
+                  VPAD(t + 400, 1, 0, 0, 0, "p2 release")
+const Step kUnlockPillar[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(5500, "unlockpillar_0"),
+	UNLOCK(6500),
+	SHOT(8000, "unlockpillar_1"),
+	GLIDEAT(10000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(11700, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(14000, "unlockpillar_2"),
+	END(15000),
+};
+const Step kUnlockCar[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1400, HERO_ASTERIX, -782.0f, 511.5f, -1059.9f),
+	GLIDEAT(1500, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	VPAD(2800, 1, 0, -1.0f, 0.0f, "p2 left"), VPAD(3300, 1, 0, 0, 0, "p2 neutral"),
+	PLACEAT(3400, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	SHOT(5000, "unlockcar_0"),
+	UNLOCK(6000),
+	SHOT(7500, "unlockcar_1"),
+	{ 10000, S_PLACE, HERO_OBELIX, 1, 0, 0, 0, "obelix to rope" },
+	GLIDEAT(10000, HERO_ASTERIX, -778.0f, 511.5f, -1059.9f, 1000),
+	GLIDEAT(11200, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	VPAD(12500, 1, 0, -1.0f, 0.0f, "p2 left"), VPAD(13000, 1, 0, 0, 0, "p2 neutral"),
+	PLACEAT(13100, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	SHOT(15000, "unlockcar_2"),
+	END(16000),
+};
+const Step kUnlockSeq[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(5300, HERO_OBELIX, -754.0f, 515.6f, -977.8f, 1000),   // through 03C8 (Asterix freed, platform off)
+	UNLOCK(7000),
+	SHOT(8500, "unlockseq_1"),
+	GLIDEAT(10000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(11700, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(14000, "unlockseq_2"),
+	END(15000),
+};
+
+// carpause (level 2, XXL_LIFTLOG=1): Asterix sits in the cable car, nobody
+// pulls; the pause menu 20 s, then play -- he stays in the car (order 9)
+// throughout (no timeout lets go of him).
 const Step kCarPause[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3904,6 +3961,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("carpause", kCarPause),
+	SCENARIO("unlockpillar", kUnlockPillar),
+	SCENARIO("unlockcar", kUnlockCar),
+	SCENARIO("unlockseq", kUnlockSeq),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),

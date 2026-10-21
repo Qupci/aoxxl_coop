@@ -105,7 +105,6 @@ struct CoopState {
 	bool    oneScreen = false;           // Twister Fusion: co-op on, split screen off
 	bool    held[HERO_COUNT] = {};       // a player's hero the game has borrowed (scripted AI order)
 	uint8_t lastOrder[HERO_COUNT] = {};
-	DWORD   heldSince[HERO_COUNT] = {};
 	int     cutsceneHold = 0;    // frames left before a cutscene counts as over
 	int     lastLevel = -2;
 	DWORD   lastFpsTick = 0;
@@ -211,12 +210,6 @@ bool IsScriptedOrder(int o) {
 	       o != AI_TAKE_HIT;
 }
 
-// Scripted orders that walk the hero somewhere (as against waiting for the partner).
-static bool IsWalkOrder(int o) {
-	return o == AI_GOTO_POS || o == AI_JUMP_TO_POS || o == AI_GOTO_BALLISTA || o == AI_CLEAR_PATH ||
-	       o == AI_GOTO_HINT_MAN || o == AI_GOTO_SHOP || o == AI_GOTO_POS_NO_PF;
-}
-
 // Locked sequences. A player's hero locked by the level -- frozen as the
 // companion ("disable sidekick movement", trio 0x4802: a blue circle, the
 // rotary beam), or held for a ride (the rope-pulled cable car) -- waits for the
@@ -268,8 +261,11 @@ bool g_seqLive = false;
 // Obelix walks off to the lifter, zone 0830 sends 4800 / 4803). Left there it
 // never offers itself again (WatchStrandedCar). Any level event that frees the
 // rider mid-way does it; the cross detector switching the leader is the one met.
-// Its rider, freed where the car stopped, stands in the car's zone: it is kept
-// off cable cars until it has walked away (keptOff*).
+// Its rider, freed where the car stopped (or put back by an undo), stands in the
+// car's zone: it is kept off cable cars until the car is home and free to board
+// (+0x7C bit 0x80) for 1 s, or it has walked 4 units from where it settled -- its
+// place over the first 0.5 s (in the frame of the put-back the car's offer pulled
+// the hero back to it, which read as having walked away).
 struct CarWatch {
 	char*   car = nullptr;
 	int     rider = -1;
@@ -277,8 +273,17 @@ struct CarWatch {
 	DWORD   stillSince = 0;
 	DWORD   drivenAt = 0;   // sent driving back then
 	int     keptOff = -1;
+	char*   keptOffCar = nullptr;
+	DWORD   keptOffSince = 0, keptOffFreeSince = 0;
 	Vector3 keptOffAt;
 } g_carWatch;
+
+static void KeepOffCars(int hero, char* car) {
+	g_carWatch.keptOff = hero;
+	g_carWatch.keptOffCar = car;
+	g_carWatch.keptOffSince = GetTickCount();
+	g_carWatch.keptOffFreeSince = 0;
+}
 
 static char* DetectionService() {
 	CKYellowPages* yp = YellowPages();
@@ -408,19 +413,11 @@ static void RestoreLockPicture(const LockPicture& p) {
 	    flags);
 }
 
-// How long a borrowed hero may be held while playing before the safety valve
-// gives it back (2 min; env XXL_HELDMAX=ms, for autotests).
-static DWORD HeldMaxMs() {
-	static DWORD ms = getenv("XXL_HELDMAX") ? (DWORD)atoi(getenv("XXL_HELDMAX")) : 120000;
-	return ms;
-}
-
 void Hold(Trio t, int idx, const char* why) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
 	g.held[idx] = true;
 	g.aiCycle[idx] = 0;   // the game's now; no reset pass afterwards
-	g.heldSince[idx] = GetTickCount();
 	uint8_t f = *F18(h);
 	if (HeroModePlayable(f)) *F18(h) = HeroAiVariant(f);
 	Log("coop: %s handed to the game (%s, AI order %d)", HeroName(idx), why, (int)h.Order());
@@ -699,7 +696,6 @@ void TryJoin(Trio t) {
 			int order = h ? (int)h.Order() : 0;
 			if (h && idx != t.Leader() && !h.IsPlayerControlled() && IsScriptedOrder(order)) {
 				g.held[idx] = true;
-				g.heldSince[idx] = GetTickCount();
 				g.lastOrder[idx] = (uint8_t)order;
 				Log("coop: joining mid-sequence: %s is the game's (AI order %d) until the sequence ends",
 					HeroName(idx), order);
@@ -1682,9 +1678,10 @@ static void UndoSequence() {
 static void UndoLock(Trio t, int up, bool lead) {
 	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) the
 	// locked hero boarded lets go and goes back to its start.
+	char* carBack = nullptr;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n; i++) {
 		char* car = (char*)GetLvlObject(2, 159, i);
-		if (car && g_lock.hero == up && car == g_lock.car) ResetCableCar(car, up);
+		if (car && g_lock.hero == up && car == g_lock.car) { ResetCableCar(car, up); carBack = car; }
 	}
 	int before = g_lock.hero == up ? g_lock.pic.leader : -1;
 	if (g_lock.hero == up) RestoreLockPicture(g_lock.pic);
@@ -1697,6 +1694,32 @@ static void UndoLock(Trio t, int up, bool lead) {
 	g.held[up] = false;
 	StartAiCycle(up, "its sequence undone");
 	IndivPutOnSafeGround(up);
+	// The car, set back, offers itself again at once to a hero still in its zone:
+	// kept off cable cars for a while (WatchStrandedCar).
+	if (carBack) KeepOffCars(up, carBack);
+}
+
+// R3 + B on a hero the level holds: its sequence undone as for a fallen partner
+// (the light pillar back, a cable car back at its start, the spinning platform
+// down, the lead back), the hero freed and on its last solid ground -- off the
+// circle, or it would be locked again at once. A step towards never being locked.
+static void UnlockByPlayer(Trio t, int me, const char* player) {
+	Hero h = t.GetHero(me);
+	if (!h) return;
+	if (LockedByLevel(me, h) && g_lock.hero == me) {
+		Log("coop: %s unlocked %s (R3 + B) -- its sequence undone", player, HeroName(me));
+		UndoLock(t, me, false);
+	} else if (g_seqHero == me && SequenceUnderWay()) {
+		Log("coop: %s unlocked %s (R3 + B) -- its spinning platform's sequence set back", player, HeroName(me));
+		int before = g_seqPic.leader;
+		UndoSequence();
+		IndivPutOnSafeGround(me);
+		GiveLeadLater(before);
+	} else if (g.held[me]) {
+		g.held[me] = false;
+		Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me), (int)h.Order());
+		EnforcePlayer(t, me);
+	}
 }
 
 // The spinning platform's sequence under way (Obelix crossed 03C8: Asterix
@@ -1732,7 +1755,18 @@ static void WatchStrandedCar() {
 	Trio t = GetTrio();
 	if (g_carWatch.keptOff >= 0) {
 		Hero k = t ? t.GetHero(g_carWatch.keptOff) : Hero();
-		if (!k || (k.Pos() - g_carWatch.keptOffAt).len2() > 4.0f * 4.0f) g_carWatch.keptOff = -1;
+		// (in its cable car situation the car is pulling it in: not walking)
+		char* kc = g_carWatch.keptOffCar;
+		bool free = !kc || (*(uint32_t*)(kc + 0x7C) & 0x80);
+		if (!free) g_carWatch.keptOffFreeSince = 0;
+		else if (!g_carWatch.keptOffFreeSince) g_carWatch.keptOffFreeSince = GetTickCount();
+		bool settled = free && GetTickCount() - g_carWatch.keptOffFreeSince >= 1000 && GetTickCount() - g_carWatch.keptOffSince >= 1000;
+		if (k && GetTickCount() - g_carWatch.keptOffSince < 500) g_carWatch.keptOffAt = k.Pos();
+		else if (!k || (Situation(k) != 0x02 && (settled || (k.Pos() - g_carWatch.keptOffAt).len2() > 4.0f * 4.0f))) {
+			if (k) Log("coop: %s may board cable cars again (%s)", HeroName(g_carWatch.keptOff),
+			           settled ? "the car home and free" : "walked away");
+			g_carWatch.keptOff = -1;
+		}
 	}
 	char* car = g_carWatch.car;
 	if (!car) return;
@@ -1773,8 +1807,12 @@ static void WatchStrandedCar() {
 	*(uint32_t*)(car + 0x7C) = (f | 0x2 | 0x8) & ~0x20u;
 	g_carWatch.drivenAt = GetTickCount();
 	g_carWatch.stillSince = 0;
+	// The rider, freed in the car, still stands on it (its CDynamicGround): onto
+	// its last solid ground, or the car carries it home and takes it again there.
 	Hero r = t ? t.GetHero(g_carWatch.rider) : Hero();
-	if (r) { g_carWatch.keptOff = g_carWatch.rider; g_carWatch.keptOffAt = r.Pos(); }
+	char* ground = r ? *(char**)(r.raw() + 0x280) : nullptr;
+	if (ground && !IsBadReadPtr(ground, 4) && *(uintptr_t*)ground == 0x6241BC) IndivPutOnSafeGround(g_carWatch.rider);
+	KeepOffCars(g_carWatch.rider, car);
 }
 
 // The hero kept off cable cars now: the lifter waits for it, or its car was just sent back. Else -1.
@@ -2157,7 +2195,9 @@ void CoopFrame() {
 	// The mod's combos: hold the right stick button (player 2 also Back) and
 	//   A  your hero joins your partner's (lost, stuck, fell behind)
 	//   B  take your hero back from the game ("wait here" orders that a sequence
-	//      played out of order never ends)
+	//      played out of order never ends); locked by the level (a light pillar,
+	//      a cable car, the spinning platform), its sequence undone as for a fallen
+	//      partner and the hero put on its last solid ground
 	//   Y  [cheats] the magic potion: filled, or emptied when it runs
 	//   X  [cheats] your hero becomes the leader
 	//   D-pad up / down  [cheats] Asterix gets the nearest torch, lit / throws it away
@@ -2180,11 +2220,9 @@ void CoopFrame() {
 			const char* player = who == 0 ? "player 1" : "player 2";
 			if ((pressed & PAD_A) && !g.suspended && !g.held[me] && !g.held[mate])
 				WarpToPartner(me, hm, mate, hp);
-			if ((pressed & PAD_B) && g.held[me]) {
-				g.held[me] = false;
-				Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me),
-				    (int)hm.Order());
-				EnforcePlayer(t, me);
+			if ((pressed & PAD_B) &&
+			    (g.held[me] || (!g.suspended && (LockedByLevel(me, hm) || (g_seqHero == me && SequenceUnderWay()))))) {
+				UnlockByPlayer(t, me, player);
 			} else if ((pressed & PAD_B) && !g.suspended) {
 				StartAiCycle(me, "R3 + B");
 			}
@@ -2392,36 +2430,20 @@ void CoopFrame() {
 	// Heroes the game has borrowed: a scripted AI order given to a player's hero
 	// while it is not the leader (Asterix riding the cable car Obelix pulls,
 	// waiting on the spinning platform...) is the AI's to carry out. Back to its
-	// player when the order is over or the hero leads again.
-	// (HeldMaxMs: 2 min; env XXL_HELDMAX=ms for autotests.)
-	// Time paused, in a menu or a cutscene (suspended) does not count towards the
-	// safety valve below: 2 min in the pause menu let go of Asterix in the cable
-	// car, which then never offered itself again.
-	static DWORD s_prevFrame = 0;
-	DWORD frameNow = GetTickCount();
-	DWORD frameDt = s_prevFrame ? frameNow - s_prevFrame : 0;
-	s_prevFrame = frameNow;
+	// player when the order is over or the hero leads again -- no timeout (an old
+	// 2 min one let go of Asterix in the cable car during a long pause, and the car
+	// was never usable again); R3 + B undoes a lock at any time.
 	const int players[2] = { g.p1Hero, g.p2Hero };
 	for (int idx : players) {
 		Hero h = t.GetHero(idx);
 		if (!h) continue;
 		int order = (int)h.Order();
 		bool leads = t.Leader() == idx;
-		if (g.held[idx] && g.suspended) g.heldSince[idx] += frameDt;
 		if (!g.held[idx] && !leads && order != g.lastOrder[idx] && IsScriptedOrder(order)) {
 			Hold(t, idx, "new order");
 		} else if (g.held[idx] && (leads || order == AI_FOLLOW_LEADER)) {
 			g.held[idx] = false;
 			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : "order done");
-		} else if (g.held[idx] && !g.suspended && order == g.lastOrder[idx] && IsWalkOrder(order) &&
-		           frameNow - g.heldSince[idx] > HeldMaxMs()) {
-			// Safety valve: a walk to a place it never reaches (LV5-5: a marker behind a
-			// wall not yet broken) must not take a player's hero for good. Not for the
-			// orders that wait for the partner (wait, the beam, a cable car): the
-			// partner can always finish those, and released, the cable car was left with
-			// Asterix in it, never to be boarded again.
-			g.held[idx] = false;
-			Log("coop: %s back to its player (walk order %d still running after 2 min of play)", HeroName(idx), order);
 		}
 		g.lastOrder[idx] = (uint8_t)order;
 	}

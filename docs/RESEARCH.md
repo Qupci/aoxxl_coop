@@ -1993,3 +1993,20 @@ both halves).
   car, 12 external control: the partner can finish them; falls / lifters / stranded cars have their undos), and
   time suspended (pause menu, cutscenes) is not counted. Env XXL_HELDMAX=ms (test aid, default 120000). Autotest
   carpause (XXL_HELDMAX=15000: 20 s paused + play past the limit, Asterix stays in the car).
+- Round 101 (2026-10-21, user: drop the 2 min release altogether; R3 + B should unlock like the lifter / revival
+  undo -- a first step to a "freedom" feature where players are never locked and nothing softlocks). (1) The held-
+  hero timeout is gone (no XXL_HELDMAX, no heldSince; carpause: 20 s paused + play, Asterix stays in the car). (2)
+  R3 + B (UnlockByPlayer) on a hero locked by the level (g_lock: the light pillar's circle, a rope cable car) ->
+  UndoLock (picture back, car reset, 4803, the lead back to who had it before, the hero on its last solid ground --
+  off the circle, or it would be locked again at once); on the hero of a spinning-platform sequence under way
+  (03C8 crossed) -> UndoSequence + put back + lead back; any other borrowed hero -> the old plain take-back. (3)
+  Cable cars keep re-taking a hero put back in their zone: an undo / reset car offers itself (0x0C0E) in the same
+  frame and the hero's next tick enters situation 2 and snaps into the seat (the seat is the car's CDynamicGround,
+  never a safe spot -- user's XXL-Editor screenshot Snipaste_2026-10-21_05-52-29; the put-back spots are on the
+  snow 5.5 units off, still within the car's offer). KeepOffCars(hero, car): the hero's situation 2 left after its
+  tick and its boarding events held back until the car is free (+0x7C bit 0x80) for 1 s, or the hero has walked 4
+  units from where it settled (its place over the first 0.5 s; time in situation 2 not counted). A rider freed
+  while still standing on the stranded car (LV3-3 cross detector 0830) is put on its last solid ground when the car
+  is sent home, or the car carried it back and took it again. Env XXL_P2HERO=asterix (autotests: player 2's virtual
+  pad drives Asterix). Autotests unlockpillar / unlockcar / unlockseq (XXL_P2HERO=asterix), cross33 (Asterix now
+  walks to the car first), carpause; regressions liftercar, lifterlock2, swingundo, cabled33 pass.

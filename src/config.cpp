@@ -69,6 +69,7 @@ void CoopConfig::Load(const char* iniPath) {
 	{
 		char hb[32] = {};
 		GetPrivateProfileStringA("coop", "p2_hero", "obelix", hb, sizeof(hb), full);
+		if (const char* env = getenv("XXL_P2HERO")) lstrcpynA(hb, env, sizeof(hb));   // autotests: player 2's hero
 		p2Hero = (hb[0] == 'a' || hb[0] == 'A') ? 0 : (hb[0] == 'o' && hb[1] == 'b') || (hb[0] == 'O' && hb[1] == 'b') ? 1 : -1;
 	}
 
