@@ -240,6 +240,7 @@ struct LockState {
 	int         hero = -1;           // the locked hero
 	char*       car = nullptr;       // the rope-pulled cable car it rides (CKHkTowedTelepher 2,159)
 	DWORD       since = 0;
+	bool        wait = false;        // a companion told to wait (0x4802: a circle), not a scripted walk or ride
 	Vector3     at;                  // where the locked hero stood (the circle)
 	LockPicture pic;
 } g_lock;
@@ -252,6 +253,7 @@ LockPicture g_prePic;
 // WatchUnfinishedSequence sets it back.
 LockPicture g_seqPic;
 int g_seqHero = -1;   // the hero that lock held
+bool g_seqWait = false;   // that lock was a "wait here" (0x4802)
 Vector3 g_seqAt;      // where it stood
 DWORD g_seqAwaySince = 0;
 bool g_seqLive = false;
@@ -329,6 +331,7 @@ static void NoteLock(int hero, const char* why) {
 	else TakePicture(g_lock.pic);
 	g_prePic.at = 0;
 	g_lock.hero = hero;
+	g_lock.wait = false;
 	g_lock.since = GetTickCount();
 	g_seqLive = false;
 	// The car boarded (the rider's own position stays at the boarding spot
@@ -360,6 +363,7 @@ static void EndLock(bool goesOn = false) {
 	if (goesOn && g_lock.hero >= 0) {
 		g_seqPic = g_lock.pic;
 		g_seqHero = g_lock.hero;
+		g_seqWait = g_lock.wait;
 		g_seqAt = g_lock.at;
 		g_seqAwaySince = 0;
 		g_seqLive = true;
@@ -371,7 +375,10 @@ static void EndLock(bool goesOn = false) {
 // (bit 0) or switched off (bit 1: the zone that frees Asterix sends 0x99C and
 // 0x99A; the turn's end switches it on again) is not as before.
 static bool SequenceUnderWay() {
-	if (!g_seqLive) return false;
+	// (only after a "wait here": LV2-1's platform top zone 0058 walks Obelix to a
+	// marker -- that lock's picture, taken as the sequence's, was "set back" later:
+	// 7 detectors from before 0058 and the lead to Obelix)
+	if (!g_seqLive || !g_seqWait) return false;
 	for (size_t i = 0; i < g_seqPic.nFlags; i++) {
 		char* o = g_seqPic.flags[i].hook;
 		if (*(uintptr_t*)o == 0x628E0C && ((g_seqPic.flags[i].f ^ *(uint32_t*)(o + 8)) & 3)) return true;
@@ -1838,7 +1845,11 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
 		if ((event & 0xFFFF) == 0x4803) EndLock(true);
-		else if (tl) NoteLock(tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX, "the companion told to wait");
+		else if (tl) {
+			int waiter = tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+			NoteLock(waiter, "the companion told to wait");
+			if (g_lock.hero == waiter) g_lock.wait = true;
+		}
 	}
 	SpyWalk& w = g_spyWalk;
 	event &= 0xFFFF;

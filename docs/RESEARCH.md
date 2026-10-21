@@ -2029,3 +2029,13 @@ both halves).
   only taken back (g.held cleared, the lead untouched) -- also not undone by a lifter or a fall. turnstile21 now
   ends with S_UNLOCKHERO on Obelix after 0058 (taken back, lead stays Asterix); liftercar, unlockcar21,
   unlockpillar, lockagain still undo.
+- Round 104 (2026-10-21, user: Obelix leading on entering LV2's sector 2, where Asterix leads in single player;
+  xxl_coop.sector2_obelix_leads*.log). The mod's own round-97 rule: the platform top zone 0058 walks Obelix to a
+  marker (4828, order 1) and that hold was noted as a lock; when it ended (the level's 4801 + 4803 + 4878 as
+  Obelix reached the marker), EndLock kept its picture as a "sequence under way" (the platform's flags differed
+  from it), and WatchUnfinishedSequence, with Asterix 32 units from where Obelix's walk began, "set it back" -- 7
+  detectors to their state before 0058 (level progress undone) and the lead to the picture's leader Obelix (mod's
+  4801 0.3 s later; 73.8 s and 124.2 s in the two logs). Now the lock remembers whether it was a "wait here"
+  (0x4802: g_lock.wait -> g_seqWait) and SequenceUnderWay is true only for those -- the platform rules (3 s away,
+  R3 + B, a fall) never act on a walk's or a ride's picture. Autotest turnstile21c (platform done, Obelix's walk,
+  Asterix walks off: nothing set back, Asterix leads); lifterlock2, unlockseq, corkdown still set back / undo.

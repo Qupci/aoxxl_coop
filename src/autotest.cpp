@@ -3391,6 +3391,45 @@ const Step kTurnstile21[] = {
 	END(24000),
 };
 
+// turnstile21c (level 2, XXL_LIFTLOG=1): turnstile21 to the platform's top (0058: Obelix walks to
+// his marker, the level gives the lead back and forth), then Asterix walks far off --
+// nothing may be "set back" (the walk's lock is no platform sequence) and Asterix keeps the lead.
+const Step kTurnstile21c[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(5300, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 1500),   // through zone 03C8 (as lifterlock2)
+	GLIDEAT(6900, HERO_OBELIX, -775.878f, 515.614f, -990.0f, 2000),
+	GLIDEAT(9000, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),   // the user's spot, walking towards the turnstile
+	SHOT(9500, "turnstile21c_1"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X"), VPAD(10150, 1, 0, 0, 0, "p2 release"),
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X"), VPAD(10650, 1, 0, 0, 0, "p2 release"),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"), VPAD(11150, 1, 0, 0, 0, "p2 release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "p2 X"), VPAD(11650, 1, 0, 0, 0, "p2 release"),
+	VPAD(12000, 1, PAD_X, 0, 0, "p2 X"), VPAD(12150, 1, 0, 0, 0, "p2 release"),
+	VPAD(12500, 1, PAD_X, 0, 0, "p2 X"), VPAD(12650, 1, 0, 0, 0, "p2 release"),
+	VPAD(13000, 1, PAD_X, 0, 0, "p2 X"), VPAD(13150, 1, 0, 0, 0, "p2 release"),
+	VPAD(13500, 1, PAD_X, 0, 0, "p2 X"), VPAD(13650, 1, 0, 0, 0, "p2 release"),
+	SHOT(14000, "turnstile21c_2"),
+	VPAD(14500, 1, PAD_X, 0, 0, "p2 X"), VPAD(14650, 1, 0, 0, 0, "p2 release"),
+	VPAD(15000, 1, PAD_X, 0, 0, "p2 X"), VPAD(15150, 1, 0, 0, 0, "p2 release"),
+	VPAD(15500, 1, PAD_X, 0, 0, "p2 X"), VPAD(15650, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16150, 1, 0, 0, 0, "p2 release"),
+	VPAD(16500, 1, PAD_X, 0, 0, "p2 X"), VPAD(16650, 1, 0, 0, 0, "p2 release"),
+	VPAD(17000, 1, PAD_X, 0, 0, "p2 X"), VPAD(17150, 1, 0, 0, 0, "p2 release"),
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17650, 1, 0, 0, 0, "p2 release"),
+	VPAD(18000, 1, PAD_X, 0, 0, "p2 X"), VPAD(18150, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "turnstile21c_3"),
+	SHOT(30000, "turnstile21c_1"),
+	PLACEAT(31000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(31300, HERO_ASTERIX, -745.0f, 514.5f, -981.0f, 2500),   // far from the platform (the user: on to sector 2)
+	SHOT(38000, "turnstile21c_2"),
+	END(40000),
+};
+
 // turnstile21b (level 2, XXL_LIFTLOG=1): the user's cycle -- Asterix locked, Obelix
 // walks off east through 03C8 (set back 3 s later, Asterix locked again), then
 // comes back to the turnstile and spins it: the ride's zone 0528 and its camera.
@@ -4002,6 +4041,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lifterlock", kLifterLock),
 	SCENARIO("lifterlock2", kLifterLock2),
 	SCENARIO("turnstile21", kTurnstile21),
+	SCENARIO("turnstile21c", kTurnstile21c),
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("carpause", kCarPause),
