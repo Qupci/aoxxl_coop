@@ -2154,3 +2154,8 @@ both halves).
   Asterix through 0308 twice, let through), spyd2 (talk held, Asterix stays by the agent), spyrev (talk after
   the revive), slidecross3 / cabled2 / lockcircle / corkdown / beamundo / reach23g / reach26w as before
   (slidecross3 checked against the pre-change build: identical).
+- Round 114b: IndivNoteLevelLead had cleared fellLeading, which BringToFallenLeader also reads -- a fallen leader
+  out of reach would no longer have had the other hero brought to it once a lead-only zone fired. Now its own flag
+  (levelLead: no lead back after the revive); fellLeading untouched. Autotest lead510o (-Level 5, XXL_DOWNAT=1:2000
+  XXL_UPAT=12000): Obelix leads and falls, 0308 let through, the reach check still says "leading when it fell",
+  revived, Asterix keeps the lead. reach23g / reach26w (brought to the leader, sent back, lead back) as before.

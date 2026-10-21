@@ -2915,6 +2915,20 @@ const Step kLead510[] = {
 	SHOT(11500, "lead510_2"),
 	END(12500),
 };
+// lead510o (-Level 5, XXL_DOWNAT=1:2000 XXL_UPAT=12000): lead510 with Obelix
+// leading when he falls: he still counts as the fallen leader (brought-to-leader
+// checks), and after the revive Asterix keeps the lead the rectangle gave him.
+const Step kLead510O[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(1500, HERO_OBELIX, 506.68f, -451.5f, -224.09f),
+	PLACEAT(1500, HERO_ASTERIX, 530.0f, -450.5f, -196.6f),
+	GLIDEAT(3500, HERO_ASTERIX, 519.5f, -453.5f, -196.6f, 2000),
+	SHOT(6000, "lead510o_1"),
+	SHOT(14000, "lead510o_2"),
+	END(15000),
+};
 // lift58u (-Level 5): the user's repro -- both at the sector's entrance
 // (-376.8 16.5 20.0), potion; player 2's Obelix (not leading) walks to
 // z = -30.7 (the lifters' Romans then hang in the air); later Asterix walks to
@@ -4493,6 +4507,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("lead510", kLead510),
+	SCENARIO("lead510o", kLead510O),
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
 	SCENARIO("fight56", kFight56),

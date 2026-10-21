@@ -66,6 +66,7 @@ struct State {
 	int      lastSector = -1;
 	int      lastLead = -1;            // the trio's leader as the frame began
 	bool     fellLeading[2] = {};      // it was the leader when it fell
+	bool     levelLead[2] = {};        // down, the level gave the other hero the lead: none back after the revive
 	int      leadBack = -1;            // revived, it was leading: the lead goes back to it
 	// The hero brought to a fallen leader (BringToFallenLeader): where from, where to.
 	bool     brought[2] = {};
@@ -364,8 +365,9 @@ bool IndivBlockTalk(const char* what) {
 void IndivNoteLevelLead(int hero) {
 	int down = IndivFallenHero();
 	if (down < 0 || (hero != HERO_ASTERIX && hero != HERO_OBELIX)) return;
-	if (g.fellLeading[down] == (hero == down)) return;
-	g.fellLeading[down] = hero == down;
+	// (fellLeading stays: a fallen leader out of reach still gets the other brought to it)
+	if (g.levelLead[down] == (hero != down)) return;
+	g.levelLead[down] = hero != down;
 	Log("indiv: the level gave the lead to %s with %s down -- %s leads after the revive", HeroName(hero),
 	    HeroName(down), HeroName(hero));
 }
@@ -615,8 +617,9 @@ void Revive(int idx, Hero h, const char* how) {
 	g.revive[idx] = 0;
 	// It led when it fell: the lead went to the other hero meanwhile, and comes
 	// back to it (next frame -- a launcher's revive is inside a hero's tick).
-	if (g.fellLeading[idx]) g.leadBack = idx;
+	if (g.fellLeading[idx] && !g.levelLead[idx]) g.leadBack = idx;
 	g.fellLeading[idx] = false;
+	g.levelLead[idx] = false;
 	// The other hero was brought to it: back where it came from (the leader's
 	// place can be one only Asterix gets out of).
 	if (g.brought[Other(idx)]) g.sendBack = Other(idx);
@@ -636,6 +639,7 @@ void Respawned() {
 		g.brought[i] = false;
 		g.fallen[i] = false;
 		g.fellLeading[i] = false;
+		g.levelLead[i] = false;
 		g.revive[i] = 0;
 		Hero h = t ? t.GetHero(i) : Hero();
 		if (h) Raise(h);
@@ -897,6 +901,7 @@ bool IndivHeroDown(int hero, const char* how) {
 	g.fallen[hero] = true;
 	g.revive[hero] = 0;
 	g.fellLeading[hero] = g.lastLead == hero;
+	g.levelLead[hero] = false;
 	g.fellAt[hero] = GetTickCount();
 	g.cutOff[hero] = 0;
 	g.reachTold[hero] = -2;
@@ -971,6 +976,7 @@ void IndivFrame() {
 		g.gameOver = false;
 		memset(g.fallen, 0, sizeof(g.fallen));
 		memset(g.fellLeading, 0, sizeof(g.fellLeading));
+		memset(g.levelLead, 0, sizeof(g.levelLead));
 		memset(g.brought, 0, sizeof(g.brought));
 		g.leadBack = g.sendBack = -1;
 	}
