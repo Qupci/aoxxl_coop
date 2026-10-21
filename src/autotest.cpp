@@ -3343,8 +3343,36 @@ const Step kLifterLock[] = {
 	GLIDEAT(12500, HERO_OBELIX, -745.719f, 514.5f, -979.123f, 1500),
 	SHOT(15000, "lifterlock_2"),
 	PLACEAT(19000, HERO_OBELIX, -746.697f, 517.0f, -992.08f),
-	SHOT(21000, "lifterlock_3"), SHOT(30000, "lifterlock_4"), SHOT(40000, "lifterlock_5"), SHOT(55000, "lifterlock_6"),
-	END(56000),
+	SHOT(21000, "lifterlock_3"), SHOT(30000, "lifterlock_4"),
+	// the circle answers again (the lead back to Asterix): locked again, undone again
+	PLACEAT(32000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(32300, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(34000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(36000, "lifterlock_5"), SHOT(42000, "lifterlock_6"),
+	END(44000),
+};
+
+// lifterlock2 (level 2, XXL_LIFTLOG=1): lifterlock, but Obelix walks off through
+// the turnstile's zone (03C8: Asterix freed, the platform switched off until its
+// turn ends) and then onto the lifter -- the user's first session; then the
+// circle must answer again.
+const Step kLifterLock2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -746.697f, 506.5f, -992.08f), PLACEAT(1500, HERO_OBELIX, -746.697f, 506.5f, -990.5f),
+	PLACEAT(9000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(9300, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(11000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(12500, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(13000, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 2000),
+	SHOT(15500, "lifterlock2_1"),
+	PLACEAT(19000, HERO_OBELIX, -746.697f, 517.0f, -992.08f),
+	SHOT(21000, "lifterlock2_2"), SHOT(27000, "lifterlock2_3"),
+	PLACEAT(29000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(29300, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(31000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(33000, "lifterlock2_4"), SHOT(38000, "lifterlock2_5"),
+	END(40000),
 };
 
 // beamundo (-Level 4 sector 2..., XXL_DOWNAT=1:7000): the hearth by the rotary
@@ -3777,6 +3805,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("cross33", kCross33),
 	SCENARIO("corkdown", kCorkDown),
 	SCENARIO("lifterlock", kLifterLock),
+	SCENARIO("lifterlock2", kLifterLock2),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),

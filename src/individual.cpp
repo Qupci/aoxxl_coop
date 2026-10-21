@@ -895,7 +895,14 @@ bool IndivHeroDown(int hero, const char* how) {
 	}
 	Log("indiv: %s is down (%s)%s -- %s plays on and can revive it", HeroName(hero), how,
 	    g.fellLeading[hero] ? " leading" : "", HeroName(other));
-	CoopUndoLockFor(hero);
+	// It led only because the undone sequence's event gave it the lead (the
+	// spinning platform's circle: 4801): no lead back after the revive -- the
+	// circle answers only the leader, and Asterix's stayed dead.
+	int before = CoopUndoLockFor(hero);
+	if (g.fellLeading[hero] && before >= 0 && before != hero) {
+		g.fellLeading[hero] = false;
+		Log("indiv: %s led only for the undone sequence -- no lead back after the revive", HeroName(hero));
+	}
 	ShowDownHint(hero);
 	return true;
 }

@@ -235,6 +235,7 @@ struct LockPicture {
 	struct Flags { char* hook; uint32_t f; } flags[256];
 	size_t  nFlags = 0;
 	DWORD   at = 0;
+	int     leader = -1;   // the trio's leader then (the circle's 4801 hands the lead to the other)
 };
 struct LockState {
 	int         hero = -1;           // the locked hero
@@ -248,6 +249,7 @@ LockPicture g_prePic;
 // (0x99A) and its pillar dark until Asterix reaches the box at its top. Kept
 // until then.
 LockPicture g_seqPic;
+int g_seqHero = -1;   // the hero that lock held
 bool g_seqLive = false;
 // A rope-pulled cable car boarded under a lock, and where it stood then (its
 // start): the car rolls back there by itself once let go -- unless the pull
@@ -276,6 +278,8 @@ static void TakePicture(LockPicture& p) {
 	p.n = p.nFlags = 0;
 	p.event = 0xFFFF;
 	p.at = GetTickCount();
+	Trio t = GetTrio();
+	p.leader = t ? t.Leader() : -1;
 	if (char* det = DetectionService()) {
 		const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
 		for (int b : bases) {
@@ -331,7 +335,7 @@ static void NoteLock(int hero, const char* why) {
 }
 
 static void EndLock(bool goesOn = false) {
-	if (goesOn && g_lock.hero >= 0) { g_seqPic = g_lock.pic; g_seqLive = true; }
+	if (goesOn && g_lock.hero >= 0) { g_seqPic = g_lock.pic; g_seqHero = g_lock.hero; g_seqLive = true; }
 	g_lock.hero = -1;
 }
 
@@ -1555,6 +1559,7 @@ static bool LockedByLevel(int idx, Hero h) {
 }
 
 static void UndoLock(Trio t, int up, bool lead);
+static void UndoSequence();
 
 // A rope-pulled cable car (CKHkTowedTelepher 2,159) lets go of `hero` (0x512D)
 // and goes back to its start (vf16).
@@ -1592,28 +1597,58 @@ static char* NearestTowedCar(Hero h) {
 	return best;
 }
 
-void CoopUndoLockFor(int fallen) {
+int CoopUndoLockFor(int fallen) {
 	int up = fallen == HERO_ASTERIX ? HERO_OBELIX : fallen == HERO_OBELIX ? HERO_ASTERIX : -1;
-	if (up < 0 || !g.p2Joined) return;
+	if (up < 0 || !g.p2Joined) return -1;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
-	if (!h) return;
+	if (!h) return -1;
 	if (!LockedByLevel(up, h)) {
-		if (!SequenceUnderWay()) return;
+		if (!SequenceUnderWay()) return -1;
 		// Freed already, but the platform's turn not finished: back to before it set off.
 		Log("coop: %s went down before the spinning platform's turn ended -- the sequence undone", HeroName(fallen));
-		for (size_t i = 0; i < g_seqPic.nFlags; i++)
-			if (*(uintptr_t*)g_seqPic.flags[i].hook == 0x628E0C) *(float*)(g_seqPic.flags[i].hook + 0x28) = 0.0f;   // down again
-		RestoreLockPicture(g_seqPic);
-		g_seqLive = false;
-		return;
+		int before = g_seqPic.leader;
+		UndoSequence();
+		return before;
 	}
 	Log("coop: %s went down while %s waited on it -- the sequence undone", HeroName(fallen), HeroName(up));
+	int before = g_lock.hero == up ? g_lock.pic.leader : -1;
 	UndoLock(t, up, true);
+	return before;
+}
+
+// The trio's lead to `who` (0x4800 Asterix, 0x4801 Obelix).
+static void GiveLead(Trio t, int who) {
+	if ((who != HERO_ASTERIX && who != HERO_OBELIX) || t.Leader() == who) return;
+	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, who == HERO_ASTERIX ? 0x4800 : 0x4801, nullptr);
+}
+
+// The same a little later (GiveLeadLater -> WatchPendingLead): the hero just put
+// back is still where it was for the spinning platform this frame -- handed the
+// lead at once on its circle, it set it off again.
+struct PendingLead { int who = -1; DWORD at = 0; } g_pendingLead;
+static void GiveLeadLater(int who) { g_pendingLead.who = who; g_pendingLead.at = GetTickCount(); }
+static void WatchPendingLead(Trio t) {
+	if (g_pendingLead.who < 0 || GetTickCount() - g_pendingLead.at < 300) return;
+	if (t && g.p2Joined) GiveLead(t, g_pendingLead.who);
+	g_pendingLead.who = -1;
+}
+
+// An ended lock's sequence still under way (SequenceUnderWay) back to before it
+// set off: the spinning platform down, its pillar and detectors as then.
+static void UndoSequence() {
+	for (size_t i = 0; i < g_seqPic.nFlags; i++)
+		if (*(uintptr_t*)g_seqPic.flags[i].hook == 0x628E0C) *(float*)(g_seqPic.flags[i].hook + 0x28) = 0.0f;   // down again
+	RestoreLockPicture(g_seqPic);
+	g_seqLive = false;
 }
 
 // The locked sequence of hero `up` back to before it started, the hero freed
-// (it takes the lead if `lead`) and put on its last solid ground.
+// (it takes the lead if `lead`; else the lead goes back to who had it before the
+// lock -- the spinning platform's circle answers only the leader: LV2-1, its
+// event's 4801 had given it to Obelix and Asterix's circle stayed dead) and put
+// on its last solid ground.
 static void UndoLock(Trio t, int up, bool lead) {
 	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) the
 	// locked hero boarded lets go and goes back to its start.
@@ -1621,12 +1656,14 @@ static void UndoLock(Trio t, int up, bool lead) {
 		char* car = (char*)GetLvlObject(2, 159, i);
 		if (car && g_lock.hero == up && car == g_lock.car) ResetCableCar(car, up);
 	}
+	int before = g_lock.hero == up ? g_lock.pic.leader : -1;
 	if (g_lock.hero == up) RestoreLockPicture(g_lock.pic);
 	EndLock();
-	// The hero freed: the companion moves again, it leads (`lead`), and a reset pass.
+	// The hero freed: the companion moves again, the lead, and a reset pass.
 	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
-	if (lead && t.Leader() != up)((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, up == HERO_ASTERIX ? 0x4800 : 0x4801, nullptr);
+	if (lead) GiveLead(t, up);
+	else GiveLeadLater(before);
 	g.held[up] = false;
 	StartAiCycle(up, "its sequence undone");
 	IndivPutOnSafeGround(up);
@@ -2215,6 +2252,7 @@ void CoopFrame() {
 	BringAlongForBossRun(t);
 	ServeMachineRequest(t);
 	WatchLifterHint(t);
+	WatchPendingLead(t);
 	WatchStrandedCar();
 	WatchSpyWalk(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
@@ -3278,9 +3316,22 @@ static void WatchLifterHint(Trio t) {
 		if (waiting != l) { waiting = l; since = GetTickCount(); }
 		int missing = on[0] ? HERO_OBELIX : HERO_ASTERIX;
 		g.lifterWaitsFor = missing;
-		if (GetTickCount() - since >= 2000 && LockedByLevel(missing, h[missing])) {
+		if (GetTickCount() - since >= 2000 && LockedByLevel(missing, h[missing]) && GetTickCount() - g_lock.since >= 2000) {
 			Log("coop: the lifter waits for %s, locked by the level -- its sequence undone", HeroName(missing));
 			UndoLock(t, missing, false);
+			since = GetTickCount();
+			return;
+		}
+		// Freed already but its sequence not over: LV2-1, Obelix on his way to the
+		// lifter crosses the turnstile's zone (03C8), which frees Asterix and switches
+		// the platform off until the turn's end -- pillar dark for good.
+		if (GetTickCount() - since >= 2000 && g_seqHero == missing && SequenceUnderWay()) {
+			Log("coop: the lifter waits for %s, whose spinning platform's turn never came -- the sequence undone",
+			    HeroName(missing));
+			int before = g_seqPic.leader;
+			UndoSequence();
+			IndivPutOnSafeGround(missing);
+			GiveLeadLater(before);
 			since = GetTickCount();
 			return;
 		}

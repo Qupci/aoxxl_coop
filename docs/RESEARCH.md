@@ -1936,3 +1936,19 @@ both halves).
   walked 4 units away (same hold as round 94's lifter: KeptOffCars). Autotests cross33 (short pull, Obelix past the
   detector: sent back, Asterix not taken again, then a ride), liftcab33w (the same ending on the lifter),
   cablefull33; XXL_LIFTLOG's car fields now on a line of their own ("cars at").
+- Round 96 (2026-10-21, user: xxl_coop.lv2-1_pillar_not_activatable.log, xxl_coop.lv2-1_car_ok_pillar_dark.log; and
+  watching corkdown / lockagain: the pillar didn't fade the second time). (1) The spinning platform's circle
+  (CKHkCorkscrew vf15) answers only the trio's leader, and its event 0050 hands the lead to Obelix (4801) before
+  locking Asterix (4802). Every undo kept Obelix leading, so the circle stayed dead for Asterix -- after the lifter
+  undo (lead kept on purpose) and after a fall (round 84's "led when it fell -> lead back after the revive" gave it
+  back to Obelix). Now the lock's picture keeps the trio's leader (LockPicture.leader, taken with it, before the
+  event's group runs); the lifter undo gives the lead back to it, 0.3 s later (GiveLeadLater: handed over in the
+  put-back's frame the platform still saw Asterix on the circle and set off again), and a fall that undoes a
+  sequence clears fellLeading when the fallen hero led only because of it (CoopUndoLockFor returns the leader
+  before). (2) Obelix walking from the circle to the lifter crosses the turnstile's zone 03C8 (corkscrew 0x99C /
+  0x99A, trio 4803): Asterix freed, the platform switched off until a turn that never comes -- the lifter undo only
+  looked for a locked hero. A lifter waiting for the hero of a sequence still under way (g_seqHero,
+  SequenceUnderWay) now undoes it like a fall does (UndoSequence: platform down, picture), puts the hero off the
+  circle and gives the lead back. (3) A re-lock while the lifter still waits is undone 2 s after the lock
+  (g_lock.since), not at once. Autotests lifterlock (now also walks back onto the circle), lifterlock2 (through
+  03C8), corkdown / lockagain (the circle answers again after the revive).
