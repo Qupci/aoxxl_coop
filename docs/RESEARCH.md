@@ -1924,3 +1924,15 @@ both halves).
   if the partner falls mid-spin). Autotests lifterlock, liftercar (LV2-1: Asterix in the cable car, Obelix on the
   lifter; then the car boards again), liftcab33 (-Level 3: releasing the rope already frees Asterix there), pass22
   with XXL_DOWNAT=1:3500; env XXL_LIFTLOG adds lifter / rope car fields to the 10 Hz log.
+- Round 95 (2026-10-21, user: LV3-3 cable car left halfway, xxl_coop.lv3-3_lifter_car.log): not the lifter -- the
+  cross detector that switches the leader (zone 0830, group 106: trio 4800 + 4803, detectors, CKHkLight 0x999/0x99B)
+  freed Asterix while the rope car (CKHkTowedTelepher) had stopped short of its start. Let go, the car rolls back by
+  itself (+0x30 speed goes negative; after a full ride too -- cablefull33: the rider gets off at the far end, the car
+  rolls home), but a short pull's momentum only takes it part way (299 -> 301.8, start 307.6). Freed there it stays,
+  +0x7C without bit 0x80 ("free"; 0x2431/0x2531), and never offers itself again. Now the car a lock boarded is
+  watched (g_carWatch: car, rider, its start = where it stood at the lock); standing still (|+0x30| < 0.05) away from
+  its start (> 1 unit), not free, rope not held (+0x7C bit 0x4000), nobody locked or held, for 1 s: sent back
+  (0x512D + vf16, ResetCableCar), and its rider -- freed in the car's zone -- is kept off cable cars until it has
+  walked 4 units away (same hold as round 94's lifter: KeptOffCars). Autotests cross33 (short pull, Obelix past the
+  detector: sent back, Asterix not taken again, then a ride), liftcab33w (the same ending on the lifter),
+  cablefull33; XXL_LIFTLOG's car fields now on a line of their own ("cars at").

@@ -2633,7 +2633,69 @@ const Step kLiftCab33[] = {
 	VPAD(19000, 1, PAD_X, 0, 0, "p2 X"),
 	GLIDEAT(20500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2500), SHOT(23000, "liftcab33_6"),
 	VPAD(24000, 1, 0, 0, 0, "p2 release"),
-	END(25000),
+	// the user's: after a short pull, Obelix onto the lifter -- the car stopped short of its start
+	PLACEAT(24300, HERO_OBELIX, 279.832f, 17.8f, -268.468f),
+	SHOT(26000, "liftcab33_7"), SHOT(30000, "liftcab33_8"),
+	END(34000),
+};
+
+// liftcab33w (-Level 3, XXL_LIFTLOG=1): the user's play -- Obelix pulls the car
+// partway (twice), lets go and walks off toward the lifter (the user's path,
+// xxl_coop.lv3-3_lifter_car.log): the level's zone 0830 frees Asterix.
+const Step kLiftCab33W[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(5500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2000), SHOT(7600, "liftcab33w_1"),
+	VPAD(8000, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(8200, HERO_OBELIX, 292.0f, 10.43f, -209.1f, 800),
+	VPAD(9200, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(9600, HERO_OBELIX, 286.0f, 10.43f, -209.1f, 1500),
+	VPAD(11300, 1, 0, 0, 0, "p2 release"), SHOT(11400, "liftcab33w_2"),
+	GLIDEAT(11500, HERO_OBELIX, 283.33f, 13.07f, -221.82f, 1500),
+	GLIDEAT(13200, HERO_OBELIX, 282.28f, 13.14f, -247.02f, 2500),
+	GLIDEAT(15900, HERO_OBELIX, 280.1f, 13.0f, -264.2f, 2000),
+	SHOT(18000, "liftcab33w_3"), SHOT(22000, "liftcab33w_4"),
+	END(24000),
+};
+
+// cross33 (-Level 3, XXL_LIFTLOG=1): liftcab33w without the lifter -- Obelix
+// stops past the cross detector that switches the leader (zone 0830); the car,
+// stopped short of its start, is sent back, Asterix not taken again where he
+// stands; then both come back and ride.
+const Step kCross33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(5500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2000),
+	VPAD(8000, 1, 0, 0, 0, "p2 release"),
+	GLIDEAT(8200, HERO_OBELIX, 286.0f, 10.43f, -209.1f, 2000),
+	GLIDEAT(10500, HERO_OBELIX, 283.33f, 13.07f, -221.82f, 1500),
+	GLIDEAT(12200, HERO_OBELIX, 282.28f, 13.14f, -250.0f, 2500),
+	SHOT(16000, "cross33_1"), SHOT(20000, "cross33_2"),
+	PLACEAT(22000, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	GLIDEAT(22000, HERO_ASTERIX, 307.582f, 13.073f, -209.154f, 1500),
+	SHOT(25000, "cross33_3"),
+	VPAD(25500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(26500, HERO_OBELIX, 295.0f, 10.43f, -209.1f, 2000), SHOT(28600, "cross33_4"),
+	VPAD(29000, 1, 0, 0, 0, "p2 release"),
+	END(32000),
+};
+
+// cablefull33 (-Level 3, XXL_LIFTLOG=1): the car pulled all the way across
+// (what a finished ride leaves).
+const Step kCableFull33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(5500, HERO_OBELIX, 287.0f, 10.43f, -209.1f, 3200),
+	GLIDEAT(8800, HERO_OBELIX, 270.0f, 10.43f, -209.1f, 3000), SHOT(12000, "cablefull33_1"),
+	VPAD(13000, 1, 0, 0, 0, "p2 release"),
+	SHOT(16000, "cablefull33_2"),
+	END(20000),
 };
 
 // p2dir (level 2): player 2 turns their camera (right stick) and then pushes
@@ -3710,6 +3772,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopsave", kShopSave),
 	SCENARIO("cabled33", kCableD33),
 	SCENARIO("liftcab33", kLiftCab33),
+	SCENARIO("liftcab33w", kLiftCab33W),
+	SCENARIO("cablefull33", kCableFull33),
+	SCENARIO("cross33", kCross33),
 	SCENARIO("corkdown", kCorkDown),
 	SCENARIO("lifterlock", kLifterLock),
 	SCENARIO("liftercar", kLifterCar),
@@ -4046,11 +4111,20 @@ void LogTick(float t) {
 			line.Add(" | lifter %u f8 %08X y %.2f w %.1f pl %p", i, *(uint32_t*)(r + 8), ((float*)((char*)l->node->matrix + 0x40))[1],
 			         *(float*)(r + 0x34), *(void**)(r + 0x50));
 		}
-	if (getenv("XXL_LIFTLOG"))   // rope cable cars (CKHkTowedTelepher 2,159): flags +0x7C, zone answer +0x20 vs +0x84
-		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n && i < 2; i++) {
+	if (getenv("XXL_LIFTLOG")) {   // rope cable cars (CKHkTowedTelepher 2,159): flags +0x7C, zone answer +0x20 vs +0x84
+		char cbuf[512];   // a line of its own (the tick line is full)
+		LineBuf cars(cbuf);
+		cars.Add("cars at %6.2f", t);
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n && i < 4; i++) {
 			char* c = (char*)GetLvlObject(2, 159, i);
-			if (c) line.Add(" | car %u 7C %08X 20 %p 84 %p", i, *(uint32_t*)(c + 0x7C), *(void**)(c + 0x20), *(void**)(c + 0x84));
+			char* node = c ? *(char**)(c + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (c) cars.Add(" | car %u 7C %08X 20 %p 84 %p 30 %.2f at %.1f %.1f %.1f", i, *(uint32_t*)(c + 0x7C), *(void**)(c + 0x20),
+			                *(void**)(c + 0x84), *(float*)(c + 0x30), fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0,
+			                fr ? ((float*)(fr + 0x80))[2] : 0);
 		}
+		Log("%s", cars.c_str());
+	}
 	if (at.probe) {
 		// Everything that might say "a cutscene has the player": cinematic scenes,
 		// the camera service's track and flags, game manager / trio flags, the

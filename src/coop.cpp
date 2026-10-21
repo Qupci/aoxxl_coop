@@ -249,6 +249,22 @@ LockPicture g_prePic;
 // until then.
 LockPicture g_seqPic;
 bool g_seqLive = false;
+// A rope-pulled cable car boarded under a lock, and where it stood then (its
+// start): the car rolls back there by itself once let go -- unless the pull
+// was short and it stops on the way, and a level zone frees the rider (LV3-3:
+// Obelix walks off to the lifter, zone 0830 sends 4800 / 4803). Left there it
+// never offers itself again (WatchStrandedCar). Any level event that frees the
+// rider mid-way does it; the cross detector switching the leader is the one met.
+// Its rider, freed where the car stopped, stands in the car's zone: it is kept
+// off cable cars until it has walked away (keptOff*).
+struct CarWatch {
+	char*   car = nullptr;
+	int     rider = -1;
+	Vector3 start;
+	DWORD   stillSince = 0;
+	int     keptOff = -1;
+	Vector3 keptOffAt;
+} g_carWatch;
 
 static char* DetectionService() {
 	CKYellowPages* yp = YellowPages();
@@ -307,8 +323,9 @@ static void NoteLock(int hero, const char* why) {
 		if (!fr) continue;
 		const float* p = (const float*)(fr + 0x80);
 		float d2 = (h.Pos() - Vector3(p[0], p[1], p[2])).len2();
-		if (d2 < best) { best = d2; g_lock.car = car; }
+		if (d2 < best) { best = d2; g_lock.car = car; g_carWatch.start = Vector3(p[0], p[1], p[2]); }
 	}
+	if (g_lock.car) { g_carWatch.car = g_lock.car; g_carWatch.rider = hero; g_carWatch.stillSince = 0; }
 	Log("coop: %s locked by the level (%s) -- %u detectors, %u circles kept (%s %04X)", HeroName(hero), why,
 	    (unsigned)g_lock.pic.n, (unsigned)g_lock.pic.nFlags, pre ? "as before its event" : "as now", g_lock.pic.event);
 }
@@ -1322,6 +1339,7 @@ static bool HeroFlying(Trio t) {
 
 static void ResetCableCar(char* car, int hero);
 static char* NearestTowedCar(Hero h);
+static int KeptOffCars();
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Individual heroes: a cable car takes the hero who steps on it from the
@@ -1334,12 +1352,12 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 		extern void* g_trioEventCaller;
 		uintptr_t from = (uintptr_t)g_trioEventCaller;
 		int e = ev & 0xFFFF;
-		bool lifter = g.lifterWaitsFor >= 0 && IndivFallenHero() < 0;
+		bool lifter = KeptOffCars() >= 0 && IndivFallenHero() < 0;
 		if ((e == 0x4801 || e == 0x4800 || e == 0x4812) && from >= 0x49AC80 && from < 0x49AD00 &&
 		    (IndivFallenHero() >= 0 || lifter) && g.p2Joined && !g.suspended) {
-			int up = lifter ? g.lifterWaitsFor : IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+			int up = lifter ? KeptOffCars() : IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
 			if (e == 0x4812) {
-				StartAiCycle(up, lifter ? "a cable car with the partner on a lifter" : "a cable car with the partner down");
+				StartAiCycle(up, lifter ? "a cable car, kept off" : "a cable car with the partner down");
 				if (IndivFallenHero() >= 0) IndivBlockPartnerSpot("a cable car");
 				else {
 					// the car took the hero already (+0x7C bit 0x20 "rider on", 0x80 "free" gone):
@@ -1351,7 +1369,7 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 				}
 			}
 			Log("coop: trio event %04X from %p held back -- %s", e, (void*)from,
-			    lifter ? "the partner is on a waiting lifter" : "the cable car waits for both heroes");
+			    lifter ? "kept off cable cars (a lifter waits for it, or its car was sent back)" : "the cable car waits for both heroes");
 			return true;
 		}
 	}
@@ -1613,6 +1631,42 @@ static void UndoLock(Trio t, int up, bool lead) {
 	StartAiCycle(up, "its sequence undone");
 	IndivPutOnSafeGround(up);
 }
+
+// The watched car stands still (+0x30 speed) away from its start, not free to
+// board (+0x7C bit 0x80), its rope not held (bit 0x4000), and nobody locked in
+// it: after 1 s it goes back to its start (as after a ride it rolls back).
+static void WatchStrandedCar() {
+	Trio t = GetTrio();
+	if (g_carWatch.keptOff >= 0) {
+		Hero k = t ? t.GetHero(g_carWatch.keptOff) : Hero();
+		if (!k || (k.Pos() - g_carWatch.keptOffAt).len2() > 4.0f * 4.0f) g_carWatch.keptOff = -1;
+	}
+	char* car = g_carWatch.car;
+	if (!car) return;
+	bool listed = false;   // still one of the level's (a level change frees it)
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n && !listed; i++) listed = (char*)GetLvlObject(2, 159, i) == car;
+	char* node = listed ? *(char**)(car + 0x10) : nullptr;
+	char* fr = node ? *(char**)(node + 4) : nullptr;
+	if (!fr) { g_carWatch.car = nullptr; return; }
+	const float* p = (const float*)(fr + 0x80);
+	uint32_t f = *(uint32_t*)(car + 0x7C);
+	bool away = (Vector3(p[0], p[1], p[2]) - g_carWatch.start).len2() > 1.0f;
+	if (!away && (f & 0x80)) { g_carWatch.car = nullptr; return; }   // back and free: done
+	bool stranded = away && !(f & 0x80) && !(f & 0x4000) && fabsf(*(float*)(car + 0x30)) < 0.05f && g_lock.hero < 0 &&
+	                !g.held[HERO_ASTERIX] && !g.held[HERO_OBELIX] && g.p2Joined && !g.suspended;
+	if (!stranded) { g_carWatch.stillSince = 0; return; }
+	if (!g_carWatch.stillSince) g_carWatch.stillSince = GetTickCount();
+	if (GetTickCount() - g_carWatch.stillSince < 1000) return;
+	Log("coop: the cable car %p stopped %.1f units from its start with nobody in it -- sent back", car,
+	    sqrtf((Vector3(p[0], p[1], p[2]) - g_carWatch.start).len2()));
+	ResetCableCar(car, g_carWatch.rider);
+	g_carWatch.car = nullptr;
+	Hero r = t ? t.GetHero(g_carWatch.rider) : Hero();
+	if (r) { g_carWatch.keptOff = g_carWatch.rider; g_carWatch.keptOffAt = r.Pos(); }
+}
+
+// The hero kept off cable cars now: the lifter waits for it, or its car was just sent back. Else -1.
+static int KeptOffCars() { return g.lifterWaitsFor >= 0 ? g.lifterWaitsFor : g_carWatch.keptOff; }
 
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
@@ -2161,6 +2215,7 @@ void CoopFrame() {
 	BringAlongForBossRun(t);
 	ServeMachineRequest(t);
 	WatchLifterHint(t);
+	WatchStrandedCar();
 	WatchSpyWalk(t, now);
 	// While suspended, the hero that is not leading is the game's companion, in
 	// whatever mode the game put it -- whichever player it belongs to. Rides only
@@ -2995,12 +3050,13 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	}
 	IndivAfterFallenTick(heroIndex);
 	IndivAfterHeroTick(heroIndex);
-	// A lifter waits for this hero with the partner on it: no cable car (WatchLifterHint).
+	// A lifter waits for this hero with the partner on it, or its car was just
+	// sent back: no cable car (WatchLifterHint, WatchStrandedCar).
 	static int s_keptOff = 0;
-	if (heroIndex == g.lifterWaitsFor && g.p2Joined && !g.suspended && IndivFallenHero() < 0 && IndivLeaveCableCar(heroIndex) &&
+	if (heroIndex == KeptOffCars() && g.p2Joined && !g.suspended && IndivFallenHero() < 0 && IndivLeaveCableCar(heroIndex) &&
 	    s_keptOff++ < 20)
-		Log("coop: %s kept off a cable car -- the lifter waits for it with %s on it", HeroName(heroIndex),
-		    HeroName(OtherHero(heroIndex)));
+		Log("coop: %s kept off a cable car (%s)", HeroName(heroIndex),
+		    heroIndex == g.lifterWaitsFor ? "a lifter waits for it" : "its car was just sent back");
 	IndivLeave(g.indivPrev);
 	g.indivPrev = -1;
 }
