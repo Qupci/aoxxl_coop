@@ -348,12 +348,26 @@ void IndivPutOnSafeGround(int hero) {
 	Log("indiv: %s put on its last solid ground (%.1f %.1f %.1f)", HeroName(hero), spot.x, spot.y, spot.z);
 }
 
-bool IndivBlockPartnerSpotFrameStart(const char* what) {
+bool IndivBlockTalk(const char* what) {
 	int down = IndivFallenHero();
-	if (down < 0) return false;
-	const Vector3& p = g.frameStart[Other(down)];
-	float xyz[3] = { p.x, p.y, p.z };
-	return IndivBlockPartnerSpotFrom(what, xyz);
+	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;
+	static DWORD s_told = 0;
+	DWORD now = GetTickCount();
+	if (now - s_told > 2000) {
+		s_told = now;
+		Log("indiv: %s reached %s with %s down -- it waits (no put-back)", HeroName(Other(down)), what, HeroName(down));
+		ShowDownHint(down);
+	}
+	return true;
+}
+
+void IndivNoteLevelLead(int hero) {
+	int down = IndivFallenHero();
+	if (down < 0 || (hero != HERO_ASTERIX && hero != HERO_OBELIX)) return;
+	if (g.fellLeading[down] == (hero == down)) return;
+	g.fellLeading[down] = hero == down;
+	Log("indiv: the level gave the lead to %s with %s down -- %s leads after the revive", HeroName(hero),
+	    HeroName(down), HeroName(hero));
 }
 
 bool IndivBlockPartnerSpot(const char* what) {
@@ -444,7 +458,7 @@ bool IndivHoldsBack(char* hook) {
 		if (!(r > 0.5f && r < 50.0f)) r = 5.0f;
 		Vector3 d = h.Pos() - Vector3(p[0], p[1], p[2]);
 		if (d.len2() > r * r) return false;
-		IndivBlockPartnerSpotFrameStart("a Roman agent's talk");
+		IndivBlockTalk("a Roman agent's talk");
 		return true;
 	} else if (vt == 0x628EE4) {   // a blue circle (its events command the trio), the hero on it
 		if (!ground || *(char**)(hook + 0x28) != ground) return false;

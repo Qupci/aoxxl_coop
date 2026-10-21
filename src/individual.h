@@ -59,9 +59,12 @@ bool IndivBlockPartnerSpot(const char* what);
 // The same for a zone the standing hero just crossed: back to where it was the
 // frame before (`before`, the detection service's), a little further back.
 bool IndivBlockPartnerSpotFrom(const char* what, const float before[3]);
-// The same, from where the standing hero was when this frame began (a Roman
-// agent's talk: the side it walked in from).
-bool IndivBlockPartnerSpotFrameStart(const char* what);
+// A Roman agent's talk reached by the standing hero: it stays shut (the caller
+// holds it back), the hero is not put back -- it can walk on past the agent.
+bool IndivBlockTalk(const char* what);
+// The level gave the lead to `hero` (a zone let through) while the other is
+// down: who leads after the revive is the level's choice.
+void IndivNoteLevelLead(int hero);
 // Hero `hero` onto its last solid ground (a sequence undone).
 void IndivPutOnSafeGround(int hero);
 // Hero `hero` about to board a cable car (situation 2): out of it and onto its
@@ -73,7 +76,7 @@ void IndivNoteLauncherSpot(int hero);
 void IndivReviveAtLauncher(int hero);
 // Should this object (a hook) skip its tick now: it needs both heroes, one is
 // down, and the standing hero is at it (on its ground; within a Roman agent's
-// talk). That hero is put back too.
+// talk). That hero is put back too (not from a talk).
 bool IndivHoldsBack(char* hook);
 
 // The stats of `hero` (for the HUD): health points, shields, combo hits.

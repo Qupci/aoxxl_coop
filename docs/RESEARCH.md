@@ -2140,3 +2140,17 @@ both halves).
   0x1000 and +0x668..+0x683) is that player's (g_shakeOwn): ShareShake skips it. World shakes (the boss) still reach
   both. Env XXL_SHAKELOG=1 traces both states' shake. Autotests twistend (P2) / twistenda (P1): each shakes only its
   own camera and stops at the Twister's end; boss36s still shared.
+- Round 114 (user: LV5-10, Obelix down, Asterix put back "the frame before" at the cross rectangle 525.7 -451.4
+  -197.2 by the keg, #97 = zone event 0308: trio 4800 "switch to Asterix" + 4803 "enable sidekick movement"): not
+  the dialogue case -- round 64's "zone that needs both heroes" (GroupNeedsBoth), which counted every group
+  commanding the trio, plain leader switches included. Now a group whose only trio orders are switches to the
+  standing hero (4800/48B7 Asterix, 4801/48B8 Obelix) and/or 4803, with no cutscene (GroupOnlyLeadsTo), is let
+  through while a hero is down; the level's switch is kept for the revive (IndivNoteLevelLead clears / sets
+  fellLeading of the fallen). A switch to the fallen hero, wait orders, marker walks, rides, the slide stay held
+  with the put-back. Roman agents' talks (spy tick within +0x70, zone -> CKHkClueMan 0x5198, trio 0x511F/0x5120)
+  are still held while a hero is down, but without the put-back (IndivBlockTalk replaces
+  IndivBlockPartnerSpotFrameStart): the hero walks on; after the revive the talk starts as in single player (at
+  once if the hero still stands within the agent's reach). Autotests: lead510 (-Level 5, XXL_DOWNAT=1:2000;
+  Asterix through 0308 twice, let through), spyd2 (talk held, Asterix stays by the agent), spyrev (talk after
+  the revive), slidecross3 / cabled2 / lockcircle / corkdown / beamundo / reach23g / reach26w as before
+  (slidecross3 checked against the pre-change build: identical).

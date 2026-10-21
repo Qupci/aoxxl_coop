@@ -1165,11 +1165,35 @@ void DumpGroup(unsigned ev) {
 	Log("%s", line.c_str());
 }
 
-// Does event `ev`'s group need both heroes: command the trio (above), or start a
-// ride / scripted mode for both (trio 0x4806, 0x4807, 0x480B..0x480F: the belly
-// slide's cross detector, LV2-2 z -903.8, sends 0x480B)?
-bool GroupNeedsBoth(unsigned ev) {
-	if (GroupCommandsTrio(ev)) return true;
+bool GroupPlaysCutscene(unsigned ev);
+
+// Are event `ev`'s orders to the trio only "lead" switches to hero `up` (0x4800 /
+// 0x48B7 Asterix, 0x4801 / 0x48B8 Obelix) and "the sidekick may move again"
+// (0x4803), with no cutscene? LV5-10's cross rectangle by the keg (525.7 -451.4
+// -197.2, #97: 4800 + 4803) -- with Obelix down it put Asterix back for nothing:
+// he leads anyway, Obelix waits for nothing. A switch to the fallen hero still
+// needs both.
+bool GroupOnlyLeadsTo(unsigned ev, int up) {
+	char* objs[32];
+	uint16_t msgs[32];
+	int n = GroupTargets(ev, objs, msgs, 32), k;
+	if (n == 32 || GroupPlaysCutscene(ev)) return false;
+	for (k = 0; k < n; k++) {
+		if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
+		unsigned m = msgs[k];
+		if (m == 0x4803) continue;
+		int to = m == 0x4800 || m == 0x48B7 ? HERO_ASTERIX : m == 0x4801 || m == 0x48B8 ? HERO_OBELIX : -1;
+		if (to < 0 || to != up) return false;
+	}
+	return true;
+}
+
+// Does event `ev`'s group need both heroes: command the trio (above; not only
+// a switch of the lead to `up`, the standing hero), or start a ride / scripted
+// mode for both (trio 0x4806, 0x4807, 0x480B..0x480F: the belly slide's cross
+// detector, LV2-2 z -903.8, sends 0x480B), or a Roman agent's talk (`talks`)?
+bool GroupNeedsBoth(unsigned ev, int up, bool talks = true) {
+	if (GroupCommandsTrio(ev) && !GroupOnlyLeadsTo(ev, up)) return true;
 	unsigned group = (ev & 0xFFFF) >> 3;
 	CKYellowPages* yp = YellowPages();
 	char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
@@ -1188,7 +1212,7 @@ bool GroupNeedsBoth(unsigned ev) {
 		// CKHkClueMan 0x5198: a Roman agent's talk set off by its zone. Let through
 		// with a hero down, the spy took it as its one start (its request to the
 		// trio dropped) and the zone never fired again.
-		if (vt == 0x6261F4 && m == 0x5198) return true;
+		if (vt == 0x6261F4 && m == 0x5198 && talks) return true;
 		if (vt != 0x6256A0) continue;
 		if (m == 0x4806 || m == 0x4807 || (m >= 0x480B && m <= 0x480F)) return true;
 	}
@@ -1676,12 +1700,16 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 	if (from >= kDetectTickBegin && from < kDetectTickEnd) {
 		// Individual heroes: a zone that orders the companion (a boss gate, the
 		// slide, a boat...) stays shut while a hero is down -- not set off, the
-		// hero who walked in put back.
-		if (IndivFallenHero() >= 0 && GroupNeedsBoth(eventId)) {
+		// hero who walked in put back. A Roman agent's talk the same, without the
+		// put-back: the hero walks on, the talk not started.
+		int up = IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+		if (IndivFallenHero() >= 0 && GroupNeedsBoth(eventId, up)) {
 			int zh = ZoneEventHero(eventId & 0xFFFF);
 			if (CoopP2Joined() && !CoopSuspended()) {
 				// (zh: the hero who set it off -- in the swapped pass too)
-				if (zh != IndivFallenHero()) {
+				if (zh != IndivFallenHero() && !GroupNeedsBoth(eventId, up, false))
+					IndivBlockTalk("a Roman agent's talk");
+				else if (zh != IndivFallenHero()) {
 					// back to the side it came from: its place the frame before (the service's)
 					Trio tz = GetTrio();
 					Hero hz = tz && zh >= 0 ? tz.GetHero(zh) : Hero();
@@ -1701,6 +1729,18 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 				}
 				return;
 			}
+		}
+		// Only "lead" switches to the standing hero (and "the sidekick may move"):
+		// let through, the level's choice of leader kept for after the revive.
+		if (IndivFallenHero() >= 0 && CoopP2Joined() && !CoopSuspended() && GroupCommandsTrio(eventId)) {
+			char* objs[32];
+			uint16_t msgs[32];
+			for (int k = 0, n = GroupTargets(eventId, objs, msgs, 32); k < n; k++)
+				if (objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] != 0x4803) { IndivNoteLevelLead(up); break; }
+			static int s_told = 0;
+			if (s_told++ < 20)
+				Log("proximity: zone event %04X let through with %s down -- only gives %s the lead / frees the sidekick",
+				    eventId & 0xFFFF, HeroName(IndivFallenHero()), HeroName(up));
 		}
 		if (g_inSwappedPass) InterlockedIncrement(&g_swappedZones);
 		int zh = ZoneEventHero(eventId & 0xFFFF);
