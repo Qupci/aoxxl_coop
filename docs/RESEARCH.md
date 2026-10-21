@@ -2233,3 +2233,6 @@ both halves).
   size close up to 0.06 apart (the asi's rows) and end by 0.39 of the screen, short of the middle pieces (from
   0.43). The group stays 0.1 down, under the shield rows: at the top, player 2's six-shield row (to 0.61) would
   meet its right end (0.60). Autotests shields6, hudreq / hudx3 -Level 4.
+- Round 121 (2026-10-21, user's pad test of 120: the 3/4 middle pieces and the six-shield shrink look less cluttered
+  -- keep them). Round 120 undone: hud2.cpp as before it, the same layout with or without xxl_widescreen2d.asi.
+  Autotests shields6 (shields shrunk again), hudreq -Level 4 (middle pieces at 3/4).
