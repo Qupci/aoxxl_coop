@@ -2095,3 +2095,15 @@ both halves).
   saw; next frame that rider gets the lead (WatchTelepherRider, 4800/4801), before the 481C 0.3 s later. Autotest
   pillar36 (-Level 3, XXL_FREEDOM=1; the pillar needs the fight won, so 4801 is sent directly): before, Asterix in
   situation 2 with order 2 to the end; after, he jumps off to (-159.7 0.8 -133.7) and picks up helmets on the way.
+- Round 110 (user, LV2-10 boss, xxl_coop.boss210-telepher.log): in freedom mode Asterix, jumped onto the boss's
+  button by the automatic cable car's end (situation 0x0F), was not locked by the boss's "Obelix leads, Asterix
+  waits" (trio 4801 / 4802 sent from the boss's code at 0x4F3165 / 0x4F317E; LV3-6's boss runs the same code), and
+  could walk off it. Its other wait (0x4F2E27 48B9 + 0x4F2E40 4802: the companion Obelix) stays free. Also, by the
+  user's wish, new [coop] freedom_corkscrews (default on, env XXL_FREEDOMCORK): a wait for a hero on a corkscrew's
+  circle (CKHkCorkscrew 2,44 node within 4 units horizontally / 4 vertically: LV3-6's light pillar 0.1, LV2-1's
+  spinning platform 0.3) is held as with freedom off -- the pillar's launch (corkscrew vf15 0x0C09, AI order 2)
+  follows while the hero is still held, aimed where the level wants it. Both via g_freedomLock (NoteFreedomLock at
+  the 0x4802 in CoopNoteTrioEvent; Hold lets it through within 0.5 s). LV2-1's lock still ends at the game's own
+  4803 (zone 03C8); the jump off the platform's top (484C, AI order 2) stays the player's. Autotests boss210t
+  (-Level 2, XXL_FREEDOM=1: Asterix held on the boss after the car; skips the intro with CINE_SKIP), pillar36l
+  (-Level 3: lock kept / with XXL_FREEDOMCORK=0 free; R3 + B frees), turnstile21 with XXL_FREEDOM=1.

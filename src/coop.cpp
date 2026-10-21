@@ -430,10 +430,25 @@ static bool FreedomLetsHold(int order) {
 	return !g_config.freedom || order == AI_USE_CABLECAR || order == AI_EXTERNAL_CTRL;
 }
 
+// Waits freedom mode still lets lock the hero (CoopNoteTrioEvent, at the 0x4802):
+// - the boss (LV2-10, LV3-6; its code at 0x4F3165/0x4F317E: "Obelix leads,
+//   Asterix waits") once Asterix is on its button (the automatic cable car's end
+//   jumps him there) -- left free he walked off and the boss fight was cheesed;
+// - a corkscrew's circle (CKHkCorkscrew 2,44 -- LV3-6's light pillar, LV2-1's
+//   spinning platform; [coop] freedom_corkscrews): it launches the waiting hero
+//   (0x0C09, AI order 2), aimed where the level wants it -- by hand it was a blind
+//   jump (LV3-6 boss: onto the cable car).
+struct FreedomLock { int hero = -1; DWORD at = 0; const char* what = ""; } g_freedomLock;
+static bool FreedomKeepsLock(int idx) {
+	return g_freedomLock.hero == idx && GetTickCount() - g_freedomLock.at < 500;
+}
+
 void Hold(Trio t, int idx, const char* why, bool modOwn = false) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
-	if (!modOwn && !FreedomLetsHold((int)h.Order())) {
+	if (!modOwn && !FreedomLetsHold((int)h.Order()) && FreedomKeepsLock(idx))
+		Log("coop: freedom: %s locked all the same (%s)", HeroName(idx), g_freedomLock.what);
+	else if (!modOwn && !FreedomLetsHold((int)h.Order())) {
 		static int s_told = 0;
 		if (s_told++ < 40)
 			Log("coop: freedom: %s stays its player's (%s, AI order %d not followed)", HeroName(idx), why, (int)h.Order());
@@ -1921,6 +1936,33 @@ static void WatchStrandedCar() {
 // The hero kept off cable cars now: the lifter waits for it, or its car was just sent back. Else -1.
 static int KeptOffCars() { return g.lifterWaitsFor >= 0 ? g.lifterWaitsFor : g_carWatch.keptOff; }
 
+// A 0x4802 freedom mode keeps (g_freedomLock): the boss's own, or the waiter on a
+// corkscrew's circle -- its node within 4 units (LV3-6's pillar: 0.4).
+static void NoteFreedomLock(Trio t, int waiter) {
+	extern void* g_trioEventCaller;
+	if (!g_config.freedom) return;
+	Hero h = t.GetHero(waiter);
+	if (!h) return;
+	if ((uintptr_t)g_trioEventCaller == 0x4F317E) {
+		g_freedomLock = { waiter, GetTickCount(), "on the boss's button" };
+		return;
+	}
+	if (!g_config.freedomCorkscrews) return;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 44); i < n; i++) {
+		char* c = (char*)GetLvlObject(2, 44, i);
+		char* node = c ? *(char**)(c + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr) continue;
+		const float* p = (const float*)(fr + 0x80);
+		float dx = h.Pos().x - p[0], dz = h.Pos().z - p[2];
+		if (dx * dx + dz * dz < 4.0f * 4.0f && fabsf(h.Pos().y - p[1]) < 4.0f) {
+			g_freedomLock = { waiter, GetTickCount(), "a corkscrew's circle" };
+			Log("coop: freedom: %s waits on corkscrew %p (%.1f units off)", HeroName(waiter), c, sqrtf(dx * dx + dz * dz));
+			return;
+		}
+	}
+}
+
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	extern void* g_trioEventCaller;
 	if (g.p2Joined && (event & 0xFFFF) == 0x0C0D && (uintptr_t)g_trioEventCaller == 0x548757) {
@@ -1934,6 +1976,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 			int waiter = tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
 			NoteLock(waiter, "the companion told to wait");
 			if (g_lock.hero == waiter) g_lock.wait = true;
+			NoteFreedomLock(tl, waiter);
 		}
 	}
 	SpyWalk& w = g_spyWalk;

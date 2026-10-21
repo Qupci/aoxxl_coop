@@ -712,6 +712,24 @@ const Step kBoss210[] = {
 	END(40000),
 };
 
+// boss210t (-Level 2, XXL_FREEDOM=1): the user's -- Asterix crosses the boss gate
+// (#34 loads it, its cutscene; #4 sets it moving), both heroes wait out of its
+// way, then Asterix takes the automatic cable car, whose end jumps him onto the
+// boss's button: the boss's "Obelix leads, Asterix waits" must lock him there.
+const Step kBoss210t[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1666.036f, -743.845f, -1212.924f), PLACEAT(3000, HERO_OBELIX, 1665.036f, -743.845f, -1213.924f),
+	GLIDEAT(4000, HERO_ASTERIX, 1678.0f, -740.0f, -1210.9f, 1500),
+	CINE_SKIP(7000),   // (Enter, as the user skips it)
+	GLIDEAT(10000, HERO_ASTERIX, 1692.0f, -740.0f, -1210.9f, 1500),
+	PLACEAT(13000, HERO_ASTERIX, 1715.187f, -747.845f, -1139.669f), PLACEAT(13000, HERO_OBELIX, 1714.187f, -747.845f, -1138.669f),
+	SHOT(20000, "boss210t_0"),
+	PLACEAT(30000, HERO_ASTERIX, 1717.434f, -738.903f, -1141.398f),   // the cable car
+	SHOT(38000, "boss210t_1"), SHOT(42000, "boss210t_2"), SHOT(48000, "boss210t_3"),
+	END(55000),
+};
+
 // boss36 (-Level 3): sector 6's boss. Obelix crosses the rectangle that loads it
 // (-208.3 11.0 -199.2 -> -226), then drops onto #46 (-232.0 9.8 -173.9) that
 // wakes it; Asterix stays back by the loading rectangle.
@@ -3830,6 +3848,23 @@ const Step kPillar36[] = {
 	SHOT(20000, "pillar36_1"), SHOT(31000, "pillar36_2"), SHOT(36000, "pillar36_3"),
 	END(40000),
 };
+// pillar36l: the same circle's lock (4801, 4802 sent as its group does) with
+// Asterix on it: freedom mode keeps it (a corkscrew's circle; off with
+// XXL_FREEDOMCORK=0); R3 + B still frees him.
+const Step kPillar36l[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -185.961f, 2.554f, -227.849f), PLACEAT(2500, HERO_OBELIX, -186.961f, 2.554f, -228.849f),
+	PLACEAT(4000, HERO_OBELIX, -177.76f, 2.63f, -216.34f),
+	PLACEAT(4500, HERO_ASTERIX, -175.255f, 3.817f, -219.225f),
+	{ 5000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads (the pillar's circle)" },
+	{ 5000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix waits (the pillar's circle)" },
+	P1(6000, 0, 1.0f, 0, "p1 walks off"), P1(7500, 0, 0, 0, "p1 stop"),
+	SHOT(8000, "pillar36l_0"),
+	{ 9000, S_UNLOCKHERO, HERO_ASTERIX, 0, 0, 0, 0, "p1 R3+B" },
+	SHOT(11000, "pillar36l_1"),
+	END(12000),
+};
 
 // cabled2 / spyd2 (level 2, with XXL_DOWNAT=1:1000): Obelix down, Asterix walks
 // onto the cable car / glides to the second spy three times -- each time put
@@ -4272,6 +4307,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("plate26", kPlate26),
 	SCENARIO("beach12o", kBeach12O),
 	SCENARIO("boss210", kBoss210),
+	SCENARIO("boss210t", kBoss210t),
 	SCENARIO("boss36", kBoss36),
 	SCENARIO("sky2", kSky2),
 	SCENARIO("shadow33", kShadow33),
@@ -4366,6 +4402,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("beam42f", kBeam42f),
 	SCENARIO("freeromans23", kFreeRomans23),
 	SCENARIO("pillar36", kPillar36),
+	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("carpause", kCarPause),
