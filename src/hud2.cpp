@@ -289,6 +289,19 @@ void Restore2d() {
 	g.nSaved2d = 0;
 }
 
+// xxl_widescreen2d.asi (a separate fix) draws the HUD's stretched plates
+// (4/3) / aspect as wide, towards the edge they are placed by: the helmet
+// counter's plate, drawn leftwards from its place, then has its middle that
+// much further right, and the counter is centred by that middle.
+float PlateDrawScale() {
+	static bool loaded = false;
+	if (!loaded) loaded = GetModuleHandleA("xxl_widescreen2d.asi") != nullptr;
+	CKYellowPages* yp = loaded ? YellowPages() : nullptr;
+	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	float aspect = m2d ? *(float*)(m2d + 4) : 0.0f;
+	return aspect > 0.5f && aspect < 8.0f ? (4.0f / 3.0f) / aspect : 1.0f;
+}
+
 // Stacked split (player 1 on top): each player's HUD in their own half, as
 // the single player HUD -- health at the top left, the combo bar's column
 // below it at the left edge, at 3/4 size (its bottom at 0.35 on the full
@@ -570,7 +583,7 @@ void Hud2BeginP1(RwCamera* hud) {
 	// met six shields' rows). Stacked: where single player has them (the right).
 	float* plate = *(float**)(itf + 0x134);
 	if (plate && !stacked) {
-		float mid = plate[5] - plate[13] * 0.5f;
+		float mid = plate[5] - plate[13] * PlateDrawScale() * 0.5f;   // the plate's middle as drawn
 		float s = 0.75f;
 		Xform t = { mid, plate[6], s, 0.5f - mid, -0.1f };
 		Xf2d(itf, 0x134, t);
