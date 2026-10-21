@@ -2077,3 +2077,11 @@ both halves).
   both heroes, out of every view, walkable to (PfReachable -- the reachability check stays, so none behind a shut
   door). LV2-3 by the hearth has no squad marker within 40 units at all: no Romans there (logged once: markers
   within 40 -- by a hero / in view / not walkable to).
+- Round 108 (2026-10-21, user: LV2-3 has no squad markers by the hearth; use Obelix's marker 147 (where the level
+  walks him after the doors shut), or squads 36 / 46 nearby?). Dump once a wait (DumpAround): Obelix's walk order (4826,
+  order 1) targets (-54.6 0.3 -523.1) = the user's marker 147, 12 units off. Squads within 60: #25 inactive (4 placed),
+  #36 active, box 82x97 holding Obelix, no markers, pool 2/2 sent (the Romans' source already, +1 to defeat each), #46
+  inactive (10 placed of 20), no markers -- none of them has spawn markers. Now the second choice after a squad
+  marker is the hero's walk-to marker (AI target hero +0x568: level-placed, on the hero's side by design), only when
+  6+ from both heroes and out of every view (else the next try). freeromans23: four Romans from it, none drowned,
+  stopped at the keg's 4803. Waking squad 46 for Romans was left alone (it would run its own script).
