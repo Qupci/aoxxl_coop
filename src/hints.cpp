@@ -148,6 +148,15 @@ float GlyphWidthScale(const char* screen) {
 	return (screen ? *(const float*)(screen + 4) : 1.0f) * *(const float*)0x623C64;
 }
 
+// xxl_widescreen2d.asi (seen by that constant no longer being 0.75) also draws
+// stretched plates (4/3) / aspect as wide; the hint's plate is sized for the
+// text's true width, so it is given that much more.
+float PlateDrawScale(const char* screen) {
+	float aspect = screen ? *(const float*)(screen + 4) : 0.0f;
+	if (*(const float*)0x623C64 == 0.75f || aspect < 0.5f) return 1.0f;
+	return (4.0f / 3.0f) / aspect;
+}
+
 void Relayout(char* t20) {
 	unsigned n = *(uint32_t*)(t20 + 0x2D4);
 	if (n == 0 || n > 64 || g_nLines < 2) return;
@@ -323,7 +332,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		const float m = 0.02f;
 		float w = (g_longest > 0.0f ? g_longest : 0.9f) / g_unitsPerScreen;
 		f[5] = *(float*)(text + 0x14) + g_boxShift + w + m;
-		f[13] = w + 2.0f * m;
+		f[13] = (w + 2.0f * m) / PlateDrawScale(yp ? *(char**)((char*)yp + 0x34) : nullptr);
 		f[14] = g_plateH * g_nLines + 0.015f;
 		f[6] = g_plateY - 0.012f * (g_nLines - 1);
 	}
