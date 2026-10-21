@@ -442,6 +442,13 @@ struct FreedomLock { int hero = -1; DWORD at = 0; const char* what = ""; } g_fre
 static bool FreedomKeepsLock(int idx) {
 	return g_freedomLock.hero == idx && GetTickCount() - g_freedomLock.at < 500;
 }
+// The hero a corkscrew's circle locked in freedom mode, until the ride gives it
+// the lead (LV2-1: the top's box 0058) or lets it go. Its whole ride is the
+// level's, as in single player: on its way to the turnstile Obelix crosses zone
+// 03C8, whose 4803 freed Asterix -- the ride's walk onto the platform (0528:
+// 482D) and the jump off at its top (0530: 484C) were then "the level taking a
+// player's hero", not followed; he rode up and stayed there.
+struct CorkRide { int hero = -1; char* cork = nullptr; } g_corkRide;
 
 void Hold(Trio t, int idx, const char* why, bool modOwn = false) {
 	Hero h = t.GetHero(idx);
@@ -1453,6 +1460,31 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 			return true;
 		}
 	}
+	// Freedom mode: the level's 4803 (zone 03C8) does not free the hero a
+	// corkscrew's circle holds (g_corkRide) -- it stays the level's until its ride
+	// ends. The lock's own bookkeeping runs as for any 4803 (the sequence goes on:
+	// Obelix off before turning it is still set back).
+	if ((ev & 0xFFFF) == 0x4803 && g_config.freedom && g_config.freedomCorkscrews && g_corkRide.hero >= 0 && g.p2Joined &&
+	    !g.suspended) {
+		extern void* g_trioEventCaller;
+		uintptr_t from = (uintptr_t)g_trioEventCaller;
+		Trio tc = GetTrio();
+		Hero h = tc ? tc.GetHero(g_corkRide.hero) : Hero();
+		char* node = g_corkRide.cork ? *(char**)(g_corkRide.cork + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (from >= 0x400000 && from < 0x800000 && h && fr && g.held[g_corkRide.hero] && (int)h.Order() == 3) {
+			const float* p = (const float*)(fr + 0x80);
+			float dx = h.Pos().x - p[0], dz = h.Pos().z - p[2];
+			if (dx * dx + dz * dz < 4.0f * 4.0f) {
+				if (g_lock.hero == g_corkRide.hero) EndLock(true);
+				static int s_told = 0;
+				if (s_told++ < 20)
+					Log("coop: freedom: trio event 4803 from %p held back -- %s stays on the corkscrew's circle for its ride",
+					    (void*)from, HeroName(g_corkRide.hero));
+				return true;
+			}
+		}
+	}
 	// Individual heroes: a Roman agent's talk needs both heroes -- with one down
 	// its offer (0x511F) and start (0x5120) are held back (the hero not put back).
 	if (((ev & 0xFFFF) == 0x511F || (ev & 0xFFFF) == 0x5120) && IndivFallenHero() >= 0 && g.p2Joined && !g.suspended) {
@@ -1696,7 +1728,8 @@ int CoopUndoLockFor(int fallen) {
 		return before;
 	}
 	Log("coop: %s went down while %s waited on it -- the sequence undone", HeroName(fallen), HeroName(up));
-	int before = g_lock.hero == up ? g_lock.pic.leader : -1;
+	int before = g_lock.hero == up ? g_lock.pic.leader
+	           : g_seqHero == up && SequenceUnderWay() ? g_seqPic.leader : -1;   // (a corkscrew's ride kept, freedom)
 	UndoLock(t, up, true);
 	return before;
 }
@@ -1796,7 +1829,13 @@ static void UndoLock(Trio t, int up, bool lead) {
 	}
 	int before = g_lock.hero == up ? g_lock.pic.leader : -1;
 	if (g_lock.hero == up) RestoreLockPicture(g_lock.pic);
+	else if (g_seqHero == up && SequenceUnderWay()) {
+		// (a corkscrew's ride in freedom mode: its lock ended at 03C8, the hero kept)
+		before = g_seqPic.leader;
+		UndoSequence();
+	}
 	EndLock();
+	if (g_corkRide.hero == up) g_corkRide = {};
 	// The hero freed: the companion moves again, the lead, and a reset pass.
 	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
@@ -1818,7 +1857,7 @@ static void UndoLock(Trio t, int up, bool lead) {
 static void UnlockByPlayer(Trio t, int me, const char* player) {
 	Hero h = t.GetHero(me);
 	if (!h) return;
-	if (LockedByLevel(me, h) && g_lock.hero == me) {
+	if (LockedByLevel(me, h) && (g_lock.hero == me || g_corkRide.hero == me)) {
 		Log("coop: %s unlocked %s (R3 + B) -- its sequence undone", player, HeroName(me));
 		UndoLock(t, me, false);
 	} else if (g_seqHero == me && SequenceUnderWay()) {
@@ -1969,6 +2008,7 @@ static void NoteFreedomLock(Trio t, int waiter) {
 		float dx = h.Pos().x - p[0], dz = h.Pos().z - p[2];
 		if (dx * dx + dz * dz < 4.0f * 4.0f && fabsf(h.Pos().y - p[1]) < 4.0f) {
 			g_freedomLock = { waiter, GetTickCount(), "a corkscrew's circle" };
+			g_corkRide = { waiter, c };
 			Log("coop: freedom: %s waits on corkscrew %p (%.1f units off)", HeroName(waiter), c, sqrtf(dx * dx + dz * dz));
 			return;
 		}
@@ -2276,6 +2316,7 @@ void CoopFrame() {
 		Log("coop: level %d -> %d", g.lastLevel, level);
 		g.lastLevel = level;
 		g_trackBeforeSpy = nullptr;   // the old level's camera tracks are gone
+		g_corkRide = {};              // (and its corkscrews)
 		g.groupTookLead = g.groupPrevLeader = -1;
 		g_spyWalk.on = false;
 		g.joinHintPending = level > 0;
@@ -2634,6 +2675,7 @@ void CoopFrame() {
 			Hold(t, idx, "new order");
 		} else if (g.held[idx] && (leads || order == AI_FOLLOW_LEADER)) {
 			g.held[idx] = false;
+			if (g_corkRide.hero == idx) g_corkRide = {};
 			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : "order done");
 		}
 		g.lastOrder[idx] = (uint8_t)order;

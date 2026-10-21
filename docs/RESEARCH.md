@@ -2176,3 +2176,19 @@ both halves).
   Seen meanwhile (older, since freedom mode a43ba13): with Obelix through 03C8, its 4803 frees Asterix from the
   corkscrew lock 1 s after it starts (order done), and the walk onto the platform (482D) is not followed in
   freedom -- turnstile21 / 21c no longer reach 0058 (the autotest's P1 does not walk). Open.
+- Round 116 (user: keep the freedom corkscrew lock until the launch). LV2-1's platform in single player: Asterix
+  lands on the corkscrew's circle (its "on landing" event #10 = 0050: 4801, 4802, pillar 0901, detectors 1403 /
+  161B -- among them zone 03C8 = #121); Obelix's way to the turnstile crosses 03C8 (4803 frees Asterix, corkscrew
+  99C/99A); the turnstile's hits (#12: corkscrew 0996 "move up slightly", camera sector 0701) raise it; zone 0528
+  walks Asterix onto it (482D), at the top zone 0530 jumps him off (484C), the top's box 0058 gives him the lead.
+  In freedom mode (since a43ba13) 03C8's 4803 freed Asterix (order 0, "order done") 1 s after the corkscrew lock
+  (round 110), and 482D / 484C were "the level taking a player's hero" -- not followed: he rode up and stayed
+  (turnstile21 / 21c never reached 0058). Now the hero a corkscrew's circle locks in freedom (g_corkRide, set in
+  NoteFreedomLock, cleared when it is let go -- leads again / order done --, on an undo, at a level change) keeps
+  it: a game 4803 (caller in the exe) while it is held, order 3, within 4 units of the corkscrew's node is held
+  back (CoopDeferTrioEvent), the lock's bookkeeping run as for any 4803 (EndLock(true): the sequence goes on).
+  With the lock already ended, a fall's undo (UndoLock / CoopUndoLockFor) and R3 + B (UnlockByPlayer) now undo
+  the sequence's picture (g_seqPic) and report its leader (corkdown had lost the circle's re-arm after the revive:
+  Obelix got the lead back, the circle answers only the leader). Autotests: turnstile21 / 21c reach 0058 with the
+  4803 held back; turnstile21b still set back and Asterix locked again; corkdown restored, no lead back, Asterix
+  locked again after the revive; turnstile21e as round 115; pillar36l (LV3-6, R3 + B) as before.
