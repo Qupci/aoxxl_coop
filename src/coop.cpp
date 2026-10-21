@@ -148,6 +148,7 @@ struct CoopState {
 	DWORD    shopClosedAt = 0;
 	bool     shopLeadBack = false;      // the merchant's visit over: the lead goes back once the shopper is out
 	bool     shopForcedClosed = false;  // the merchant closed for the other player's dialogue (until the shopper is out)
+	int      lifterWaitsFor = -1;       // a lifter waits at the bottom for this hero (the other on it)
 } g;
 
 const int kJoinSettleFrames = 5;
@@ -1319,23 +1320,38 @@ static bool HeroFlying(Trio t) {
 	return false;
 }
 
+static void ResetCableCar(char* car, int hero);
+static char* NearestTowedCar(Hero h);
+
 bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Individual heroes: a cable car takes the hero who steps on it from the
 	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
 	// AI order 9) -- with the partner down the ride is not started: the hero
-	// reset (two AI ticks, as R3 + B) and put back.
+	// reset (two AI ticks, as R3 + B) and put back. The same while a lifter waits
+	// for that hero with the partner on it (WatchLifterHint): the car would lock it
+	// with the partner unable to pull.
 	{
 		extern void* g_trioEventCaller;
 		uintptr_t from = (uintptr_t)g_trioEventCaller;
 		int e = ev & 0xFFFF;
-		if ((e == 0x4801 || e == 0x4800 || e == 0x4812) && from >= 0x49AC80 && from < 0x49AD00 && IndivFallenHero() >= 0 &&
-		    g.p2Joined && !g.suspended) {
-			int up = IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+		bool lifter = g.lifterWaitsFor >= 0 && IndivFallenHero() < 0;
+		if ((e == 0x4801 || e == 0x4800 || e == 0x4812) && from >= 0x49AC80 && from < 0x49AD00 &&
+		    (IndivFallenHero() >= 0 || lifter) && g.p2Joined && !g.suspended) {
+			int up = lifter ? g.lifterWaitsFor : IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
 			if (e == 0x4812) {
-				StartAiCycle(up, "a cable car with the partner down");
-				IndivBlockPartnerSpot("a cable car");
+				StartAiCycle(up, lifter ? "a cable car with the partner on a lifter" : "a cable car with the partner down");
+				if (IndivFallenHero() >= 0) IndivBlockPartnerSpot("a cable car");
+				else {
+					// the car took the hero already (+0x7C bit 0x20 "rider on", 0x80 "free" gone):
+					// it would never offer itself again
+					Trio tc = GetTrio();
+					char* car = tc ? NearestTowedCar(tc.GetHero(up)) : nullptr;
+					if (car && (*(uint32_t*)(car + 0x7C) & 0xA0) == 0x20) ResetCableCar(car, up);
+					IndivPutOnSafeGround(up);
+				}
 			}
-			Log("coop: trio event %04X from %p held back -- the cable car waits for both heroes", e, (void*)from);
+			Log("coop: trio event %04X from %p held back -- %s", e, (void*)from,
+			    lifter ? "the partner is on a waiting lifter" : "the cable car waits for both heroes");
 			return true;
 		}
 	}
@@ -1514,15 +1530,57 @@ void CloseShopFor(const char* why) {
 
 void CoopNoteTrioEventFlagged(unsigned eventId) { NoteTrioEventFlagged(eventId); }
 
+// Still locked by the level: held by the game, or told to wait (+0x564 = 3,
+// 0x4802; 0x4803 sets 0).
+static bool LockedByLevel(int idx, Hero h) {
+	return h && (g.held[idx] || (g_lock.hero == idx && *(uint8_t*)(h.raw() + 0x564) == 3));
+}
+
+static void UndoLock(Trio t, int up, bool lead);
+
+// A rope-pulled cable car (CKHkTowedTelepher 2,159) lets go of `hero` (0x512D)
+// and goes back to its start (vf16).
+static void ResetCableCar(char* car, int hero) {
+	char* node = *(char**)(car + 0x10);
+	char* fr = node ? *(char**)(node + 4) : nullptr;
+	if (!fr) return;
+	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+	uint32_t f0 = *(uint32_t*)(node + 0x10), h0 = *(uint32_t*)(car + 0x7C);
+	((SendEventFn)(*(void***)car)[5])(car, nullptr, 0x512D, nullptr);
+	((void(__fastcall*)(char*, void*))(*(void***)car)[16])(car, nullptr);
+	node = *(char**)(car + 0x10);
+	fr = node ? *(char**)(node + 4) : nullptr;
+	// vf16 is its level-start init, which ends by hiding the car (node +0x10
+	// bit 1) -- the model was gone, the rope still there: shown again.
+	if (node && !(f0 & 2)) *(uint32_t*)(node + 0x10) &= ~2u;
+	Log("coop: the cable car %p let go of %s and went back to its start (node %p flags %08X -> %08X, hook +7C %08X -> %08X, "
+	    "now at %.1f %.1f %.1f)", car, HeroName(hero), node, f0, node ? *(uint32_t*)(node + 0x10) : 0, h0,
+	    *(uint32_t*)(car + 0x7C), fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0, fr ? ((float*)(fr + 0x80))[2] : 0);
+}
+
+// The rope-pulled cable car nearest hero `h` (within 12 units), else null.
+static char* NearestTowedCar(Hero h) {
+	char* best = nullptr;
+	float bestD = 12.0f * 12.0f;
+	for (unsigned i = 0, n = h ? GetNumLvlClassInstances(2, 159) : 0; i < n; i++) {
+		char* car = (char*)GetLvlObject(2, 159, i);
+		char* node = car ? *(char**)(car + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr) continue;
+		const float* p = (const float*)(fr + 0x80);
+		float d2 = (h.Pos() - Vector3(p[0], p[1], p[2])).len2();
+		if (d2 < bestD) { bestD = d2; best = car; }
+	}
+	return best;
+}
+
 void CoopUndoLockFor(int fallen) {
 	int up = fallen == HERO_ASTERIX ? HERO_OBELIX : fallen == HERO_OBELIX ? HERO_ASTERIX : -1;
 	if (up < 0 || !g.p2Joined) return;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
 	if (!h) return;
-	// still locked: held by the game, or told to wait (+0x564 = 3, 0x4802; 0x4803 sets 0)
-	bool waits = g_lock.hero == up && *(uint8_t*)(h.raw() + 0x564) == 3;
-	if (!g.held[up] && !waits) {
+	if (!LockedByLevel(up, h)) {
 		if (!SequenceUnderWay()) return;
 		// Freed already, but the platform's turn not finished: back to before it set off.
 		Log("coop: %s went down before the spinning platform's turn ended -- the sequence undone", HeroName(fallen));
@@ -1533,33 +1591,24 @@ void CoopUndoLockFor(int fallen) {
 		return;
 	}
 	Log("coop: %s went down while %s waited on it -- the sequence undone", HeroName(fallen), HeroName(up));
+	UndoLock(t, up, true);
+}
+
+// The locked sequence of hero `up` back to before it started, the hero freed
+// (it takes the lead if `lead`) and put on its last solid ground.
+static void UndoLock(Trio t, int up, bool lead) {
 	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) the
-	// locked hero boarded lets go (0x512D) and goes back to its start (vf16).
+	// locked hero boarded lets go and goes back to its start.
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n; i++) {
 		char* car = (char*)GetLvlObject(2, 159, i);
-		char* node = car ? *(char**)(car + 0x10) : nullptr;
-		char* fr = node ? *(char**)(node + 4) : nullptr;
-		if (!fr) continue;
-		if (g_lock.hero != up || car != g_lock.car) continue;
-		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
-		uint32_t f0 = *(uint32_t*)(node + 0x10), h0 = *(uint32_t*)(car + 0x7C);
-		((SendEventFn)(*(void***)car)[5])(car, nullptr, 0x512D, nullptr);
-		((void(__fastcall*)(char*, void*))(*(void***)car)[16])(car, nullptr);
-		node = *(char**)(car + 0x10);
-		fr = node ? *(char**)(node + 4) : nullptr;
-		// vf16 is its level-start init, which ends by hiding the car (node +0x10
-		// bit 1) -- the model was gone, the rope still there: shown again.
-		if (node && !(f0 & 2)) *(uint32_t*)(node + 0x10) &= ~2u;
-		Log("coop: the cable car %p let go of %s and went back to its start (node %p flags %08X -> %08X, hook +7C %08X -> %08X, "
-		    "now at %.1f %.1f %.1f)", car, HeroName(up), node, f0, node ? *(uint32_t*)(node + 0x10) : 0, h0,
-		    *(uint32_t*)(car + 0x7C), fr ? ((float*)(fr + 0x80))[0] : 0, fr ? ((float*)(fr + 0x80))[1] : 0, fr ? ((float*)(fr + 0x80))[2] : 0);
+		if (car && g_lock.hero == up && car == g_lock.car) ResetCableCar(car, up);
 	}
 	if (g_lock.hero == up) RestoreLockPicture(g_lock.pic);
 	EndLock();
-	// The hero freed: the companion moves again, it leads, and a reset pass.
+	// The hero freed: the companion moves again, it leads (`lead`), and a reset pass.
 	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
-	if (t.Leader() != up) ((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, up == HERO_ASTERIX ? 0x4800 : 0x4801, nullptr);
+	if (lead && t.Leader() != up)((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, up == HERO_ASTERIX ? 0x4800 : 0x4801, nullptr);
 	g.held[up] = false;
 	StartAiCycle(up, "its sequence undone");
 	IndivPutOnSafeGround(up);
@@ -2773,7 +2822,7 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 // hero as the trio leader, the spin's throw step 0x0D; the Roman then ticks with
 // that hero as the leader until it lands (ProximityPassTo), and the thrower
 // whistles (bank +0x280, the companion's "ready" whistle). LB with no Roman
-// spinning, or the other player too far: the other hero's "no".
+// spinning, or the other player too far or down: the other hero's "no".
 const float kPassRange = 30.0f;
 
 static void PlaySound(Hero h, uint32_t bankOffset) {
@@ -2799,9 +2848,10 @@ static void WatchLbPass(int idx, Hero h) {
 	uint8_t step = *(uint8_t*)(h.raw() + 0x38E) & 0x3F;
 	bool spinning = roman && step == 0x0C && *(uint8_t*)(roman + 0x21) == 3;
 	float apart = sqrtf((h.Pos() - o.Pos()).len2());
-	if (!spinning || apart > kPassRange || g.held[other] || !HeroModePlayable(o.Flags18())) {
-		Log("coop: %s pressed LB: %s", HeroName(idx), !spinning ? "no Roman spinning" : apart > kPassRange ?
-		    "the other player is too far" : "the other player is busy");
+	bool down = IndivFallen(other);
+	if (!spinning || down || apart > kPassRange || g.held[other] || !HeroModePlayable(o.Flags18())) {
+		Log("coop: %s pressed LB: %s", HeroName(idx), !spinning ? "no Roman spinning" : down ? "the other player is down" :
+		    apart > kPassRange ? "the other player is too far" : "the other player is busy");
 		PlaySound(o, 0x200);
 		return;
 	}
@@ -2830,7 +2880,7 @@ static void WatchLbPass(int idx, Hero h) {
 }
 
 // Hint: while a player's hero spins a Roman (its grab-spin at step 0x0C, the
-// Roman held in state 3) with the other player in passing range, "LB passes
+// Roman held in state 3) with the other player in passing range and not down, "LB passes
 // it" -- the first three spins of a level, until a Roman has been passed once.
 static void WatchSpinHint(int idx, Hero h) {
 	if (!g.p2Joined || g.suspended || (idx != g.p1Hero && idx != g.p2Hero) || !h) return;
@@ -2839,12 +2889,12 @@ static void WatchSpinHint(int idx, Hero h) {
 	bool started = spin && !g.spinning[idx];
 	bool ended = !spin && g.spinning[idx];
 	g.spinning[idx] = spin;
-	if (ended && !g.spinning[OtherHero(idx)]) HintHide(HINT_PASS);
+	if ((ended && !g.spinning[OtherHero(idx)]) || (spin && IndivFallen(OtherHero(idx)))) HintHide(HINT_PASS);
 	if (!started || g.passDone || g.spinHints >= 3) return;
 	Trio t = GetTrio();
 	int other = idx == g.p1Hero ? g.p2Hero : g.p1Hero;
 	Hero o = t ? t.GetHero(other) : Hero();
-	if (!o || (h.Pos() - o.Pos()).len2() > kPassRange * kPassRange) return;
+	if (!o || IndivFallen(other) || (h.Pos() - o.Pos()).len2() > kPassRange * kPassRange) return;
 	g.spinHints++;
 	int player = idx == g.p1Hero ? 0 : 1;
 	wchar_t text[96];
@@ -2945,6 +2995,12 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	}
 	IndivAfterFallenTick(heroIndex);
 	IndivAfterHeroTick(heroIndex);
+	// A lifter waits for this hero with the partner on it: no cable car (WatchLifterHint).
+	static int s_keptOff = 0;
+	if (heroIndex == g.lifterWaitsFor && g.p2Joined && !g.suspended && IndivFallenHero() < 0 && IndivLeaveCableCar(heroIndex) &&
+	    s_keptOff++ < 20)
+		Log("coop: %s kept off a cable car -- the lifter waits for it with %s on it", HeroName(heroIndex),
+		    HeroName(OtherHero(heroIndex)));
 	IndivLeave(g.indivPrev);
 	g.indivPrev = -1;
 }
@@ -3141,9 +3197,17 @@ static void ShowJoinHint(Trio t) {
 // (+8 >> 1) & 3 == 0 with flag +8 bit 0) with one player's hero on its platform
 // (+0x50: the object under a hero's feet, hero +0x280, on the ground) -- in co-op
 // it waits for both (proximity.cpp). Shown after 4 s of waiting, not at once.
+// The hero it waits for locked by the level (LV2-1: Asterix on the spinning
+// platform's circle waits for Obelix at the turnstile, Obelix went back to the
+// lifter) can't come: after 2 s its sequence is undone as for a fallen partner
+// (the circle's light pillar back, the hero freed and on its last solid ground).
+// Left alone, the lifter's own wait (+0x34, ~8 s) dropped him onto it still locked.
+// While it waits, that hero can't board a cable car either (as with the partner
+// down): its situation 2 is left and its boarding events held back.
 static void WatchLifterHint(Trio t) {
 	static char* waiting = nullptr;
 	static DWORD since = 0;
+	g.lifterWaitsFor = -1;
 	if (!g.p2Joined || g.suspended || !t) { waiting = nullptr; return; }
 	Hero h[2] = { t.GetHero(HERO_ASTERIX), t.GetHero(HERO_OBELIX) };
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n && i < 32; i++) {
@@ -3156,6 +3220,14 @@ static void WatchLifterHint(Trio t) {
 			        *(void**)(h[k].raw() + 0x280) == platform;
 		if (on[0] == on[1]) continue;
 		if (waiting != l) { waiting = l; since = GetTickCount(); }
+		int missing = on[0] ? HERO_OBELIX : HERO_ASTERIX;
+		g.lifterWaitsFor = missing;
+		if (GetTickCount() - since >= 2000 && LockedByLevel(missing, h[missing])) {
+			Log("coop: the lifter waits for %s, locked by the level -- its sequence undone", HeroName(missing));
+			UndoLock(t, missing, false);
+			since = GetTickCount();
+			return;
+		}
 		if (GetTickCount() - since < 4000) return;
 		wchar_t text[64];
 		swprintf(text, 64, L"The lifter waits for %s\nto go up", HintHeroName(on[0] ? HERO_OBELIX : HERO_ASTERIX));

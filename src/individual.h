@@ -64,6 +64,9 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float before[3]);
 bool IndivBlockPartnerSpotFrameStart(const char* what);
 // Hero `hero` onto its last solid ground (a sequence undone).
 void IndivPutOnSafeGround(int hero);
+// Hero `hero` about to board a cable car (situation 2): out of it and onto its
+// last solid ground. True: it was.
+bool IndivLeaveCableCar(int hero);
 // Hero `hero` stands where a launcher offers itself (its prompt): no safe spot there.
 void IndivNoteLauncherSpot(int hero);
 // Hero `hero` is at a launcher: a fallen partner is revived beside it.

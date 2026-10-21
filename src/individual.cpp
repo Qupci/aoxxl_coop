@@ -465,6 +465,29 @@ bool IndivHoldsBack(char* hook) {
 	return true;
 }
 
+// A cable car: the hero's situation 2 (handler 0x49AB50, table +0x3E4 indexed by
+// +0x3E9; 0x49A670 is situation 1's -- the check against it never matched) boards
+// it on a later tick (the car's 0x512B, the trio's 0x4801 / 0x4812) -- once
+// boarded he is the car's. Its exit run now (as the chooser would). True: it was in it.
+static bool LeaveCableCarSituation(Hero h) {
+	uint8_t* sit = (uint8_t*)(h.raw() + 0x3E9);
+	typedef char(__fastcall* SitFn)(void* self, void* edx, int mode, int other);
+	SitFn* table = *(SitFn**)(h.raw() + 0x3E4);
+	if (*sit != 0x02 || !table || (uintptr_t)table[0x02] != 0x49AB50) return false;
+	void* owner = *(void**)(h.raw() + 0x3E0);
+	if (owner) table[0x02](owner, nullptr, 2, 0xFF);
+	*sit = 0xFF;
+	return true;
+}
+
+bool IndivLeaveCableCar(int hero) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(hero) : Hero();
+	if (!h || !LeaveCableCarSituation(h)) return false;
+	IndivPutOnSafeGround(hero);
+	return true;
+}
+
 namespace {
 
 void BlockPartnerGrounds() {
@@ -474,17 +497,8 @@ void BlockPartnerGrounds() {
 	Hero h = t ? t.GetHero(Other(down)) : Hero();
 	if (!h) return;
 	const char* what = nullptr;
-	// A cable car: the hero's situation 2 (FUN_0049A670) boards it on a later tick
-	// (the car's 0x512B, the trio's 0x4801 / 0x4812) -- once boarded he is the
-	// car's. Its exit run now (as the chooser would), and the hero put back.
-	uint8_t* sit = (uint8_t*)(h.raw() + 0x3E9);
-	typedef char(__fastcall* SitFn)(void* self, void* edx, int mode, int other);
-	SitFn* sitTable = *(SitFn**)(h.raw() + 0x3E4);
-	if (*sit == 0x02 && sitTable && (uintptr_t)sitTable[0x02] == 0x49A670) {
-		void* owner = *(void**)(h.raw() + 0x3E0);
-		SitFn* table = sitTable;
-		if (owner) table[0x02](owner, nullptr, 2, 0xFF);
-		*sit = 0xFF;
+	// a cable car: out of its situation, and put back
+	if (LeaveCableCarSituation(h)) {
 		IndivBlockPartnerSpot("a cable car");
 		return;
 	}

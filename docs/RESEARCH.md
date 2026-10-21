@@ -1907,3 +1907,20 @@ both halves).
   went every 10 s (module, innermost game return address). Its own 1 ms Sleep loop does not change the game's
   timer, but an earlier version called timeBeginPeriod and so hid the drop. Autotest soak: DSOAL 45 fps, DSOAL +
   timerfix 62, IndirectSound 61.5.
+- Round 94 (2026-10-21, user: LV2-1 softlock, xxl_coop.pass_to_down.log). (1) A lifter waiting for a hero locked by
+  the level: Asterix on the spinning platform's circle (event 0050: trio 4801/4802, pillar 0x901) while Obelix rides
+  the lifter back down and stands on it. The lifter's own wait (+0x34, counts while Asterix is held -- the co-op
+  zeroing in TickLife is not on that path) teleported him onto it after ~8 s, still locked, and the pillar stayed
+  dark. Now WatchLifterHint (lifter state 0 + flag bit 0, one hero on +0x50) undoes the waited-for hero's lock
+  after 2 s with the fallen-partner undo (UndoLock: pillar back, detectors / circle flags, rope cable car reset,
+  trio 4803, hero on its last solid ground; the lead is not moved). While such a lifter waits, that hero can't
+  board a rope cable car either (g.lifterWaitsFor: its situation 2 left after its tick, the hero-tick 4800/4801/4812
+  held back, a car left in "rider on" +0x7C & 0xA0 == 0x20 reset). (2) Situation 2's handler is 0x49AB50: the
+  table at hero +0x3E4 is indexed by +0x3E9 ([0] 0x49A630, [1] 0x49A670, [2] 0x49AB50). Round 63's check against
+  0x49A670 never matched -- the cable car block with a partner down only ever worked through the event hold-back;
+  it now leaves situation 2 as intended (cabled2: three approaches put back). Without that exit the car offered
+  itself again (0x0C0E) in the frame of the put-back, took the hero back and stayed in 0x2571 for good. (3) LB
+  pass to a fallen partner: no pass, the partner's "no" (bank +0x200); the pass hint isn't shown (and is hidden
+  if the partner falls mid-spin). Autotests lifterlock, liftercar (LV2-1: Asterix in the cable car, Obelix on the
+  lifter; then the car boards again), liftcab33 (-Level 3: releasing the rope already frees Asterix there), pass22
+  with XXL_DOWNAT=1:3500; env XXL_LIFTLOG adds lifter / rope car fields to the 10 Hz log.

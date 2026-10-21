@@ -2615,6 +2615,27 @@ const Step kCableD33[] = {
 	END(21000),
 };
 
+// liftcab33 (-Level 3, XXL_LIFTLOG=1): cabled33 with Obelix going onto the
+// sector's lifter instead of falling, the car halfway -- the lifter waits for
+// Asterix: the car back at its start, Asterix on solid ground, then ride again.
+const Step kLiftCab33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	SHOT(4000, "liftcab33_1"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(5500, HERO_OBELIX, 287.0f, 10.43f, -209.1f, 3200), SHOT(8500, "liftcab33_2"),
+	VPAD(9000, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(9500, HERO_OBELIX, 279.832f, 17.8f, -268.468f),
+	SHOT(11000, "liftcab33_3"), SHOT(14000, "liftcab33_4"),
+	PLACEAT(17000, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(17000, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	SHOT(18500, "liftcab33_5"),
+	VPAD(19000, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(20500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2500), SHOT(23000, "liftcab33_6"),
+	VPAD(24000, 1, 0, 0, 0, "p2 release"),
+	END(25000),
+};
+
 // p2dir (level 2): player 2 turns their camera (right stick) and then pushes
 // the left stick up: Obelix must walk away from player 2's camera.
 const Step kP2Dir[] = {
@@ -3244,6 +3265,26 @@ const Step kCorkDown[] = {
 	END(19000),
 };
 
+// lifterlock (level 2, XXL_LIFTLOG=1): the user's LV2-1 softlock. Both heroes ride
+// the lifter up, Asterix goes onto the spinning platform's circle (locked, waits
+// for Obelix at the turnstile), Obelix steps off the lifter (it goes down) and back
+// on: the lifter waits for Asterix, who can't come.
+const Step kLifterLock[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -746.697f, 506.5f, -992.08f), PLACEAT(1500, HERO_OBELIX, -746.697f, 506.5f, -990.5f),
+	SHOT(4000, "lifterlock_0"),
+	SHOT(9000, "lifterlock_1"),
+	PLACEAT(9000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),   // walked over: a trail of safe spots
+	GLIDEAT(9300, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(11000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	GLIDEAT(12500, HERO_OBELIX, -745.719f, 514.5f, -979.123f, 1500),
+	SHOT(15000, "lifterlock_2"),
+	PLACEAT(19000, HERO_OBELIX, -746.697f, 517.0f, -992.08f),
+	SHOT(21000, "lifterlock_3"), SHOT(30000, "lifterlock_4"), SHOT(40000, "lifterlock_5"), SHOT(55000, "lifterlock_6"),
+	END(56000),
+};
+
 // beamundo (-Level 4 sector 2..., XXL_DOWNAT=1:7000): the hearth by the rotary
 // beam lit, Asterix onto its blue circle (he waits for Obelix), Obelix falls --
 // undone; the circle's group and what it changed are logged.
@@ -3329,6 +3370,35 @@ const Step kSwing[] = {
 	VPAD(6400, 1, PAD_X, 0, 0, "p2 X"), VPAD(6550, 1, 0, 0, 0, "p2 release"),
 	SHOT(7000, "swing_02"),
 	END(9000),
+};
+
+// liftercar (level 2, XXL_LIFTLOG=1): Asterix sits in the cable car (locked,
+// waits for Obelix at the rope), Obelix goes onto the lifter instead: undone as
+// for a fallen Obelix. Then the car is worked as in swing: still working.
+const Step kLifterCar[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1400, HERO_ASTERIX, -782.0f, 511.5f, -1059.9f),   // walked over: a trail of safe spots
+	GLIDEAT(1500, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	P1(2800, 0, -1, 0, "p1 left (held)"), P1(3300, 0, 0, 0, "p1 neutral"),
+	PLACEAT(3400, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	SHOT(4500, "liftercar_0"),
+	PLACEAT(5000, HERO_OBELIX, -746.697f, 506.5f, -992.08f),
+	SHOT(7500, "liftercar_1"), SHOT(10000, "liftercar_2"),
+	GLIDEAT(12000, HERO_ASTERIX, -778.0f, 511.5f, -1059.9f, 1500),   // away from the car, as a player walks off
+	{ 14000, S_PLACE, HERO_OBELIX, 1, 0, 0, 0, "obelix to rope" },
+	GLIDEAT(14100, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	P1(15400, 0, -1, 0, "p1 left (held)"), P1(15900, 0, 0, 0, "p1 neutral"),
+	PLACEAT(16000, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	{ 16600, S_SCATTER, HERO_OBELIX, 0, 0, 0, 0, "scatter" },
+	SHOT(17200, "liftercar_3"),
+	VPAD(17300, 1, PAD_X, 0, 0, "p2 X"), VPAD(17450, 1, 0, 0, 0, "p2 release"),
+	VPAD(17900, 1, PAD_X, 0, 0, "p2 X"), VPAD(18050, 1, 0, 0, 0, "p2 release"),
+	VPAD(18500, 1, PAD_X, 0, 0, "p2 X"), VPAD(18650, 1, 0, 0, 0, "p2 release"),
+	VPAD(19100, 1, PAD_X, 0, 0, "p2 X"), VPAD(19250, 1, 0, 0, 0, "p2 release"),
+	VPAD(19700, 1, PAD_X, 0, 0, "p2 X"), VPAD(19850, 1, 0, 0, 0, "p2 release"),
+	SHOT(20500, "liftercar_4"),
+	END(22000),
 };
 
 // swingundo (level 2, XXL_DOWNAT=1:3500): Asterix on the cable car, Obelix
@@ -3639,7 +3709,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopzone", kShopZone),
 	SCENARIO("shopsave", kShopSave),
 	SCENARIO("cabled33", kCableD33),
+	SCENARIO("liftcab33", kLiftCab33),
 	SCENARIO("corkdown", kCorkDown),
+	SCENARIO("lifterlock", kLifterLock),
+	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),
@@ -3965,6 +4038,19 @@ void LogTick(float t) {
 		if (meca) line.Add(" | prompt %p kind %d on %d trio48 %p/%d", *(void**)(meca + 0x90), *(uint8_t*)(gm + 0x68),
 		                   *(uint32_t*)(gm + 0x5C) & 1, *(void**)(tr.raw() + 0x48), (*(uint32_t*)(tr.raw() + 0x3F4) >> 3) & 1);
 	}
+	if (getenv("XXL_LIFTLOG"))   // lifters: flags +8 (state (>> 1) & 3), height, wait time +0x34, platform +0x50
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n && i < 4; i++) {
+			KHook* l = (KHook*)GetLvlObject(2, 47, i);
+			if (!l || !l->node || !l->node->matrix) continue;
+			char* r = (char*)l;
+			line.Add(" | lifter %u f8 %08X y %.2f w %.1f pl %p", i, *(uint32_t*)(r + 8), ((float*)((char*)l->node->matrix + 0x40))[1],
+			         *(float*)(r + 0x34), *(void**)(r + 0x50));
+		}
+	if (getenv("XXL_LIFTLOG"))   // rope cable cars (CKHkTowedTelepher 2,159): flags +0x7C, zone answer +0x20 vs +0x84
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n && i < 2; i++) {
+			char* c = (char*)GetLvlObject(2, 159, i);
+			if (c) line.Add(" | car %u 7C %08X 20 %p 84 %p", i, *(uint32_t*)(c + 0x7C), *(void**)(c + 0x20), *(void**)(c + 0x84));
+		}
 	if (at.probe) {
 		// Everything that might say "a cutscene has the player": cinematic scenes,
 		// the camera service's track and flags, game manager / trio flags, the
