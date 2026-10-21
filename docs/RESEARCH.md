@@ -2282,3 +2282,10 @@ both halves).
   fixes): vtable slot 15 hook -- a block ticked with bit 0x40 and slot -1 gets the bit cleared and 10 tries, so
   it requests a slot first (vf13's own path). Logs to Game Files\xxl_cutscenefix.log. Autotests keg23 / keg23s
   (single player): crash before, with the asi block #16 takes slot 1, the cutscene ends (25.8 s), co-op resumes.
+  Round 124b (user's pad test: no crash; but the game without xxl_coop.asi and the fix asi does not crash there,
+  so the mod sets it off): the fix moved into xxl_coop.asi (hooks.cpp PathBlocTickHook, "hooks: cutscene path
+  block ... asks for one first", 20 logs), xxl_cutscenefix.asi removed. keg23 sequence: block #16 gets slot 2 at
+  the cutscene's start, vf14 drops it at 21.08 s while it is still ticked; the fix takes slot 1, cutscene ends.
+  The fix also fired for 7 other blocks in the user's play: running without a slot is common, the stray write
+  usually harmless. How the mod sets off the keg's case (stop then tick in one cutscene, or only the heap layout
+  under the write) is not known.
