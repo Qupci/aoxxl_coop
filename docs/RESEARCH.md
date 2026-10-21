@@ -2071,3 +2071,9 @@ both halves).
   player's hero posing as the leader (proximity TickLife), so Asterix's torch burned while Obelix led. A carried
   torch now ticks with the real leader (as the corkscrew / plates). beam42f: timer 2.73 held while Obelix led.
   XXL_LIFTLOG logs carried torches.
+- Round 107 (2026-10-21, user: freedom mode fine in LV4-2 and LV5-5; freedom_romans should rely on the level's
+  placed markers, not pathfinding cells). The fallback (a random walkable graph cell + a ground drop with
+  FUN_004493C0) is removed (PfSpotNear gone): a Roman comes only at a squad spawn marker within 40 units, 6+ from
+  both heroes, out of every view, walkable to (PfReachable -- the reachability check stays, so none behind a shut
+  door). LV2-3 by the hearth has no squad marker within 40 units at all: no Romans there (logged once: markers
+  within 40 -- by a hero / in view / not walkable to).

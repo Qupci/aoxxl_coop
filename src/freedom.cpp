@@ -7,7 +7,6 @@
 #include "pathfind.h"
 #include "trio.h"
 
-#include <cmath>
 #include <cstdlib>
 
 // Freedom mode's Romans ([experimental] freedom_romans): while the level would
@@ -66,45 +65,24 @@ char* SquadFor(const Vector3& at, int* pool) {
 	return best;
 }
 
-// The ground under `p`, as the game drops a squad's reinforcement point (FUN_00530060):
-// FUN_004493C0 on the collision world ([[0x6621F4] + 0x50]), thiscall(params
-// { radius 0.3, height 2, 0 }, result, point, 1) ret 0x10 -- result +0x14 the hit's
-// kind (4 nothing), +0x18 the point on the ground.
-bool GroundUnder(const Vector3& p, float* y) {
-	struct { float radius, height; uint32_t flags; } params = { 0.3f, 2.0f, 0 };
-	uint8_t out[0x40] = {};
-	*(int*)(out + 0x14) = 4;
-	float pt[3] = { p.x, p.y, p.z };
-	typedef void(__fastcall* DropFn)(char* self, void* edx, void* params, void* out, float* pt, int n);
-	__try {
-		char* g = *(char**)0x6621F4;
-		char* world = g ? *(char**)(g + 0x50) : nullptr;
-		if (!world) return false;
-		((DropFn)0x4493C0)(world, nullptr, &params, out, pt, 1);
-	} __except (EXCEPTION_EXECUTE_HANDLER) {
-		return false;
-	}
-	if (*(int*)(out + 0x14) == 4) return false;
-	*y = *(float*)(out + 0x1C);
-	return true;
-}
-
 bool InAView(const Vector3& p) {
 	float c[3] = { p.x, p.y, p.z };
 	return KlusterSphereInAnyView(c, 1.5f, 40.0f);
 }
 
-// Where a Roman comes in for `h`, as squads bring theirs: a spawn marker (any
-// squad's: +0x5C, 8 bytes each, +0 -> position; count +0x64) within 30 units the
-// hero can walk to, at least 6 from both heroes and in no player's view (the
-// co-op rule for squad markers) -- the nearest. Else a place the hero can walk
-// to (the level's pathfinding graph: not behind a shut door) with ground at its
-// height under it (the graph's walkable cells take in shallow water: LV2-3's
-// Romans there drowned), out of view if one is.
-bool SpawnPoint(Trio t, Hero h, Vector3* at, const char** how) {
+// Where a Roman comes in for `h`, as squads bring theirs: a spawn marker the
+// level placed (any squad's: +0x5C, 8 bytes each, +0 -> position; count +0x64)
+// within 40 units, at least 6 from both heroes, in no player's view (the co-op
+// rule for squad markers) and one the hero can walk to (the level's pathfinding
+// graph: not behind a shut door) -- the nearest. None, no Roman: places picked
+// off the graph's cells were unreliable (its walkable cells take in shallow
+// water -- LV2-3's Romans there drowned).
+bool SpawnPoint(Trio t, Hero h, Vector3* at) {
 	Hero ha = t.GetHero(HERO_ASTERIX), ho = t.GetHero(HERO_OBELIX);
-	float bestD = 30.0f * 30.0f;
+	const float kReach = 40.0f;
+	float bestD = kReach * kReach;
 	bool have = false;
+	int total = 0, nearHero = 0, seen = 0, unreachable = 0;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 		char* sq = (char*)GetLvlObject(4, 26, i);
 		char* list = sq ? *(char**)(sq + 0x5C) : nullptr;
@@ -114,26 +92,22 @@ bool SpawnPoint(Trio t, Hero h, Vector3* at, const char** how) {
 			if (!p) continue;
 			Vector3 pv(p[0], p[1], p[2]);
 			float d = (pv - h.Pos()).len2();
-			if (d >= bestD || (ha && (ha.Pos() - pv).len2() < 36.0f) || (ho && (ho.Pos() - pv).len2() < 36.0f)) continue;
-			if (InAView(pv) || PfReachable(h.Pos(), pv) != PF_YES) continue;
+			if (d >= kReach * kReach) continue;
+			total++;
+			if ((ha && (ha.Pos() - pv).len2() < 36.0f) || (ho && (ho.Pos() - pv).len2() < 36.0f)) { nearHero++; continue; }
+			if (InAView(pv)) { seen++; continue; }
+			if (PfReachable(h.Pos(), pv) != PF_YES) { unreachable++; continue; }
+			if (d >= bestD) continue;
 			bestD = d;
 			*at = pv;
 			have = true;
 		}
 	}
-	if (have) { *how = "a spawn marker"; return true; }
-	bool found = false, hidden = false;
-	for (int tries = 0; tries < 30 && !hidden; tries++) {
-		Vector3 c;
-		if (!PfSpotNear(h.Pos(), 3.0f, 10.0f, &c)) break;
-		float gy;
-		if (!GroundUnder(Vector3(c.x, h.Pos().y + 1.5f, c.z), &gy) || fabsf(gy - h.Pos().y) >= 1.0f) continue;
-		c.y = gy + 0.5f;
-		bool unseen = !InAView(c);
-		if (!found || unseen) { *at = c; found = true; hidden = unseen; }
-	}
-	*how = hidden ? "walkable ground out of view" : "walkable ground (in view)";
-	return found;
+	static int s_told = 0;
+	if (!have && s_told++ < 5)
+		Log("freedom: spawn markers within %.0f units of %s: %d -- %d by a hero, %d in view, %d not walkable to", kReach,
+		    HeroName(t.GetHero(HERO_ASTERIX).raw() == h.raw() ? HERO_ASTERIX : HERO_OBELIX), total, nearHero, seen, unreachable);
+	return have;
 }
 
 void SpawnFor(int hero, Trio t, Hero h) {
@@ -145,9 +119,8 @@ void SpawnFor(int hero, Trio t, Hero h) {
 		return;
 	}
 	Vector3 at;
-	const char* how = "";
-	if (!SpawnPoint(t, h, &at, &how)) {
-		if (w.noneTold++ < 3) Log("freedom: no place near %s for a Roman", HeroName(hero));
+	if (!SpawnPoint(t, h, &at)) {
+		if (w.noneTold++ < 3) Log("freedom: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
 		return;
 	}
 	uint32_t args[3] = { 1, (uint32_t)(uintptr_t)&at, (uint32_t)pool };
@@ -160,8 +133,8 @@ void SpawnFor(int hero, Trio t, Hero h) {
 	((CmdFn)(*(void***)sq)[55])(sq, nullptr, args);
 	char alive1 = *(char*)(rec + 0x11);
 	w.sent++;
-	Log("freedom: a Roman of squad %p (pool %d) sent at %s from %s (%.1f %.1f %.1f): alive %d -> %d [%d/%d]", sq, pool,
-	    HeroName(hero), how, at.x, at.y, at.z, alive0, alive1, w.sent, kMaxPerWait);
+	Log("freedom: a Roman of squad %p (pool %d) sent at %s from a spawn marker (%.1f %.1f %.1f): alive %d -> %d [%d/%d]", sq, pool,
+	    HeroName(hero), at.x, at.y, at.z, alive0, alive1, w.sent, kMaxPerWait);
 }
 
 } // namespace
