@@ -32,6 +32,7 @@
 #include "pads.h"
 #include "hints.h"
 #include "individual.h"
+#include "freedom.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -420,9 +421,24 @@ static void RestoreLockPicture(const LockPicture& p) {
 	    flags);
 }
 
-void Hold(Trio t, int idx, const char* why) {
+// Freedom mode ([coop] freedom): the level never takes a player's hero -- no
+// "wait here" (light pillars, the rotary beam's circle), no walks to markers; the
+// player does it by hand. Cable cars still do: the rope-pulled one (order 9) and
+// the automatic CKHkTelepher (12, external control). Not the mod's own holds (the
+// machine gun Obelix's player asked to join).
+static bool FreedomLetsHold(int order) {
+	return !g_config.freedom || order == AI_USE_CABLECAR || order == AI_EXTERNAL_CTRL;
+}
+
+void Hold(Trio t, int idx, const char* why, bool modOwn = false) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
+	if (!modOwn && !FreedomLetsHold((int)h.Order())) {
+		static int s_told = 0;
+		if (s_told++ < 40)
+			Log("coop: freedom: %s stays its player's (%s, AI order %d not followed)", HeroName(idx), why, (int)h.Order());
+		return;
+	}
 	g.held[idx] = true;
 	g.aiCycle[idx] = 0;   // the game's now; no reset pass afterwards
 	uint8_t f = *F18(h);
@@ -1595,6 +1611,7 @@ static bool LockedByLevel(int idx, Hero h) {
 	if (!h) return false;
 	uint8_t order = *(uint8_t*)(h.raw() + 0x564);
 	bool waits = order == AI_WAIT || order == AI_HANG_ON_BEAM || order == AI_USE_CABLECAR;
+	if (g_config.freedom) return waits && g.held[idx];   // only a cable car holds a hero
 	return waits && (g.held[idx] || g_lock.hero == idx);
 }
 
@@ -1675,6 +1692,28 @@ static void WatchPendingLead(Trio t) {
 	g_pendingLead.who = -1;
 }
 
+// Freedom mode and the rotary beam (CKHkRotaryBeam 2,57; LV4-2): the level asks
+// the hero on its circle to hang on it (beam event 0x0C02 -> AI order 8) when the
+// beam is over him (+8 bit 2). A player's jump never catches it -- only the AI's
+// order 8 does. So the player's jump (body 0x0E) while the beam is over him hands
+// the hero to the game for that ride; it comes back when the beam lets go.
+static void WatchFreedomBeam(Trio t) {
+	if (!g_config.freedom || !t || !g.p2Joined || g.suspended) return;
+	bool over = false;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n && !over; i++) {
+		char* b = (char*)GetLvlObject(2, 57, i);
+		over = b && (*(uint32_t*)(b + 8) & 4);
+	}
+	if (!over) return;
+	const int players[2] = { g.p1Hero, g.p2Hero };
+	for (int idx : players) {
+		Hero h = t.GetHero(idx);
+		if (!h || g.held[idx] || h.Order() != AI_HANG_ON_BEAM || *(uint8_t*)(h.raw() + 0xE5) != 0x0E) continue;
+		Log("coop: freedom: %s jumped for the rotary beam -- the game's for the ride", HeroName(idx));
+		Hold(t, idx, "jumped for the rotary beam", true);
+	}
+}
+
 // An ended lock's sequence still under way (SequenceUnderWay) back to before it
 // set off: the spinning platform down, its pillar and detectors as then.
 static void UndoSequence() {
@@ -1735,6 +1774,16 @@ static void UnlockByPlayer(Trio t, int me, const char* player) {
 		Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me), (int)h.Order());
 		EnforcePlayer(t, me);
 	}
+}
+
+// Freedom mode: the level has given `hero` a scripted order the mode leaves
+// unfollowed (a wait, a walk to a marker) -- it would be waiting now.
+bool CoopFreedomWaiting(int hero) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(hero) : Hero();
+	if (!g_config.freedom || !h || g.held[hero] || t.Leader() == hero) return false;
+	int o = (int)h.Order();
+	return IsScriptedOrder(o) && !FreedomLetsHold(o);
 }
 
 void CoopUnlockHero(int hero) {
@@ -2393,6 +2442,8 @@ void CoopFrame() {
 	ServeMachineRequest(t);
 	WatchLifterHint(t);
 	WatchPendingLead(t);
+	WatchFreedomBeam(t);
+	FreedomFrame();
 	WatchUnfinishedSequence(t);
 	WatchStrandedCar();
 	WatchSpyWalk(t, now);
@@ -3385,7 +3436,7 @@ static void JoinGun(Trio t, const char* why) {
 	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
 	Vector3 pos, dir;
 	if (!o || g.held[HERO_OBELIX] || !GunHandles(t, &pos, &dir)) return;
-	Hold(t, HERO_OBELIX, why);
+	Hold(t, HERO_OBELIX, why, true);
 	uint8_t* ai = (uint8_t*)(o.raw() + 0x561);
 	if (*ai == 0xFF) *ai = 0;
 	o.SetOrder(AI_GOTO_BALLISTA);

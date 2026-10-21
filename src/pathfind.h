@@ -12,6 +12,10 @@ enum PfReach { PF_UNKNOWN = -1, PF_NO = 0, PF_YES = 1 };
 // node of the graph (or the level has none).
 int PfReachable(const Vector3& from, const Vector3& to);
 
+// A random place a hero at `from` can walk to, `rmin`..`rmax` units away
+// (x / z; y is `from`'s). False if `from` is in no node or none is that far.
+bool PfSpotNear(const Vector3& from, float rmin, float rmax, Vector3* out);
+
 // The graph in the log: nodes, transitions, doors; with `around`, the cells
 // within `radius` units of it as a map.
 void PfDump(const Vector3* around, float radius);

@@ -26,6 +26,7 @@ struct CoopConfig {
 	bool  safeSequence  = true;   // the non-leading player can't set off levers meant for the leader's switch
 	int   sectorCatchUpMs = 1000; // a hero left in an unloaded sector this long is brought to the other
 	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with
+	bool  freedom       = false;  // the level never takes a player's hero (waits, walks to markers); cable cars still do
 	float deadzone      = 0.24f;
 
 	// Experimental rules ([experimental]; read at startup, single player too)
@@ -35,6 +36,7 @@ struct CoopConfig {
 	float comboFactor      = 0.5f;  // combo bar hits counted per Roman hit
 	float comboDrainFactor = 1.5f;  // the combo bar losing its hits (before it is full)
 	float comboFullDrainFactor = 1.5f; // a full combo bar running out
+	bool  freedomRomans    = false; // freedom mode: Romans come for a hero the level would have kept waiting
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

@@ -2039,3 +2039,25 @@ both halves).
   (0x4802: g_lock.wait -> g_seqWait) and SequenceUnderWay is true only for those -- the platform rules (3 s away,
   R3 + B, a fall) never act on a walk's or a ride's picture. Autotest turnstile21c (platform done, Obelix's walk,
   Asterix walks off: nothing set back, Asterix leads); lifterlock2, unlockseq, corkdown still set back / undo.
+- Round 105 (2026-10-21, user: "freedom mode"). [coop] freedom (default off; env XXL_FREEDOM): Hold() leaves a
+  player's hero its player's for any scripted order but the cable cars' (9 rope, 12 external control -- the automatic
+  CKHkTelepher); the mod's own holds (JoinGun) pass modOwn. LockedByLevel then only sees held heroes (undos only for
+  cable cars). The trio's 4802 freezes nothing by itself: a player-variant hero with order 3 walks and jumps freely.
+  LV2-1 spinning platform: rises with a free Asterix on it (turnstile21 with freedom); its "jump off at the top"
+  orders (482D order 1, 484C order 2) are left to the player. LV4-2 rotary beam (CKHkRotaryBeam 2,57, vt 0x628FC0;
+  +8 flags: 0x4 over the circle, 0x1 a hero hanging, 0x2 going back; it sends trio 0x0C02 -> companion order 8 "hang
+  on beam" when over the hero standing on the circle): a player's jump never catches it, only the AI's order 8 does.
+  WatchFreedomBeam: the player's jump (body 0x0E) with order 8 pending and the beam over him hands the hero to the
+  game for that ride (Hold modOwn) -- caught (0x821), carried (0x825), let go at the far end, back to its player
+  (beam42f: XXL_P2HERO=asterix, player 1's Obelix turns the turnstile with X). [experimental] freedom_romans (env
+  XXL_FREEDOMROMANS; freedom.cpp): while CoopFreedomWaiting(hero) (a scripted order freedom left unfollowed, not
+  leading, not held), every 6 s up to 6 Romans: the nearest active squad (group 4,26, +0x152 bit 1, not 0x2000) with
+  a pool that has Romans left (a spent pool gets +1 to defeat, +0x18) sends one in with vf55 (thiscall(args {count,
+  Vector3*, pool}), the script's "send in at a point"); the point: a squad spawn marker within 30 units, walkable to
+  (PfReachable), 6+ from both heroes, in no view (KlusterSphereInAnyView) -- else PfSpotNear (new: a random reachable
+  cell of the hero's own cell kind 3-10 units off) with ground at the hero's height under it (FUN_004493C0 on the
+  collision world [[0x6621F4]+0x50], thiscall(params {0.3, 2, 0}, out, point, 1) ret 0x10: out +0x14 kind, 4 none;
+  +0x18 the point) -- the graph's walkable cells take in shallow water (Romans there drowned). Stops when the wait is
+  lifted. LV2-3 (freeromans23): the hearth (#423) gives Obelix 4826 (order 1); Romans come; the powder keg (#327) sends
+  4803 -> no more. Autotest steps S_NEAROBJ for the keg (CKHkPowderKeg 2,77; #20 at -51.2 0.8 -521.4); test steps must
+  be in time order (steps run in list order).

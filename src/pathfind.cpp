@@ -289,6 +289,36 @@ void Flood(const Graph& g, const std::vector<int>& seeds, std::vector<uint8_t>* 
 
 } // namespace
 
+bool PfSpotNear(const Vector3& from, float rmin, float rmax, Vector3* out) {
+	Graph g;
+	if (!Load(&g)) return false;
+	std::vector<int> a;
+	Seeds(g, from, &a);
+	if (a.empty()) return false;
+	std::vector<uint8_t> seen;
+	Flood(g, a, &seen);
+	// Only cells of the kind the hero stands on: the walkable values (1-6) also
+	// mark shallow water (LV2-3: Romans placed there ended up under water).
+	const Node& sn = g.nodes[NodeOfCell(g, a[0])];
+	int kind = Value(sn, (a[0] - sn.base) % sn.nx, (a[0] - sn.base) / sn.nx);
+	std::vector<Vector3> spots;
+	for (int c = 0; c < g.cells; c++) {
+		if (!seen[c]) continue;
+		int ni = NodeOfCell(g, c);
+		const Node& n = g.nodes[ni];
+		int x = (c - n.base) % n.nx, z = (c - n.base) / n.nx;
+		if (!Walkable(g, ni, x, z) || Value(n, x, z) != kind) continue;   // (a jump's landing is flooded as it is)
+		Vector3 p = Centre(n, x, z);
+		float dx = p.x - from.x, dz = p.z - from.z, d2 = dx * dx + dz * dz;
+		if (d2 < rmin * rmin || d2 > rmax * rmax) continue;
+		p.y = from.y;
+		spots.push_back(p);
+	}
+	if (spots.empty()) return false;
+	*out = spots[rand() % spots.size()];
+	return true;
+}
+
 int PfReachable(const Vector3& from, const Vector3& to) {
 	Graph g;
 	if (!Load(&g)) return PF_UNKNOWN;

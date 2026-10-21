@@ -81,6 +81,8 @@ bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 int CoopUndoLockFor(int fallen);
 // What R3 + B does for `hero` (autotests): unlocks it from a level lock.
 void CoopUnlockHero(int hero);
+// Freedom mode: `hero` has a scripted order the mode leaves unfollowed (it would be waiting).
+bool CoopFreedomWaiting(int hero);
 // An event that commands the trio was just flagged (before its group runs): the
 // level's state is noted, should it lock a hero and need undoing.
 void CoopNoteTrioEventFlagged(unsigned eventId);
