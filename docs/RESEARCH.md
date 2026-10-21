@@ -2010,3 +2010,13 @@ both halves).
   is sent home, or the car carried it back and took it again. Env XXL_P2HERO=asterix (autotests: player 2's virtual
   pad drives Asterix). Autotests unlockpillar / unlockcar / unlockseq (XXL_P2HERO=asterix), cross33 (Asterix now
   walks to the car first), carpause; regressions liftercar, lifterlock2, swingundo, cabled33 pass.
+- Round 102 (2026-10-21, user: xxl_coop.lv2-1_r3b_car_camera.log -- R3 + B in LV2-1's cable car, P1's camera did
+  not come back to Asterix). The camera service follows one target (+0xE8, a hero's +0x10). Boarding the car (while
+  Asterix still leads) aims the game's camera at the car's node; the leader switch that follows hands that state to
+  Asterix's copy (gamecam HandOver), so the copy kept following the car after any undo (also the lifter undo, and
+  after a pillar unlock it followed another object). Now UndoLock and the stranded car's put-back call
+  GameCamAimAtHero(hero): the copy gets a cut aim at its hero on its next tick (g_copy.cut), or the game's camera
+  gets SetTarget(hero, 0, cut). LV3-3's car does not retarget (unlockcar33: the target stayed Asterix). Autotest
+  steps S_UNLOCKHERO (what R3 + B does, for player 1's hero -- injected P1 input never reaches the rope / R3 combo)
+  and S_CARPOS (the car's +0x14 along the rope; only tilts the car, no real move); XXL_LIFTLOG logs the cameras'
+  targets. Autotests unlockcar21 (LV2-1: before, P1's view stayed on the rope; now on Asterix), unlockcar33.

@@ -34,3 +34,6 @@ const char* GameCamCopyState(int hero);
 
 // The copy (if it is that hero's) starts over from the game's camera.
 void GameCamDropCopy(int hero);
+// Hero `hero`'s camera (the copy or the game's) aimed at the hero again, with a
+// cut: a sequence undone (the cable car had it follow the car).
+void GameCamAimAtHero(int hero);

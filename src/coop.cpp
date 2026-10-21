@@ -1694,6 +1694,7 @@ static void UndoLock(Trio t, int up, bool lead) {
 	g.held[up] = false;
 	StartAiCycle(up, "its sequence undone");
 	IndivPutOnSafeGround(up);
+	GameCamAimAtHero(up);   // a cable car had its camera follow the car
 	// The car, set back, offers itself again at once to a hero still in its zone:
 	// kept off cable cars for a while (WatchStrandedCar).
 	if (carBack) KeepOffCars(up, carBack);
@@ -1720,6 +1721,11 @@ static void UnlockByPlayer(Trio t, int me, const char* player) {
 		Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me), (int)h.Order());
 		EnforcePlayer(t, me);
 	}
+}
+
+void CoopUnlockHero(int hero) {
+	Trio t = GetTrio();
+	if (t && g.p2Joined) UnlockByPlayer(t, hero, hero == g.p1Hero ? "player 1" : "player 2");
 }
 
 // The spinning platform's sequence under way (Obelix crossed 03C8: Asterix
@@ -1811,7 +1817,10 @@ static void WatchStrandedCar() {
 	// its last solid ground, or the car carries it home and takes it again there.
 	Hero r = t ? t.GetHero(g_carWatch.rider) : Hero();
 	char* ground = r ? *(char**)(r.raw() + 0x280) : nullptr;
-	if (ground && !IsBadReadPtr(ground, 4) && *(uintptr_t*)ground == 0x6241BC) IndivPutOnSafeGround(g_carWatch.rider);
+	if (ground && !IsBadReadPtr(ground, 4) && *(uintptr_t*)ground == 0x6241BC) {
+		IndivPutOnSafeGround(g_carWatch.rider);
+		GameCamAimAtHero(g_carWatch.rider);
+	}
 	KeepOffCars(g_carWatch.rider, car);
 }
 

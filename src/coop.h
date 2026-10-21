@@ -79,6 +79,8 @@ bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 // it), the sequence is undone so the other can come and revive it. Returns who
 // led before that sequence (its event can hand the lead over), else -1.
 int CoopUndoLockFor(int fallen);
+// What R3 + B does for `hero` (autotests): unlocks it from a level lock.
+void CoopUnlockHero(int hero);
 // An event that commands the trio was just flagged (before its group runs): the
 // level's state is noted, should it lock a hero and need undoing.
 void CoopNoteTrioEventFlagged(unsigned eventId);

@@ -24,7 +24,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -3589,6 +3589,48 @@ const Step kUnlockSeq[] = {
 	END(15000),
 };
 
+// unlockcar33 (-Level 3, XXL_LIFTLOG=1): the user's -- player 2's Obelix pulls
+// Asterix partway (not past the leader-switching detector) and player 1's
+// Asterix presses R3 + B (S_UNLOCKHERO): his camera must follow him again, not the car.
+const Step kUnlockCar33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1200, HERO_ASTERIX, 296.0f, 10.9f, -209.1f),   // walked over: a trail of safe spots
+	GLIDEAT(1300, HERO_ASTERIX, 306.0f, 10.9f, -209.1f, 1000),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X (held)"),
+	GLIDEAT(5000, HERO_OBELIX, 292.0f, 10.43f, -209.1f, 2500),
+	SHOT(7700, "unlockcar33_0"),
+	{ 8000, S_UNLOCKHERO, HERO_ASTERIX, 0, 0, 0, 0, "player 1's R3 + B" },
+	VPAD(8100, 1, 0, 0, 0, "p2 release"),
+	SHOT(9000, "unlockcar33_1"), SHOT(12000, "unlockcar33_2"),
+	GLIDEAT(12500, HERO_ASTERIX, 296.0f, 10.9f, -209.1f, 1500),
+	SHOT(14500, "unlockcar33_3"),
+	END(15500),
+};
+
+// unlockcar21 (level 2, XXL_LIFTLOG=1): the user's -- player 2's Obelix pulls the
+// cable car far (X again and again), player 1's Asterix presses R3 + B
+// (S_UNLOCKHERO): his camera must be his usual one again.
+const Step kUnlockCar21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_OBELIX, 1, 0, 0, 0, "obelix to rope" },
+	PLACEAT(1600, HERO_ASTERIX, -782.0f, 511.5f, -1059.9f),
+	GLIDEAT(1700, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	P1(3000, 0, -1, 0, "p1 left (held)"), P1(3500, 0, 0, 0, "p1 neutral"),
+	PLACEAT(3600, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	{ 4500, S_SCATTER, HERO_OBELIX, 0, 0, 0, 0, "scatter" },
+	SHOT(5500, "unlockcar21_0"),
+	{ 6000, S_CARPOS, HERO_ASTERIX, 0, 0, 6.0f, 0, "car along its rope" },
+	{ 8000, S_CARPOS, HERO_ASTERIX, 0, 0, 12.0f, 0, "car along its rope" },
+	{ 10000, S_CARPOS, HERO_ASTERIX, 0, 0, 18.0f, 0, "car along its rope" },
+	SHOT(13200, "unlockcar21_1"),
+	{ 13500, S_UNLOCKHERO, HERO_ASTERIX, 0, 0, 0, 0, "player 1's R3 + B" },
+	SHOT(14500, "unlockcar21_2"), SHOT(17000, "unlockcar21_3"),
+	END(18000),
+};
+
 // carpause (level 2, XXL_LIFTLOG=1): Asterix sits in the cable car, nobody
 // pulls; the pause menu 20 s, then play -- he stays in the car (order 9)
 // throughout (no timeout lets go of him).
@@ -3964,6 +4006,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("unlockpillar", kUnlockPillar),
 	SCENARIO("unlockcar", kUnlockCar),
 	SCENARIO("unlockseq", kUnlockSeq),
+	SCENARIO("unlockcar33", kUnlockCar33),
+	SCENARIO("unlockcar21", kUnlockCar21),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),
@@ -4328,6 +4372,18 @@ void LogTick(float t) {
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 44); i < n && i < 8; i++) {
 			char* c = (char*)GetLvlObject(2, 44, i);
 			if (c && (*(uint32_t*)(c + 8) & 3)) cars.Add(" | cork %u f8 %08X 28 %.2f", i, *(uint32_t*)(c + 8), *(float*)(c + 0x28));
+		}
+		// the cameras' targets (service +0xE8; a hero's is its +0x10): the copy's and the game's
+		for (int hh = 0; hh < 2; hh++)
+			if (const char* cs = GameCamCopyState(hh)) {
+				Hero hx = tr.GetHero(hh);
+				cars.Add(" | %s's cam target %p (hero %p)", HeroName(hh), *(void* const*)(cs + 0xE8), hx ? *(void**)(hx.raw() + 0x10) : nullptr);
+			}
+		{
+			CKYellowPages* yp = YellowPages();
+			char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+			Hero hl = tr.GetHero(tr.Leader());
+			if (svc) cars.Add(" | game cam target %p (leader %p)", *(void**)(svc + 0xE8), hl ? *(void**)(hl.raw() + 0x10) : nullptr);
 		}
 		Log("%s", cars.c_str());
 	}
@@ -4750,6 +4806,30 @@ void RunStep(const Step& s) {
 		PfDump(&p, s.x);
 		break;
 	}
+	case S_CARPOS: {   // the rope cable car nearest hero a moved along its rope (+0x14 = x), as a pull does
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		char* best = nullptr;
+		float bestD = 1e30f;
+		for (unsigned i = 0, n = h ? GetNumLvlClassInstances(2, 159) : 0; i < n; i++) {
+			char* c = (char*)GetLvlObject(2, 159, i);
+			char* node = c ? *(char**)(c + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			const float* p = (const float*)(fr + 0x80);
+			float d = (h.Pos() - Vector3(p[0], p[1], p[2])).len2();
+			if (d < bestD) { bestD = d; best = c; }
+		}
+		if (best) {
+			Log("autotest: cable car %p along its rope %.1f -> %.1f", best, *(float*)(best + 0x14), s.x);
+			*(float*)(best + 0x14) = s.x;
+		}
+		break;
+	}
+	case S_UNLOCKHERO:   // a player's R3 + B on hero a (the mod's unlock)
+		Log("autotest: R3 + B for %s", HeroName(s.a));
+		CoopUnlockHero(s.a);
+		break;
 	case S_REACH: {   // can each hero walk to the other (the graph)
 		Trio t = GetTrio();
 		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();

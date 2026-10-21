@@ -483,6 +483,20 @@ const char* GameCamCopyState(int hero) {
 	return g_active && g_copy.valid && g_copy.hero == hero ? (const char*)g_copy.svc : nullptr;
 }
 
+void GameCamAimAtHero(int hero) {
+	void* target = TargetOf(hero);
+	if (!g_active || !target) return;
+	if (g_copy.valid && g_copy.hero == hero) {
+		Log("gamecam: %s's camera (copy) aimed at its hero again (it followed %p)", HeroName(hero),
+		    *(void**)(g_copy.svc + 0xE8));
+		g_copy.cut = true;   // on the copy's next tick
+	} else if (g_liveOwner == hero && g_svc) {
+		Log("gamecam: the game's camera (%s) aimed at its hero again (it followed %p)", HeroName(hero),
+		    *(void**)(g_svc + 0xE8));
+		g_origSetTarget(g_svc, nullptr, target, 0.0f, 1);
+	}
+}
+
 void GameCamDropCopy(int hero) {
 	if (!g_copy.valid || g_copy.hero != hero) return;
 	g_copy.valid = false;
