@@ -2236,3 +2236,26 @@ both halves).
 - Round 121 (2026-10-21, user's pad test of 120: the 3/4 middle pieces and the six-shield shrink look less cluttered
   -- keep them). Round 120 undone: hud2.cpp as before it, the same layout with or without xxl_widescreen2d.asi.
   Autotests shields6 (shields shrunk again), hudreq -Level 4 (middle pieces at 3/4).
+- Round 122 (2026-10-21, user: upscale the text font from their Figma "English table" -- Arial Bold 24 px nodes
+  over the 256 page -- for every language). Packs 00-04GLOC each have their own page 0 (same layout, different
+  extra characters: 00 French oe/a-grave..., 01 English en dash/ellipsis, 02 German umlauts/sharp s, 03 Spanish
+  inverted !/?, n-tilde..., 04 Italian E/I-grave...); page 1 is icons only. Glyph UVs sit on texel centres (cell
+  + 0.5); the user's nodes are cell - 0.5 (ink centres within 0.8 px of the old glyphs). Figma's text placement
+  = GDI+ GraphicsPath of Arial Bold with baseline y + 0.9167 * size (outline bounds equal to 0.03 px), so the
+  pages are rendered locally (coop\widescreen2d\fonts\tools\render.cs) from the node positions; the Figma MCP
+  has no Arial (server side), the other tables there use Arimo Bold (Arial's metrics). Other packs: shared
+  characters keep the English node's offset from its cell; new ones the baseline and the x leaving the least old
+  ink bare (render.exe check). English X / Y moved 1 px right (0.5 px out of their cells); quotes straight (the
+  original's shape; the user's curly ones read "It's" with an opening quote), ' 1 px right. Output 1024x1024 per
+  pack (Game Files\xxl_widescreen2d\arial24-windows0_LL.png): icon cells upscaled from the original, text cells,
+  green borders and their corner marks cleared (the old text showed faint cell lines between letters).
+  xxl_widescreen2d.asi swaps it in from its CText2d draw hook (render thread, once a frame): CManager2d (yellow
+  pages +0x34, vtable 0x623A28) fonts +8 + id * 4; the pack by a character only it has (+0x124 / +0x128 / +0x12C
+  wide table) and its "A" glyph's u0 (+0x24 ASCII glyph shorts, +0x134 glyph list, glyph +8 u0, +0x1C page 0);
+  page texture = glyph +4, its raster (+0) 256x256 -> RwRasterCreate(1024, 1024, 32, 0x9504) filled at level 0,
+  put in the texture, the old raster destroyed at the next swap (RwRasterDestroy 0x590FB0). The D3D9 driver
+  drops the mipmap flags (raster +0x23 format byte comes back 05; RwRasterGetNumLevels 0x5910F0 answers 1
+  without bit 0x80), so the filter stays linear (texture +0x50 = 2). No conflict with the co-op icons (their own
+  page in a free slot, glyphs appended). Autotests spy21a (English: page swapped, subtitle sharper, no cell
+  lines; straight apostrophe) and spy21a with 03GLOC.KWN copied over 01GLOC.KWN for the run ("pack 03"
+  swapped, "!Grrrr! Que frio hace aqui." with its accents), 01GLOC restored.

@@ -20,12 +20,25 @@
 // comes from the D3D viewport and the camera's view window, so it is right in any
 // layout (a split screen's halves too).
 
+//
+// The text font (Rt2d bitmap font "arial24-windows", 28 px glyphs on a 256 x 256
+// page, from the language pack xxGLOC.KWN) is blurred when stretched to a modern
+// screen. Its first page is swapped for a 4x one (xxl_widescreen2d\
+// arial24-windows0_LL.png next to the game, LL the pack: 00 French, 01 English,
+// 02 German, 03 Spanish, 04 Italian), drawn from Arial Bold on the same layout:
+// the glyphs' texture coordinates are shares of the page, so they stay as they are.
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <objidl.h>
+#include <gdiplus.h>
 #include <cstdint>
 #include <cstring>
 #include <cmath>
 #include <cstdarg>
+#include <cstdlib>
+
+#pragma comment(lib, "gdiplus.lib")
 
 namespace {
 
@@ -34,6 +47,7 @@ const uintptr_t kGlyphScale  = 0x623C64;   // float 0.75 in .rdata
 const uintptr_t kHudCamera   = 0x662EBC;   // RwCamera* (orthographic)
 const uintptr_t kD3DDevice   = 0x668978;   // IDirect3DDevice9*
 const uintptr_t kHudLists[3] = { 0x662DDC, 0x662BC0, 0x662E00 };
+const uintptr_t kFrameId     = 0x6464C4;   // bumped every frame
 
 typedef void(__fastcall* ListDrawFn)(char* list, void* edx);
 struct Wrapped { uintptr_t vtbl; ListDrawFn orig; };
@@ -82,6 +96,126 @@ float HudSqueeze(const char* cam) {
 	return window[0] / window[1] * (float)vp.h / (float)vp.w * (4.0f / 3.0f);
 }
 
+// --- Font pages -----------------------------------------------------------------
+// CManager2d (yellow pages +0x34) keeps its fonts at +8 + id * 4 (ids 0-9). Font:
+// +0x10 flags (2 = wide characters), +0x24 128 shorts (glyph of each ASCII
+// character), +0x124 first wide character, +0x128 count, +0x12C their glyphs,
+// +0x134 glyph list (+0 array; glyph 0x20: +4 texture, +8 u0 v0 u1 v1, +0x1C page).
+// RwTexture: +0 raster, +0x50 filter (byte). RwRaster: +0xC width, +0x10 height,
+// +0x18 stride. RenderWare (cdecl): RwRasterCreate(w, h, depth, flags) -- 4
+// texture, 0x500 8888, 0x9000 mipmaps made on unlock (as the game's own texture
+// reader asks for them) --, RwRasterLock(raster, level, 1 = write),
+// RwRasterUnlock, RwRasterDestroy, RwRasterGetNumLevels.
+typedef char*    (__cdecl* RasterCreateFn)(int w, int h, int depth, int flags);
+typedef uint8_t* (__cdecl* RasterLockFn)(char* raster, int level, int mode);
+typedef char*    (__cdecl* RasterFn)(char* raster);
+typedef int      (__cdecl* RasterLevelsFn)(char* raster);
+const uintptr_t kRwRasterCreate = 0x591160, kRwRasterLock = 0x591200, kRwRasterUnlock = 0x590F60;
+const uintptr_t kRwRasterDestroy = 0x590FB0, kRwRasterLevels = 0x5910F0;
+const int kPageSize = 1024;
+
+// The packs' fonts differ in their extra characters and layout: one character
+// only that pack has, and where its "A" starts on the page (texels).
+const struct { int mark; float aX; } kPacks[5] = {
+	{ 0x153, 173.5f }, { 0x2013, 182.5f }, { 0xDF, 173.5f }, { 0xA1, 162.5f }, { 0xC8, 182.5f } };
+
+ULONG_PTR g_gdiplus = 0;
+uint32_t* g_pagePx[5];     // decoded pages, A8R8G8B8
+bool      g_pageTried[5];
+char*     g_retired = nullptr;   // the last swapped-out raster: destroyed at the next swap, frames later
+uint32_t  g_fontsFrame = 0;
+
+const uint32_t* PagePixels(int pack) {
+	if (g_pageTried[pack]) return g_pagePx[pack];
+	g_pageTried[pack] = true;
+	if (!g_gdiplus) {
+		Gdiplus::GdiplusStartupInput in;
+		if (Gdiplus::GdiplusStartup(&g_gdiplus, &in, nullptr) != Gdiplus::Ok) { g_gdiplus = 0; return nullptr; }
+	}
+	wchar_t path[MAX_PATH];
+	DWORD len = GetModuleFileNameW(nullptr, path, MAX_PATH);
+	while (len && path[len - 1] != L'\\') len--;
+	wsprintfW(path + len, L"xxl_widescreen2d\\arial24-windows0_%02d.png", pack);
+	Gdiplus::Bitmap bmp(path);
+	if (bmp.GetLastStatus() != Gdiplus::Ok || bmp.GetWidth() != kPageSize || bmp.GetHeight() != kPageSize) {
+		Log("font: pack %02d has no %dx%d page in xxl_widescreen2d -- its font stays as it is", pack, kPageSize, kPageSize);
+		return nullptr;
+	}
+	Gdiplus::Rect r(0, 0, kPageSize, kPageSize);
+	Gdiplus::BitmapData d;
+	if (bmp.LockBits(&r, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &d) != Gdiplus::Ok) return nullptr;
+	uint32_t* px = (uint32_t*)malloc(kPageSize * kPageSize * 4);
+	if (px)
+		for (int y = 0; y < kPageSize; y++) memcpy(px + y * kPageSize, (char*)d.Scan0 + y * d.Stride, kPageSize * 4);
+	bmp.UnlockBits(&d);
+	g_pagePx[pack] = px;
+	return px;
+}
+
+// Which pack's font this is (-1: not the text font, or already swapped), and the
+// texture of its first page.
+int FontPack(char* f, char** texture) {
+	if (!(*(uint32_t*)(f + 0x10) & 2)) return -1;
+	int first = *(int*)(f + 0x124), n = *(int*)(f + 0x128);
+	const int16_t* wide = *(int16_t**)(f + 0x12C);
+	int16_t a = ((int16_t*)(f + 0x24))['A'];
+	char* list = *(char**)(f + 0x134);
+	if (!wide || a < 0 || !list || a >= *(int*)(list + 4)) return -1;
+	char* glyph = *(char**)list + a * 0x20;
+	char* tex = *(char**)(glyph + 4);
+	char* raster = tex ? *(char**)tex : nullptr;
+	if (*(uint32_t*)(glyph + 0x1C) != 0 || !raster || *(int*)(raster + 0x0C) != 256 || *(int*)(raster + 0x10) != 256)
+		return -1;
+	float ax = *(float*)(glyph + 8) * 256.0f;
+	for (int p = 0; p < 5; p++) {
+		int c = kPacks[p].mark;
+		if (c >= first && c < first + n && wide[c - first] >= 0 && fabsf(ax - kPacks[p].aX) < 0.01f) {
+			*texture = tex;
+			return p;
+		}
+	}
+	return -1;
+}
+
+void SwapPage(char* tex, int pack) {
+	const uint32_t* px = PagePixels(pack);
+	if (!px) return;
+	char* r = ((RasterCreateFn)kRwRasterCreate)(kPageSize, kPageSize, 32, 0x9504);
+	if (!r) r = ((RasterCreateFn)kRwRasterCreate)(kPageSize, kPageSize, 32, 0x504);
+	if (!r) { Log("font: no raster for pack %02d", pack); return; }
+	bool mips = (*(uint8_t*)(r + 0x23) & 0x80) != 0;   // the driver may drop the mipmap flags
+	uint8_t* dst = ((RasterLockFn)kRwRasterLock)(r, 0, 1);
+	if (!dst) { ((RasterFn)kRwRasterDestroy)(r); Log("font: the page did not lock"); return; }
+	int stride = *(int*)(r + 0x18);
+	for (int y = 0; y < kPageSize; y++) memcpy(dst + y * stride, px + y * kPageSize, kPageSize * 4);
+	((RasterFn)kRwRasterUnlock)(r);
+	if (g_retired) ((RasterFn)kRwRasterDestroy)(g_retired);
+	g_retired = *(char**)tex;
+	*(char**)tex = r;
+	*(uint8_t*)(tex + 0x50) = mips ? 6 : 2;   // trilinear / linear
+	Log("font: pack %02d's page now %dx%d, format %02X, %d levels", pack, kPageSize, kPageSize, *(uint8_t*)(r + 0x23),
+	    ((RasterLevelsFn)kRwRasterLevels)(r));
+}
+
+// On the render thread (from the text draw), once a frame: fonts come with the
+// language pack and may be read again.
+void FontPagesFrame() {
+	uint32_t frame = *(uint32_t*)kFrameId;
+	if (frame == g_fontsFrame) return;
+	g_fontsFrame = frame;
+	__try {
+		char* yp = *(char**)kYellowPages;
+		char* m2d = yp ? *(char**)(yp + 0x34) : nullptr;
+		if (!m2d || *(uintptr_t*)m2d != 0x623A28) return;
+		for (int i = 0; i < 10; i++) {
+			char* f = *(char**)(m2d + 8 + 4 * i);
+			char* tex = nullptr;
+			int pack = f ? FontPack(f, &tex) : -1;
+			if (pack >= 0) SwapPage(tex, pack);
+		}
+	} __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
 // --- 2D plates ------------------------------------------------------------------
 // A CBillboard2d (draw 0x42D6F0, thiscall(bb, float pos[2], ?, char alignX, char
 // alignY, ?), ret 0x14; width +0x14, height +0x18) with +0x1C set takes its width
@@ -92,8 +226,6 @@ float HudSqueeze(const char* cam) {
 // same arguments), small billboards, the HUD models -- was placed by shares of the
 // screen too, so it is drawn that much nearer the plate's anchor. Plates spanning
 // (nearly) the whole screen -- fades, bars, backgrounds -- are left as they are.
-const uintptr_t kFrameId = 0x6464C4;   // bumped every frame
-
 struct Plate { float anchor, left, right, cy, halfH; };
 Plate    g_plates[2][64];
 int      g_nPlates[2];
@@ -160,6 +292,7 @@ int __fastcall BillboardDrawHook(char* self, void* edx, float* pos, int a, char 
 }
 
 int __fastcall TextDrawHook(char* self, void* edx, float* pos, int a, char alignX, char alignY, int b) {
+	FontPagesFrame();
 	PlatesNextFrame();
 	const Plate* on = pos ? PlateAt(pos[0], pos[1]) : nullptr;
 	float s = on ? PlateSqueeze() : 1.0f;
