@@ -2159,3 +2159,20 @@ both halves).
   (levelLead: no lead back after the revive); fellLeading untouched. Autotest lead510o (-Level 5, XXL_DOWNAT=1:2000
   XXL_UPAT=12000): Obelix leads and falls, 0308 let through, the reach check still says "leading when it fell",
   revived, Asterix keeps the lead. reach23g / reach26w (brought to the leader, sent back, lead back) as before.
+- Round 115 (user, LV2-1, userlogs\xxl_coop.lv21-lead-20261021.log: Asterix the leader before the iron crates,
+  where Obelix should lead): not the revive code. Obelix stood east of the circle (-747 -978) when Asterix was
+  locked again on it (137.8 s, after a fall's undo), walked straight to the turnstile, so zone 03C8 (its 4803 ends
+  the circle lock as "sequence goes on") never fired; freedom_corkscrews launched Asterix to the top (0058, 146.1).
+  The lock stayed open; the keg's group (Asterix blows it up, -782.8 518.0 -992.7: 4801 + 4803 + 4878, Obelix
+  leads to the iron crates) ended it with EndLock(true) -> g_seqLive with the picture from before 0050; the
+  platform's +8 differed from it, Obelix walked 31 units off -> WatchUnfinishedSequence "set back" (pillar,
+  detectors) and gave the lead to the picture's leader, Asterix. Now a 4803 continues the sequence only while the
+  locked hero still waits (AI order 3); else the lock just ends (log "lock ended after its sequence", with the
+  platform's +8 now / at the lock). Autotests turnstile21d / turnstile21e (XXL_DOWNAT=1:6000 XXL_UPAT=9000: the
+  user's history, Obelix not through 03C8, the ride to the top, Asterix down to the keg, S_TRIOEV 4801 + 4803,
+  Obelix off): the lock ends at the keg event (order 0). The final "set back" itself did not reproduce (the
+  platform's +8 equal to the picture, 0/0, in the test). turnstile21b's intended set back (Obelix off through 03C8
+  before turning) still happens.
+  Seen meanwhile (older, since freedom mode a43ba13): with Obelix through 03C8, its 4803 frees Asterix from the
+  corkscrew lock 1 s after it starts (order done), and the walk onto the platform (482D) is not followed in
+  freedom -- turnstile21 / 21c no longer reach 0058 (the autotest's P1 does not walk). Open.

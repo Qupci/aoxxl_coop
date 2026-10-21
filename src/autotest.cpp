@@ -3523,6 +3523,101 @@ const Step kTurnstile21c[] = {
 	END(40000),
 };
 
+// turnstile21d (level 2): the user's LV2-1 run -- Obelix reaches the turnstile
+// without zone 03C8 (so Asterix's circle lock never ends), the platform's ride to
+// its top; later the level sends 4801 + 4803 (Obelix leads -- after the top's
+// agent in the user's log) and Obelix walks off to the iron crates: nothing may
+// be "set back", Obelix keeps the lead.
+const Step kTurnstile21d[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(1500, HERO_OBELIX, -747.36f, 514.6f, -977.79f),   // (the user's: already there, so not through 03C8)
+	GLIDEAT(5000, HERO_OBELIX, -774.59f, 515.51f, -981.24f, 4000),
+	GLIDEAT(9200, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),   // the turnstile spot
+	SHOT(9500, "turnstile21d_1"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X"), VPAD(10150, 1, 0, 0, 0, "p2 release"),
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X"), VPAD(10650, 1, 0, 0, 0, "p2 release"),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"), VPAD(11150, 1, 0, 0, 0, "p2 release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "p2 X"), VPAD(11650, 1, 0, 0, 0, "p2 release"),
+	VPAD(12000, 1, PAD_X, 0, 0, "p2 X"), VPAD(12150, 1, 0, 0, 0, "p2 release"),
+	VPAD(12500, 1, PAD_X, 0, 0, "p2 X"), VPAD(12650, 1, 0, 0, 0, "p2 release"),
+	VPAD(13000, 1, PAD_X, 0, 0, "p2 X"), VPAD(13150, 1, 0, 0, 0, "p2 release"),
+	VPAD(13500, 1, PAD_X, 0, 0, "p2 X"), VPAD(13650, 1, 0, 0, 0, "p2 release"),
+	VPAD(14000, 1, PAD_X, 0, 0, "p2 X"), VPAD(14150, 1, 0, 0, 0, "p2 release"),
+	VPAD(14500, 1, PAD_X, 0, 0, "p2 X"), VPAD(14650, 1, 0, 0, 0, "p2 release"),
+	VPAD(15000, 1, PAD_X, 0, 0, "p2 X"), VPAD(15150, 1, 0, 0, 0, "p2 release"),
+	VPAD(15500, 1, PAD_X, 0, 0, "p2 X"), VPAD(15650, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16150, 1, 0, 0, 0, "p2 release"),
+	VPAD(16500, 1, PAD_X, 0, 0, "p2 X"), VPAD(16650, 1, 0, 0, 0, "p2 release"),
+	VPAD(17000, 1, PAD_X, 0, 0, "p2 X"), VPAD(17150, 1, 0, 0, 0, "p2 release"),
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17650, 1, 0, 0, 0, "p2 release"),
+	VPAD(18000, 1, PAD_X, 0, 0, "p2 X"), VPAD(18150, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "turnstile21d_2"),
+	{ 26000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads (the level)" },
+	{ 26000, S_TRIOEV, 0x4803, 0, 0, 0, 0, "sidekick free (the level)" },
+	GLIDEAT(27000, HERO_OBELIX, -800.0f, 516.0f, -1000.0f, 2000),
+	GLIDEAT(29500, HERO_OBELIX, -815.0f, 516.0f, -1015.0f, 2000),
+	SHOT(40000, "turnstile21d_3"),
+	END(42000),
+};
+
+// turnstile21e (level 2, XXL_DOWNAT=1:6000 XXL_UPAT=9000): the user's whole LV2-1
+// run -- Asterix on the circle (locked), Obelix goes down (the lock undone) and is
+// revived, Asterix back on the circle; then turnstile21d: Obelix to the turnstile
+// from the east (not through 03C8), the ride to the top, the keg's 4801 + 4803,
+// Obelix off to the iron crates -- nothing set back, Obelix keeps the lead.
+const Step kTurnstile21e[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	PLACEAT(1500, HERO_OBELIX, -747.36f, 514.6f, -977.79f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	GLIDEAT(11000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f, 1500),
+	GLIDEAT(13000, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(14700, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	GLIDEAT(16500, HERO_OBELIX, -774.59f, 515.51f, -981.24f, 4000),
+	GLIDEAT(20700, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),
+	SHOT(21000, "turnstile21e_1"),
+	VPAD(21500, 1, PAD_X, 0, 0, "p2 X"), VPAD(21650, 1, 0, 0, 0, "p2 release"),
+	VPAD(22000, 1, PAD_X, 0, 0, "p2 X"), VPAD(22150, 1, 0, 0, 0, "p2 release"),
+	VPAD(22500, 1, PAD_X, 0, 0, "p2 X"), VPAD(22650, 1, 0, 0, 0, "p2 release"),
+	VPAD(23000, 1, PAD_X, 0, 0, "p2 X"), VPAD(23150, 1, 0, 0, 0, "p2 release"),
+	VPAD(23500, 1, PAD_X, 0, 0, "p2 X"), VPAD(23650, 1, 0, 0, 0, "p2 release"),
+	VPAD(24000, 1, PAD_X, 0, 0, "p2 X"), VPAD(24150, 1, 0, 0, 0, "p2 release"),
+	VPAD(24500, 1, PAD_X, 0, 0, "p2 X"), VPAD(24650, 1, 0, 0, 0, "p2 release"),
+	VPAD(25000, 1, PAD_X, 0, 0, "p2 X"), VPAD(25150, 1, 0, 0, 0, "p2 release"),
+	VPAD(25500, 1, PAD_X, 0, 0, "p2 X"), VPAD(25650, 1, 0, 0, 0, "p2 release"),
+	VPAD(26000, 1, PAD_X, 0, 0, "p2 X"), VPAD(26150, 1, 0, 0, 0, "p2 release"),
+	VPAD(26500, 1, PAD_X, 0, 0, "p2 X"), VPAD(26650, 1, 0, 0, 0, "p2 release"),
+	VPAD(27000, 1, PAD_X, 0, 0, "p2 X"), VPAD(27150, 1, 0, 0, 0, "p2 release"),
+	VPAD(27500, 1, PAD_X, 0, 0, "p2 X"), VPAD(27650, 1, 0, 0, 0, "p2 release"),
+	VPAD(28000, 1, PAD_X, 0, 0, "p2 X"), VPAD(28150, 1, 0, 0, 0, "p2 release"),
+	VPAD(28500, 1, PAD_X, 0, 0, "p2 X"), VPAD(28650, 1, 0, 0, 0, "p2 release"),
+	VPAD(29000, 1, PAD_X, 0, 0, "p2 X"), VPAD(29150, 1, 0, 0, 0, "p2 release"),
+	VPAD(29500, 1, PAD_X, 0, 0, "p2 X"), VPAD(29650, 1, 0, 0, 0, "p2 release"),
+	VPAD(30000, 1, PAD_X, 0, 0, "p2 X"), VPAD(30150, 1, 0, 0, 0, "p2 release"),
+	VPAD(30500, 1, PAD_X, 0, 0, "p2 X"), VPAD(30650, 1, 0, 0, 0, "p2 release"),
+	VPAD(31000, 1, PAD_X, 0, 0, "p2 X"), VPAD(31150, 1, 0, 0, 0, "p2 release"),
+	VPAD(31500, 1, PAD_X, 0, 0, "p2 X"), VPAD(31650, 1, 0, 0, 0, "p2 release"),
+	VPAD(32000, 1, PAD_X, 0, 0, "p2 X"), VPAD(32150, 1, 0, 0, 0, "p2 release"),
+	VPAD(32500, 1, PAD_X, 0, 0, "p2 X"), VPAD(32650, 1, 0, 0, 0, "p2 release"),
+	VPAD(33000, 1, PAD_X, 0, 0, "p2 X"), VPAD(33150, 1, 0, 0, 0, "p2 release"),
+	VPAD(33500, 1, PAD_X, 0, 0, "p2 X"), VPAD(33650, 1, 0, 0, 0, "p2 release"),
+	VPAD(34000, 1, PAD_X, 0, 0, "p2 X"), VPAD(34150, 1, 0, 0, 0, "p2 release"),
+	SHOT(35000, "turnstile21e_2"),
+	GLIDEAT(36000, HERO_ASTERIX, -782.8f, 518.5f, -992.67f, 1500),   // down to the keg (the user's spot)
+	{ 38000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads (the keg)" },
+	{ 38000, S_TRIOEV, 0x4803, 0, 0, 0, 0, "sidekick free (the keg)" },
+	GLIDEAT(39000, HERO_OBELIX, -800.0f, 516.0f, -1000.0f, 2000),
+	GLIDEAT(41500, HERO_OBELIX, -815.0f, 516.0f, -1015.0f, 2000),
+	SHOT(50000, "turnstile21e_3"),
+	END(52000),
+};
+
 // turnstile21b (level 2, XXL_LIFTLOG=1): the user's cycle -- Asterix locked, Obelix
 // walks off east through 03C8 (set back 3 s later, Asterix locked again), then
 // comes back to the turnstile and spins it: the ride's zone 0528 and its camera.
@@ -4490,6 +4585,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("lifterlock2", kLifterLock2),
 	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("turnstile21c", kTurnstile21c),
+	SCENARIO("turnstile21d", kTurnstile21d),
+	SCENARIO("turnstile21e", kTurnstile21e),
 	SCENARIO("beam42", kBeam42),
 	SCENARIO("beam42f", kBeam42f),
 	SCENARIO("freeromans23", kFreeRomans23),

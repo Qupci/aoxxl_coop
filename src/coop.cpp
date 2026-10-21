@@ -1983,8 +1983,29 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	}
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
-		if ((event & 0xFFFF) == 0x4803) EndLock(true);
-		else if (tl) {
+		if ((event & 0xFFFF) == 0x4803) {
+			// Its sequence goes on only while the locked hero still waits (AI order 3):
+			// LV2-1's turnstile reached without its zone 03C8 (Obelix already past it)
+			// left Asterix's circle lock open through the platform's ride; the keg's
+			// 4801 + 4803 then ended it as a sequence under way, and Obelix walking on
+			// to the iron crates "set it back" (the lead to Asterix).
+			Hero lh = tl && g_lock.hero >= 0 ? tl.GetHero(g_lock.hero) : Hero();
+			bool waits = lh && (int)lh.Order() == 3;
+			if (lh && !waits) {
+				static int s_told = 0;
+				unsigned picF = 0, nowF = 0;   // (a spinning platform's +8: the old rule's "under way" if bits 0/1 differ)
+				for (size_t i = 0; i < g_lock.pic.nFlags; i++)
+					if (*(uintptr_t*)g_lock.pic.flags[i].hook == 0x628E0C &&
+					    ((g_lock.pic.flags[i].f ^ *(uint32_t*)(g_lock.pic.flags[i].hook + 8)) & 3)) {
+						picF = g_lock.pic.flags[i].f;
+						nowF = *(uint32_t*)(g_lock.pic.flags[i].hook + 8);
+					}
+				if (s_told++ < 20)
+					Log("coop: %s's lock ended after its sequence (AI order %d) -- nothing goes on (platform +8 %X, at the lock %X)",
+					    HeroName(g_lock.hero), (int)lh.Order(), nowF, picF);
+			}
+			EndLock(waits);
+		} else if (tl) {
 			int waiter = tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
 			NoteLock(waiter, "the companion told to wait");
 			if (g_lock.hero == waiter) g_lock.wait = true;
