@@ -1975,3 +1975,11 @@ both halves).
   during the ride P1's Asterix view (the copy) shows a close shot behind a post, P2's the wide shot. The user
   remembers the single-player camera on P1's view while P2 hit the turnstile but chose to leave it for now.
   Autotest turnstile21b (reset, then back to the turnstile); XXL_LIFTLOG adds box13 / cross1B and the corkscrews.
+- Round 99 (2026-10-21, user: LV3-3 car comes back, but by a jump; after a full ride it drives home smoothly). With
+  the rope let go a rope car travels as an automatic one (CKHkTowedTelepher::vf29 0x4BD020 -> CKHkTelepher::vf29
+  0x548880 while +0x7C bit 0x4000 is clear): +0x7C bit 0x2 = on its motor (target speed from +0x94), bit 0x4 =
+  constant (no slope term), bit 0x8 = backwards; +0x14 position along the path, +0x30 speed, +0x28 target, +0x2C
+  acceleration. A finished ride leaves 0x241B (motor, backwards); a short pull's stop 0x2431 (no motor, bit 0x20).
+  WatchStrandedCar now sets bits 0x2 | 0x8 and clears 0x20 instead of the reset: the car drives home (cross33:
+  301.8 -> 307.6 in 1.6 s, then 0x2591, free) and rides again. Fallback: not home within 15 s, or stopped again on
+  the way, or home but not free -> ResetCableCar.

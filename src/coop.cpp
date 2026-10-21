@@ -269,6 +269,7 @@ struct CarWatch {
 	int     rider = -1;
 	Vector3 start;
 	DWORD   stillSince = 0;
+	DWORD   drivenAt = 0;   // sent driving back then
 	int     keptOff = -1;
 	Vector3 keptOffAt;
 } g_carWatch;
@@ -335,7 +336,11 @@ static void NoteLock(int hero, const char* why) {
 		float d2 = (h.Pos() - Vector3(p[0], p[1], p[2])).len2();
 		if (d2 < best) { best = d2; g_lock.car = car; g_carWatch.start = Vector3(p[0], p[1], p[2]); }
 	}
-	if (g_lock.car) { g_carWatch.car = g_lock.car; g_carWatch.rider = hero; g_carWatch.stillSince = 0; }
+	if (g_lock.car) {
+		g_carWatch.car = g_lock.car;
+		g_carWatch.rider = hero;
+		g_carWatch.stillSince = g_carWatch.drivenAt = 0;
+	}
 	Log("coop: %s locked by the level (%s) -- %u detectors, %u circles kept (%s %04X)", HeroName(hero), why,
 	    (unsigned)g_lock.pic.n, (unsigned)g_lock.pic.nFlags, pre ? "as before its event" : "as now", g_lock.pic.event);
 }
@@ -1705,7 +1710,11 @@ static void WatchUnfinishedSequence(Trio t) {
 
 // The watched car stands still (+0x30 speed) away from its start, not free to
 // board (+0x7C bit 0x80), its rope not held (bit 0x4000), and nobody locked in
-// it: after 1 s it goes back to its start (as after a ride it rolls back).
+// it: after 1 s it drives back to its start as it does after a full ride. With
+// the rope let go it travels as an automatic cable car (CKHkTelepher::vf29,
+// 0x548880): +0x7C bit 0x2 = on its motor (+0x94), bit 0x8 = backwards; a
+// finished ride leaves 0x241B (both on), a short pull's stop 0x2431 (neither, and
+// bit 0x20). Not home within 15 s (or stopped again on the way): put there.
 static void WatchStrandedCar() {
 	Trio t = GetTrio();
 	if (g_carWatch.keptOff >= 0) {
@@ -1721,17 +1730,36 @@ static void WatchStrandedCar() {
 	if (!fr) { g_carWatch.car = nullptr; return; }
 	const float* p = (const float*)(fr + 0x80);
 	uint32_t f = *(uint32_t*)(car + 0x7C);
-	bool away = (Vector3(p[0], p[1], p[2]) - g_carWatch.start).len2() > 1.0f;
-	if (!away && (f & 0x80)) { g_carWatch.car = nullptr; return; }   // back and free: done
-	bool stranded = away && !(f & 0x80) && !(f & 0x4000) && fabsf(*(float*)(car + 0x30)) < 0.05f && g_lock.hero < 0 &&
-	                !g.held[HERO_ASTERIX] && !g.held[HERO_OBELIX] && g.p2Joined && !g.suspended;
+	float dist = sqrtf((Vector3(p[0], p[1], p[2]) - g_carWatch.start).len2());
+	bool away = dist > 1.0f;
+	if (!away && (f & 0x80)) {   // back and free: done
+		if (g_carWatch.drivenAt) Log("coop: the cable car %p is back at its start", car);
+		g_carWatch.car = nullptr;
+		g_carWatch.drivenAt = 0;
+		return;
+	}
+	bool still = fabsf(*(float*)(car + 0x30)) < 0.05f;
+	if (g_carWatch.drivenAt) {
+		// on its way back: home but not free, stopped on the way, or too long -- put there
+		DWORD on = GetTickCount() - g_carWatch.drivenAt;
+		if (on < 1500 || (!still && on < 15000)) { g_carWatch.stillSince = 0; return; }
+		if (!g_carWatch.stillSince) g_carWatch.stillSince = GetTickCount();
+		if (on < 15000 && GetTickCount() - g_carWatch.stillSince < 1000) return;
+		Log("coop: the cable car %p did not get home by itself (%.1f units off, +7C %08X) -- put there", car, dist, f);
+		ResetCableCar(car, g_carWatch.rider);
+		g_carWatch.car = nullptr;
+		g_carWatch.drivenAt = 0;
+		return;
+	}
+	bool stranded = away && !(f & 0x80) && !(f & 0x4000) && still && g_lock.hero < 0 && !g.held[HERO_ASTERIX] &&
+	                !g.held[HERO_OBELIX] && g.p2Joined && !g.suspended;
 	if (!stranded) { g_carWatch.stillSince = 0; return; }
 	if (!g_carWatch.stillSince) g_carWatch.stillSince = GetTickCount();
 	if (GetTickCount() - g_carWatch.stillSince < 1000) return;
-	Log("coop: the cable car %p stopped %.1f units from its start with nobody in it -- sent back", car,
-	    sqrtf((Vector3(p[0], p[1], p[2]) - g_carWatch.start).len2()));
-	ResetCableCar(car, g_carWatch.rider);
-	g_carWatch.car = nullptr;
+	Log("coop: the cable car %p stopped %.1f units from its start with nobody in it -- it drives back (+7C %08X)", car, dist, f);
+	*(uint32_t*)(car + 0x7C) = (f | 0x2 | 0x8) & ~0x20u;
+	g_carWatch.drivenAt = GetTickCount();
+	g_carWatch.stillSince = 0;
 	Hero r = t ? t.GetHero(g_carWatch.rider) : Hero();
 	if (r) { g_carWatch.keptOff = g_carWatch.rider; g_carWatch.keptOffAt = r.Pos(); }
 }
