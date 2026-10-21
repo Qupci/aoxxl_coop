@@ -13,6 +13,7 @@
 #include "crash.h"
 #include "individual.h"
 #include "pathfind.h"
+#include "detour.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -22,6 +23,19 @@
 #include <cstring>
 
 namespace {
+
+// The path slot step (FUN_0045C010, thiscall(slot, short*, Vector3*), ret 0xC):
+// the pathfinding service's slots are 0..19. CPNTCHECK logs calls outside them.
+const uint8_t kSlotStepPrologue[7] = { 0x6A, 0xFF, 0x68, 0x08, 0xCD, 0x61, 0x00 };
+uint32_t(__fastcall* g_origSlotStep)(char* pf, void* edx, uint32_t slot, void* node, void* out) = nullptr;
+
+uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node, void* out) {
+	if ((slot & 0xFF) >= 20) {
+		static int n = 0;
+		if (n++ < 20) Log("autotest: path slot step with slot %u (service %p) from %p", slot & 0xFF, pf, _ReturnAddress());
+	}
+	return g_origSlotStep(pf, edx, slot, node, out);
+}
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
                 S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_END };
@@ -3978,30 +3992,49 @@ const Step kBeam42f[] = {
 	END(34000),
 };
 
-// hearth23 (-Level 2): the user's crash (xxl_coop.crash-10-22.log) -- player 2's
-// Obelix swimming by the bank (-75.0 -2.1 -521.6) while Asterix lights the
-// hearth by the doors, then the powder keg (511E): the wall's cutscene brings
-// Obelix over; every Roman's component pointer checked each frame.
-const Step kHearth23[] = {
+// keg23 (-Level 2): the user's crash (xxl_coop.crash-10-22b.log) -- Asterix
+// crosses the detector at (-55.9 1.8 -569.6) -> (-48.1 2.2 -569.6) (a fight
+// starts), then lights the powder keg at (-40.2 1.9 -549.7) (511E): the game
+// crashed in a Roman's move (0x531CE5) during the keg's cutscene. Every
+// Roman's component pointer is checked each frame.
+const Step kKeg23[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 3),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
-	{ 1000, S_CPNTCHECK, 0, 0, 0, 0, 0, "component check" },
-	PLACEAT(2500, HERO_ASTERIX, -44.030f, 1.0f, -541.286f), PLACEAT(2500, HERO_OBELIX, -74.98f, -1.5f, -521.64f),
-	PLACEAT(3000, HERO_ASTERIX, -44.030f, 1.0f, -541.286f), PLACEAT(3000, HERO_OBELIX, -74.98f, -1.5f, -521.64f),
-	{ 3200, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 3400, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
-	{ 3700, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
-	SHOT(4200, "hearth23_0"),
-	P1(4500, PAD_X, 0, 0, "p1 X: light the hearth"), P1(4700, 0, 0, 0, "p1 release"),
-	SHOT(6000, "hearth23_1"), SHOT(14000, "hearth23_2"),
-	{ 26000, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" }, { 26300, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
-	PLACEAT(26500, HERO_ASTERIX, -50.901f, 1.3f, -522.217f),   // by the keg
-	{ 26800, S_NEAROBJ, HERO_ASTERIX, 77, 0, 0.85f, 0, "asterix by the powder keg, facing it" },
-	{ 27100, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
-	P1(27300, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(27450, 0, 0, 0, "p1 release"),
-	P1(27700, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(27850, 0, 0, 0, "p1 release"),
-	P1(28100, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(28250, 0, 0, 0, "p1 release"),
-	SHOT(29000, "hearth23_3"), SHOT(33000, "hearth23_4"), SHOT(40000, "hearth23_5"),
-	END(50000),
+	{ 1000, S_CPNTCHECK, 93, 18, 0, 0, 0, "component check; the crashing Roman's watched" },
+	PLACEAT(2500, HERO_ASTERIX, -58.0f, 2.0f, -569.6f), PLACEAT(2500, HERO_OBELIX, -59.0f, 2.0f, -567.0f),
+	PLACEAT(3000, HERO_ASTERIX, -58.0f, 2.0f, -569.6f), PLACEAT(3000, HERO_OBELIX, -59.0f, 2.0f, -567.0f),
+	GLIDEAT(3500, HERO_ASTERIX, -48.058f, 2.179f, -569.581f, 1500),   // through the cross detector
+	SHOT(5500, "keg23_0"), SHOT(9000, "keg23_1"),
+	{ 10000, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 10200, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	{ 10500, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	PLACEAT(11000, HERO_ASTERIX, -40.218f, 1.926f, -549.734f),   // the user's spot by the keg
+	{ 11300, S_NEAROBJ, HERO_ASTERIX, 77, 0, 0.85f, 0, "asterix by the powder keg, facing it" },
+	{ 11600, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	P1(11800, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(11950, 0, 0, 0, "p1 release"),
+	P1(12200, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(12350, 0, 0, 0, "p1 release"),
+	P1(12600, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(12750, 0, 0, 0, "p1 release"),
+	SHOT(13500, "keg23_2"), SHOT(15000, "keg23_3"), SHOT(17000, "keg23_4"), SHOT(22000, "keg23_5"),
+	END(30000),
+};
+
+// keg23s (-Level 2): keg23 in single player (player 2 never joins).
+const Step kKeg23S[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	{ 1000, S_CPNTCHECK, 93, 18, 0, 0, 0, "component check; the crashing Roman's watched" },
+	PLACEAT(2500, HERO_ASTERIX, -58.0f, 2.0f, -569.6f), PLACEAT(2500, HERO_OBELIX, -59.0f, 2.0f, -567.0f),
+	PLACEAT(3000, HERO_ASTERIX, -58.0f, 2.0f, -569.6f), PLACEAT(3000, HERO_OBELIX, -59.0f, 2.0f, -567.0f),
+	GLIDEAT(3500, HERO_ASTERIX, -48.058f, 2.179f, -569.581f, 1500),   // through the cross detector
+	SHOT(5500, "keg23s_0"), SHOT(9000, "keg23s_1"),
+	{ 10000, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 10200, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	{ 10500, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	PLACEAT(11000, HERO_ASTERIX, -40.218f, 1.926f, -549.734f),   // the user's spot by the keg
+	{ 11300, S_NEAROBJ, HERO_ASTERIX, 77, 0, 0.85f, 0, "asterix by the powder keg, facing it" },
+	{ 11600, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	P1(11800, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(11950, 0, 0, 0, "p1 release"),
+	P1(12200, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(12350, 0, 0, 0, "p1 release"),
+	P1(12600, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(12750, 0, 0, 0, "p1 release"),
+	SHOT(13500, "keg23s_2"), SHOT(15000, "keg23s_3"), SHOT(17000, "keg23s_4"), SHOT(22000, "keg23s_5"),
+	END(30000),
 };
 
 // freeromans23 (level 2 sector 3, XXL_FREEDOM=1 XXL_FREEDOMROMANS=1 XXL_LIFTLOG=1): the
@@ -4616,7 +4649,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("beam42", kBeam42),
 	SCENARIO("beam42f", kBeam42f),
 	SCENARIO("freeromans23", kFreeRomans23),
-	SCENARIO("hearth23", kHearth23),
+	SCENARIO("keg23", kKeg23),
+	SCENARIO("keg23s", kKeg23S),
 	SCENARIO("pillar36", kPillar36),
 	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("cam14", kCam14),
@@ -5079,6 +5113,7 @@ void LogTick(float t) {
 					if (s_n == 1024) continue;
 					s_obj[s_n] = e;
 					s_last[s_n++] = nullptr;
+					Log("autotest: cpnt Roman %p class %d #%u: +54 %p", e, id, i, c);
 				}
 				char*& last = s_last[k];
 				if (c == last) continue;
@@ -5093,6 +5128,21 @@ void LogTick(float t) {
 				}
 				last = c;
 			}
+		// cutscene pathfinding blocks (CKPathFindingCinematicBloc, class 8,4): +0x98 path slot
+		// (0..19, -1 none), +0x2C flags (0x40 running), +0x14 state, +0x48 the character
+		static uint32_t s_bloc[256];
+		static int s_blocLogs = 0;
+		for (unsigned i = 0, n = GetNumLvlClassInstances(8, 4); i < n && i < 256; i++) {
+			char* b = (char*)GetLvlObject(8, 4, i);
+			if (!b) continue;
+			uint32_t st = *(uint8_t*)(b + 0x98) | (uint32_t)*(uint8_t*)(b + 0x2C) << 8 | (*(uint32_t*)(b + 0x14) & 0xFF) << 16;
+			if (st == s_bloc[i] || s_blocLogs >= 200) continue;
+			s_bloc[i] = st;
+			s_blocLogs++;
+			Log("autotest: path block #%u %p: slot %d flags %02X state %02X, character %p%s", i, b, (int)*(int8_t*)(b + 0x98),
+			    *(uint8_t*)(b + 0x2C), *(uint32_t*)(b + 0x14) & 0xFF, *(void**)(b + 0x48),
+			    *(int8_t*)(b + 0x98) == -1 && (*(uint8_t*)(b + 0x2C) & 0x40) ? " -- RUNNING WITHOUT A SLOT" : "");
+		}
 	}
 	if (at.watchEnemies) {   // live Romans near the point; squads near it (flags, member groups)
 		int live = 0, nearA = 0, nearO = 0;   // within 7 units of each hero: fighting / chasing it
@@ -5912,7 +5962,21 @@ void RunStep(const Step& s) {
 	case S_WATCHCAM: at.watchCam = true; break;
 	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
 	case S_WATCHENEMIES: at.watchEnemies = true; at.enemyPoint = Vector3(s.x, s.y, s.z); break;
-	case S_CPNTCHECK: at.cpntCheck = true; Log("autotest: checking every Roman's component (+0x54) each frame"); break;
+	case S_CPNTCHECK: {   // a > 0: writes to +0x54 of Roman #b of class a watched as well
+		at.cpntCheck = true;
+		Log("autotest: checking every Roman's component (+0x54) each frame");
+		static bool hooked = false;
+		if (!hooked)
+			hooked = InstallDetour(0x45C010, (void*)SlotStepHook, (void**)&g_origSlotStep, kSlotStepPrologue,
+			                       sizeof(kSlotStepPrologue), "path slot step (autotest)");
+		char* e = s.a > 0 ? (char*)GetLvlObject(2, s.a, s.b) : nullptr;
+		if (e) {
+			const void* w[1] = { e + 0x54 };
+			WatchBytes(w, 1, 0, 0);
+			Log("autotest: watching writes to Roman %p's component (+0x54 = %p)", e, *(void**)(e + 0x54));
+		}
+		break;
+	}
 	case S_NODEDUMP: {   // bonuses (2,114) within 6 units of (x y z): their node trees
 		Vector3 c(s.x, s.y, s.z);
 		struct D {

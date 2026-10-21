@@ -2265,3 +2265,20 @@ both halves).
   right of the screen's. PlateDrawScale(): that factor while xxl_widescreen2d.asi is loaded (GetModuleHandleA),
   else 1; the pivot is the drawn middle. Sizes stay at 3/4 (round 121). Autotests hudreq / hudx3 -Level 4: the
   helmet plate's middle at 481 of 960 px (was 498), the requirement and x3 plates with it.
+- Round 124 (2026-10-22, user: xxl_coop.crash-10-22.log / -10-22b.log, LV2-3: cross the detector -55.9 -> -48.1
+  at z -569.6 (a fight), light the powder keg at -40.2 1.9 -549.7 -> crash ~3 s into the keg's cutscene). A game
+  bug, not the mod's: crashes in single player with the x2 squads, skip_cutscenes and freedom off. Crash at
+  0x531CE5 (FUN_00531B60, a Roman's move, from FUN_005339B0 with this = Roman +0x54 (its CK*EnemyCpnt, from the
+  pool record +4; cpnt +0x60 = cpnt +0x10, its move parameters) + 0x60) reading address 5/6: the Roman's +0x54
+  held a squad pointer (CKGrpSquad +0x5C/+0x60/+0x64 = marker list / capacity / count). Write watch on that
+  Roman's +0x54 (autotest keg23, CPNTCHECK a=class b=index): written by 0x45C1F7 (FUN_0045C010, the path slot step
+  of the pathfinding service yp+0x64: 20 slots of 0x514 at +0, +0xC5 == 1 free, +0xC8 state, +0x5A8 point) called
+  from FUN_00467830 with slot 255. CKPathFindingCinematicBloc (class 8,4, vtable 0x624D04): +0x98 slot (-1
+  none), +0x2C bit 0x40 = has a path, +0x118 tries; vf13 0x4672B0 start (slot -1 -> FUN_0045BFC0 request; none:
+  bit 0x40 off, 10 tries), vf15 0x467660 tick (bit 0x40 off: request, counted down; on: FUN_00467830 steps the
+  slot, and steps slot -1 too), vf14 0x467560 stop (slot -> -1, bit kept). The level stores most blocks with bit
+  0x40 set; LV2-3's block #16 was ticked so with slot -1 and wrote its path point 0x50FEC past the service, over
+  a Roman. Fix: Game Files\xxl_cutscenefix.asi (source coop\cutscenefix, own asi per the user's rule for game
+  fixes): vtable slot 15 hook -- a block ticked with bit 0x40 and slot -1 gets the bit cleared and 10 tries, so
+  it requests a slot first (vf13's own path). Logs to Game Files\xxl_cutscenefix.log. Autotests keg23 / keg23s
+  (single player): crash before, with the asi block #16 takes slot 1, the cutscene ends (25.8 s), co-op resumes.
