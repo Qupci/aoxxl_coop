@@ -1983,3 +1983,13 @@ both halves).
   WatchStrandedCar now sets bits 0x2 | 0x8 and clears 0x20 instead of the reset: the car drives home (cross33:
   301.8 -> 307.6 in 1.6 s, then 0x2591, free) and rides again. Fallback: not home within 15 s, or stopped again on
   the way, or home but not free -> ResetCableCar.
+- Round 100 (2026-10-21, user: xxl_coop.menu_unlock_car.log -- after a long stay in the pause menu Asterix came out
+  of the cable car on his own and the car could not be used again). The mod's own safety valve (session 1): a
+  borrowed hero whose scripted order runs 2 min is handed back to its player (g.held cleared, nothing else) -- it
+  counted the pause menu (suspended 70.7 -> 215.6 s, released at 159.9 s) and left the car holding Asterix
+  (+0x7C 0x2571, never offers itself again). The user did not ask for it. Now it applies to walk orders only
+  (IsWalkOrder: 1 go to, 2 jump to, 7 ballista, 11 clear path, 13 hint man, 14 shop, 15 go to without PF -- a
+  marker that can't be reached, LV5-5), never to the orders that wait for the partner (3 wait, 8 beam, 9 cable
+  car, 12 external control: the partner can finish them; falls / lifters / stranded cars have their undos), and
+  time suspended (pause menu, cutscenes) is not counted. Env XXL_HELDMAX=ms (test aid, default 120000). Autotest
+  carpause (XXL_HELDMAX=15000: 20 s paused + play past the limit, Asterix stays in the car).

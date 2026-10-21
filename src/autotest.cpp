@@ -3532,6 +3532,30 @@ const Step kSwing[] = {
 	END(9000),
 };
 
+// carpause (level 2, XXL_HELDMAX=15000 XXL_LIFTLOG=1): Asterix sits in the cable
+// car, nobody pulls; the pause menu 20 s, then play past the held limit -- the
+// safety valve (walk orders only) must leave him in the car (order 9) throughout.
+const Step kCarPause[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1400, HERO_ASTERIX, -782.0f, 511.5f, -1059.9f),
+	GLIDEAT(1500, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	P1(2800, 0, -1, 0, "p1 left (held)"), P1(3300, 0, 0, 0, "p1 neutral"),
+	PLACEAT(3400, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	SHOT(4500, "carpause_0"),
+	{ 6000, S_POKE8, -3, 2, 0, 0, 0, "the pause menu (game manager state 2)" },
+	{ 6000, S_POKE8, -2, 0x5E, 0, (float)0x10, 0, "its bars (game manager +0x5C bit 20) on" },
+	SHOT(16000, "carpause_1"),
+	{ 26000, S_POKE8, -3, 1, 0, 0, 0, "back to the game (state 1; the game clears the bars itself)" },
+	SHOT(28000, "carpause_2"), SHOT(36000, "carpause_3"),
+	GLIDEAT(38000, HERO_ASTERIX, -778.0f, 511.5f, -1059.9f, 1500),
+	GLIDEAT(40000, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	P1(41300, 0, -1, 0, "p1 left (held)"), P1(41800, 0, 0, 0, "p1 neutral"),
+	PLACEAT(41900, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),
+	SHOT(43500, "carpause_4"),
+	END(44500),
+};
+
 // liftercar (level 2, XXL_LIFTLOG=1): Asterix sits in the cable car (locked,
 // waits for Obelix at the rope), Obelix goes onto the lifter instead: undone as
 // for a fallen Obelix. Then the car is worked as in swing: still working.
@@ -3879,6 +3903,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
+	SCENARIO("carpause", kCarPause),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
 	SCENARIO("reload2", kReload2),

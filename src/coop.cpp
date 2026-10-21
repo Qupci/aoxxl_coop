@@ -211,6 +211,12 @@ bool IsScriptedOrder(int o) {
 	       o != AI_TAKE_HIT;
 }
 
+// Scripted orders that walk the hero somewhere (as against waiting for the partner).
+static bool IsWalkOrder(int o) {
+	return o == AI_GOTO_POS || o == AI_JUMP_TO_POS || o == AI_GOTO_BALLISTA || o == AI_CLEAR_PATH ||
+	       o == AI_GOTO_HINT_MAN || o == AI_GOTO_SHOP || o == AI_GOTO_POS_NO_PF;
+}
+
 // Locked sequences. A player's hero locked by the level -- frozen as the
 // companion ("disable sidekick movement", trio 0x4802: a blue circle, the
 // rotary beam), or held for a ride (the rope-pulled cable car) -- waits for the
@@ -400,6 +406,13 @@ static void RestoreLockPicture(const LockPicture& p) {
 	}
 	Log("coop: as before the lock: %d detectors, %d light pillars switched back, %d circles' states put back", changed, shown,
 	    flags);
+}
+
+// How long a borrowed hero may be held while playing before the safety valve
+// gives it back (2 min; env XXL_HELDMAX=ms, for autotests).
+static DWORD HeldMaxMs() {
+	static DWORD ms = getenv("XXL_HELDMAX") ? (DWORD)atoi(getenv("XXL_HELDMAX")) : 120000;
+	return ms;
 }
 
 void Hold(Trio t, int idx, const char* why) {
@@ -2380,21 +2393,35 @@ void CoopFrame() {
 	// while it is not the leader (Asterix riding the cable car Obelix pulls,
 	// waiting on the spinning platform...) is the AI's to carry out. Back to its
 	// player when the order is over or the hero leads again.
+	// (HeldMaxMs: 2 min; env XXL_HELDMAX=ms for autotests.)
+	// Time paused, in a menu or a cutscene (suspended) does not count towards the
+	// safety valve below: 2 min in the pause menu let go of Asterix in the cable
+	// car, which then never offered itself again.
+	static DWORD s_prevFrame = 0;
+	DWORD frameNow = GetTickCount();
+	DWORD frameDt = s_prevFrame ? frameNow - s_prevFrame : 0;
+	s_prevFrame = frameNow;
 	const int players[2] = { g.p1Hero, g.p2Hero };
 	for (int idx : players) {
 		Hero h = t.GetHero(idx);
 		if (!h) continue;
 		int order = (int)h.Order();
 		bool leads = t.Leader() == idx;
+		if (g.held[idx] && g.suspended) g.heldSince[idx] += frameDt;
 		if (!g.held[idx] && !leads && order != g.lastOrder[idx] && IsScriptedOrder(order)) {
 			Hold(t, idx, "new order");
 		} else if (g.held[idx] && (leads || order == AI_FOLLOW_LEADER)) {
 			g.held[idx] = false;
 			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : "order done");
-		} else if (g.held[idx] && order == g.lastOrder[idx] && GetTickCount() - g.heldSince[idx] > 120000) {
-			// Safety valve: an order that never ends must not take a player's hero for good.
+		} else if (g.held[idx] && !g.suspended && order == g.lastOrder[idx] && IsWalkOrder(order) &&
+		           frameNow - g.heldSince[idx] > HeldMaxMs()) {
+			// Safety valve: a walk to a place it never reaches (LV5-5: a marker behind a
+			// wall not yet broken) must not take a player's hero for good. Not for the
+			// orders that wait for the partner (wait, the beam, a cable car): the
+			// partner can always finish those, and released, the cable car was left with
+			// Asterix in it, never to be boarded again.
 			g.held[idx] = false;
-			Log("coop: %s back to its player (order %d still running after 2 min)", HeroName(idx), order);
+			Log("coop: %s back to its player (walk order %d still running after 2 min of play)", HeroName(idx), order);
 		}
 		g.lastOrder[idx] = (uint8_t)order;
 	}
