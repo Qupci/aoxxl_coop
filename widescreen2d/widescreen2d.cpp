@@ -23,10 +23,11 @@
 //
 // The text font (Rt2d bitmap font "arial24-windows", 28 px glyphs on a 256 x 256
 // page, from the language pack xxGLOC.KWN) is blurred when stretched to a modern
-// screen. Its first page is swapped for a 4x one (xxl_widescreen2d\
-// arial24-windows0_LL.png next to the game, LL the pack: 00 French, 01 English,
-// 02 German, 03 Spanish, 04 Italian), drawn from Arial Bold on the same layout:
-// the glyphs' texture coordinates are shares of the page, so they stay as they are.
+// screen. Its two pages are swapped for 4x ones (xxl_widescreen2d\
+// arial24-windowsN_LL.png next to the game, LL the pack: 00 French, 01 English,
+// 02 German, 03 Spanish, 04 Italian), drawn from Arial Bold and redrawn action
+// icons on the same layout: the glyphs' texture coordinates are shares of the
+// page, so they stay as they are.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -98,7 +99,7 @@ float HudSqueeze(const char* cam) {
 
 // --- Font pages -----------------------------------------------------------------
 // CManager2d (yellow pages +0x34) keeps its fonts at +8 + id * 4 (ids 0-9). Font:
-// +0x10 flags (2 = wide characters), +0x24 128 shorts (glyph of each ASCII
+// +0x10 flags (2 = wide characters), +0x14 four page textures, +0x24 128 shorts (glyph of each ASCII
 // character), +0x124 first wide character, +0x128 count, +0x12C their glyphs,
 // +0x134 glyph list (+0 array; glyph 0x20: +4 texture, +8 u0 v0 u1 v1, +0x1C page).
 // RwTexture: +0 raster, +0x50 filter (byte). RwRaster: +0xC width, +0x10 height,
@@ -120,14 +121,14 @@ const struct { int mark; float aX; } kPacks[5] = {
 	{ 0x153, 173.5f }, { 0x2013, 182.5f }, { 0xDF, 173.5f }, { 0xA1, 162.5f }, { 0xC8, 182.5f } };
 
 ULONG_PTR g_gdiplus = 0;
-uint32_t* g_pagePx[5];     // decoded pages, A8R8G8B8
-bool      g_pageTried[5];
-char*     g_retired = nullptr;   // the last swapped-out raster: destroyed at the next swap, frames later
+uint32_t* g_pagePx[5][2];     // decoded pages, A8R8G8B8
+bool      g_pageTried[5][2];
+char*     g_retired[2];   // the last swapped-out raster of each page: destroyed at the next swap, frames later
 uint32_t  g_fontsFrame = 0;
 
-const uint32_t* PagePixels(int pack) {
-	if (g_pageTried[pack]) return g_pagePx[pack];
-	g_pageTried[pack] = true;
+const uint32_t* PagePixels(int pack, int page) {
+	if (g_pageTried[pack][page]) return g_pagePx[pack][page];
+	g_pageTried[pack][page] = true;
 	if (!g_gdiplus) {
 		Gdiplus::GdiplusStartupInput in;
 		if (Gdiplus::GdiplusStartup(&g_gdiplus, &in, nullptr) != Gdiplus::Ok) { g_gdiplus = 0; return nullptr; }
@@ -135,10 +136,10 @@ const uint32_t* PagePixels(int pack) {
 	wchar_t path[MAX_PATH];
 	DWORD len = GetModuleFileNameW(nullptr, path, MAX_PATH);
 	while (len && path[len - 1] != L'\\') len--;
-	wsprintfW(path + len, L"xxl_widescreen2d\\arial24-windows0_%02d.png", pack);
+	wsprintfW(path + len, L"xxl_widescreen2d\\arial24-windows%d_%02d.png", page, pack);
 	Gdiplus::Bitmap bmp(path);
 	if (bmp.GetLastStatus() != Gdiplus::Ok || bmp.GetWidth() != kPageSize || bmp.GetHeight() != kPageSize) {
-		Log("font: pack %02d has no %dx%d page in xxl_widescreen2d -- its font stays as it is", pack, kPageSize, kPageSize);
+		Log("font: pack %02d has no %dx%d page %d in xxl_widescreen2d -- it stays as it is", pack, kPageSize, kPageSize, page);
 		return nullptr;
 	}
 	Gdiplus::Rect r(0, 0, kPageSize, kPageSize);
@@ -148,7 +149,7 @@ const uint32_t* PagePixels(int pack) {
 	if (px)
 		for (int y = 0; y < kPageSize; y++) memcpy(px + y * kPageSize, (char*)d.Scan0 + y * d.Stride, kPageSize * 4);
 	bmp.UnlockBits(&d);
-	g_pagePx[pack] = px;
+	g_pagePx[pack][page] = px;
 	return px;
 }
 
@@ -177,8 +178,10 @@ int FontPack(char* f, char** texture) {
 	return -1;
 }
 
-void SwapPage(char* tex, int pack) {
-	const uint32_t* px = PagePixels(pack);
+void SwapPage(char* tex, int pack, int page) {
+	char* old = tex ? *(char**)tex : nullptr;
+	if (!old || *(int*)(old + 0x0C) != 256 || *(int*)(old + 0x10) != 256) return;
+	const uint32_t* px = PagePixels(pack, page);
 	if (!px) return;
 	char* r = ((RasterCreateFn)kRwRasterCreate)(kPageSize, kPageSize, 32, 0x9504);
 	if (!r) r = ((RasterCreateFn)kRwRasterCreate)(kPageSize, kPageSize, 32, 0x504);
@@ -189,12 +192,12 @@ void SwapPage(char* tex, int pack) {
 	int stride = *(int*)(r + 0x18);
 	for (int y = 0; y < kPageSize; y++) memcpy(dst + y * stride, px + y * kPageSize, kPageSize * 4);
 	((RasterFn)kRwRasterUnlock)(r);
-	if (g_retired) ((RasterFn)kRwRasterDestroy)(g_retired);
-	g_retired = *(char**)tex;
+	if (g_retired[page]) ((RasterFn)kRwRasterDestroy)(g_retired[page]);
+	g_retired[page] = old;
 	*(char**)tex = r;
 	*(uint8_t*)(tex + 0x50) = mips ? 6 : 2;   // trilinear / linear
-	Log("font: pack %02d's page now %dx%d, format %02X, %d levels", pack, kPageSize, kPageSize, *(uint8_t*)(r + 0x23),
-	    ((RasterLevelsFn)kRwRasterLevels)(r));
+	Log("font: pack %02d's page %d now %dx%d, format %02X, %d levels", pack, page, kPageSize, kPageSize,
+	    *(uint8_t*)(r + 0x23), ((RasterLevelsFn)kRwRasterLevels)(r));
 }
 
 // On the render thread (from the text draw), once a frame: fonts come with the
@@ -211,7 +214,9 @@ void FontPagesFrame() {
 			char* f = *(char**)(m2d + 8 + 4 * i);
 			char* tex = nullptr;
 			int pack = f ? FontPack(f, &tex) : -1;
-			if (pack >= 0) SwapPage(tex, pack);
+			if (pack < 0) continue;
+			SwapPage(*(char**)(f + 0x18), pack, 1);   // the icons that did not fit the first page
+			SwapPage(tex, pack, 0);
 		}
 	} __except (EXCEPTION_EXECUTE_HANDLER) {}
 }

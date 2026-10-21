@@ -2303,3 +2303,14 @@ both halves).
   measured before its own Xf2d (it had been read after, which also made round 125's pieces pivot on its moved
   place -- kept as the pivot so the look is round 125's, tighter). Autotests hudreq / hudx3 -Level 4: helmet to
   requirement 35 -> 17 px, helmet to x3 35 -> 17 px (960 x 540).
+- Round 127 (2026-10-22, user: redraw the font's action icons from the designer's Figma left arrow). The 13 icons
+  (U+E000-E003, E005-E00B, E00E, E00F; E004 / E00C / E00D are empty cells) are vectors in the Figma frame "Action
+  icons": the designer's 24 px plate (gradient fill, bevel stroke) with the glyphs traced from the originals and
+  the arrow's glows. Where an icon lives depends on the pack: the first page holds as many as fit after the
+  pack's extra characters (French 8, English 13, German / Spanish 9, Italian 10), the rest are on the second
+  page (font +0x18, the second of the four page textures at +0x14), so the second page differs per pack too
+  (02 = 03). The plate sits at the glyph cell + (1, 2) texels (the exporter's banker's rounding of u0 / v0 made
+  the 28 px crops look offset by 0 or 1). The asi now swaps both pages (arial24-windowsN_LL.png); page 1 first,
+  since page 0 at 1024 is what marks the font done. Autotest icons21: both pages logged swapped (xxl_coop.asi
+  still draws its pad prompts over the game's icons there); with xxl_coop.asi moved aside, the title screen's
+  "Press Validate" confirm icon at 1920 x 1080 is the new one.

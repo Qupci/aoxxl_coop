@@ -102,6 +102,61 @@ static class R {
 				}
 				return 0;
 			}
+			if (a[0] == "icons") {
+				// icons BASE.png|blank SHEET.png LIST OUT.png: the action icons from SHEET (one 24 px plate
+				// per 28 px column, S = sheet height / 24 times larger) onto BASE (or a blank page). LIST
+				// lines: "index x0 y0 x1 y1", the glyph's cell on the 256 page; its plate sits at (x0+1, y0+2).
+				var sheet = new Bitmap(a[2]);
+				int S = sheet.Height / 24;
+				Bitmap dst;
+				using (var b = a[1] == "blank" ? new Bitmap(256 * S, 256 * S, PixelFormat.Format32bppArgb) : new Bitmap(a[1]))
+					dst = b.Clone(new Rectangle(0, 0, b.Width, b.Height), PixelFormat.Format32bppArgb);
+				var cells = new List<Rectangle>();
+				using (var gd = Graphics.FromImage(dst)) {
+					gd.CompositingMode = CompositingMode.SourceCopy;
+					foreach (var line in File.ReadAllLines(a[3])) {
+						var p = line.Split(' ');
+						if (p.Length < 5) continue;
+						int i = int.Parse(p[0]);
+						int x0 = (int)float.Parse(p[1], ci), y0 = (int)float.Parse(p[2], ci);
+						int x1 = (int)float.Parse(p[3], ci), y1 = (int)float.Parse(p[4], ci);
+						var cell = new Rectangle(x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S);
+						using (var clear = new SolidBrush(Color.FromArgb(0, 255, 255, 255))) gd.FillRectangle(clear, cell);
+						gd.DrawImage(sheet, new Rectangle((x0 + 1) * S, (y0 + 2) * S, 24 * S, 24 * S),
+							new Rectangle(i * 28 * S, 0, 24 * S, 24 * S), GraphicsUnit.Pixel);
+						cells.Add(cell);
+					}
+				}
+				// transparent pixels next to a plate take its colour (no light fringe under filtering)
+				foreach (var cell in cells) {
+					var known = new bool[cell.Width, cell.Height];
+					for (int y = 0; y < cell.Height; y++)
+						for (int x = 0; x < cell.Width; x++)
+							known[x, y] = dst.GetPixel(cell.Left + x, cell.Top + y).A != 0;
+					for (int pass = 0; pass < 2 * S; pass++) {
+						var fill = new List<Point>();
+						var col = new List<Color>();
+						for (int y = 0; y < cell.Height; y++)
+							for (int x = 0; x < cell.Width; x++) {
+								if (known[x, y]) continue;
+								int[] dx = { 1, -1, 0, 0 }, dy = { 0, 0, 1, -1 };
+								for (int k = 0; k < 4; k++) {
+									int nx = x + dx[k], ny = y + dy[k];
+									if (nx < 0 || ny < 0 || nx >= cell.Width || ny >= cell.Height || !known[nx, ny]) continue;
+									Color c = dst.GetPixel(cell.Left + nx, cell.Top + ny);
+									fill.Add(new Point(x, y)); col.Add(Color.FromArgb(0, c.R, c.G, c.B));
+									break;
+								}
+							}
+						for (int k = 0; k < fill.Count; k++) {
+							known[fill[k].X, fill[k].Y] = true;
+							dst.SetPixel(cell.Left + fill[k].X, cell.Top + fill[k].Y, col[k]);
+						}
+					}
+				}
+				dst.Save(a[4], ImageFormat.Png);
+				return 0;
+			}
 			if (a[0] == "page") {
 				var spec = ReadSpec(a[1]);
 				int S = int.Parse(a[4]);

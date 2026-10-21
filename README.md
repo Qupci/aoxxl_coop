@@ -67,9 +67,9 @@ hints, menus, the font's button icons) at its true shape: the game widens it by 
 too wide at 16:9. It also draws the HUD's 3D models (health shields, helmet, combo columns) without
 the stretch, in their places; a row of them (the shields) closes up towards its outer end. The HUD's
 see-through plates are drawn narrower about their anchored edge, and what sits on them comes in with them.
-It also swaps the text font's page for a 4x sharper one (Arial Bold): copy the folder
-`coop\widescreen2d\fonts` PNGs into `Game Files\xxl_widescreen2d\` (one per language pack; without them the
-font stays as it is).
+It also swaps the text font's two pages for 4x sharper ones (Arial Bold, and redrawn action icons): copy the
+folder `coop\widescreen2d\fonts` PNGs into `Game Files\xxl_widescreen2d\` (two per language pack; without them
+the font stays as it is).
 
 ## Controls
 
