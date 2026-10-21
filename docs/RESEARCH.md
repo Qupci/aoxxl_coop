@@ -2192,3 +2192,13 @@ both halves).
   Obelix got the lead back, the circle answers only the leader). Autotests: turnstile21 / 21c reach 0058 with the
   4803 held back; turnstile21b still set back and Asterix locked again; corkdown restored, no lead back, Asterix
   locked again after the revive; turnstile21e as round 115; pillar36l (LV3-6, R3 + B) as before.
+- Round 94 (2026-10-21, user's designer: dialogue text and icons ~30% too wide at 16:9). CText2d widths are
+  aspect (2D manager = yellow pages +0x34, +4: width / height, 1.778 at 16:9) times the float 0.75 at 0x623C64,
+  read only by the text layouts 0x42DF40 / 0x42E840 / 0x42EF80 and the glyph draw 0x42F430 (Rt2dCTMScale(aspect *
+  0.75, 1) per glyph; positions are x * aspect): 1 at 4:3, 1.33 at 16:9. Separate coop\widescreen2d\
+  xxl_widescreen2d.asi keeps 0x623C64 at 1 / aspect (a thread, every 10 ms; .rdata made writable): true letter
+  shapes, lines hold more words. hints.cpp reads that factor (GlyphWidthScale) instead of assuming 0.75, so the
+  co-op hints place right with or without it. CBillboard2d has its own switch (+0x1C: width in screen shares,
+  i.e. stretched, vs square units). Not covered: the HUD's 3D models (shields, helmet; HUD camera renderer +0x14,
+  view window 0.5 x 0.5 over the whole screen) and stretched billboards. Autotests spy21a / hintjoin / shop
+  before and after: subtitles and hints narrower, centred / right-aligned, round icons round.
