@@ -3815,6 +3815,22 @@ const Step kFreeRomans23[] = {
 	END(40000),
 };
 
+// pillar36 (-Level 3, sector 6; the user's with XXL_FREEDOM=1): the light
+// pillar's circle (-175.3 3.8 -219.2, live only once the fight is won) hands
+// Obelix the lead (4801) -- sent here directly; then Asterix rides the automatic
+// cable car (CKHkTelepher) -- at its end it must jump off by itself (0C09).
+const Step kPillar36[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -185.961f, 2.554f, -227.849f), PLACEAT(2500, HERO_OBELIX, -186.961f, 2.554f, -228.849f),
+	PLACEAT(4000, HERO_OBELIX, -177.76f, 2.63f, -216.34f),
+	{ 5000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads (the pillar's circle)" },
+	SHOT(9000, "pillar36_0"),
+	PLACEAT(12000, HERO_ASTERIX, -159.605f, 11.772f, -209.331f),   // the cable car
+	SHOT(20000, "pillar36_1"), SHOT(31000, "pillar36_2"), SHOT(36000, "pillar36_3"),
+	END(40000),
+};
+
 // cabled2 / spyd2 (level 2, with XXL_DOWNAT=1:1000): Obelix down, Asterix walks
 // onto the cable car / glides to the second spy three times -- each time put
 // back, the car never boarded, the talk never started.
@@ -4349,6 +4365,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("beam42", kBeam42),
 	SCENARIO("beam42f", kBeam42f),
 	SCENARIO("freeromans23", kFreeRomans23),
+	SCENARIO("pillar36", kPillar36),
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("carpause", kCarPause),

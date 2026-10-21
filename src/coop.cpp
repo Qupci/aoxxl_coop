@@ -1692,6 +1692,25 @@ static void WatchPendingLead(Trio t) {
 	g_pendingLead.who = -1;
 }
 
+// The automatic cable car (CKHkTelepher 2,158) takes only the trio's leader
+// (its +0x84 hero == trio vf 0x74): ticked with the nearest player's hero posing
+// as the leader (proximity), it took the other one's -- and told the trio
+// (0x0C0D) in that tick. All the rest of the ride is the real leader's: the
+// companion's walk to its end (0x481C, AI order 1), the jump off at the end
+// (0x0C09: the leader's own; the companion's AI order 2) and the helmets on the
+// way. LV3-6: the light pillar's circle had handed Obelix the lead (4801); in
+// freedom mode Asterix rode on to the end and stayed on the car, his jump off an
+// AI order not followed, the helmets not his. The rider takes the lead the next
+// frame -- before the walk order (0.3 s later), as in a ride boarded leading.
+int g_telepherRider = -1;
+static void WatchTelepherRider(Trio t) {
+	int who = g_telepherRider;
+	g_telepherRider = -1;
+	if (who < 0 || !t || !g.p2Joined || t.Leader() == who) return;
+	Log("coop: %s boarded an automatic cable car while %s led -- the lead to the rider", HeroName(who), HeroName(t.Leader()));
+	GiveLead(t, who);
+}
+
 // Freedom mode and the rotary beam (CKHkRotaryBeam 2,57; LV4-2): the level asks
 // the hero on its circle to hang on it (beam event 0x0C02 -> AI order 8) when the
 // beam is over him (+8 bit 2). A player's jump never catches it -- only the AI's
@@ -1903,6 +1922,11 @@ static void WatchStrandedCar() {
 static int KeptOffCars() { return g.lifterWaitsFor >= 0 ? g.lifterWaitsFor : g_carWatch.keptOff; }
 
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
+	extern void* g_trioEventCaller;
+	if (g.p2Joined && (event & 0xFFFF) == 0x0C0D && (uintptr_t)g_trioEventCaller == 0x548757) {
+		Trio tl = GetTrio();
+		if (tl) g_telepherRider = tl.Leader();   // (the leader its tick saw: the rider)
+	}
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
 		if ((event & 0xFFFF) == 0x4803) EndLock(true);
@@ -2454,6 +2478,7 @@ void CoopFrame() {
 	ServeMachineRequest(t);
 	WatchLifterHint(t);
 	WatchPendingLead(t);
+	WatchTelepherRider(t);
 	WatchFreedomBeam(t);
 	FreedomFrame();
 	WatchUnfinishedSequence(t);

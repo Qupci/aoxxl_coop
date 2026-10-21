@@ -2085,3 +2085,13 @@ both halves).
   marker is the hero's walk-to marker (AI target hero +0x568: level-placed, on the hero's side by design), only when
   6+ from both heroes and out of every view (else the next try). freeromans23: four Romans from it, none drowned,
   stopped at the keg's 4803. Waking squad 46 for Romans was left alone (it would run its own script).
+- Round 109 (user, LV3-6, xxl_coop.lv36-telepher.log): after the light pillar (-175.3 3.8 -219.2; its circle's 4801 gives
+  Obelix the lead) Asterix rode the automatic cable car (CKHkTelepher 2,158, -159.6 11.8 -209.3) and stayed on it at the
+  end, no helmets collected on the way. CKHkTelepher::vf15 (0x5485F0) takes only the trio leader (its +0x84 hero ==
+  trio vf 0x74) and tells the trio 0x0C0D (from 0x548757); proximity ticks it with the nearest player's hero posing as
+  leader, so the non-leader boarded. The rest of the ride follows the real leader: 0x481C walks the companion to the
+  end (AI order 1), the end's 0x0C09 (0x549BA5) is the leader's jump off but the companion's AI order 2 (freedom: not
+  followed -> stuck in situation 2), the helmets are the leader's. Fix: 0x0C0D from 0x548757 notes the leader its tick
+  saw; next frame that rider gets the lead (WatchTelepherRider, 4800/4801), before the 481C 0.3 s later. Autotest
+  pillar36 (-Level 3, XXL_FREEDOM=1; the pillar needs the fight won, so 4801 is sent directly): before, Asterix in
+  situation 2 with order 2 to the end; after, he jumps off to (-159.7 0.8 -133.7) and picks up helmets on the way.
