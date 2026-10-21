@@ -62,7 +62,7 @@ With DSOAL as the sound wrapper, also copy `xxl_timerfix.asi` (`coop\timerfix\bu
 separate from the mod. Without it the game runs at ~45 fps instead of 62: the frame limiter's `Sleep`
 needs a 1 ms timer, which IndirectSound's XAudio2 requests but DSOAL doesn't.
 
-`xxl_widescreen2d.asi` (`coop\widescreen2duild.bat`), also separate, draws 2D text (dialogues,
+`xxl_widescreen2d.asi` (`coop\widescreen2d\build.bat`), also separate, draws 2D text (dialogues,
 hints, menus, the font's button icons) at its true shape: the game widens it by aspect / (4/3), a third
 too wide at 16:9.
 
