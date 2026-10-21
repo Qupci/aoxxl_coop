@@ -1964,3 +1964,14 @@ both halves).
   dropped (it moved Asterix off the circle). 3 s: walking through 03C8 to the turnstile is 1.5 s past 25 units.
   Platform +0x28 = its rise (0 -> 8 at the top). Autotests turnstile21 (the platform as meant: risen, top reached,
   the level's next zones 0528 / 0530 / 0058, nothing set back), lifterlock2, corkdown.
+- Round 98 (2026-10-21, user: LB with the partner down confirmed; LV2-1 platform no longer sticks and re-activates;
+  asked about the turnstile camera on P1's view, xxl_coop.lv2-1_turnstile_camera_gone.log). LV2-1 platform zones,
+  from CKSrvDetection::sendEvent (0x14..0x18 enable / 0x1B..0x1F disable entry `low byte` of list +0x2C box-enter,
+  +0x34 sphere-enter, +0x3C plane-cross, +0x44 box-level, +0x4C sphere-level): 0050 (circle) arms box #03 and
+  cross #1B (= 03C8); 03C8 disarms itself, arms box #13 (= 0528, Obelix at the turnstile: 482D / 4827, then the
+  ride camera, track vt 6244EC) and sends CKCameraSector (vt 624728) 0x700 (= +0x29 bit 1 off; 0x701 on, 0x702 /
+  0x703 bit 3 -- not a toggle); 0528 disarms itself and re-arms 03C8. Pre-fix build 31a3734 run on turnstile21
+  (old src + today's autotest.cpp in a worktree): the same zones and camera switches at the same times as now --
+  during the ride P1's Asterix view (the copy) shows a close shot behind a post, P2's the wide shot. The user
+  remembers the single-player camera on P1's view while P2 hit the turnstile but chose to leave it for now.
+  Autotest turnstile21b (reset, then back to the turnstile); XXL_LIFTLOG adds box13 / cross1B and the corkscrews.

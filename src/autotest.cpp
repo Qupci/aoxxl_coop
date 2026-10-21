@@ -3387,6 +3387,41 @@ const Step kTurnstile21[] = {
 	END(24000),
 };
 
+// turnstile21b (level 2, XXL_LIFTLOG=1): the user's cycle -- Asterix locked, Obelix
+// walks off east through 03C8 (set back 3 s later, Asterix locked again), then
+// comes back to the turnstile and spins it: the ride's zone 0528 and its camera.
+const Step kTurnstile21b[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(5300, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 1500),   // through 03C8, then stays off
+	SHOT(11000, "turnstile21b_1"),
+	GLIDEAT(12000, HERO_OBELIX, -775.878f, 515.614f, -990.0f, 2500),
+	GLIDEAT(14600, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),
+	VPAD(15500, 1, PAD_X, 0, 0, "p2 X"), VPAD(15650, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16150, 1, 0, 0, 0, "p2 release"),
+	VPAD(16500, 1, PAD_X, 0, 0, "p2 X"), VPAD(16650, 1, 0, 0, 0, "p2 release"),
+	VPAD(17000, 1, PAD_X, 0, 0, "p2 X"), VPAD(17150, 1, 0, 0, 0, "p2 release"),
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17650, 1, 0, 0, 0, "p2 release"),
+	VPAD(18000, 1, PAD_X, 0, 0, "p2 X"), VPAD(18150, 1, 0, 0, 0, "p2 release"),
+	VPAD(18500, 1, PAD_X, 0, 0, "p2 X"), VPAD(18650, 1, 0, 0, 0, "p2 release"),
+	VPAD(19000, 1, PAD_X, 0, 0, "p2 X"), VPAD(19150, 1, 0, 0, 0, "p2 release"),
+	SHOT(19500, "turnstile21b_2"),
+	VPAD(19500, 1, PAD_X, 0, 0, "p2 X"), VPAD(19650, 1, 0, 0, 0, "p2 release"),
+	VPAD(20000, 1, PAD_X, 0, 0, "p2 X"), VPAD(20150, 1, 0, 0, 0, "p2 release"),
+	VPAD(20500, 1, PAD_X, 0, 0, "p2 X"), VPAD(20650, 1, 0, 0, 0, "p2 release"),
+	VPAD(21000, 1, PAD_X, 0, 0, "p2 X"), VPAD(21150, 1, 0, 0, 0, "p2 release"),
+	VPAD(21500, 1, PAD_X, 0, 0, "p2 X"), VPAD(21650, 1, 0, 0, 0, "p2 release"),
+	VPAD(22000, 1, PAD_X, 0, 0, "p2 X"), VPAD(22150, 1, 0, 0, 0, "p2 release"),
+	VPAD(22500, 1, PAD_X, 0, 0, "p2 X"), VPAD(22650, 1, 0, 0, 0, "p2 release"),
+	VPAD(23000, 1, PAD_X, 0, 0, "p2 X"), VPAD(23150, 1, 0, 0, 0, "p2 release"),
+	SHOT(24000, "turnstile21b_3"), SHOT(28000, "turnstile21b_4"),
+	END(29000),
+};
+
 // lifterlock2 (level 2, XXL_LIFTLOG=1): lifterlock, but Obelix walks off through
 // the turnstile's zone (03C8: Asterix freed, the platform switched off until its
 // turn ends) and then onto the lifter -- the user's first session; then the
@@ -3842,6 +3877,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lifterlock", kLifterLock),
 	SCENARIO("lifterlock2", kLifterLock2),
 	SCENARIO("turnstile21", kTurnstile21),
+	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("beamundo", kBeamUndo),
 	SCENARIO("liftd58", kLiftD58),
@@ -4196,6 +4232,13 @@ void LogTick(float t) {
 			if (!fr) continue;
 			const float* m = (const float*)(fr + 0x80);
 			cars.Add(" | turnstile %u f8 %08X at %.1f %.1f %.1f", i, *(uint32_t*)(k + 8), m[0], m[1], m[2]);
+		}
+		{   // LV2-1's platform zones: box-enter #13 (0528, the ride + camera), plane-cross #1B (03C8)
+			CKYellowPages* yp = YellowPages();
+			char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+			if (det && *(uintptr_t*)det == 0x62504C && *(uint16_t*)(det + 0x30) > 0x13 && *(uint16_t*)(det + 0x40) > 0x1B)
+				cars.Add(" | box13 %u cross1B %u", *(uint8_t*)(*(char**)(det + 0x2C) + 8 * 0x13 + 4) & 1,
+				         *(uint8_t*)(*(char**)(det + 0x3C) + 8 * 0x1B + 4) & 1);
 		}
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 44); i < n && i < 8; i++) {
 			char* c = (char*)GetLvlObject(2, 44, i);
