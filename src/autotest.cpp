@@ -24,7 +24,7 @@
 namespace {
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -3978,6 +3978,32 @@ const Step kBeam42f[] = {
 	END(34000),
 };
 
+// hearth23 (-Level 2): the user's crash (xxl_coop.crash-10-22.log) -- player 2's
+// Obelix swimming by the bank (-75.0 -2.1 -521.6) while Asterix lights the
+// hearth by the doors, then the powder keg (511E): the wall's cutscene brings
+// Obelix over; every Roman's component pointer checked each frame.
+const Step kHearth23[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_CPNTCHECK, 0, 0, 0, 0, 0, "component check" },
+	PLACEAT(2500, HERO_ASTERIX, -44.030f, 1.0f, -541.286f), PLACEAT(2500, HERO_OBELIX, -74.98f, -1.5f, -521.64f),
+	PLACEAT(3000, HERO_ASTERIX, -44.030f, 1.0f, -541.286f), PLACEAT(3000, HERO_OBELIX, -74.98f, -1.5f, -521.64f),
+	{ 3200, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 3400, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	{ 3700, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	SHOT(4200, "hearth23_0"),
+	P1(4500, PAD_X, 0, 0, "p1 X: light the hearth"), P1(4700, 0, 0, 0, "p1 release"),
+	SHOT(6000, "hearth23_1"), SHOT(14000, "hearth23_2"),
+	{ 26000, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" }, { 26300, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	PLACEAT(26500, HERO_ASTERIX, -50.901f, 1.3f, -522.217f),   // by the keg
+	{ 26800, S_NEAROBJ, HERO_ASTERIX, 77, 0, 0.85f, 0, "asterix by the powder keg, facing it" },
+	{ 27100, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	P1(27300, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(27450, 0, 0, 0, "p1 release"),
+	P1(27700, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(27850, 0, 0, 0, "p1 release"),
+	P1(28100, PAD_X, 0, 0, "p1 X: light the powder keg"), P1(28250, 0, 0, 0, "p1 release"),
+	SHOT(29000, "hearth23_3"), SHOT(33000, "hearth23_4"), SHOT(40000, "hearth23_5"),
+	END(50000),
+};
+
 // freeromans23 (level 2 sector 3, XXL_FREEDOM=1 XXL_FREEDOMROMANS=1 XXL_LIFTLOG=1): the
 // user's -- Asterix lights the hearth by the doors (#423: the doors shut, Obelix
 // walks to a marker and waits -- in freedom mode not followed: Romans come for
@@ -4590,6 +4616,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("beam42", kBeam42),
 	SCENARIO("beam42f", kBeam42f),
 	SCENARIO("freeromans23", kFreeRomans23),
+	SCENARIO("hearth23", kHearth23),
 	SCENARIO("pillar36", kPillar36),
 	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("cam14", kCam14),
@@ -4732,6 +4759,7 @@ struct AutotestState {
 	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
 	bool    watchEnemies = false;   // Romans and squads near enemyPoint, WATCHENEMIES
 	bool    enemiesPrimed = false;
+	bool    cpntCheck = false;      // every Roman's component (+0x54) checked each frame, CPNTCHECK
 	Vector3 enemyPoint;
 	Vector3 beaconPoint;
 	int     cineScene = -1;         // scene started by CINE_START
@@ -5034,6 +5062,37 @@ void LogTick(float t) {
 		} __except (EXCEPTION_EXECUTE_HANDLER) {
 			line.Add(" | probe fault");
 		}
+	}
+	if (at.cpntCheck) {   // a Roman's +0x54 is its pool's component (CK*Cpnt, vtables 0x627B10..0x627E20) or 0
+		const int ids[] = { 75, 93, 95, 148, 164 };
+		static char* s_obj[1024];
+		static char* s_last[1024];
+		static int s_n = 0, s_bad = 0;
+		for (int id : ids)
+			for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n; i++) {
+				char* e = (char*)GetLvlObject(2, id, i);
+				if (!e) continue;
+				char* c = *(char**)(e + 0x54);
+				int k = 0;
+				while (k < s_n && s_obj[k] != e) k++;
+				if (k == s_n) {
+					if (s_n == 1024) continue;
+					s_obj[s_n] = e;
+					s_last[s_n++] = nullptr;
+				}
+				char*& last = s_last[k];
+				if (c == last) continue;
+				uintptr_t vt = c && !IsBadReadPtr(c, 4) ? *(uintptr_t*)c : 0;
+				bool ok = !c || (vt >= 0x627B10 && vt <= 0x627E20);
+				if (!ok && s_bad < 40) {
+					s_bad++;
+					Log("autotest: CPNT Roman %p (class %d, vt %08X) +54 %p -> %p (vt %08X) -- not a component", e, id,
+					    *(uint32_t*)e, last, c, (unsigned)vt);
+				} else if (ok && s_bad < 40 && c && last) {
+					Log("autotest: cpnt Roman %p +54 %p -> %p", e, last, c);
+				}
+				last = c;
+			}
 	}
 	if (at.watchEnemies) {   // live Romans near the point; squads near it (flags, member groups)
 		int live = 0, nearA = 0, nearO = 0;   // within 7 units of each hero: fighting / chasing it
@@ -5853,6 +5912,7 @@ void RunStep(const Step& s) {
 	case S_WATCHCAM: at.watchCam = true; break;
 	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
 	case S_WATCHENEMIES: at.watchEnemies = true; at.enemyPoint = Vector3(s.x, s.y, s.z); break;
+	case S_CPNTCHECK: at.cpntCheck = true; Log("autotest: checking every Roman's component (+0x54) each frame"); break;
 	case S_NODEDUMP: {   // bonuses (2,114) within 6 units of (x y z): their node trees
 		Vector3 c(s.x, s.y, s.z);
 		struct D {

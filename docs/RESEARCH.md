@@ -2259,7 +2259,7 @@ both halves).
   page in a free slot, glyphs appended). Autotests spy21a (English: page swapped, subtitle sharper, no cell
   lines; straight apostrophe) and spy21a with 03GLOC.KWN copied over 01GLOC.KWN for the run ("pack 03"
   swapped, "!Grrrr! Que frio hace aqui." with its accents), 01GLOC restored.
-- Round 122 (2026-10-22, user: side by side, the helmet counter group no longer looks centred under
+- Round 123 (2026-10-22, user: side by side, the helmet counter group no longer looks centred under
   xxl_widescreen2d.asi). hud2.cpp centred it by its plate's middle from the stretched width (place +0x14 minus
   half of +0x34); the asi draws that plate (4/3) / aspect as wide towards its right edge, so the drawn middle sat
   right of the screen's. PlateDrawScale(): that factor while xxl_widescreen2d.asi is loaded (GetModuleHandleA),
