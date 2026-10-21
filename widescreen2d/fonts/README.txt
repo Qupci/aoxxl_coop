@@ -44,4 +44,6 @@ New icon designs: export the Figma frame "Action icons" as PNG at 4x (1456 x 96)
 keeping its layout (13 plates of 24 px at 28 px steps, glows inside the plates), then
   powershell -ExecutionPolicy Bypass -File tools\update_icons.ps1 EXPORT.png
 rebuilds both pages of all five packs and copies them to Game Files\xxl_widescreen2d.
+  update_icons.ps1 -Original   the game's own icons, upscaled (icons\sheet_original_x4.png)
+  update_icons.ps1 -Undo       the icons before the last run (icons\sheet_previous_x4.png)
 The original pages: python ..\..\tools\export_game_icons.py "Game Files\LLGLOC.KWN" OUT
