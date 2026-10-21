@@ -141,13 +141,20 @@ void PlateBack(char* self) {
 	g_plate = nullptr;
 }
 
+// Text glyphs are laid out and drawn this much wider than the font: the aspect
+// (2D manager +4) times the game's constant at 0x623C64 -- 0.75, or 1 / aspect
+// under xxl_widescreen2d.asi (true letter shapes), so it is read, not assumed.
+float GlyphWidthScale(const char* screen) {
+	return (screen ? *(const float*)(screen + 4) : 1.0f) * *(const float*)0x623C64;
+}
+
 void Relayout(char* t20) {
 	unsigned n = *(uint32_t*)(t20 + 0x2D4);
 	if (n == 0 || n > 64 || g_nLines < 2) return;
 	float* pos = (float*)(t20 + 0x3C8);
 	CKYellowPages* yp = YellowPages();
 	char* screen = yp ? *(char**)((char*)yp + 0x34) : nullptr;
-	float scale = screen ? *(float*)(screen + 4) * 0.75f : 0.75f;
+	float scale = GlyphWidthScale(screen);
 	typedef float(__cdecl* WidthFn)(void* font, const wchar_t* word, uint32_t size);
 	void* font = *(void**)(t20 + 0x660);
 	if (!font) return;
@@ -270,7 +277,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 		float* pos = (float*)(t20 + 0x3C8);
 		CKYellowPages* y2 = YellowPages();
 		char* screen = y2 ? *(char**)((char*)y2 + 0x34) : nullptr;
-		float scale = screen ? *(float*)(screen + 4) * 0.75f : 0.75f;
+		float scale = GlyphWidthScale(screen);
 		typedef float(__cdecl* WidthFn)(void* font, const wchar_t* word, uint32_t size);
 		void* font = *(void**)(t20 + 0x660);
 		if (n && n <= 64 && font) {
