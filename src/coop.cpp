@@ -1578,10 +1578,17 @@ void CloseShopFor(const char* why) {
 
 void CoopNoteTrioEventFlagged(unsigned eventId) { NoteTrioEventFlagged(eventId); }
 
-// Still locked by the level: held by the game, or told to wait (+0x564 = 3,
-// 0x4802; 0x4803 sets 0).
+// Still locked by the level, waiting for the partner: held by the game, or told
+// to wait (+0x564 = 3, 0x4802; 0x4803 sets 0) -- in an order that waits (3 wait,
+// 8 the beam, 9 a cable car). Not a scripted walk (LV2-1: the platform's top
+// zone 0058 gives Asterix the lead and walks Obelix to a marker, 4828 order 1):
+// that is the level going on; undone, its "before" lead went back to Obelix and
+// the torch's prompt became player 2's.
 static bool LockedByLevel(int idx, Hero h) {
-	return h && (g.held[idx] || (g_lock.hero == idx && *(uint8_t*)(h.raw() + 0x564) == 3));
+	if (!h) return false;
+	uint8_t order = *(uint8_t*)(h.raw() + 0x564);
+	bool waits = order == AI_WAIT || order == AI_HANG_ON_BEAM || order == AI_USE_CABLECAR;
+	return waits && (g.held[idx] || g_lock.hero == idx);
 }
 
 static void UndoLock(Trio t, int up, bool lead);

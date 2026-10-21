@@ -3385,7 +3385,9 @@ const Step kTurnstile21[] = {
 	VPAD(17000, 1, PAD_X, 0, 0, "p2 X"), VPAD(17150, 1, 0, 0, 0, "p2 release"),
 	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17650, 1, 0, 0, 0, "p2 release"),
 	VPAD(18000, 1, PAD_X, 0, 0, "p2 X"), VPAD(18150, 1, 0, 0, 0, "p2 release"),
-	SHOT(19000, "turnstile21_3"), SHOT(23000, "turnstile21_4"),
+	SHOT(19000, "turnstile21_3"),
+	{ 20500, S_UNLOCKHERO, HERO_OBELIX, 0, 0, 0, 0, "R3 + B on Obelix walking to his marker (0058)" },
+	SHOT(23000, "turnstile21_4"),
 	END(24000),
 };
 

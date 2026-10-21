@@ -2020,3 +2020,12 @@ both halves).
   steps S_UNLOCKHERO (what R3 + B does, for player 1's hero -- injected P1 input never reaches the rope / R3 combo)
   and S_CARPOS (the car's +0x14 along the rope; only tilts the car, no real move); XXL_LIFTLOG logs the cameras'
   targets. Autotests unlockcar21 (LV2-1: before, P1's view stayed on the rope; now on Asterix), unlockcar33.
+- Round 103 (2026-10-21, user: xxl_coop.obelix_unlock_identity.log, Snipaste_2026-10-21_06-32-37 -- after the
+  spinning platform, Backspace + G on Obelix walking to his marker made Obelix the leader again; Asterix's torch
+  then showed player 2's "Grab F" and could not be taken). LV2-1's platform top zone 0058 (group 00B: trio 4800
+  Asterix leads, 4828 Obelix walks to a marker = AI order 1, camera sector 0x700, detectors) is the level going on,
+  but R3 + B ran the full undo on it: its picture (taken before 0058, leader Obelix) gave the lead back to Obelix.
+  LockedByLevel now requires an order that waits for the partner (3 wait, 8 beam, 9 cable car); a scripted walk is
+  only taken back (g.held cleared, the lead untouched) -- also not undone by a lifter or a fall. turnstile21 now
+  ends with S_UNLOCKHERO on Obelix after 0058 (taken back, lead stays Asterix); liftercar, unlockcar21,
+  unlockpillar, lockagain still undo.
