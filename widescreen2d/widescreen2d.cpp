@@ -82,6 +82,136 @@ float HudSqueeze(const char* cam) {
 	return window[0] / window[1] * (float)vp.h / (float)vp.w * (4.0f / 3.0f);
 }
 
+// --- 2D plates ------------------------------------------------------------------
+// A CBillboard2d (draw 0x42D6F0, thiscall(bb, float pos[2], ?, char alignX, char
+// alignY, ?), ret 0x14; width +0x14, height +0x18) with +0x1C set takes its width
+// as a share of the screen's: the HUD's see-through plates (the Romans to beat,
+// the helmets, the laurels) come out a third too wide at 16:9. They are drawn
+// (4/3) / aspect as wide, about the edge or middle they are placed by (the game's
+// own sums keep it). What sits on a plate -- its text (CText2d draw 0x42F430,
+// same arguments), small billboards, the HUD models -- was placed by shares of the
+// screen too, so it is drawn that much nearer the plate's anchor. Plates spanning
+// (nearly) the whole screen -- fades, bars, backgrounds -- are left as they are.
+const uintptr_t kFrameId = 0x6464C4;   // bumped every frame
+
+struct Plate { float anchor, left, right, cy, halfH; };
+Plate    g_plates[2][64];
+int      g_nPlates[2];
+int      g_platesNow = 0;
+uint32_t g_platesFrame = 0;
+
+float PlateSqueeze() {
+	float aspect = 0.0f;
+	__try {
+		char* yp = *(char**)kYellowPages;
+		char* m2d = yp ? *(char**)(yp + 0x34) : nullptr;
+		aspect = m2d ? *(float*)(m2d + 4) : 0.0f;
+	} __except (EXCEPTION_EXECUTE_HANDLER) {}
+	return aspect > 0.5f && aspect < 8.0f ? (4.0f / 3.0f) / aspect : 1.0f;
+}
+
+void PlatesNextFrame() {
+	uint32_t f = *(uint32_t*)kFrameId;
+	if (f == g_platesFrame) return;
+	g_platesFrame = f;
+	g_platesNow ^= 1;
+	g_nPlates[g_platesNow] = 0;
+}
+
+// The smallest plate (this frame's or the last one's) holding 2D point (x, y).
+const Plate* PlateAt(float x, float y) {
+	const Plate* best = nullptr;
+	for (int b = 0; b < 2; b++)
+		for (int i = 0; i < g_nPlates[b]; i++) {
+			const Plate& p = g_plates[b][i];
+			if (x >= p.left && x <= p.right && fabsf(y - p.cy) <= p.halfH &&
+			    (!best || p.right - p.left < best->right - best->left))
+				best = &p;
+		}
+	return best;
+}
+
+typedef int(__fastcall* Draw2dFn)(char* self, void* edx, float* pos, int a, char alignX, char alignY, int b);
+Draw2dFn g_origBillboard = nullptr, g_origText = nullptr;
+
+int __fastcall BillboardDrawHook(char* self, void* edx, float* pos, int a, char alignX, char alignY, int b) {
+	PlatesNextFrame();
+	float s = PlateSqueeze();
+	if (s > 0.995f || !pos) return g_origBillboard(self, edx, pos, a, alignX, alignY, b);
+	float* w = (float*)(self + 0x14);
+	float h = *(float*)(self + 0x18);
+	float p[2] = { pos[0], pos[1] };
+	const Plate* on = PlateAt(pos[0], pos[1]);
+	bool stretched = *(char*)(self + 0x1C) != 0 && *w > 0.0f && *w < 0.95f;
+	if (on && !(stretched && on->right - on->left <= *w * 1.01f))   // not itself
+		p[0] = on->anchor + (p[0] - on->anchor) * s;
+	if (!stretched) return g_origBillboard(self, edx, p, a, alignX, alignY, b);
+	float width = *w;
+	Plate& rec = g_plates[g_platesNow][g_nPlates[g_platesNow] < 64 ? g_nPlates[g_platesNow]++ : 63];
+	rec.anchor = pos[0];
+	rec.left = alignX == 2 ? pos[0] - width : alignX == 1 ? pos[0] - width * 0.5f : pos[0];
+	rec.right = rec.left + width;
+	rec.cy = alignY == 0 ? pos[1] - h * 0.5f : alignY == 2 ? pos[1] + h * 0.5f : pos[1];
+	rec.halfH = h * 0.5f;
+	*w = width * s;
+	int r = g_origBillboard(self, edx, p, a, alignX, alignY, b);
+	*w = width;
+	return r;
+}
+
+int __fastcall TextDrawHook(char* self, void* edx, float* pos, int a, char alignX, char alignY, int b) {
+	PlatesNextFrame();
+	const Plate* on = pos ? PlateAt(pos[0], pos[1]) : nullptr;
+	float s = on ? PlateSqueeze() : 1.0f;
+	if (!on || s > 0.995f) return g_origText(self, edx, pos, a, alignX, alignY, b);
+	float p[2] = { on->anchor + (pos[0] - on->anchor) * s, pos[1] };
+	return g_origText(self, edx, p, a, alignX, alignY, b);
+}
+
+bool Detour(uintptr_t target, const uint8_t* expected, size_t len, void* hook, void** orig) {
+	uint8_t* code = (uint8_t*)target;
+	if (memcmp(code, expected, len) != 0) return false;
+	uint8_t* tramp = (uint8_t*)VirtualAlloc(nullptr, len + 5, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+	if (!tramp) return false;
+	memcpy(tramp, code, len);
+	tramp[len] = 0xE9;
+	*(uint32_t*)(tramp + len + 1) = (uint32_t)((target + len) - ((uintptr_t)tramp + len + 5));
+	*orig = tramp;
+	DWORD old;
+	if (!VirtualProtect(code, len, PAGE_EXECUTE_READWRITE, &old)) return false;
+	code[0] = 0xE9;
+	*(uint32_t*)(code + 1) = (uint32_t)((uintptr_t)hook - (target + 5));
+	for (size_t i = 5; i < len; i++) code[i] = 0x90;
+	VirtualProtect(code, len, old, &old);
+	FlushInstructionCache(GetCurrentProcess(), code, len);
+	return true;
+}
+
+void InstallPlateHooks() {
+	static const uint8_t kBillboard[7] = { 0x83, 0xEC, 0x10, 0x8B, 0x44, 0x24, 0x14 };
+	static const uint8_t kText[7] = { 0x83, 0xEC, 0x28, 0x53, 0x56, 0x8B, 0xF1 };
+	bool bb = Detour(0x42D6F0, kBillboard, sizeof(kBillboard), (void*)BillboardDrawHook, (void**)&g_origBillboard);
+	bool tx = Detour(0x42F430, kText, sizeof(kText), (void*)TextDrawHook, (void**)&g_origText);
+	Log("plates: billboard draw %s, text draw %s", bb ? "hooked" : "NOT hooked", tx ? "hooked" : "NOT hooked");
+}
+
+// A HUD model's place as a 2D point (x 0..1 from the left, y 0..1 from the
+// bottom of the screen), from its camera-space x / y: the camera's view window
+// maps onto the D3D viewport, the 2D layer onto the whole back buffer.
+struct HudMap { float vpX, vpY, vpW, vpH, winX, winY, fullW, fullH; };
+
+bool GetHudMap(const char* cam, HudMap& m) {
+	struct { DWORD x, y, w, h; float minZ, maxZ; } vp = {};
+	void* dev = *(void**)kD3DDevice;
+	typedef long(__stdcall* GetViewportFn)(void* dev, void* vp);
+	if (!dev || ((GetViewportFn)(*(void***)dev)[48])(dev, &vp) < 0 || !vp.w || !vp.h) return false;
+	const char* raster = *(char**)(cam + 0x60);
+	if (!raster) return false;
+	m = { (float)vp.x, (float)vp.y, (float)vp.w, (float)vp.h, ((const float*)(cam + 0x68))[0],
+	      ((const float*)(cam + 0x68))[1], (float)*(const int*)(raster + 0x0C), (float)*(const int*)(raster + 0x10) };
+	return m.winX > 0.0f && m.winY > 0.0f && m.fullW > 0.0f && m.fullH > 0.0f;
+}
+
 // Rows of models (the health shields): models on one line, each within kRowGap
 // of the next, are drawn as a group, so their spacing shrinks with them --
 // towards the row's outer end, which stays put. A model on its own keeps its
@@ -89,7 +219,7 @@ float HudSqueeze(const char* cam) {
 // units: the view is 1 across.
 const float kRowGap = 0.15f, kRowLine = 0.03f;
 
-void CloseRows(const float* camLtm, float s, int n) {
+void CloseRows(const char* cam, const float* camLtm, float s, int n) {
 	float ru[3], uu[3];
 	float rl = sqrtf(camLtm[0] * camLtm[0] + camLtm[1] * camLtm[1] + camLtm[2] * camLtm[2]);
 	float ul = sqrtf(camLtm[4] * camLtm[4] + camLtm[5] * camLtm[5] + camLtm[6] * camLtm[6]);
@@ -104,12 +234,26 @@ void CloseRows(const float* camLtm, float s, int n) {
 		y[k] = d[0] * uu[0] + d[1] * uu[1] + d[2] * uu[2];
 		group[k] = k;
 	}
+	// models on a plate go nearer its anchor with it, and are no row's
+	HudMap hm;
+	float sp = PlateSqueeze();
+	if (sp < 0.995f && GetHudMap(cam, hm))
+		for (int k = 0; k < n; k++) {
+			float px = (hm.vpX + hm.vpW * (0.5f - x[k] / (2.0f * hm.winX))) / hm.fullW;
+			float py = 1.0f - (hm.vpY + hm.vpH * (0.5f - y[k] / (2.0f * hm.winY))) / hm.fullH;
+			const Plate* on = PlateAt(px, py);
+			if (!on) continue;
+			float dx = -(on->anchor + (px - on->anchor) * sp - px) * hm.fullW * 2.0f * hm.winX / hm.vpW;
+			float* p = g_saved[k].ltm + 12;
+			for (int c = 0; c < 3; c++) p[c] += dx * ru[c];
+			group[k] = -1;
+		}
 	// neighbours join a group (merging until nothing changes)
 	for (bool changed = true; changed;) {
 		changed = false;
 		for (int a = 0; a < n; a++)
 			for (int b = a + 1; b < n; b++)
-				if (group[a] != group[b] && fabsf(y[a] - y[b]) < kRowLine && fabsf(x[a] - x[b]) < kRowGap) {
+				if (group[a] >= 0 && group[b] >= 0 && group[a] != group[b] && fabsf(y[a] - y[b]) < kRowLine && fabsf(x[a] - x[b]) < kRowGap) {
 					int to = group[a] < group[b] ? group[a] : group[b];
 					int from = group[a] < group[b] ? group[b] : group[a];
 					for (int k = 0; k < n; k++) if (group[k] == from) group[k] = to;
@@ -163,7 +307,7 @@ void __fastcall ListDrawHook(char* list, void* edx) {
 					for (int c = 0; c < 3; c++) v[c] -= d * r[c];
 				}
 			}
-			if (len2 > 0.0f) CloseRows(camLtm, s, n);
+			if (len2 > 0.0f) CloseRows(cam, camLtm, s, n);
 		}
 	} __except (EXCEPTION_EXECUTE_HANDLER) {}
 	static int logged = 0;
@@ -214,6 +358,7 @@ DWORD WINAPI WatchThread(LPVOID) {
 	float* scale = (float*)kGlyphScale;
 	DWORD old;
 	if (*scale != 0.75f || !VirtualProtect(scale, sizeof(float), PAGE_READWRITE, &old)) return 0;
+	InstallPlateHooks();
 	bool listsWrapped = false;
 	for (;;) {
 		if (!listsWrapped) listsWrapped = WrapHudLists();

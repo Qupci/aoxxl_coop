@@ -2214,3 +2214,15 @@ both halves).
   their spacing squeezed towards the row's outer end; single models keep their centres (they sit in 2D plates).
   The co-op mod's P2 HUD pass calls the same slots, so both HUDs get it. Autotest hudlayout -Level 4 before /
   after: shields and combo columns narrow and in place, rows closed up.
+- Round 119 (2026-10-21, user: the see-through HUD plates -- Romans to beat, helmets, laurels -- still wide; then: the
+  co-op hints need a fix). CBillboard2d draw 0x42D6F0 (thiscall(bb, float pos[2], ?, char alignX, char alignY, ?),
+  ret 0x14; inline at element +0x20, called by 0x427060; width +0x14, height +0x18, +0x1C set = width as a share
+  of the screen, i.e. stretched; alignX 0 left / 1 middle / 2 right edge at pos). xxl_widescreen2d.asi detours it
+  and the CText2d draw 0x42F430 (same arguments): a stretched billboard under 0.95 of the screen is drawn
+  (4/3) / aspect as wide (the game's sums keep its anchor) and its box kept per frame (frame id 0x6464C4, this
+  frame's and the last's); text, small billboards and HUD models (camera space -> D3D viewport -> back buffer
+  share) on a plate are drawn that much nearer its anchor, and are no row. The co-op hint's plate (interface
+  +0x140, width +0x34) is sized for the true-shape text, so hints.cpp PlateDrawScale gives it 1 / that factor
+  when the asi is in (seen by 0x623C64 != 0.75). The hint's text is not on its plate's box (laid out in a 2.0
+  box, words moved), so it is not moved. Autotests hudreq -Level 4 (plates narrower to the right, 0/0 and 3 inside,
+  icons at the ends), hintjoin and down2a (plates fit the hints), spy21a (bars and subtitle untouched).
