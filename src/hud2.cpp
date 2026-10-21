@@ -589,14 +589,26 @@ void Hud2BeginP1(RwCamera* hud) {
 		Xf2d(itf, 0x134, t);
 		Xf2d(itf, 0x150, t);
 		Xf3d(NodeAt(itf, 0xA8), cl, t, true);
-		// The pieces under it slide in from the right edge and out again; in the
-		// middle that crossed player 2's half: they come down from the top
-		// instead, like the helmets. `off` is how far a piece is from its place
-		// (0.0 - 1.0 of its way).
-		auto fromTop = [&](float off, float way) {
+		// The pieces under it, centred each on its own plate's middle as drawn
+		// at rest (its place +0x14 less `off`, how far it has slid; width +0x34;
+		// byte +6: 0 drawn rightwards from the place, 1 about it, 2 leftwards),
+		// scaled with the counter.
+		auto centred = [&](int plateOff, float off) {
+			float* pl = *(float**)(itf + plateOff);
+			if (!pl) return t;
+			uint8_t align = *(uint8_t*)((char*)pl + 6);
+			float w = pl[13] * PlateDrawScale();
+			float m = pl[5] - off + (align == 2 ? -0.5f : align == 0 ? 0.5f : 0.0f) * w;
+			return Xform{ m, plate[6], s, 0.5f - m, -0.1f };
+		};
+		// They slide in from the right edge and out again; in the middle that
+		// crossed player 2's half: they come down from the top instead, like the
+		// helmets. `off` is how far a piece is from its place (0.0 - 1.0 of its
+		// way).
+		auto fromTop = [&](const Xform& base, float off, float way) {
 			float p = way > 0.01f ? off / way : 0.0f;
 			p = p < 0.0f ? 0.0f : p > 1.0f ? 1.0f : p;
-			Xform u = t;
+			Xform u = base;
 			u.dx -= s * off;
 			u.dy += s * p * 0.6f;
 			return u;
@@ -604,7 +616,8 @@ void Hud2BeginP1(RwCamera* hud) {
 		// The x3 / x10 sign (FUN_0051E440: +0x3A0 slides from 1.01 to +0x31C;
 		// plate +0x13C, text +0x158, model +0x130).
 		float shown = *(float*)(itf + 0x31C);
-		Xform ts = fromTop(*(float*)(itf + 0x3A0) - shown, 1.01f - shown);
+		float sOff = *(float*)(itf + 0x3A0) - shown;
+		Xform ts = fromTop(centred(0x13C, sOff), sOff, 1.01f - shown);
 		Xf2d(itf, 0x13C, ts);
 		Xf2d(itf, 0x158, ts);
 		Xf3d(NodeAt(itf, 0x130), cl, ts, true);
@@ -613,10 +626,12 @@ void Hud2BeginP1(RwCamera* hud) {
 		// +0x318, its model +0x12C on +0x394 to +0x33C). Natively it stays at
 		// the right; side by side that was on player 2's combo bar.
 		float rShown = *(float*)(itf + 0x318);
-		Xform tr = fromTop(*(float*)(itf + 0x388) - rShown, 1.01f - rShown);
+		float rOff = *(float*)(itf + 0x388) - rShown;
+		Xform tc = centred(0x138, rOff);
+		Xform tr = fromTop(tc, rOff, 1.01f - rShown);
 		Xf2d(itf, 0x138, tr);
 		Xf2d(itf, 0x154, tr);
-		Xform tm = fromTop(*(float*)(itf + 0x394) - *(float*)(itf + 0x33C), 1.01f - rShown);
+		Xform tm = fromTop(tc, *(float*)(itf + 0x394) - *(float*)(itf + 0x33C), 1.01f - rShown);
 		tm.dy = tr.dy;
 		Xf3d(NodeAt(itf, 0x12C), cl, tm, true);
 	}

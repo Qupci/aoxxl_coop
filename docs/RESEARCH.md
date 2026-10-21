@@ -2289,3 +2289,10 @@ both halves).
   The fix also fired for 7 other blocks in the user's play: running without a slot is common, the stray write
   usually harmless. How the mod sets off the keg's case (stop then tick in one cutscene, or only the heap layout
   under the write) is not known.
+- Round 125 (2026-10-22, user: centre the x3 / x10 sign and the spy's helmet requirement too, with or without
+  xxl_widescreen2d.asi). Side by side they took the helmet counter's transform (right ends lined up). Now each is
+  centred on its own plate's drawn middle at rest: place +0x14 less how far it has slid, width +0x34 times
+  PlateDrawScale(), alignment byte +6 (0 drawn rightwards from the place, 1 about it, 2 leftwards -- these two
+  are not drawn leftwards like the helmet counter's). Scale 3/4 and the vertical pivot (the counter's) as before.
+  Autotests hudreq / hudx3 -Level 4, with the asi and with it moved aside: all three plates' middles on the
+  split line.
