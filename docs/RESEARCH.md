@@ -2226,3 +2226,10 @@ both halves).
   when the asi is in (seen by 0x623C64 != 0.75). The hint's text is not on its plate's box (laid out in a 2.0
   box, words moved), so it is not moved. Autotests hudreq -Level 4 (plates narrower to the right, 0/0 and 3 inside,
   icons at the ends), hintjoin and down2a (plates fit the hints), spy21a (bars and subtitle untouched).
+- Round 120 (2026-10-21, user: with xxl_widescreen2d.asi the side-by-side HUD's 3/4 size-downs are no longer
+  needed). hud2.cpp MiddleScale(): 1 while xxl_widescreen2d.asi is loaded (GetModuleHandleA), else 0.75 as before:
+  the helmet counter group in the top middle (counter, x3 / x10 sign, spy's helmet requirement), the fight gate's
+  counter and its sparkle's place. ScaleHealth (more than four shields) is skipped under it: six shields at full
+  size close up to 0.06 apart (the asi's rows) and end by 0.39 of the screen, short of the middle pieces (from
+  0.43). The group stays 0.1 down, under the shield rows: at the top, player 2's six-shield row (to 0.61) would
+  meet its right end (0.60). Autotests shields6, hudreq / hudx3 -Level 4.

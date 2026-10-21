@@ -289,6 +289,15 @@ void Restore2d() {
 	g.nSaved2d = 0;
 }
 
+// Side by side, the pieces moved to the middle were sized down to 3/4 for the
+// game's HUD stretched a third wide at 16:9. Under xxl_widescreen2d.asi (a
+// separate fix) the HUD has its true shape, narrower: they keep their size.
+float MiddleScale() {
+	static bool trueShape = false;
+	if (!trueShape) trueShape = GetModuleHandleA("xxl_widescreen2d.asi") != nullptr;
+	return trueShape ? 1.0f : 0.75f;
+}
+
 // Stacked split (player 1 on top): each player's HUD in their own half, as
 // the single player HUD -- health at the top left, the combo bar's column
 // below it at the left edge, at 3/4 size (its bottom at 0.35 on the full
@@ -320,7 +329,7 @@ void ComboToHalf(char* itf, const float* cl, int player, bool save) {
 void LayoutGate(char* itf, const float* cl, bool stacked) {
 	float shown = *(float*)(itf + 0x3DC);
 	if (!(shown > 0.3f && shown < 1.0f)) shown = 0.879f;
-	Xform t = stacked ? Xform{ shown, 0.475f, 1.0f, 0.0f, 0.025f } : Xform{ shown, 0.475f, 0.75f, 0.5f - shown, 0.0f };
+	Xform t = stacked ? Xform{ shown, 0.475f, 1.0f, 0.0f, 0.025f } : Xform{ shown, 0.475f, MiddleScale(), 0.5f - shown, 0.0f };
 	Xform u = t;
 	if (!stacked) {
 		float way = 0.4f;
@@ -351,8 +360,8 @@ void PlaceGateSparkle(char* itf, bool middle) {
 	if (!fr || IsBadReadPtr(fr, 0x90)) return;
 	float shown = *(float*)(itf + 0x3DC);
 	if (!(shown > 0.3f && shown < 1.0f)) return;
-	// The game's place, or the counter's middle (scaled 3/4 about (shown, 0.475), at x 0.5).
-	float x = middle ? 0.5f : shown, y = middle ? 0.475f + (0.5f - 0.475f) * 0.75f : 0.5f;
+	// The game's place, or the counter's middle (scaled about (shown, 0.475), at x 0.5).
+	float x = middle ? 0.5f : shown, y = middle ? 0.475f + (0.5f - 0.475f) * MiddleScale() : 0.5f;
 	float dx = x - fr[0x80 / 4], dy = y - fr[0x84 / 4];
 	if (fabsf(dx) < 0.001f && fabsf(dy) < 0.001f) return;
 	fr[0x40 / 4] += dx; fr[0x44 / 4] += dy;   // modelling
@@ -420,7 +429,7 @@ void __fastcall ItfVf15Hook(char* self, void* edx) {
 // spacing alike (0.08 apart), to fit 0.28 across between the first and the
 // last. LTMs only (what the draw reads); `save` keeps them to put back.
 void ScaleHealth(char* itf, const float* cl, int shields, bool save) {
-	if (shields <= 4) return;
+	if (shields <= 4 || MiddleScale() == 1.0f) return;   // true shape: six fit
 	if (shields > 6) shields = 6;
 	float sc = 0.28f / (0.08f * (float)(shields - 1));
 	auto camX = [&](float* fr) {
@@ -571,7 +580,7 @@ void Hud2BeginP1(RwCamera* hud) {
 	float* plate = *(float**)(itf + 0x134);
 	if (plate && !stacked) {
 		float mid = plate[5] - plate[13] * 0.5f;
-		float s = 0.75f;
+		float s = MiddleScale();
 		Xform t = { mid, plate[6], s, 0.5f - mid, -0.1f };
 		Xf2d(itf, 0x134, t);
 		Xf2d(itf, 0x150, t);
