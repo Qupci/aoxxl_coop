@@ -820,12 +820,18 @@ uint8_t* CoopP2CameraValues() {
 // sees one (what the title does next time). 1 chosen with a pad (the options'
 // keyboard layout) is left alone. XXL_PRESETNOPAD=1 (autotest preset1): the
 // game's next choice counts as made without a pad.
+// A fourth session (xxl_coop.pad_preset_issue.log): another slow start, where the
+// boot's saved options (vf10(1) -> FUN_00503B00, which sets 1 at 0x503B41 while it
+// builds the tables) came right before the menu, and force_level's level started
+// before the title's choice (vf10(6), normally a second later). 1 from 0x503B41 is
+// that step, never a choice, so a level running on it gets 3 too (autotest presetopts).
 typedef void(__fastcall* SetPresetFn)(char* in, void* edx, int preset);
 typedef char(__fastcall* HasPadFn)(char* in, void* edx);
 const uintptr_t kSetPreset = 0x438950;
 const uint8_t   kSetPresetPrologue[6] = { 0x55, 0x8B, 0x6C, 0x24, 0x08, 0x56 };
 SetPresetFn g_origSetPreset = nullptr;
 bool g_presetWithoutPad = false;   // the game's last choice was 1, made while it saw no pad
+bool g_presetOptionsStep = false;  // the last one was the saved options' own 1 (0x503B41)
 
 static bool GameSeesPad(char* in) { return ((HasPadFn)0x438AB0)(in, nullptr) != 0; }
 
@@ -930,6 +936,7 @@ static void __fastcall SetPresetHook(char* in, void* edx, int preset) {
 	g_presetWithoutPad = preset == 1 && !pad;
 	g_presetSeen = true;
 	void* from = _ReturnAddress();
+	g_presetOptionsStep = preset == 1 && (uintptr_t)from == 0x503B41;
 	Log("input: the game sets controller preset %d (from %p; it sees %s)", preset, from, pad ? "a pad" : "no pad");
 	g_origSetPreset(in, edx, preset);
 	// The title's own choice with a pad (FUN_00503AA0): its layout is the right one.
@@ -950,7 +957,7 @@ static void WatchControllerPreset() {
 	}
 	if (g.lastLevel <= 0 || now - lastCheck < 1000) return;
 	lastCheck = now;
-	if (preset == 1 && (g_presetWithoutPad || !g_presetSeen) && GameSeesPad(in)) {
+	if (preset == 1 && (g_presetWithoutPad || g_presetOptionsStep || !g_presetSeen) && GameSeesPad(in)) {
 		// The pad's own layout goes into the presets at boot, when the game sees a
 		// pad there (CKAsterixGameManager::vf10(1) -> FUN_00503B00, thiscall(game
 		// manager), done: +0x5BC = 1); the title then picks 3. With no pad seen at
@@ -961,12 +968,17 @@ static void WatchControllerPreset() {
 			((void(__fastcall*)(char*, void*))0x503B00)(gm, nullptr);
 			Log("input: the pad's layout was never built (no pad at boot) -- built now (FUN_00503B00)");
 		}
+		// The saved options outside the title build preset 3 as the default table
+		// (face buttons shifted, autotest presetopts), so the title's always goes back.
 		RestorePadLayout(in);
 		SetPreset(in, 3);
 		Log("input: level %d is running on the keyboard preset 1, which the game chose %s; it sees a pad now -- "
 		    "preset 3 set (the game's choice with a pad)", g.lastLevel,
-		    g_presetWithoutPad ? "while it saw no pad" : "before the mod could see it (at boot)");
+		    g_presetWithoutPad ? "while it saw no pad" :
+		    g_presetOptionsStep ? "as a step of the saved options (FUN_00503B00), with no choice after it" :
+		    "before the mod could see it (at boot)");
 		g_presetWithoutPad = false;
+		g_presetOptionsStep = false;
 		g_presetSeen = true;
 		return;
 	}

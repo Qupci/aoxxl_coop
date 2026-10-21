@@ -913,6 +913,13 @@ const Step kPreset1[] = {
 	MARK(0, "baseline"), { 2000, S_SETPRESET, 1, 0, 0, 0, 0, "preset 1" }, END(5000),
 };
 
+// presetopts: the saved options (FUN_00503B00) run in play, which leave preset 1
+// set from 0x503B41 -- as at a slow boot where force_level started the level
+// before the title's choice (xxl_coop.pad_preset_issue.log); the mod should set 3.
+const Step kPresetOpts[] = {
+	MARK(0, "baseline"), { 2000, S_SETPRESET, -1, 0, 0, 0, 0, "saved options" }, END(5000),
+};
+
 // fog21: level 2's starting camp (snow, CFogBoxNodeFx): 6 s single player, then
 // player 2 joins (split screen); XXL_FOGLOG logs a snowflake, XXL_FOGFIX=0 the
 // game's own walks.
@@ -4323,6 +4330,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lbwait", kLbWait),
 	SCENARIO("preset0", kPreset0),
 	SCENARIO("preset1", kPreset1),
+	SCENARIO("presetopts", kPresetOpts),
 	SCENARIO("fog21", kFog21),
 	SCENARIO("spy21o", kSpy21O),
 	SCENARIO("spy21a", kSpy21A),
@@ -5690,10 +5698,15 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
-	case S_SETPRESET: {   // the game's controller preset a (CKInput +0x64 via FUN_00438950)
+	case S_SETPRESET: {   // the game's controller preset a (CKInput +0x64 via FUN_00438950); -1: the saved options (FUN_00503B00)
 		CKYellowPages* yp = YellowPages();
 		char* in = yp ? *(char**)((char*)yp + 0x14) : nullptr;
 		if (!in) break;
+		if (s.a == -1) {
+			Log("autotest: the saved options (FUN_00503B00), controller preset %d", *(int*)(in + 0x64));
+			((void(__fastcall*)(char*, void*))0x503B00)((char*)yp->gameManager, nullptr);
+			break;
+		}
 		typedef void(__fastcall* SetPresetFn)(char* in, void* edx, int preset);
 		Log("autotest: controller preset %d -> %d", *(int*)(in + 0x64), s.a);
 		((SetPresetFn)0x438950)(in, nullptr, s.a);

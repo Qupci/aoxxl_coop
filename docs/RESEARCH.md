@@ -2107,3 +2107,11 @@ both halves).
   4803 (zone 03C8); the jump off the platform's top (484C, AI order 2) stays the player's. Autotests boss210t
   (-Level 2, XXL_FREEDOM=1: Asterix held on the boss after the car; skips the intro with CINE_SKIP), pillar36l
   (-Level 3: lock kept / with XXL_FREEDOMCORK=0 free; R3 + B frees), turnstile21 with XXL_FREEDOM=1.
+- Round 111 (xxl_coop.pad_preset_issue.log, wrong pad layout again): another slow boot (menu at 5.8 s). The boot's saved
+  options (vf10(1) -> FUN_00503B00) set preset 1 at 0x503B41 as a step while building the tables, and force_level's
+  level started before the title's choice (vf10(6) -> FUN_00503AA0 -> 3 at 0x503AED, normally ~1 s later, e.g.
+  bump2 / 20261015-031152 logs) -- the level ran on 1, "chosen with a pad", which the mod left alone. Now 1 from
+  0x503B41 counts as no choice: a running level on it gets the pad layout file put back and preset 3. FUN_00503B00
+  outside the title also rebuilds preset 3 as the default table (A0+0F/10/11/12, face buttons shifted), so the file
+  is always restored. Autotest presetopts (S_SETPRESET a=-1 runs FUN_00503B00 in play): before, stayed on 1; now 3 with
+  all 48 bindings as the file (no table change logged against the title's); preset1 (XXL_PRESETNOPAD=1) still OK.
