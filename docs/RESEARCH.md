@@ -2544,3 +2544,16 @@ both halves).
   corkscrew 0x999, Asterix onto the circle, the turnstile's 0x996 every 150 ms: launch, 0118, lead, free), cork53b
   (box #3 off after the circle: before, held for good at the user's spot; now "landed from the corkscrew's launch
   -- back to its player", walked by player 1). turnstile21 / corklead21 as before (LV2-1 has no corkscrew launch).
+- Round 142 (user, LV5-3, userlogs\xxl_coop.dis_split_screen.log / xxl_coop.launcher_split_screen.log). (1) Player 2
+  leaving (Start; "split: off") after the level's switch to Obelix (zone 4801 at 28.9 s) gave the lead back to
+  Asterix: Release switched to player 1's hero whenever that one led when player 2 joined (joinLeader). Now the
+  leader stays (single player from there: player 1 drives whoever leads, as after the game's own switches); a lead
+  the mod only lent (groupTookLead) goes back first (GiveBackLead). joinLeader removed. (2) A launcher started by the
+  hero not leading (situation 0x0D in its sliced tick; the trio 0x4804 from 0x49C699 -- lifters send none) keeps
+  the lead after landing: the flight asks the trio for its leader, so the mod had lent it and gave it back on
+  resume -- to Obelix in the user's run (their R3 + X before). No level switch happened there; in single player
+  only the leader uses a launcher and still leads on landing. g.groupLauncher marks it (launcherAt in
+  CoopNoteTrioEvent); GiveBackLead keeps the lead for it. Autotests leave2 (level 2: 4801, player 2 leaves --
+  before Asterix, now Obelix, walked by player 1), launch53 (-Level 5 sector 3: Obelix leads, player 1's Asterix
+  launches -- before Obelix after landing, now Asterix), launchp2 / launch48 (player 2's Obelix launches: he keeps
+  it, the landing ground's switch hands it to Asterix), p2basic as before.

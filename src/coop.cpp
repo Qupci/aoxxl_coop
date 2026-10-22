@@ -66,7 +66,6 @@ struct CoopState {
 	DWORD   p2BackHeldAt = 0;
 	bool    p2BackCombo = false;    // Back is held for a combo, not to leave
 	bool    cineRegrouped = false;  // RegroupForCutscene done for the current cutscene
-	int     joinLeader = -1;        // the trio's leader when player 2 joined
 	int     storyZoneHero = -1;     // a cutscene zone bound to the other hero set off by this one
 	DWORD   storyZoneAt = 0;
 	int     bossRunHero = -1;       // woke a boss the heroes run from; the other player is brought along
@@ -98,6 +97,8 @@ struct CoopState {
 	uint8_t  slicedHero = 0, slicedOther = 0;   // what the trio said during the sliced tick
 	int      groupTookLead = -1;      // a hero that took the lead to start a group action
 	int      groupPrevLeader = -1;    // ... and the leader before it, who gets it back after
+	bool     groupLauncher = false;   // ... that group action was a launcher: the lead stays (single player's)
+	DWORD    launcherAt = 0;          // the last launcher start (trio 0x4804 from 0x49C699)
 	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
 
 	bool    suspended = false;
@@ -701,14 +702,12 @@ void Release(const char* why) {
 	if (t && p1 >= 0 && p2 >= 0 && scripted) {
 		Log("coop: player 2 left (%s) during a scripted sequence; leader stays %s", why, HeroName(t.Leader()));
 	} else if (t && p1 >= 0 && p2 >= 0) {
-		Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
-		// Back to player 1's hero only if it led when player 2 came in: joined
-		// while the game led with Obelix (after the belly slides), it stays so.
-		if (t.Leader() == p2 && g.joinLeader == p1 && h1 && h2) {
-			// The switch handler only accepts a target that looks like a companion.
-			*F18(h1) = HeroAiVariant(*F18(h1));
-			t.SwitchTo(p1);
-		}
+		// The leader stays the level's (single player from here: player 1 drives
+		// whoever leads, as the game does after its own switches) -- a lead the mod
+		// only lent for something under way goes back first. (It went back to player
+		// 1's hero when that one led as player 2 came in: LV5-3, the level's switch
+		// to Obelix undone by player 2 leaving.)
+		GiveBackLead(t);
 		// Single player from here: the leader is player 1's, the other one the AI
 		// companion following it.
 		int lead = t.Leader(), comp = lead == p1 ? p2 : p1;
@@ -782,7 +781,6 @@ void TryJoin(Trio t) {
 		if (g_config.p2Hero == HERO_ASTERIX || g_config.p2Hero == HERO_OBELIX) g.p2Hero = g_config.p2Hero;
 		else g.p2Hero = OtherHero(t.Leader());
 		g.p1Hero = OtherHero(g.p2Hero);
-		g.joinLeader = t.Leader();
 		// Joining in the middle of a scripted sequence (Asterix already seated in
 		// the cable car, Obelix leading to pull it): a hero the game has borrowed
 		// stays the game's until the sequence is over.
@@ -2209,6 +2207,7 @@ static void NoteFreedomLock(Trio t, int waiter) {
 
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	extern void* g_trioEventCaller;
+	if ((event & 0xFFFF) == 0x4804 && (uintptr_t)g_trioEventCaller == 0x49C699) g.launcherAt = GetTickCount();
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4800 || (event & 0xFFFF) == 0x4801) &&
 	    (uintptr_t)g_trioEventCaller >= 0x49AC80 && (uintptr_t)g_trioEventCaller < 0x49AD00) {
 		Trio tl = GetTrio();
@@ -3596,6 +3595,10 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 				    startedTalk ? "a Roman agent's dialogue" : startedShop ? "the merchant's shop" : startedMode ? "a machine (mode change)" : "a group action");
 				g.groupTookLead = g.slicedHero;
 				g.groupPrevLeader = g.savedLeader;
+				// (A launcher -- trio 0x4804 from 0x49C699 in this tick; lifters send
+				// none: only the leader uses one in single player, and it still leads
+				// on landing. The lead the hero took for it stays.)
+				g.groupLauncher = startedGroup && g.launcherAt && GetTickCount() - g.launcherAt < 200;
 			} else if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther) {
 				trio[0x2C] = g.savedLeader;
 				trio[0x2D] = g.savedCompanion;
@@ -3828,7 +3831,13 @@ static void JoinGun(Trio t, const char* why) {
 static void GiveBackLead(Trio t) {
 	if (g.groupTookLead < 0 || !t) return;
 	int took = g.groupTookLead, prev = g.groupPrevLeader;
+	bool launcher = g.groupLauncher;
 	g.groupTookLead = g.groupPrevLeader = -1;
+	g.groupLauncher = false;
+	if (launcher) {
+		Log("coop: %s landed from the launcher it started -- it keeps the lead (the launcher's, as in single player)", HeroName(took));
+		return;
+	}
 	// (Held with its order already back to "follow" -- Obelix at the gun's handles
 	// once Asterix leaves it, 0x4806 -- it is let go this same frame: not held.)
 	Hero ph = prev >= 0 ? t.GetHero(prev) : Hero();

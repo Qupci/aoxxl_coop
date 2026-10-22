@@ -553,7 +553,8 @@ const Step kLever[] = {
 };
 
 // launchp2: player 2's Obelix (not leading) starts sector 2's launcher; co-op
-// has to suspend as for the leader, and Asterix lead again after the landing.
+// has to suspend as for the leader; Obelix keeps the lead he took for it (round
+// 142), and the landing ground's own switch hands it to Asterix.
 // launchp2 / launcha: sector 2's launcher started by player 2's Obelix (not
 // leading) or by the leader Asterix; afterwards both walk, the game camera is
 // logged. Co-op has to suspend for the flight either way, Asterix lead after.
@@ -1867,6 +1868,34 @@ const Step kCork53B[] = {
 	P1(26000, 0, 1.0f, 0, "p1 walks"), P1(27500, 0, 0, 0, "p1 stops"),
 	SHOT(28000, "cork53b_3"),
 	END(29000),
+};
+
+// leave2 (level 2): the level's switch to Obelix (4801), then player 2 leaves
+// (Start): the lead stays Obelix's -- player 1 drives him, as in single player.
+const Step kLeave2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 3000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads (the level)" },
+	SHOT(4500, "leave2_1"),
+	VPAD(5000, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	P1(6500, 0, 1.0f, 0, "p1 walks"), P1(8000, 0, 0, 0, "p1 stops"),
+	SHOT(8500, "leave2_2"),
+	END(9500),
+};
+
+// launch53 (-Level 5, sector 3): the user's LV5-3 launcher (-341.28 14.08 151.93) --
+// Obelix leads (4801), player 1's Asterix uses it (X): he leads for the flight (the
+// launcher asks for the leader) and keeps the lead after landing, as in single
+// player where only the leader uses one.
+const Step kLaunch53[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -341.64f, 12.2f, 152.53f), PLACEAT(3000, HERO_OBELIX, -340.69f, 12.2f, 151.56f),
+	{ 3500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	P1(5000, PAD_X, 0, 0, "p1 X (launcher)"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "launch53_flight"),
+	SHOT(19000, "launch53_landed"),
+	END(20000),
 };
 
 // pushkeg5 (-Level 5, sector 3): Asterix lights the powder keg (the level
@@ -5628,6 +5657,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("combofull2", kComboFull2),
 	SCENARIO("combomix", kComboMix),
 	SCENARIO("pushkeg5", kPushKeg5),
+	SCENARIO("leave2", kLeave2),
+	SCENARIO("launch53", kLaunch53),
 	SCENARIO("cork53", kCork53),
 	SCENARIO("cork53b", kCork53B),
 	SCENARIO("molefov", kMoleFov),
