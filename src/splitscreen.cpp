@@ -13,6 +13,8 @@
 #include <intrin.h>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
+#include <cctype>
 
 namespace {
 
@@ -1102,6 +1104,95 @@ void __fastcall GraphicTickHook(void* self, void* edx, void* dt) {
 	RenderSplitFrame(*(char**)((char*)self + 4), dt);
 }
 
+// [debug] show_leader: the trio's leader written on the screen just before the
+// frame is shown (FUN_00414780, the renderer's present, thiscall, ret 0) -- in
+// the leader's half when the screen is split, else at the top left; player 1's
+// hero in red, player 2's in blue (the button icons' colours). The letters are
+// D3D Clear rectangles (a 5x7 block font): no render state is touched.
+const uint8_t kPresentPrologue[5] = { 0x8B, 0x41, 0x04, 0x85, 0xC0 };   // mov eax,[ecx+4]; test eax,eax
+ThisFn g_origPresent = nullptr;
+
+const uint8_t* Glyph(char c) {
+	static const struct { char c; uint8_t rows[7]; } kFont[] = {
+		{ 'A', { 14, 17, 17, 31, 17, 17, 17 } }, { 'B', { 30, 17, 17, 30, 17, 17, 30 } },
+		{ 'D', { 30, 17, 17, 17, 17, 17, 30 } }, { 'E', { 31, 16, 16, 30, 16, 16, 31 } },
+		{ 'F', { 31, 16, 16, 30, 16, 16, 16 } }, { 'I', { 14, 4, 4, 4, 4, 4, 14 } },
+		{ 'L', { 16, 16, 16, 16, 16, 16, 31 } }, { 'O', { 14, 17, 17, 17, 17, 17, 14 } },
+		{ 'P', { 30, 17, 17, 30, 16, 16, 16 } }, { 'R', { 30, 17, 17, 30, 20, 18, 17 } },
+		{ 'S', { 15, 16, 16, 14, 1, 1, 30 } },   { 'T', { 31, 4, 4, 4, 4, 4, 4 } },
+		{ 'X', { 17, 17, 10, 4, 10, 17, 17 } },  { '1', { 4, 12, 4, 4, 4, 4, 14 } },
+		{ '2', { 14, 17, 1, 2, 4, 8, 31 } },     { '(', { 2, 4, 8, 8, 8, 4, 2 } },
+		{ ')', { 8, 4, 2, 2, 2, 4, 8 } },        { ':', { 0, 12, 12, 0, 12, 12, 0 } },
+	};
+	for (const auto& g : kFont) if (g.c == c) return g.rows;
+	return nullptr;   // a space
+}
+
+void ClearRects(const long* rects, unsigned n, unsigned color) {
+	void* dev = *(void**)kD3DDevicePtr;
+	if (!dev || !n) return;
+	typedef long(__stdcall* ClearFn)(void* dev, unsigned long count, const void* rects, unsigned long flags,
+	                                 unsigned long color, float z, unsigned long stencil);
+	((ClearFn)(*(void***)dev)[43])(dev, n, rects, 1 /* D3DCLEAR_TARGET */, color, 1.0f, 0);
+}
+
+void DrawLeaderTag(char* renderer) {
+	Trio t = GetTrio();
+	RwCamera* cam = renderer ? *(RwCamera**)(renderer + 0x10) : nullptr;
+	char* raster = cam ? (char*)cam->frameBuffer : nullptr;
+	void* dev = *(void**)kD3DDevicePtr;
+	if (!t || !raster || !dev) return;
+	unsigned w = *(unsigned*)(raster + 0x0C), h = *(unsigned*)(raster + 0x10);
+	int lead = t.Leader();
+	if (!w || !h || lead < 0 || lead >= HERO_COUNT) return;
+	bool p2 = CoopP2Joined() && lead == CoopP2Hero();
+	char text[40];
+	const char* name = HeroName(lead);
+	int n = sprintf(text, "LEADER: ");
+	for (const char* c = name; *c && n < 30; c++) text[n++] = (char)toupper((unsigned char)*c);
+	text[n] = 0;
+	if (CoopP2Joined()) sprintf(text + n, " (P%d)", p2 ? 2 : 1);
+	// Where: the leader's half (split: player 2's is the right / bottom one).
+	unsigned x0 = 0, y0 = 0;
+	if (g_splitActive && p2) {
+		if (g_config.splitMode == SPLIT_VERTICAL) x0 = w / 2; else y0 = h / 2;
+	}
+	unsigned px = h / 300 > 2 ? h / 300 : 2;   // one font pixel
+	unsigned len = (unsigned)strlen(text);
+	x0 += px * 6;
+	y0 += h / 16;
+	static long rects[40 * 7 * 4 * 4];
+	unsigned nr = 0;
+	for (unsigned i = 0; i < len; i++) {
+		const uint8_t* g = Glyph(text[i]);
+		if (!g) continue;
+		long gx = (long)(x0 + i * 6 * px);
+		for (int r = 0; r < 7; r++)
+			for (int b = 4; b >= 0;) {   // a run of lit pixels, one rectangle
+				if (!(g[r] & (1 << b))) { b--; continue; }
+				int e = b;
+				while (e >= 0 && (g[r] & (1 << e))) e--;
+				long* q = rects + 4 * nr++;
+				q[0] = gx + (long)((4 - b) * px); q[1] = (long)(y0 + r * px);
+				q[2] = gx + (long)((5 - e - 1) * px); q[3] = (long)(y0 + (r + 1) * px);
+				b = e;
+			}
+	}
+	typedef long(__stdcall* ViewportFn)(void* dev, void* vp);
+	Viewport saved = {}, full = { 0, 0, w, h, 0.0f, 1.0f };
+	((ViewportFn)(*(void***)dev)[48])(dev, &saved);
+	((ViewportFn)(*(void***)dev)[47])(dev, &full);
+	long box[4] = { (long)(x0 - px * 2), (long)(y0 - px * 2), (long)(x0 + len * 6 * px + px), (long)(y0 + 9 * px) };
+	ClearRects(box, 1, 0xFF000000);
+	ClearRects(rects, nr, !CoopP2Joined() ? 0xFFF0F0F0 : p2 ? 0xFF3C78F0 : 0xFFE03C3C);
+	((ViewportFn)(*(void***)dev)[47])(dev, &saved);
+}
+
+void __fastcall PresentHook(char* renderer, void* edx) {
+	if (g_config.showLeader) DrawLeaderTag(renderer);
+	g_origPresent(renderer, edx);
+}
+
 } // namespace
 
 bool SplitActive() { return g_splitActive; }
@@ -1121,6 +1212,8 @@ bool SplitInstallHooks() {
 	ok &= PatchVtableSlot(kFogVtbl, kWalkSlot, kFogWalk, (void*)FogWalkHook, (void**)&g_origFogWalk, "CFogBoxNodeFx::walk");
 	ok &= InstallDetour(0x414070, (void*)DrawHudHook, (void**)&g_origDrawHud, kDrawHudPrologue, sizeof(kDrawHudPrologue),
 	                    "HUD draw (player 2's HUD on one screen)");
+	ok &= InstallDetour(0x414780, (void*)PresentHook, (void**)&g_origPresent, kPresentPrologue, sizeof(kPresentPrologue),
+	                    "frame present (show_leader)");
 	CollectFn same = nullptr;
 	ok &= PatchVtableSlot(kDynProjectileVtbl, kWalkSlot, kDynSphereWalk, (void*)DynSphereWalkHook,
 	                      (void**)&same, "CKDynBSphereProjectile::walk");

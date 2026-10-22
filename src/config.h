@@ -13,6 +13,7 @@ struct CoopConfig {
 	bool  vtProfile     = false;  // count calls through hero / hero-life vtables
 	bool  renderProbe   = false;  // find the scene-render call via RwCamera.beginUpdate
 	bool  splitTest     = false;
+	bool  showLeader    = false;  // the trio's leader written on the screen
 	bool  cheats        = false;  // test helpers: Back + Y fills the magic potion  // render the scene twice, to prove re-entrancy
 	int   splitMode     = SPLIT_VERTICAL;
 	bool  splitScreen   = true;   // off = shared camera on the leader

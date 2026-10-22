@@ -2386,3 +2386,11 @@ both halves).
   is placed beside it 8 s later, collected at Asterix), spitter44o (4801 first) and spitter44l (4801 after the
   hit): gauge 20 with Obelix still leading. A 4801 sent right after placing Obelix at the lever left his hits
   missing it (as in the pre-fix build); the hit itself is position-sensitive, the tests press X five times.
+- Round 131 (user: a debug option showing who leads). [debug] show_leader (default off; on in the user's ini; env
+  XXL_SHOWLEADER): "LEADER: OBELIX (P2)" drawn just before the frame is shown -- detour of the renderer's present
+  FUN_00414780 (thiscall, ret 0; prologue 8B 41 04 85 C0), which both the game's frame and the split frame call. In
+  the leader's half when split (player 2's: right / bottom), else top left; player 1's hero red, player 2's blue,
+  white before player 2 joins. Letters are IDirect3DDevice9::Clear rectangles (vtable 43, one per run of lit pixels
+  of a 5x7 block font, black box behind), with the viewport (47 / 48) set to the whole screen and put back: no
+  render state touched. Screen size from the renderer's camera raster (+0x10 camera, frameBuffer +0x0C / +0x10).
+  Autotests carleadu33 / carlead33 with XXL_SHOWLEADER=1 (tag in P2's half while Obelix leads, P1's after zone 0830).

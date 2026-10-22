@@ -94,6 +94,8 @@ void CoopConfig::Load(const char* iniPath) {
 	renderProbe = ReadBool("debug", "render_probe", renderProbe, full);
 	splitTest   = ReadBool("debug", "split_test", splitTest, full);
 	cheats      = ReadBool("debug", "cheats", cheats, full);
+	showLeader  = ReadBool("debug", "show_leader", showLeader, full);
+	if (getenv("XXL_SHOWLEADER")) showLeader = atoi(getenv("XXL_SHOWLEADER")) != 0;   // autotests
 	skipCutscenes = ReadBool("debug", "skip_cutscenes", skipCutscenes, full);
 
 	char buf[64] = {};
