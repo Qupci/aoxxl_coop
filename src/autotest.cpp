@@ -2320,6 +2320,28 @@ const Step kShopSpy[] = {
 	END(24000),
 };
 
+// shopspyb (level 2): the mirror of shopspy -- Obelix leads (4801), player 1's
+// Asterix (not leading) at the merchant (words), player 2's Obelix sets off the
+// second spy: the shop closes first, the agent's dialogue plays.
+const Step kShopSpyB[] = {
+	MARK(0, "baseline"), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	{ 1200, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
+	P1(7500, PAD_X, 0, 0, "p1 X (words)"), P1(7700, 0, 0, 0, "p1 release"),
+	SHOT(12000, "shopspyb_1"),
+	PLACEAT(14000, HERO_OBELIX, -752.0f, 508.0f, -1012.0f),
+	GLIDEAT(14500, HERO_OBELIX, -746.46f, 507.8f, -1007.37f, 1000),
+	SHOT(17000, "shopspyb_2"),
+	VPAD(19000, 1, PAD_A, 0, 0, "p2 A"), VPAD(19200, 1, 0, 0, 0, "p2 release"),
+	SHOT(21000, "shopspyb_3"),
+	SHOT(30000, "shopspyb_4"),
+	END(31000),
+};
+
 // shopspyw (level 2): shopspy with the merchant still talking (state 2, before
 // his menu): after the agent's dialogue no shop screen (bars) may be left.
 const Step kShopSpyW[] = {
@@ -5760,6 +5782,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("shieldfull", kShieldFull),
 	SCENARIO("hudorder", kHudOrder),
 	SCENARIO("shopspy", kShopSpy),
+	SCENARIO("shopspyb", kShopSpyB),
 	SCENARIO("spyonly", kSpyOnly),
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
