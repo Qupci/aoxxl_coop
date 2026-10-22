@@ -2325,3 +2325,9 @@ both halves).
   freedom_romans stays off (not final). (3) The ini's revive time comment said 8 s; it is 5 s since round 69.
   (4) Round 113's rule (a hero's own Twister shake on its player's camera only, world shakes on both) is
   user-confirmed.
+- Round 128b (2026-10-22, user: undo 128 (1)): the level's switch kept for after the revive is needed -- many
+  detectors that switch the leader are one-shot (they disable themselves), so a lead handed back to the revived
+  hero would leave the rest of the section on a leader the level never meant, with nothing to set it right.
+  levelLead / IndivNoteLevelLead restored as in round 114b (individual.cpp, individual.h, proximity.cpp,
+  autotest.cpp from 5bc702f~1). Autotest lead510o: "the level gave the lead to Asterix with Obelix down", no
+  lead back after the revive. Freedom on by default and the 5 s ini comment stay.

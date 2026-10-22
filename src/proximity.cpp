@@ -1731,9 +1731,12 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 			}
 		}
 		// Only "lead" switches to the standing hero (and "the sidekick may move"):
-		// let through. Nothing is kept for later: a fallen leader still gets the
-		// lead back after the revive.
+		// let through, the level's choice of leader kept for after the revive.
 		if (IndivFallenHero() >= 0 && CoopP2Joined() && !CoopSuspended() && GroupCommandsTrio(eventId)) {
+			char* objs[32];
+			uint16_t msgs[32];
+			for (int k = 0, n = GroupTargets(eventId, objs, msgs, 32); k < n; k++)
+				if (objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] != 0x4803) { IndivNoteLevelLead(up); break; }
 			static int s_told = 0;
 			if (s_told++ < 20)
 				Log("proximity: zone event %04X let through with %s down -- only gives %s the lead / frees the sidekick",
