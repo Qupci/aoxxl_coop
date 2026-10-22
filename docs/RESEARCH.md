@@ -2574,3 +2574,24 @@ both halves).
   shopsplit, shopspy, shopzone, shopboss, shoplaunch4 + new 4b (Obelix leads, Asterix shops, Obelix launches), 4c
   (Asterix leads, Obelix shops, Asterix launches), 4d (Obelix leads and shops, Asterix launches): the lead stays,
   the shop in the shopper's half, each half on its hero after the landing.
+- Round 144 (user, LV2-1, userlogs\xxl_coop.torch_nonleader.log: with Obelix leading, Asterix could not take the
+  torch at -744.2 513.8 -982.1; the prompt was player 2's and Obelix, across the map, went into the take situation
+  05). The torch's tick (proximity: Asterix nearest, posing as the leader; vf40 "leader is Asterix") offers it with
+  trio 0x0C06 -> trio +0x4C (what X takes: FUN_00499CF0 / FUN_0049A080; the trio's life tick, FUN_004817F0, clears
+  it unless +0x3F4 bit 0x10). The non-leader's sliced tick hid +0x4C (offers meant for the leader -- the potion),
+  so only the leader saw it. Now TrioSendEventHook notes a +0x4C an event put there with the trio's leader byte
+  of that moment (CoopNoteOffer; an object ticked as that hero's): the non-leader's tick keeps an offer made for
+  it, the leader's tick has one made for the other player's hero hidden (restored after). Hearths need nothing
+  more: CKHkHearth::vf15 (0x4AEBB0) asks trio vf94 (the leader's carried object: class 0x20 = torch) and the
+  leader within +0x18, then trio 0x511D ("Light", prompt kind 8) -- sliced to the nearest, it is Asterix's.
+  Autotests torchnl2 (Obelix leads) / torchl2 (Asterix leads): take the torch, light it at the lit hearth
+  (-745.1 513.9 -978.6), light the hearth from -785.7 526.8 -983.0, then LV2-3's keg from -50.7 0.8 -522.0 (both
+  user spots): the same in both. potion, flask unchanged.
+  Also: spitter44o (LV4-4's lever, Obelix leading, Asterix still at the level start) no longer hit the lever since
+  round 135 (bisected: cb0a78a; 0/5 runs vs 4/4 without its rule). The one-hero block rule sliced an Asterix
+  block at -913 37 -469, 860 units from both heroes, as Asterix every frame -- what it changed for the lever's hits
+  is not known. The rule now applies only within the slicing range of that hero (pull28 unchanged: Pull for
+  player 2). New autotests spitter44n (Asterix on the ledge behind Obelix at -733.0 14.0 -239.3 when Obelix hits)
+  and spitter44a (Asterix, not leading, hits the lever himself): the flask goes to Asterix, 2/2 each. A spot
+  off the ledge (-731.5 -244) drops a hero to y 6, outside the loaded geometry (the user: "stuck in the unloaded
+  sector").

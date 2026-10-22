@@ -81,6 +81,9 @@ void CoopBeamCatchEnd(bool began);
 void CoopRideSliceEnd(bool began);
 // Also called before CKGrpTrio::sendEvent, with the event's parameter.
 void CoopNoteTrioEvent(void* trio, int event, void* param);
+// A trio event put `offer` in trio+0x4C (what X takes: a torch's 0xC06) while
+// the trio's leader byte said `hero` (an object ticked as that hero's).
+void CoopNoteOffer(uint32_t offer, int hero);
 // A trio event to hold back for now (sent again later by the mod).
 bool CoopDeferTrioEvent(void* trio, int event);
 

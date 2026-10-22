@@ -83,7 +83,10 @@ int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) 
 	bool ride = CoopRideSliceBegin(event, _ReturnAddress());
 	bool beam = CoopBeamCatchBegin(event, _ReturnAddress());
 	int cookie = CoopBeforeTrioEvent(event, _ReturnAddress());
+	uint32_t offer = *(uint32_t*)((char*)self + 0x4C);
 	int r = g_origTrioSendEvent(self, edx, event, param);
+	uint32_t offered = *(uint32_t*)((char*)self + 0x4C);
+	if (offered && (offered != offer || (event & 0xFFFF) == 0x0C06)) CoopNoteOffer(offered, *((uint8_t*)self + 0x2C));
 	CoopAfterTrioEvent(event, cookie);
 	CoopBeamCatchEnd(beam);
 	CoopRideSliceEnd(ride);

@@ -531,6 +531,57 @@ const Step kTorchGrab[] = {
 	END(9000),
 };
 
+// torchnl2 (level 2): Obelix leads (4801); player 1's Asterix (not leading) takes
+// the torch (-744.2 513.8 -982.1) with X, lights it at the lit hearth beside it
+// (-745.1 513.9 -978.6), lights the unlit hearth (from -785.7 526.8 -983.0), then
+// LV2-3's keg (from -50.7 0.8 -522.0). torchl2: the same with Asterix leading.
+const Step kTorchNL2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 600, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 900, S_TORCH, 4, 0, 0, 0, 0, "watch offer" },
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(1500, HERO_ASTERIX, -744.26f, 514.4f, -981.0f),
+	SHOT(2700, "torchnl2_0"),
+	P1(3000, PAD_X, 0, 0, "p1 X (take the torch)"), P1(3200, 0, 0, 0, "p1 release"),
+	SHOT(4500, "torchnl2_1"),
+	PLACEAT(5000, HERO_ASTERIX, -744.14f, 514.3f, -979.3f),
+	P1(6000, PAD_X, 0, 0, "p1 X (lit hearth)"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(7000, "torchnl2_2"),
+	PLACEAT(8000, HERO_ASTERIX, -785.748f, 527.1f, -982.975f),
+	P1(9500, PAD_X, 0, 0, "p1 X (unlit hearth)"), P1(9700, 0, 0, 0, "p1 release"),
+	SHOT(10500, "torchnl2_3"),
+	LOADSECTOR(11000, 3),
+	PLACEAT(12000, HERO_ASTERIX, -50.698f, 1.0f, -521.963f), PLACEAT(12000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	P1(13500, PAD_X, 0, 0, "p1 X (keg)"), P1(13700, 0, 0, 0, "p1 release"),
+	SHOT(14000, "torchnl2_4"),
+	SHOT(15500, "torchnl2_5"),
+	END(17000),
+};
+
+const Step kTorchL2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 600, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 900, S_TORCH, 4, 0, 0, 0, 0, "watch offer" },
+	PLACEAT(1500, HERO_ASTERIX, -744.26f, 514.4f, -981.0f),
+	SHOT(2700, "torchl2_0"),
+	P1(3000, PAD_X, 0, 0, "p1 X (take the torch)"), P1(3200, 0, 0, 0, "p1 release"),
+	SHOT(4500, "torchl2_1"),
+	PLACEAT(5000, HERO_ASTERIX, -744.14f, 514.3f, -979.3f),
+	P1(6000, PAD_X, 0, 0, "p1 X (lit hearth)"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(7000, "torchl2_2"),
+	PLACEAT(8000, HERO_ASTERIX, -785.748f, 527.1f, -982.975f),
+	P1(9500, PAD_X, 0, 0, "p1 X (unlit hearth)"), P1(9700, 0, 0, 0, "p1 release"),
+	SHOT(10500, "torchl2_3"),
+	LOADSECTOR(11000, 3),
+	PLACEAT(12000, HERO_ASTERIX, -50.698f, 1.0f, -521.963f), PLACEAT(12000, HERO_OBELIX, -60.0f, 1.0f, -535.0f),
+	P1(13500, PAD_X, 0, 0, "p1 X (keg)"), P1(13700, 0, 0, 0, "p1 release"),
+	SHOT(14000, "torchl2_4"),
+	SHOT(15500, "torchl2_5"),
+	END(17000),
+};
+
 // lever: sector 5's lever behind the iron crates ("switch to Asterix") hit by
 // player 2's Obelix while Asterix leads: safe sequence keeps it from working.
 const Step kLever[] = {
@@ -5222,6 +5273,38 @@ const Step kSpitter44l[] = {
 	SHOT(13000, "spitter44l_2"), SHOT(15000, "spitter44l_3"),
 	END(20000),
 };
+// spitter44n: Obelix leads (4801); Asterix already on the ledge behind him when
+// player 2's Obelix hits the lever: the flask goes to Asterix.
+// spitter44a: Obelix leads; player 1's Asterix (not leading) hits the lever
+// himself: the flask goes to him.
+const Step kSpitter44n[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(2500, HERO_OBELIX, -733.742f, 13.944f, -240.739f), PLACEAT(2500, HERO_ASTERIX, -733.04f, 14.5f, -239.3f),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	VPAD(4600, 1, PAD_X, 0, 0, "p2 X"), VPAD(4750, 1, 0, 0, 0, "p2 release"),
+	SHOT(5500, "spitter44n_0"),
+	VPAD(5600, 1, PAD_X, 0, 0, "p2 X"), VPAD(5750, 1, 0, 0, 0, "p2 release"),
+	VPAD(6600, 1, PAD_X, 0, 0, "p2 X"), VPAD(6750, 1, 0, 0, 0, "p2 release"),
+	VPAD(7600, 1, PAD_X, 0, 0, "p2 X"), VPAD(7750, 1, 0, 0, 0, "p2 release"),
+	SHOT(9000, "spitter44n_1"), SHOT(12000, "spitter44n_2"),
+	END(15000),
+};
+const Step kSpitter44a[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(2500, HERO_ASTERIX, -733.742f, 13.944f, -240.739f), PLACEAT(2500, HERO_OBELIX, -733.04f, 14.5f, -239.3f),
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4150, 0, 0, 0, "p1 release"),
+	P1(4600, PAD_X, 0, 0, "p1 X"), P1(4750, 0, 0, 0, "p1 release"),
+	SHOT(5500, "spitter44a_0"),
+	P1(5600, PAD_X, 0, 0, "p1 X"), P1(5750, 0, 0, 0, "p1 release"),
+	P1(6600, PAD_X, 0, 0, "p1 X"), P1(6750, 0, 0, 0, "p1 release"),
+	P1(7600, PAD_X, 0, 0, "p1 X"), P1(7750, 0, 0, 0, "p1 release"),
+	SHOT(9000, "spitter44a_1"), SHOT(12000, "spitter44a_2"),
+	END(15000),
+};
 const Step kSpitter44o[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 4),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -5686,6 +5769,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("sectorzone", kSectorZone),
 	SCENARIO("torch", kTorch),
 	SCENARIO("torchgrab", kTorchGrab),
+	SCENARIO("torchnl2", kTorchNL2),
+	SCENARIO("torchl2", kTorchL2),
 	SCENARIO("lever", kLever),
 	SCENARIO("launchp2", kLaunchP2),
 	SCENARIO("launcha", kLaunchA),
@@ -5838,6 +5923,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("pillar36", kPillar36),
 	SCENARIO("spitter44", kSpitter44),
 	SCENARIO("spitter44o", kSpitter44o),
+	SCENARIO("spitter44n", kSpitter44n),
+	SCENARIO("spitter44a", kSpitter44a),
 	SCENARIO("spitter44l", kSpitter44l),
 	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("cam14", kCam14),

@@ -370,8 +370,20 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 		nearest = pusher;
 		range2 = 1e30f;
 	} else if (hook && *(uintptr_t*)hook == kPushPullVtbl) {
+		// (Only near that hero: a block far from it ticked as its -- LV4's at -913 37
+		// -469 from the lever by the spitter at -734 14 -241 -- and the lever there
+		// missed player 2's hits: before, it ticked with the real leader.)
 		int only = BlockHero(hook);
-		if (only == p1 || only == p2) {   // (a player's: both are in this pass)
+		if ((only == p1 || only == p2) && (only == p1 ? d1 : d2) <= range2) {   // (a player's: both are in this pass)
+			static char* s_seen[16];
+			static int s_n = 0;
+			bool seen = false;
+			for (int i = 0; i < s_n; i++) seen |= s_seen[i] == hook;
+			if (!seen && s_n < 16) {
+				s_seen[s_n++] = hook;
+				Log("proximity: block %p at (%.1f %.1f %.1f) is %s's (+14 %02X): ticks with it as the leader (%s %.1f away, %s %.1f)",
+				    hook, at.x, at.y, at.z, HeroName(only), *(uint8_t*)(hook + 0x14), HeroName(p1), sqrtf(d1), HeroName(p2), sqrtf(d2));
+			}
 			nearest = only;
 			range2 = 1e30f;
 		}

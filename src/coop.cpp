@@ -100,6 +100,9 @@ struct CoopState {
 	bool     groupLauncher = false;   // ... that group action was a launcher: the lead stays (single player's)
 	DWORD    launcherAt = 0;          // the last launcher start (trio 0x4804 from 0x49C699)
 	uint32_t savedOffer = 0;          // trio+0x4C hidden from player 2's tick
+	uint32_t offerValue = 0;          // the last trio+0x4C a trio event put there...
+	int      offerHero = -1;          // ... for this hero (the leader byte then: an object ticked as its)
+	uint32_t leaderHidOffer = 0;      // trio+0x4C hidden from the leader's tick (the other hero's)
 
 	bool    suspended = false;
 	bool    shopping = false;            // a merchant's menu is open
@@ -2211,6 +2214,18 @@ static void NoteFreedomLock(Trio t, int waiter) {
 	}
 }
 
+void CoopNoteOffer(uint32_t offer, int hero) {
+	if (offer != g.offerValue || hero != g.offerHero) {
+		static int s_told = 0;
+		if (g.p2Joined && s_told < 20 && (hero == g.p1Hero || hero == g.p2Hero) && offer != g.offerValue) {
+			s_told++;
+			Log("coop: %08X offered to %s (trio+0x4C)", offer, HeroName(hero));
+		}
+	}
+	g.offerValue = offer;
+	g.offerHero = hero;
+}
+
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	extern void* g_trioEventCaller;
 	if ((event & 0xFFFF) == 0x4804 && (uintptr_t)g_trioEventCaller == 0x49C699) g.launcherAt = GetTickCount();
@@ -3382,6 +3397,19 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
 		ClearStaleAiState(heroIndex, hero);
 
+	// What X takes (trio+0x4C) offered for the other player's hero -- an object
+	// ticked as that hero's (proximity slicing: the torch by Asterix while Obelix
+	// leads, LV2-1) -- is that hero's: hidden from the leader's tick. (It went to
+	// the leader: Obelix took Asterix's torch from across the map.)
+	if (heroIndex == t.Leader()) {
+		uint32_t& offer = *(uint32_t*)(t.raw() + 0x4C);
+		int other = heroIndex == g.p1Hero ? g.p2Hero : g.p1Hero;
+		if (offer && offer == g.offerValue && g.offerHero == other) {
+			g.leaderHidOffer = offer;
+			offer = 0;
+		}
+	}
+
 	// Player 1 steers relative to its own camera while player 2's hero leads.
 	if (heroIndex == g.p1Hero && t.Leader() == g.p2Hero) P1CamBeginHeroTick();
 
@@ -3443,14 +3471,15 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 		if (g.hidDash) *(uint32_t*)(gm + 0x5C) &= ~0x80000u;
 		// Offers meant for the real leader stay with it: the magic potion
 		// (latched at trio+0x4C for one frame) must not be taken by the other
-		// hero while it poses as leader.
+		// hero while it poses as leader. One made for this hero stays (CoopNoteOffer).
 		// The trio caches its nearby-enemy lists and distances once per frame,
 		// from the leader (FUN_0047CB40, valid while +0x3F4 bit 0 is set):
 		// lock-on and grabbing pick from them. Rebuild them for this hero, and
 		// again after.
 		*(uint32_t*)(trio + 0x3F4) &= ~1u;
 		g.savedOffer = *(uint32_t*)(trio + 0x4C);
-		*(uint32_t*)(trio + 0x4C) = 0;
+		if (g.savedOffer && g.savedOffer == g.offerValue && g.offerHero == heroIndex) g.savedOffer = 0;
+		else *(uint32_t*)(trio + 0x4C) = 0;
 	}
 
 	// With split-screen, player 2 steers relative to player 2's own camera.
@@ -3556,6 +3585,11 @@ static void WatchSpinHint(int idx, Hero h) {
 void CoopAfterLifeTick(int heroIndex, Hero hero) {
 	(void)heroIndex; (void)hero;
 	P2CamEndHeroTick();
+	if (g.leaderHidOffer) {
+		Trio t = GetTrio();
+		if (t && *(uint32_t*)(t.raw() + 0x4C) == 0) *(uint32_t*)(t.raw() + 0x4C) = g.leaderHidOffer;
+		g.leaderHidOffer = 0;
+	}
 	if (g.hidDash) {
 		g.hidDash = false;
 		CKYellowPages* yp = YellowPages();
