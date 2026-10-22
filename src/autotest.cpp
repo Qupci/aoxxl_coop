@@ -4130,6 +4130,55 @@ const Step kPillar36[] = {
 	SHOT(20000, "pillar36_1"), SHOT(31000, "pillar36_2"), SHOT(36000, "pillar36_3"),
 	END(40000),
 };
+// spitter44 (-Level 4, sector 4): Obelix hits the lever (CKHkActivator, the
+// user's spot) that makes a CKHkBonusSpitter spit a magic potion flask, Asterix
+// far away; the flask must wait for Asterix, then go to him.
+const Step kSpitter44[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, -733.742f, 13.944f, -240.739f),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	VPAD(4600, 1, PAD_X, 0, 0, "p2 X"), VPAD(4750, 1, 0, 0, 0, "p2 release"),
+	SHOT(5500, "spitter44_0"),
+	VPAD(5600, 1, PAD_X, 0, 0, "p2 X"), VPAD(5750, 1, 0, 0, 0, "p2 release"),
+	VPAD(6600, 1, PAD_X, 0, 0, "p2 X"), VPAD(6750, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "spitter44_1"),
+	PLACEAT(12000, HERO_ASTERIX, -731.5f, 13.944f, -244.0f),
+	SHOT(13000, "spitter44_2"), SHOT(15000, "spitter44_3"),
+	END(20000),
+};
+// spitter44o: the same with Obelix leading (4801 before the lever); l: Obelix
+// takes the lead right after hitting it.
+const Step kSpitter44l[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, -733.742f, 13.944f, -240.739f),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	VPAD(4600, 1, PAD_X, 0, 0, "p2 X"), VPAD(4750, 1, 0, 0, 0, "p2 release"),
+	VPAD(5600, 1, PAD_X, 0, 0, "p2 X"), VPAD(5750, 1, 0, 0, 0, "p2 release"),
+	VPAD(6600, 1, PAD_X, 0, 0, "p2 X"), VPAD(6750, 1, 0, 0, 0, "p2 release"),
+	{ 7500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	SHOT(8000, "spitter44l_1"),
+	PLACEAT(12000, HERO_ASTERIX, -731.5f, 13.944f, -244.0f),
+	SHOT(13000, "spitter44l_2"), SHOT(15000, "spitter44l_3"),
+	END(20000),
+};
+const Step kSpitter44o[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(2500, HERO_OBELIX, -733.742f, 13.944f, -240.739f),
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4150, 1, 0, 0, 0, "p2 release"),
+	VPAD(4600, 1, PAD_X, 0, 0, "p2 X"), VPAD(4750, 1, 0, 0, 0, "p2 release"),
+	SHOT(5500, "spitter44o_0"),
+	VPAD(5600, 1, PAD_X, 0, 0, "p2 X"), VPAD(5750, 1, 0, 0, 0, "p2 release"),
+	VPAD(6600, 1, PAD_X, 0, 0, "p2 X"), VPAD(6750, 1, 0, 0, 0, "p2 release"),
+	VPAD(7600, 1, PAD_X, 0, 0, "p2 X"), VPAD(7750, 1, 0, 0, 0, "p2 release"),
+	SHOT(9000, "spitter44o_1"),
+	PLACEAT(12000, HERO_ASTERIX, -731.5f, 13.944f, -244.0f),
+	SHOT(13000, "spitter44o_2"), SHOT(15000, "spitter44o_3"),
+	END(20000),
+};
 // cam14 (-Level 1, sector 4; the modded "Caesar's Challenge" levels, -GameDir):
 // Obelix walks from the user's spot onto their camera trigger -- P2's copy of
 // the game camera must keep its track, not start over every frame.
@@ -4705,6 +4754,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("keg23", kKeg23),
 	SCENARIO("keg23s", kKeg23S),
 	SCENARIO("pillar36", kPillar36),
+	SCENARIO("spitter44", kSpitter44),
+	SCENARIO("spitter44o", kSpitter44o),
+	SCENARIO("spitter44l", kSpitter44l),
 	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("cam14", kCam14),
 	SCENARIO("turnstile21b", kTurnstile21b),

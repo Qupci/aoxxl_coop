@@ -748,6 +748,9 @@ GmFn g_origHeal = nullptr, g_origAddShield = nullptr;
 // A bonus collected: CKHkBasicBonus's tick hands it to its pool's vf40
 // (CKGrpAsterixBonusPool 0x506E90, thiscall(pool, hero), ret 4) with the hero
 // it flew to; the pool applies it (heal, shield, helmets...). That hero's stats.
+// vf40 first asks vf39, which refuses the potion (type 3) unless the trio's
+// leader is Asterix: a flask that reached Asterix while Obelix led (the LV4-4
+// lever's spitter) was thrown away. Asterix's flask is applied with him leading.
 int g_collector = -1;
 typedef void(__fastcall* CollectFn)(char* pool, void* edx, char* hero);
 CollectFn g_origCollect = nullptr;
@@ -759,7 +762,19 @@ void __fastcall CollectHook(char* pool, void* edx, char* hero) {
 	int prevCollector = g_collector;
 	g_collector = who;
 	int prev = IndivEnter(who);
+	uint8_t* tr = t ? (uint8_t*)t.raw() : nullptr;
+	bool slice = tr && who == HERO_ASTERIX && *(int*)(pool + 0x24) == 3 && tr[0x2C] != HERO_ASTERIX;
+	uint8_t leader = tr ? tr[0x2C] : 0, companion = tr ? tr[0x2D] : 0;
+	if (slice) {
+		tr[0x2C] = HERO_ASTERIX;
+		tr[0x2D] = HERO_OBELIX;
+		Log("indiv: Asterix's magic potion applied with him as the leader (%s leads)", HeroName(leader));
+	}
 	g_origCollect(pool, edx, hero);
+	if (slice && tr[0x2C] == HERO_ASTERIX && tr[0x2D] == HERO_OBELIX) {
+		tr[0x2C] = leader;
+		tr[0x2D] = companion;
+	}
 	IndivLeave(prev);
 	g_collector = prevCollector;
 }

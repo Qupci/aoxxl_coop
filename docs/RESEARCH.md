@@ -2370,3 +2370,19 @@ both halves).
   round 129; pillar36 (-Level 3): Asterix rides while Obelix leads, 481C to Obelix, the end's 0C09 makes Asterix jump
   off to (-159.7 0.8 -133.6), 9 helmets his; XXL_RIDERLEADS=1 as round 109; XXL_FREEDOM=0: Obelix handed to the
   game for 481C as with Asterix leading; boss210t as before.
+- Round 131 (user: LV4-4, Obelix hits the lever at -733.742 13.944 -240.739 and the magic potion goes on both
+  heroes; the flask should be Asterix's). The lever (CKHkActivator, event #178) sends 0996 "spit item" to a
+  CKHkBonusSpitter (2,194, vtable 0x6294B8). Its tick (vf15 0x54A780) spits the next item -- a bonus pool type,
+  +0x18 (one shot, -1 none) else +0x1C -- through CKGrpBonus_SpawnBonus (0x54BE20, pool +0x24 == type) when the
+  trio leader (trio vf25) is within +0x24, and sends it after that leader (CKHkBasicBonus_FollowHero 0x54E2C0,
+  bonus +0x20). Proximity slicing ticked it with Obelix as leader -> the flask flew to Obelix, the gauge filled
+  (one global gauge; obelix_potion puts it on both). Now a spitter whose next item is type 3 (potion) ticks with
+  Asterix as the leader whoever is nearer (proximity.cpp SpitsPotion): it waits for Asterix, then goes to him.
+  Second half: CKHkBasicBonus::vf15 hands a collected bonus to pool vf40 (0x506E90), which first asks vf39
+  (0x507320): type 3 only while trio vfA0 (leader is Asterix). With Obelix leading, the flask reached Asterix and
+  was thrown away -- also true of ordinary potion flasks drawn to a non-leading Asterix. CollectHook
+  (individual.cpp) now runs vf40 for Asterix's potion with trio +0x2C/+0x2D = Asterix/Obelix. Autotests (-Level 4,
+  sector 4): spitter44 (Asterix leads, far away: before, spat at once and collected at Obelix; now spat when Asterix
+  is placed beside it 8 s later, collected at Asterix), spitter44o (4801 first) and spitter44l (4801 after the
+  hit): gauge 20 with Obelix still leading. A 4801 sent right after placing Obelix at the lever left his hits
+  missing it (as in the pre-fix build); the hit itself is position-sensitive, the tests press X five times.

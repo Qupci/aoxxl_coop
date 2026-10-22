@@ -77,6 +77,20 @@ const uintptr_t kClueManVtbl = 0x6261F4;
 // sent the 090C(0) that ends it, and Obelix pushed in place for good. A block
 // a hero pushes ticks with that hero as the leader.
 const uintptr_t kPushPullVtbl = 0x626110;
+// Bonus spitters (CKHkBonusSpitter, 2,194; LV4-4's lever spits a magic potion
+// flask). Their tick (vf15, 0x54A780) spits the next item -- a bonus pool type,
+// +0x18, or +0x1C while +0x18 is -1 -- when the trio's leader (trio vf25) is
+// within +0x24, and sends it after that leader (CKHkBasicBonus_FollowHero).
+// Ticked as Obelix's nearest, the flask flew to Obelix and filled the potion.
+// A spitter whose next item is the potion (type 3) ticks with Asterix as the
+// leader: it waits for him, as the potion pool does.
+const uintptr_t kBonusSpitterVtbl = 0x6294B8;
+const int       kPotionPoolType   = 3;
+static bool SpitsPotion(char* spitter) {
+	int item = *(int*)(spitter + 0x18);
+	if (item == -1) item = *(int*)(spitter + 0x1C);
+	return item == kPotionPoolType;
+}
 // The hero pushing `block`: its push state (hero +0x3EC bits 25-30, FUN_0049A670)
 // is on and its pushed object (+0x484, which it sends 0x0901 to) is the block.
 static int PusherOf(char* block, Trio t, int p1, int p2) {
@@ -292,6 +306,10 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	int pusher = hook && *(uintptr_t*)hook == kPushPullVtbl ? PusherOf(hook, t, p1, p2) : -1;
 	if (pusher >= 0) {
 		nearest = pusher;
+		range2 = 1e30f;
+	}
+	if (hook && *(uintptr_t*)hook == kBonusSpitterVtbl && SpitsPotion(hook)) {
+		nearest = HERO_ASTERIX;
 		range2 = 1e30f;
 	}
 	if (hook && *(uintptr_t*)hook == kClueManVtbl) {
