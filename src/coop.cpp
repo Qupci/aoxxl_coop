@@ -494,7 +494,12 @@ static bool FreedomKeepsLock(int idx) {
 // 03C8, whose 4803 freed Asterix -- the ride's walk onto the platform (0528:
 // 482D) and the jump off at its top (0530: 484C) were then "the level taking a
 // player's hero", not followed; he rode up and stayed there.
-struct CorkRide { int hero = -1; char* cork = nullptr; } g_corkRide;
+// Its launch (the corkscrew's 0x0C09 from 0x53C5F4 -> 4805, the companion's AI
+// order 2, a jump to its marker) ends the lock's purpose: once that jump is over
+// the hero is its player's again. LV5-3's corkscrew (-259.7 10.5 353.7) lands
+// Asterix in a box (-263.9 16 352.5 / -261.9 20 354.5, event 0118: 4800 + 4803)
+// that frees him -- in the user's run it never went off, and he stayed the game's.
+struct CorkRide { int hero = -1; char* cork = nullptr; DWORD launched = 0; bool jumping = false; } g_corkRide;
 
 void Hold(Trio t, int idx, const char* why, bool modOwn = false) {
 	Hero h = t.GetHero(idx);
@@ -1867,6 +1872,18 @@ static void WatchTelepherRider(Trio t) {
 // 0x0C03 from the beam (0x53F4C3: the companion's order 8 -> 3; anyone else's
 // "nobody on it", 0x0C05 to the beam), is run the same way. Only Asterix: Obelix
 // has no ride.
+static void WatchCorkLaunch(Trio t) {
+	int idx = g_corkRide.hero;
+	if (idx < 0 || !g_corkRide.launched || !t) return;
+	Hero h = t.GetHero(idx);
+	if (!h || !g.held[idx]) { g_corkRide = {}; return; }
+	if (h.Order() == AI_JUMP_TO_POS) { g_corkRide.jumping = true; return; }
+	if (!g_corkRide.jumping && GetTickCount() - g_corkRide.launched < 3000) return;   // (the jump not begun yet)
+	g.held[idx] = false;
+	g_corkRide = {};
+	Log("coop: freedom: %s landed from the corkscrew's launch -- back to its player (AI order %d)", HeroName(idx), (int)h.Order());
+}
+
 DWORD g_beamJumpAt[2] = {};   // a player's hero's last jump (body 0x0E), set by WatchFreedomBeam
 struct BeamCatch { int hero = -1; uint8_t order = 0; bool sliced = false; uint8_t leader = 0, companion = 0; bool drop = false; } g_beamCatch;
 
@@ -2199,6 +2216,8 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		// tick has it posing as the leader)
 		if (tl) g_carSwitch = { g.sliced ? (int)g.savedLeader : tl.Leader(), GetTickCount() };
 	}
+	if (g.p2Joined && (event & 0xFFFF) == 0x0C09 && (uintptr_t)g_trioEventCaller == 0x53C5F4 && g_corkRide.hero >= 0)
+		g_corkRide.launched = GetTickCount();
 	if (g.p2Joined && (event & 0xFFFF) == 0x0C0D && (uintptr_t)g_trioEventCaller == 0x548757) {
 		Trio tl = GetTrio();
 		if (tl) g_telepherRider = tl.Leader();   // (the leader its tick saw: the rider)
@@ -2780,6 +2799,7 @@ void CoopFrame() {
 	WatchPendingLead(t);
 	WatchTelepherRider(t);
 	WatchFreedomBeam(t);
+	WatchCorkLaunch(t);
 	FreedomFrame();
 	WatchUnfinishedSequence(t);
 	WatchStrandedCar();

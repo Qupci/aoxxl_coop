@@ -2527,3 +2527,20 @@ both halves).
   beam42f with 4800 / 4801 / 4800 after the circle -- Asterix leads, order 0): "taken as waiting for its catch",
   carried across while leading (the leader tag on him), "the rotary beam drops Asterix (leading)", his player's
   again, landed where the companion lands (-414.3 1.1 -99.2). beam42f / beam28 / beam28b as before.
+- Round 141 (user, LV5-3, userlogs\xxl_coop.lv5-3_corkscrew.log: after the corkscrew's launch Asterix stayed locked;
+  corkscrew -259.71 10.49 353.69, turnstile -255.87 9.54 358.30; the user's editor shot: box detector #3, list +0x2C,
+  (-263.909 15.993 352.549)-(-261.909 19.993 354.549), not on at start, event #35 = 0118: trio 4800, camera sector
+  0x700, detector 1D31, trio 4803). The corkscrew's landing event 0110 (4801 + 4802, detection 1403 = box #3 on,
+  camera 0701, pillar 0901, 1631) locks Asterix (freedom_corkscrews); the turnstile's hits raise it (turnstile 0x300
+  -> FUN_0053E900: trio 0907, its hit group, corkscrew 0x996); at the top the corkscrew's 0x0C09 (0x53C5F4) -> 4805,
+  the companion's AI order 2 to its marker, inside box #3 -- whose 0118 gives Asterix the lead, and the lead frees
+  him (held release "leads again"). In the user's run 0118 never fired: Asterix ended the jump at the box's centre
+  (-262.63 16.14 353.85), order 3, held for good. Not reproduced: in every test run the box fires as the jump
+  crosses its edge (-261.98 16.10 353.82). Now the corkscrew lock has its own end in freedom mode: after the
+  launch (0x0C09 from 0x53C5F4 while g_corkRide is held) the hero is its player's again once the launch's jump
+  (order 2) is over (WatchCorkLaunch; 3 s if the jump never shows). Zone 0218 (the turnstile's Roman fight: turnstile
+  090D, corkscrew 099A off, squad 0D17) and the corkscrew's arming (0x999) skipped in the autotests. New test steps:
+  S_DETOFF (detector b of the detection service's list +a off). Autotests cork53 (-Level 5 sector 3: zone 0368,
+  corkscrew 0x999, Asterix onto the circle, the turnstile's 0x996 every 150 ms: launch, 0118, lead, free), cork53b
+  (box #3 off after the circle: before, held for good at the user's spot; now "landed from the corkscrew's launch
+  -- back to its player", walked by player 1). turnstile21 / corklead21 as before (LV2-1 has no corkscrew launch).
