@@ -1340,7 +1340,12 @@ bool GroupPlaysCutscene(unsigned ev) {
 // nor does a zone that starts a cutscene (level 2 sector 10's boss: #34 "switch
 // to Asterix", then #4 "Obelix walks to marker 22" and the boss's cutscene,
 // both bound to Asterix -- in single player the AI Asterix crosses them with
-// Obelix; in co-op player 2's Obelix could never start the boss).
+// Obelix; in co-op player 2's Obelix could never start the boss). Nor does a zone
+// that lights a light pillar (0x900 to CKHkLightPillar) -- a wait's sequence
+// started or started over, the waiting hero's: LV2-8's 03B8 (Asterix off the
+// platforms: Asterix leads, the blocks back, the pillar lit) was set off by
+// Obelix jumping on the turnstile, and took the lead from him while Asterix
+// waited at the rotary beam.
 bool ZoneMeansItsHero(unsigned ev) {
 	if (!GroupCommandsTrio(ev) || GroupPlaysCutscene(ev)) return false;
 	unsigned group = (ev & 0xFFFF) >> 3;
@@ -1351,6 +1356,8 @@ bool ZoneMeansItsHero(unsigned ev) {
 	uint16_t* msgs = *(uint16_t**)(es + 0x14);
 	unsigned first = 0;
 	for (unsigned g = 0; g < group; g++) first += tab[g * 3];
+	for (unsigned k = 0; k < tab[group * 3]; k++)
+		if (objs[first + k] && *(uintptr_t*)objs[first + k] == 0x629030 && msgs[first + k] == 0x900) return true;
 	for (unsigned k = 0; k < tab[group * 3]; k++) {
 		if (!objs[first + k] || *(uintptr_t*)objs[first + k] != 0x6256A0) continue;
 		unsigned m = msgs[first + k];

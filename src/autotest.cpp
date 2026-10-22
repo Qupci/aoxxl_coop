@@ -3614,6 +3614,46 @@ const Step kCamFall28[] = {
 	END(31000),
 };
 
+// lead28 (level 2, sector 8): the user's -- the platforms' sequence done
+// (Obelix leads), Asterix waiting at the rotary beam's spot (41.0 58.4 -89.6), and
+// player 2's Obelix jumping about by the turnstile (44.8 52.8 -69.3): Asterix's
+// "fell off the platforms" zone (03B8: Asterix leads, the blocks back, the pillar
+// lit) set off by Obelix in the other hero's pass took the lead from him.
+const Step kLead28[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, 16.913f, 51.4f, -133.0f),
+	GLIDEAT(2300, HERO_ASTERIX, 16.913f, 51.4f, -127.5f, 1000),
+	PLACEAT(4000, HERO_OBELIX, 37.923f, 51.5f, -120.156f),
+	PLACEAT(4200, HERO_ASTERIX, 42.057f, 57.5f, -120.097f),
+	PLACEAT(6000, HERO_OBELIX, 38.0f, 57.5f, -92.0f),
+	PLACEAT(6000, HERO_ASTERIX, 41.0f, 58.5f, -89.613f),
+	PLACEAT(16000, HERO_OBELIX, 44.8f, 53.0f, -69.3f),
+	PLACEAT(17000, HERO_OBELIX, 44.8f, 56.0f, -69.3f),   // up on the turnstile (the user: 55.5)
+	PLACEAT(21000, HERO_OBELIX, 44.8f, 56.0f, -69.3f),
+	PLACEAT(25000, HERO_OBELIX, 44.8f, 56.0f, -69.3f),
+	VPAD(18000, 1, PAD_A, 0, 0, "p2 A"), VPAD(18300, 1, 0, 0, 0, "p2 release"),
+	VPAD(18700, 1, PAD_A, 0, 0, "p2 A"), VPAD(19000, 1, 0, 0, 0, "p2 release"),
+	VPAD(19400, 1, PAD_A, 0, 0, "p2 A"), VPAD(19700, 1, 0, 0, 0, "p2 release"),
+	VPAD(20100, 1, PAD_A, 0, 0, "p2 A"), VPAD(20400, 1, 0, 0, 0, "p2 release"),
+	VPAD(20800, 1, PAD_A, 0, 0, "p2 A"), VPAD(21100, 1, 0, 0, 0, "p2 release"),
+	VPAD(21500, 1, PAD_A, 0, 0, "p2 A"), VPAD(21800, 1, 0, 0, 0, "p2 release"),
+	VPAD(22200, 1, PAD_A, 0, 0, "p2 A"), VPAD(22500, 1, 0, 0, 0, "p2 release"),
+	VPAD(22900, 1, PAD_A, 0, 0, "p2 A"), VPAD(23200, 1, 0, 0, 0, "p2 release"),
+	VPAD(23600, 1, PAD_A, 0, 0, "p2 A"), VPAD(23900, 1, 0, 0, 0, "p2 release"),
+	VPAD(24300, 1, PAD_A, 0, 0, "p2 A"), VPAD(24600, 1, 0, 0, 0, "p2 release"),
+	VPAD(25000, 1, PAD_A, 0, 0, "p2 A"), VPAD(25300, 1, 0, 0, 0, "p2 release"),
+	VPAD(25700, 1, PAD_A, 0, 0, "p2 A"), VPAD(26000, 1, 0, 0, 0, "p2 release"),
+	VPAD(26400, 1, PAD_A, 0, 0, "p2 A"), VPAD(26700, 1, 0, 0, 0, "p2 release"),
+	VPAD(27100, 1, PAD_A, 0, 0, "p2 A"), VPAD(27400, 1, 0, 0, 0, "p2 release"),
+	VPAD(27800, 1, PAD_A, 0, 0, "p2 A"), VPAD(28100, 1, 0, 0, 0, "p2 release"),
+	VPAD(28500, 1, PAD_A, 0, 0, "p2 A"), VPAD(28800, 1, 0, 0, 0, "p2 release"),
+	VPAD(29200, 1, PAD_A, 0, 0, "p2 A"), VPAD(29500, 1, 0, 0, 0, "p2 release"),
+	VPAD(29900, 1, PAD_A, 0, 0, "p2 A"), VPAD(30200, 1, 0, 0, 0, "p2 release"),
+	SHOT(25000, "lead28_1"), SHOT(31000, "lead28_2"),
+	END(32000),
+};
+
 // tele28 (level 2, sector 8): Asterix leading walks into LV2-8's beam cutscene
 // zone (41.0 58.4 -89.6, ~8 s), then player 2's Obelix is put by the turnstile
 // (45.52 52.58 -66.59): the user's -- he did not stay there unless leading.
@@ -5178,6 +5218,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("corklead21", kCorkLead21),
 	SCENARIO("pull28", kPull28),
+	SCENARIO("lead28", kLead28),
 	SCENARIO("camfall28", kCamFall28),
 	SCENARIO("tele28", kTele28),
 	SCENARIO("beam28", kBeam28),

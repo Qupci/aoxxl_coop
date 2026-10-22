@@ -2485,3 +2485,14 @@ both halves).
   pull, new step S_CAMSECTOR switching on the platforms' sector as 02E9 does, Asterix off the platform through 03B8):
   before, both cameras stayed on its track; now "03B8 starts the wait's sequence over -- 1 camera sectors ... off",
   both back on the area's track. turnstile21b / corkdown / lockcircle / carunlock33 / pull28 as before.
+- Round 138 (user, LV2-8, userlogs\xxl_coop.lv2-8_lead_switch_romans.log: the platforms done, Asterix waiting at the
+  rotary beam's spot, Obelix fighting the turnstile's Romans -- the lead went to Asterix out of nowhere; the user:
+  Obelix had jumped onto the turnstile). Zone 03B8 (Asterix off the platforms: trio 4800 + 4803, the blocks back,
+  detectors, the light pillar 0x900 -- the level's start over, bound to Asterix) fired in the other hero's pass
+  (DetectTickHook: hero-bound tests run again with the heroes' nodes swapped) for Obelix up on the turnstile (44.8
+  55.5 -69.3), inside its height volume. ZoneMeansItsHero (the swapped pass's filter) let it through: its only trio
+  orders were a lead switch and 4803. Now a zone whose group lights a light pillar (CKHkLightPillar 0x900) means
+  the hero it is bound to: a wait's sequence started or started over is the waiting hero's. Autotest lead28 (level 2
+  sector 8: the pillar, Asterix at the beam's spot, Obelix put up on the turnstile hopping): before, 03B8 "(the
+  other hero's zone)" and 4800; now none in two runs. camfall28 (Asterix's own fall still starts over, cameras off),
+  pull28, beam28 as before.
