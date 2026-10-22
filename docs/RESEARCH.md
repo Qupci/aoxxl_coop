@@ -2420,4 +2420,5 @@ both halves).
   it (g_gameHalfSvc; in the union, KlusterSphereInOtherViews / InAnyView). Autotest crates44 (-Level 4, sector 4,
   user's spots -709.3 6.0 -232.7 / -712.1 12.0 -142.4): "half only" log -- crate klusters (handler 3, flags 7) at
   (-712 14 -137/-141) and helmets (handler 12) in P1's half but outside the old frustum. Not seen on screen in the
-  autotest; the user's pad test decides.
+  autotest. User pad test (Oct 22): LV4-4 boxes no longer pop in, floating collectibles no longer vanish at the
+  view's edges, shadows fine; their "boxes act differently far apart" was this pop-in.
