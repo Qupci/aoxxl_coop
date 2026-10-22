@@ -2439,3 +2439,16 @@ both halves).
   the ride to 0058) and corkobelix21 (Obelix leading onto the circle, Asterix 4.2 units off -- before: 0050, Asterix
   told to wait; now nothing, Asterix walks off). turnstile21 / 21b / corkdown as before. LV3-6's pillar (live only
   after its fight) not run: same class and code.
+- Round 135 (user, LV2-8, userlogs\xxl_coop.lv2-8_freedom_on.log / _off.log): with freedom on, once Asterix stood
+  on the light pillar on the platform (42.06 57.0 -120.10; its event: 4801 + 4802, Asterix free -- the user: like
+  the rotary beam, he may move and jump), player 2's Obelix got no "Pull" at the platform (37.92 51.0 -120.16);
+  with freedom off he did. The platform is a CKHkPushPullAsterix (2,147, vt 0x626110) for Obelix only (+0x14 bit 7;
+  bit 6 = Asterix). Its tick (vf15 0x4B5140) offers the push / pull (0x900 to trio vf25) only while trio vfA0 says
+  the leader is a hero it is for (and bit 12 of +0x18, the leader near its push spots +0x1D8/+0x1E0). The mod ticks
+  objects with the nearest player's hero posing as the leader (proximity TickLife) unless a hero is out: freedom
+  off held Asterix (HeroOut -> no slicing, Obelix the real leader); freedom on left him free on the platform, the
+  nearest, so the platform ticked as his and never offered Obelix anything (switching leaders did not help: then
+  the offer is Asterix's own and he is not one it is for). Now a block for only one hero, not being pushed, ticks
+  with that hero as the leader whoever is nearer (BlockHero). Autotest pull28 (level 2 sector 8; the user's ini
+  had freedom off, so XXL_FREEDOM=1): before, no 0901 after the pillar; now 0901 and 151 pull steps, the platform
+  carries Asterix -- the same as with XXL_FREEDOM=0. pushkeg5 (-Level 5) as before.

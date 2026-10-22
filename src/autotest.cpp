@@ -3565,6 +3565,26 @@ const Step kLifterLock[] = {
 	END(44000),
 };
 
+// pull28 (level 2, sector 8; freedom on): the user's LV2-8 -- Asterix crosses the
+// detector that lights the pillar (16.9 50.9 -133 -> -128), stands on the pillar
+// on the platform (42.06 57.0 -120.10; "Obelix leads, Asterix waits", free in
+// freedom mode), player 2's Obelix holds X at the platform (37.92 51.0 -120.16)
+// and pulls right, then down: the "Pull" prompt and the platform moving.
+const Step kPull28[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, 16.913f, 51.4f, -133.0f),
+	GLIDEAT(2300, HERO_ASTERIX, 16.913f, 51.4f, -127.5f, 1000),
+	PLACEAT(4000, HERO_OBELIX, 37.923f, 51.5f, -120.156f),
+	PLACEAT(4200, HERO_ASTERIX, 42.057f, 57.5f, -120.097f),
+	SHOT(6000, "pull28_1"),
+	VPAD(7000, 1, PAD_X, 0, 0, "p2 X"),
+	VPAD(7500, 1, PAD_X, 1.0f, 0, "p2 X + right"), SHOT(9000, "pull28_2"),
+	VPAD(10000, 1, PAD_X, 0, -1.0f, "p2 X + down"), SHOT(11500, "pull28_3"),
+	VPAD(12500, 1, 0, 0, 0, "p2 release"), SHOT(13000, "pull28_4"),
+	END(14000),
+};
+
 // corklead21 (level 2): turnstile21 with Obelix leading (4801 first): Asterix
 // on the spinning platform's circle sets it off all the same (its event 0050
 // makes him wait); Obelix turns it, Asterix rides to the top (0058).
@@ -4853,6 +4873,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lifterlock2", kLifterLock2),
 	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("corklead21", kCorkLead21),
+	SCENARIO("pull28", kPull28),
 	SCENARIO("corkobelix21", kCorkObelix21),
 	SCENARIO("turnstile21c", kTurnstile21c),
 	SCENARIO("turnstile21d", kTurnstile21d),

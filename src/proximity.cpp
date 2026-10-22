@@ -91,6 +91,17 @@ static bool SpitsPotion(char* spitter) {
 	if (item == -1) item = *(int*)(spitter + 0x1C);
 	return item == kPotionPoolType;
 }
+// The one hero a block is for (+0x14 bit 6 Asterix, bit 7 Obelix; it offers its
+// push or pull, 0x900 to trio vf25, only while that hero leads), else -1. LV2-8's
+// platform under a light pillar is Obelix's to pull with Asterix on the pillar:
+// in freedom mode Asterix stands there as a player's hero, the nearest, and the
+// platform ticked with him as the leader never offered Obelix its "Pull" (with
+// freedom off he is the game's, and nothing is sliced).
+static int BlockHero(char* block) {
+	uint8_t f = *(uint8_t*)(block + 0x14) & 0xC0;
+	return f == 0x40 ? HERO_ASTERIX : f == 0x80 ? HERO_OBELIX : -1;
+}
+
 // The hero pushing `block`: its push state (hero +0x3EC bits 25-30, FUN_0049A670)
 // is on and its pushed object (+0x484, which it sends 0x0901 to) is the block.
 static int PusherOf(char* block, Trio t, int p1, int p2) {
@@ -357,6 +368,12 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	if (pusher >= 0) {
 		nearest = pusher;
 		range2 = 1e30f;
+	} else if (hook && *(uintptr_t*)hook == kPushPullVtbl) {
+		int only = BlockHero(hook);
+		if (only == p1 || only == p2) {   // (a player's: both are in this pass)
+			nearest = only;
+			range2 = 1e30f;
+		}
 	}
 	if (hook && *(uintptr_t*)hook == kBonusSpitterVtbl && SpitsPotion(hook)) {
 		nearest = HERO_ASTERIX;
