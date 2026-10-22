@@ -464,6 +464,20 @@ void __fastcall SetTargetHook(char* svc, void* edx, void* target, float time, ch
 		int h = HeroOfTarget(target);
 		if (h >= 0 && h != g_liveOwner && HandOver(svc, h, "leader switch")) return;
 	}
+	// A switch run in the non-leader's own tick (its copy in): the rope cable car
+	// boarded by the hero not leading sends "Obelix leads" from Asterix's tick.
+	// Aimed at the other hero -- whose the game's camera is already -- it turned
+	// Asterix's camera to Obelix for good (his once the car's end freed him).
+	if (g_active && g_inCopy && svc == g_svc && ret >= kSwitchFollowup && ret < kSwitchFollowupEnd) {
+		int h = HeroOfTarget(target);
+		if (h >= 0 && h != g_copy.hero) {
+			static int s_told = 0;
+			if (s_told++ < 20)
+				Log("gamecam: leader switch during %s's tick: its camera stays on it (not aimed at %s)", HeroName(g_copy.hero),
+				    HeroName(h));
+			return;
+		}
+	}
 	g_origSetTarget(svc, edx, target, time, cut);
 }
 

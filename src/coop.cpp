@@ -1773,7 +1773,7 @@ int g_telepherRider = -1;
 static void WatchTelepherRider(Trio t) {
 	int who = g_telepherRider;
 	g_telepherRider = -1;
-	if (who < 0 || !t || !g.p2Joined || t.Leader() == who) return;
+	if (who < 0 || !t || !g.p2Joined || t.Leader() == who || !g_config.carRiderLeads) return;
 	Log("coop: %s boarded an automatic cable car while %s led -- the lead to the rider", HeroName(who), HeroName(t.Leader()));
 	GiveLead(t, who);
 }
@@ -2027,7 +2027,9 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4800 || (event & 0xFFFF) == 0x4801) &&
 	    (uintptr_t)g_trioEventCaller >= 0x49AC80 && (uintptr_t)g_trioEventCaller < 0x49AD00) {
 		Trio tl = GetTrio();
-		if (tl) g_carSwitch = { tl.Leader(), GetTickCount() };   // (before the switch)
+		// (before the switch; the real leader -- boarded by the hero not leading, its
+		// tick has it posing as the leader)
+		if (tl) g_carSwitch = { g.sliced ? (int)g.savedLeader : tl.Leader(), GetTickCount() };
 	}
 	if (g.p2Joined && (event & 0xFFFF) == 0x0C0D && (uintptr_t)g_trioEventCaller == 0x548757) {
 		Trio tl = GetTrio();

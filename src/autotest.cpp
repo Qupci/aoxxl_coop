@@ -2674,6 +2674,41 @@ const Step kCable33[] = {
 	END(12500),
 };
 
+// carlead33 (-Level 3): Obelix leads (4801) when Asterix boards LV3-3's rope
+// car; player 2's Obelix pulls it to the end. Player 1's camera must stay on
+// Asterix (the car's own 4801 ran in his tick with his camera copy in).
+const Step kCarLead33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1200, HERO_ASTERIX, 296.0f, 10.9f, -209.1f),   // walked over: a trail of safe spots
+	GLIDEAT(1300, HERO_ASTERIX, 306.0f, 10.9f, -209.1f, 1000),
+	PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	{ 2600, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(3200, HERO_ASTERIX, 307.582f, 13.073f, -209.154f),
+	SHOT(4200, "carlead33_1"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	GLIDEAT(5500, HERO_OBELIX, 299.0f, 10.43f, -209.1f, 2000),
+	VPAD(8000, 1, 0, 0, 0, "p2 release"), SHOT(8000, "carlead33_2"),
+	GLIDEAT(8200, HERO_OBELIX, 286.0f, 10.43f, -209.1f, 2000),
+	GLIDEAT(10500, HERO_OBELIX, 283.33f, 13.07f, -221.82f, 1500),   // through zone 0830: Asterix leads, freed
+	GLIDEAT(12200, HERO_OBELIX, 282.28f, 13.14f, -250.0f, 2500),
+	SHOT(15000, "carlead33_3"), SHOT(18000, "carlead33_4"),
+	END(19000),
+};
+
+// carleadu33 (-Level 3): Obelix leads, Asterix boards LV3-3's rope car, player
+// 1's R3 + B: the lead stays Obelix's, as before boarding.
+const Step kCarLeadU33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, 300.0f, 11.0f, -209.154f), PLACEAT(2000, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	{ 2500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(3500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f),
+	{ 6000, S_UNLOCKHERO, HERO_ASTERIX, 0, 0, 0, 0, "player 1's R3 + B" },
+	SHOT(8000, "carleadu33"),
+	END(9000),
+};
+
 // carunlock33 (-Level 3): the user's LV2 report on LV3-3's car -- Asterix boards
 // (the car's code gives Obelix the lead, 4801), player 1's R3 + B: the lead must
 // go back to Asterix. Then he boards again and player 2's Obelix pulls to the end.
@@ -4752,6 +4787,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("p2dir", kP2Dir),
 	SCENARIO("cable33", kCable33),
 	SCENARIO("carunlock33", kCarUnlock33),
+	SCENARIO("carlead33", kCarLead33),
+	SCENARIO("carleadu33", kCarLeadU33),
 	SCENARIO("cam32s", kCam32S),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("camfight", kCamFight),
