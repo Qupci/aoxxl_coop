@@ -2343,3 +2343,6 @@ both halves).
   Asterix in every shot). Autotest carunlock33 (-Level 3): board, P1's R3 + B -> 4800, Asterix leads again
   (11.17 s); boards again, Obelix pulls to the end. cabled33: Obelix (leading only for the car) falls -> no lead
   back after the revive; swingundo / cross33 as before.
+  Round 129 also fixes LV2-1's rope car (unlockcar21: no lead back on Oct 21, 4800 after R3 + B now). Circles
+  (LV2-1 corkscrew, unlockpillar / unlockseq) were already right: their 4801 comes from an event group, so the
+  lock's picture is taken before it (g_prePic). pillar36l sends 4801 / 4802 directly, so it does not show that.
