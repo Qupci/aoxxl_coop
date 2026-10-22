@@ -2514,3 +2514,16 @@ both halves).
   joins, leave -- Obelix leads again), mgun33d (XXL_DOWNAT=1:9000 XXL_UPAT=20000: Obelix down at the rope cable car,
   across the river; Asterix untouched on the gun, brought once off it, back by the gun after the revive);
   mgun33j / mgun33o / mgun33a as before.
+- Round 140 (user: Asterix leading should ride the rotary beam too -- no difference with him as the companion).
+  The beam's catch (trio 0x0C02, FUN_00481d50 case 2) and its drop at the far end (0x0C03 from 0x53F4C3, case 3:
+  the companion's order 8 -> 3; anyone else's -> 0x0C05 to the beam) both act on the companion (trio +0x2D).
+  CoopBeamCatchBegin/End now: only Asterix (Obelix has no ride); jumped in the last second and not held; if he is
+  not the companion for the event (he leads, the beam ticked with him as the leader) the trio's leader / companion
+  are swapped for the event and put back after; his order 3 for it unless already 3 as the companion (the game's
+  own catch). The drop is run with him as the companion while he leads and hangs (order 8). The held release
+  ("leads again") waits while a leading hero's order is 8, the beam's ride. Before the drop slice, a leading rider
+  kept order 8 after the drop, stayed held, and the arrival zone's 4800 switched to a held (AI variant) leader --
+  Obelix ended up in mode 1 and co-op was suspended. Autotest beam42l (-Level 4, XXL_P2HERO=asterix XXL_FREEDOM=1:
+  beam42f with 4800 / 4801 / 4800 after the circle -- Asterix leads, order 0): "taken as waiting for its catch",
+  carried across while leading (the leader tag on him), "the rotary beam drops Asterix (leading)", his player's
+  again, landed where the companion lands (-414.3 1.1 -99.2). beam42f / beam28 / beam28b as before.

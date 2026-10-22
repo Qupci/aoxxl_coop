@@ -1861,22 +1861,42 @@ static void WatchTelepherRider(Trio t) {
 // sets the other hero's order to 0 (the user's R3 + X; a level's switch, a cable
 // car...) and the beam took nobody. A companion player's hero that jumped in the
 // last second counts as waiting for the catch; not caught, its order is put back.
+// Asterix leading jumps for it too: the catch is run with him as the companion
+// and the real leader back afterwards -- he rides it as the game's while leading
+// (the held release waits for the ride's end). Its drop at the far end, trio
+// 0x0C03 from the beam (0x53F4C3: the companion's order 8 -> 3; anyone else's
+// "nobody on it", 0x0C05 to the beam), is run the same way. Only Asterix: Obelix
+// has no ride.
 DWORD g_beamJumpAt[2] = {};   // a player's hero's last jump (body 0x0E), set by WatchFreedomBeam
-struct BeamCatch { int hero = -1; uint8_t order = 0; } g_beamCatch;
+struct BeamCatch { int hero = -1; uint8_t order = 0; bool sliced = false; uint8_t leader = 0, companion = 0; bool drop = false; } g_beamCatch;
 
 bool CoopBeamCatchBegin(int ev, void* caller) {
-	if ((ev & 0xFFFF) != 0x0C02 || (uintptr_t)caller != 0x53F348 || !g_config.freedom || !g.p2Joined || g.suspended) return false;
 	Trio t = GetTrio();
-	if (!t) return false;
-	int c = ((uint8_t*)t.raw())[0x2D];
-	if (c != g.p1Hero && c != g.p2Hero) return false;
-	Hero h = t.GetHero(c);
-	uint8_t* order = h ? (uint8_t*)(h.raw() + 0x564) : nullptr;
-	if (!h || g.held[c] || *order == AI_WAIT || GetTickCount() - g_beamJumpAt[c] > 1000) return false;
-	g_beamCatch = { c, *order };
+	Hero h = t ? t.GetHero(HERO_ASTERIX) : Hero();
+	const int a = HERO_ASTERIX;
+	if ((ev & 0xFFFF) == 0x0C03 && (uintptr_t)caller == 0x53F4C3 && h && g.p2Joined) {
+		uint8_t* tr = (uint8_t*)t.raw();
+		if (tr[0x2C] != a || h.Order() != AI_HANG_ON_BEAM) return false;
+		g_beamCatch = { a, (uint8_t)h.Order(), true, tr[0x2C], tr[0x2D], true };
+		tr[0x2C] = tr[0x2D];
+		tr[0x2D] = (uint8_t)a;
+		Log("coop: the rotary beam drops Asterix (leading) -- the companion for it");
+		return true;
+	}
+	if ((ev & 0xFFFF) != 0x0C02 || (uintptr_t)caller != 0x53F348 || !g_config.freedom || !g.p2Joined || g.suspended) return false;
+	if (!h || (a != g.p1Hero && a != g.p2Hero) || g.held[a] || GetTickCount() - g_beamJumpAt[a] > 1000) return false;
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t* order = (uint8_t*)(h.raw() + 0x564);
+	bool leads = tr[0x2C] == a;
+	if (!leads && *order == AI_WAIT) return false;   // waiting already: the game's own catch
+	g_beamCatch = { a, *order, leads, tr[0x2C], tr[0x2D], false };
+	if (leads) {
+		tr[0x2C] = tr[0x2D];
+		tr[0x2D] = (uint8_t)a;
+	}
 	*order = AI_WAIT;
-	Log("coop: freedom: %s jumped as the rotary beam came (AI order %d) -- taken as waiting for its catch", HeroName(c),
-	    g_beamCatch.order);
+	Log("coop: freedom: Asterix jumped as the rotary beam came (AI order %d%s) -- taken as waiting for its catch",
+	    g_beamCatch.order, leads ? ", leading: the companion for it" : "");
 	return true;
 }
 
@@ -1884,7 +1904,12 @@ void CoopBeamCatchEnd(bool began) {
 	if (!began || g_beamCatch.hero < 0) return;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(g_beamCatch.hero) : Hero();
-	if (h && h.Order() != AI_HANG_ON_BEAM) *(uint8_t*)(h.raw() + 0x564) = g_beamCatch.order;   // not caught (too far)
+	if (h && !g_beamCatch.drop && h.Order() != AI_HANG_ON_BEAM) *(uint8_t*)(h.raw() + 0x564) = g_beamCatch.order;   // not caught (too far)
+	uint8_t* tr = t ? (uint8_t*)t.raw() : nullptr;
+	if (tr && g_beamCatch.sliced && tr[0x2C] == g_beamCatch.companion && tr[0x2D] == (uint8_t)g_beamCatch.hero) {
+		tr[0x2C] = g_beamCatch.leader;
+		tr[0x2D] = g_beamCatch.companion;
+	}
 	g_beamCatch = {};
 }
 
@@ -2831,7 +2856,7 @@ void CoopFrame() {
 		bool leads = t.Leader() == idx;
 		if (!g.held[idx] && !leads && order != g.lastOrder[idx] && IsScriptedOrder(order)) {
 			Hold(t, idx, "new order");
-		} else if (g.held[idx] && (leads || order == AI_FOLLOW_LEADER)) {
+		} else if (g.held[idx] && ((leads && order != AI_HANG_ON_BEAM) || order == AI_FOLLOW_LEADER)) {   // (riding the beam leading: its end)
 			g.held[idx] = false;
 			if (g_corkRide.hero == idx) g_corkRide = {};
 			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : "order done");
