@@ -50,6 +50,8 @@ void IndivAfterHeroTick(int hero);
 
 // A hero down while the other stands: that hero, else -1.
 int IndivFallenHero();
+// The hero that collected a magic potion flask in the last 3 s, else -1.
+int IndivPotionDrinker();
 // Things that need both heroes -- a lifter, a cable car, a blue circle, the
 // spinning platform, a launcher, a zone that orders the companion (the boss
 // gates, the slide, the boats), a Roman agent's talk -- stay shut while a hero is

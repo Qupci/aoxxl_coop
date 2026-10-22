@@ -89,6 +89,7 @@ struct CoopState {
 	uint8_t  sitBefore = 0xFF;        // the sliced hero's situation before its tick
 	uint8_t  f18Before = 0;           // ... and its control bits
 	bool     hidDash = false;         // game manager +0x5C bit 19 hidden for the tick
+	int      dashHero = -1;           // the magic potion's dash is this hero's (-1: none up)
 	int      aiCycle[HERO_COUNT] = {};   // ticks left in the AI variant (situation reset)
 	DWORD    stuckSince[HERO_COUNT] = {};
 	DWORD    outsideSince[HERO_COUNT] = {};   // WatchSectors: outside the streamed sector since
@@ -621,6 +622,7 @@ void ForgetP2() {
 	g.suspended = false;
 	g.shopping = false;
 	g.shopHero = -1;
+	g.dashHero = -1;
 	g.shopLeadBack = false;
 	g.dying = -1;
 	g.dyingLeads = false;
@@ -3397,6 +3399,28 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 	    Situation(t.GetHero(g.p2Hero)) != kSituationGroupAction)
 		ClearStaleAiState(heroIndex, hero);
 
+	// The magic potion's dash: while game manager +0x5C bit 19 is up, every
+	// player-driven hero on the ground goes into situation 0x10 (dash), and only
+	// the hero that drank gets the flag (+0x388 bit 0x4000) that ends it. In
+	// single player the companion is an AI and never sees it. It is the drinker's
+	// -- the hero the flask went to, else the leader -- and hidden from the other
+	// player's hero. (Hidden from the hero not leading only, Obelix leading ran on
+	// for good when Asterix took the flask: LV4-4's lever.)
+	{
+		CKYellowPages* yp = YellowPages();
+		char* gm = yp ? (char*)yp->gameManager : nullptr;
+		bool up = gm && (*(uint32_t*)(gm + 0x5C) & 0x80000);
+		if (up && g.dashHero < 0) {
+			int d = IndivPotionDrinker();
+			g.dashHero = d == g.p1Hero || d == g.p2Hero ? d : t.Leader();
+			Log("coop: the magic potion's dash is %s's", HeroName(g.dashHero));
+		} else if (!up) {
+			g.dashHero = -1;
+		}
+		g.hidDash = up && heroIndex != g.dashHero;
+		if (g.hidDash) *(uint32_t*)(gm + 0x5C) &= ~0x80000u;
+	}
+
 	// What X takes (trio+0x4C) offered for the other player's hero -- an object
 	// ticked as that hero's (proximity slicing: the torch by Asterix while Obelix
 	// leads, LV2-1) -- is that hero's: hidden from the leader's tick. (It went to
@@ -3460,15 +3484,6 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 		g.sliced = true;
 		g.sitBefore = Situation(hero);
 		g.f18Before = *F18(hero);
-		// The magic potion's dash: while game manager +0x5C bit 19 is up, every
-		// player-driven hero on the ground goes into situation 0x10 (dash), and
-		// only the hero that drank gets the flag (+0x388 bit 0x4000) that ends it.
-		// In single player the companion is an AI and never sees it; player 2's
-		// Obelix dashed until a cutscene. Hidden from the non-leader's tick.
-		CKYellowPages* yp = YellowPages();
-		char* gm = yp ? (char*)yp->gameManager : nullptr;
-		g.hidDash = gm && (*(uint32_t*)(gm + 0x5C) & 0x80000);
-		if (g.hidDash) *(uint32_t*)(gm + 0x5C) &= ~0x80000u;
 		// Offers meant for the real leader stay with it: the magic potion
 		// (latched at trio+0x4C for one frame) must not be taken by the other
 		// hero while it poses as leader. One made for this hero stays (CoopNoteOffer).

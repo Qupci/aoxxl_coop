@@ -753,6 +753,8 @@ GmFn g_origHeal = nullptr, g_origAddShield = nullptr;
 // leader is Asterix: a flask that reached Asterix while Obelix led (the LV4-4
 // lever's spitter) was thrown away. Asterix's flask is applied with him leading.
 int g_collector = -1;
+int g_potionHero = -1;     // the last potion flask's hero, and when
+DWORD g_potionAt = 0;
 typedef void(__fastcall* CollectFn)(char* pool, void* edx, char* hero);
 CollectFn g_origCollect = nullptr;
 void __fastcall CollectHook(char* pool, void* edx, char* hero) {
@@ -770,6 +772,10 @@ void __fastcall CollectHook(char* pool, void* edx, char* hero) {
 		tr[0x2C] = HERO_ASTERIX;
 		tr[0x2D] = HERO_OBELIX;
 		Log("indiv: Asterix's magic potion applied with him as the leader (%s leads)", HeroName(leader));
+	}
+	if (who >= 0 && *(int*)(pool + 0x24) == 3) {
+		g_potionHero = who;
+		g_potionAt = GetTickCount();
 	}
 	g_origCollect(pool, edx, hero);
 	if (slice && tr[0x2C] == HERO_ASTERIX && tr[0x2D] == HERO_OBELIX) {
@@ -838,6 +844,10 @@ char __fastcall AddShieldHook(char* gm, void* edx, int arg) {
 }
 
 } // namespace
+
+int IndivPotionDrinker() {
+	return g_potionHero >= 0 && GetTickCount() - g_potionAt < 3000 ? g_potionHero : -1;
+}
 
 bool IndivActive() { return g.active; }
 

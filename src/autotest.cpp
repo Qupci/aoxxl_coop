@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -5291,6 +5291,21 @@ const Step kSpitter44n[] = {
 	SHOT(9000, "spitter44n_1"), SHOT(12000, "spitter44n_2"),
 	END(15000),
 };
+// spitter44d: spitter44n with lever 14 (-734.1 13.9 -241.6, event 0590 = group
+// #178) worked as a punch does, instead of the punches, which miss it in some
+// runs: the flask goes to Asterix, and the potion's dash is his alone -- Obelix,
+// leading, keeps walking (he ran on for good before).
+const Step kSpitter44d[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 2000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(2500, HERO_OBELIX, -733.742f, 13.944f, -240.739f), PLACEAT(2500, HERO_ASTERIX, -733.04f, 14.5f, -239.3f),
+	{ 4000, S_PULLLEVER, 14, 0, 0, 0, 0, "the lever by the spitter" },
+	SHOT(6000, "spitter44d_0"),
+	VPAD(7000, 1, 0, 0, 1.0f, "p2 forward"), VPAD(8500, 1, 0, 0, 0, "p2 stop"),
+	SHOT(9000, "spitter44d_1"),
+	END(10000),
+};
 const Step kSpitter44a[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 4),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -5925,6 +5940,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spitter44o", kSpitter44o),
 	SCENARIO("spitter44n", kSpitter44n),
 	SCENARIO("spitter44a", kSpitter44a),
+	SCENARIO("spitter44d", kSpitter44d),
 	SCENARIO("spitter44l", kSpitter44l),
 	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("cam14", kCam14),
@@ -6771,6 +6787,21 @@ void RunStep(const Step& s) {
 		if (!lvl) break;
 		Log("autotest: loading sector %d (current %d)", s.a, *(int*)(lvl + 0x24));
 		*(int*)(lvl + 0x34) = s.a;
+		break;
+	}
+	case S_PULLLEVER: {   // lever a (CKHkActivator 2,52) worked as a punch on it does (FUN_0053B610, thiscall)
+		char* l = (char*)GetLvlObject(2, 52, (unsigned)s.a);
+		if (!l) break;
+		((void(__fastcall*)(char*, void*))0x53B610)(l, nullptr);
+		Log("autotest: lever %d %p worked (events %04X/%04X)", s.a, l, *(uint16_t*)(l + 0x28), *(uint16_t*)(l + 0x2A));
+		break;
+	}
+	case S_FLAGEV: {   // event a flagged in the event service (FUN_00460C20), as a lever or a zone does
+		CKYellowPages* yp = YellowPages();
+		char* ev = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+		if (!ev) break;
+		((void(__fastcall*)(void*, void*, unsigned))0x460C20)(ev, nullptr, (unsigned)s.a);
+		Log("autotest: event %04X flagged", (unsigned)s.a);
 		break;
 	}
 	case S_OBJEV: {   // event b sent to the object of class (2, a) nearest Asterix

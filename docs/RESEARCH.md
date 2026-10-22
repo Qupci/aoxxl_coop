@@ -2595,3 +2595,17 @@ both halves).
   and spitter44a (Asterix, not leading, hits the lever himself): the flask goes to Asterix, 2/2 each. A spot
   off the ledge (-731.5 -244) drops a hero to y 6, outside the loaded geometry (the user: "stuck in the unloaded
   sector").
+- Round 145 (user, LV4-4, userlogs\xxl_coop.lever_potion_dash.log: Obelix leading hit the spitter's lever, the
+  flask went to Asterix -- and Obelix ran on by himself, situation 0x10). The potion's dash: game manager +0x5C
+  bit 19 sends every player-driven hero on the ground into situation 0x10 (Hero_ChooseSituationState 0x49C900);
+  only the drinker gets the flag that ends it (+0x388 bit 0x4000). The mod hid bit 19 from the non-leader's tick
+  only -- right while the leader drinks; Asterix, not leading, drank: the leader Obelix dashed for good and
+  Asterix not at all. Now the dash is its drinker's: CollectHook notes a potion flask's hero (IndivPotionDrinker,
+  3 s), else the leader when bit 19 goes up (g.dashHero), and the bit is hidden from the other player's hero
+  (CoopBeforeLifeTick, either hero). Autotest spitter44d (Obelix leads, Asterix behind him; lever 14 at -734.1
+  13.9 -241.6, event 0590 = group #178, worked as a punch does: new step S_PULLLEVER, CKHkActivator's FUN_0053B610):
+  before, Obelix in 0x10 to the end (47 rows); now Asterix 0.4 s, Obelix walks. spitter44a / dash / potion /
+  flask as before. Punches on that lever miss it in some runs (spitter44n 2 of 5): CKHkActivator::sendEvent
+  0x301 needs the punch's shape on the lever. New step S_FLAGEV (an event flagged in the event service).
+  Line endings: src/autotest.cpp and this file are LF (this file since b5e1b50); rounds 143-144 added CRLF lines
+  to both -- converted back to LF. The other sources are CRLF.
