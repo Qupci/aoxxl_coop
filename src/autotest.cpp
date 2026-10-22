@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -102,6 +102,7 @@ struct Step {
 #define CINE_STOP(t)                { t, S_CINE, -3, 0, 0, 0, 0, "cine stop" }
 // Ends every playing cutscene the game's own way (as Enter does on a skippable one).
 #define CINE_SKIP(t)                { t, S_CINE, -4, 0, 0, 0, 0, "cine skip" }
+#define CINE_ENTER(t)               { t, S_CINE, -5, 0, 0, 0, 0, "cine skip (as Enter)" }
 // Turn the cutscene probe (extra state every log tick) on or off.
 #define PROBE(t, on)                { t, S_PROBE, on, 0, 0, 0, 0, "probe" }
 // Right stick of virtual pad `slot` (camera look).
@@ -505,6 +506,32 @@ const Step kSectorZone[] = {
 	END(10000),
 };
 
+// cine1 (-Level 1): the cinematic scenes' graphs -- the one playing (the intro)
+// and the first few.
+const Step kCine1[] = {
+	MARK(0, "baseline"),
+	{ 100, S_CINEDUMP, -1, 0, 0, 0, 0, "playing scene" },
+	{ 300, S_CINEDUMP, 0, 0, 0, 0, 0, "scene 0" }, { 400, S_CINEDUMP, 1, 0, 0, 0, 0, "scene 1" },
+	{ 500, S_CINEDUMP, 2, 0, 0, 0, 0, "scene 2" }, { 600, S_CINEDUMP, 3, 0, 0, 0, 0, "scene 3" },
+	END(1500),
+};
+
+// skip1 (-Level 1): the intro skipped as Enter does, 1.5 s in: what its later
+// nodes would have done still happens (the level's music: event 0020 -> the
+// stream). intro1: the intro played to its end, for comparison.
+const Step kSkip1[] = {
+	MARK(0, "baseline"),
+	{ 1400, S_CINEDUMP, 1, 0, 0, 0, 0, "the intro" },
+	CINE_ENTER(1500),
+	SHOT(4000, "skip1_0"), SHOT(12000, "skip1_1"),
+	END(15000),
+};
+const Step kIntro1[] = {
+	MARK(0, "baseline"),
+	SHOT(30000, "intro1_0"), SHOT(90000, "intro1_1"),
+	END(150000),
+};
+
 // torch: list the torches, move the nearest to Asterix, give it, later drop it.
 const Step kTorch[] = {
 	MARK(0, "baseline"), { 500, S_TORCH, 0, 0, 0, 0, 0, "torches" },
@@ -653,6 +680,28 @@ const Step kLvl1[] = {
 	END(17000),
 };
 
+// obelix1s (-Level 1): lvl1obelix with both cutscenes skipped as Enter does --
+// the Obelix one 1 s in: its later events (music) must still happen.
+// obelix1f: the Obelix cutscene played to its end, for comparison.
+const Step kObelix1S[] = {
+	MARK(0, "baseline"), CINE_ENTER(200),
+	{ 7000, S_PLACE, HERO_ASTERIX, 19, 0, 0, 0, "asterix to sector 2's zone" },
+	{ 9000, S_PLACE, HERO_ASTERIX, 20, 0, 0, 0, "asterix before the rectangle" },
+	GLIDE(9500, HERO_ASTERIX, 21, 1500),
+	{ 11900, S_CINEDUMP, 2, 0, 0, 0, 0, "the obelix cutscene" },
+	CINE_ENTER(12000),
+	SHOT(18000, "obelix1s_0"),
+	END(24000),
+};
+const Step kObelix1F[] = {
+	MARK(0, "baseline"), CINE_ENTER(200),
+	{ 7000, S_PLACE, HERO_ASTERIX, 19, 0, 0, 0, "asterix to sector 2's zone" },
+	{ 9000, S_PLACE, HERO_ASTERIX, 20, 0, 0, 0, "asterix before the rectangle" },
+	GLIDE(9500, HERO_ASTERIX, 21, 1500),
+	SHOT(40000, "obelix1f_0"),
+	END(70000),
+};
+
 // lvl1obelix (-Level 1): Asterix finds Obelix (sector 2's rectangle starts the
 // cutscene, then trio 0x4883); player 2 can join only after that.
 const Step kLvl1Obelix[] = {
@@ -777,6 +826,41 @@ const Step kBoss210[] = {
 	SHOT(21500, "boss_5"), SHOT(24000, "boss_6"), SHOT(28000, "boss_7"), SHOT(33000, "boss_8"), SHOT(38000, "boss_9"),
 	END(40000),
 };
+
+// boss210s (-Level 2): player 2's Obelix crosses the boss gate's #34 (its
+// cutscene, skipped as Enter does 1.5 s in), Asterix 25 units back; then Obelix
+// crosses #4 (the boss): Asterix must be brought to him, as without the skip.
+// boss210f: the same with the cutscene played to its end.
+const Step kBoss210s[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1640.0f, -742.5f, -1210.1f), PLACEAT(3000, HERO_OBELIX, 1665.34f, -742.8f, -1210.13f),
+	GLIDEAT(4000, HERO_OBELIX, 1678.0f, -742.8f, -1210.5f, 1500),
+	{ 7400, S_CINEDUMP, -1, 0, 0, 0, 0, "the boss cutscene" },
+	CINE_ENTER(7500),
+	SHOT(9000, "boss210s_0"),
+	GLIDEAT(14000, HERO_OBELIX, 1695.0f, -742.8f, -1210.5f, 2000),
+	SHOT(19000, "boss210s_1"), SHOT(25000, "boss210s_2"),
+	END(28000),
+};
+const Step kBoss210f[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1640.0f, -742.5f, -1210.1f), PLACEAT(3000, HERO_OBELIX, 1665.34f, -742.8f, -1210.13f),
+	GLIDEAT(4000, HERO_OBELIX, 1678.0f, -742.8f, -1210.5f, 1500),
+	SHOT(9000, "boss210f_0"),
+	GLIDEAT(40000, HERO_OBELIX, 1695.0f, -742.8f, -1210.5f, 2000),
+	SHOT(45000, "boss210f_1"), SHOT(51000, "boss210f_2"),
+	END(54000),
+};
+
+// boss210u / boss210v (-Level 2): the user's (userlogs xxl_coop.lv2-10_asterix_no_tp):
+// player 2's Obelix crosses #34 beside Asterix (u: its cutscene skipped as Enter
+// does; v: played out), then from the user's spots Obelix crosses #4 with Asterix
+// 9 units behind (1682.8 -743.8 -1207.1): Asterix must be brought into the run.
+#define BOSS210_USER(skip) 	MARK(0, "baseline"), LOADSECTOR(200, 10), 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), 	PLACEAT(3000, HERO_ASTERIX, 1665.24f, -743.4f, -1212.82f), PLACEAT(3000, HERO_OBELIX, 1670.51f, -743.4f, -1212.8f), 	GLIDEAT(4000, HERO_OBELIX, 1678.0f, -743.4f, -1212.8f, 1500), 	skip, 	PLACEAT(25000, HERO_ASTERIX, 1682.77f, -743.4f, -1207.05f), PLACEAT(25000, HERO_OBELIX, 1682.87f, -743.4f, -1212.85f), 	GLIDEAT(26000, HERO_OBELIX, 1695.0f, -747.4f, -1210.5f, 2000), 	SHOT(30000, "boss210u_1"), SHOT(36000, "boss210u_2"), 	END(38000)
+const Step kBoss210u[] = { BOSS210_USER(CINE_ENTER(7500)) };
+const Step kBoss210v[] = { BOSS210_USER(MARK(7500, "no skip")) };
 
 // boss210t (-Level 2, XXL_FREEDOM=1): the user's -- Asterix crosses the boss gate
 // (#34 loads it, its cutscene; #4 sets it moving), both heroes wait out of its
@@ -5782,6 +5866,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("spywalk", kSpyWalk),
 	SCENARIO("sas", kSas),
 	SCENARIO("sectorzone", kSectorZone),
+	SCENARIO("cine1", kCine1),
+	SCENARIO("skip1", kSkip1),
+	SCENARIO("intro1", kIntro1),
 	SCENARIO("torch", kTorch),
 	SCENARIO("torchgrab", kTorchGrab),
 	SCENARIO("torchnl2", kTorchNL2),
@@ -5791,6 +5878,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("launcha", kLaunchA),
 	SCENARIO("lvl1", kLvl1),
 	SCENARIO("lvl1obelix", kLvl1Obelix),
+	SCENARIO("obelix1s", kObelix1S),
+	SCENARIO("obelix1f", kObelix1F),
 	SCENARIO("potionmove", kPotionMove),
 	SCENARIO("hurto", kHurtO),
 	SCENARIO("hurtop", kHurtOP),
@@ -5813,6 +5902,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("beach12o", kBeach12O),
 	SCENARIO("boss210", kBoss210),
 	SCENARIO("boss210t", kBoss210t),
+	SCENARIO("boss210s", kBoss210s),
+	SCENARIO("boss210f", kBoss210f),
+	SCENARIO("boss210u", kBoss210u),
+	SCENARIO("boss210v", kBoss210v),
 	SCENARIO("boss36", kBoss36),
 	SCENARIO("boss36s", kBoss36s),
 	SCENARIO("sky2", kSky2),
@@ -6787,6 +6880,67 @@ void RunStep(const Step& s) {
 		if (!lvl) break;
 		Log("autotest: loading sector %d (current %d)", s.a, *(int*)(lvl + 0x24));
 		*(int*)(lvl + 0x34) = s.a;
+		break;
+	}
+	case S_CINEDUMP: {   // cinematic scene a (-1: the one playing): its nodes, edges and events
+		CKYellowPages* yp = YellowPages();
+		char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+		unsigned ns = cin ? *(unsigned*)(cin + 0x14) : 0;
+		char* sc = nullptr;
+		int si = -1;
+		for (unsigned i = 0; scenes && i < ns; i++)
+			if ((s.a < 0 && (*(uint16_t*)(scenes[i] + 0x20) & 1) && (*(uint16_t*)(scenes[i] + 0x20) & 0x180) != 0x80) ||
+			    (int)i == s.a) { sc = scenes[i]; si = (int)i; break; }
+		if (!sc) { Log("autotest: no cinematic scene %d (of %u)", s.a, ns); break; }
+		char** edges = *(char***)(sc + 4);
+		unsigned ne = *(unsigned*)(sc + 8);
+		Log("autotest: scene %d %p flags %04X +30 %02X running %p start door %p end event %04X, %u edges", si, sc,
+		    *(uint16_t*)(sc + 0x20), *(uint8_t*)(sc + 0x30), *(void**)(sc + 0xC), *(void**)(sc + 0x28), *(uint16_t*)(sc + 0x64), ne);
+		struct { unsigned id; const char* name; } kinds[] = {
+			{ 1, "And" }, { 2, "Or" }, { 11, "RandDoor" }, { 17, "StartDoor" }, { 9, "AttachObjects" }, { 22, "DisplayPicture" },
+			{ 5, "FlaggedPath" }, { 7, "GroupBloc" }, { 27, "Lightning" }, { 23, "ManageCamera" }, { 15, "ManageEvent" },
+			{ 16, "ManagerEventStop" }, { 12, "Particle" }, { 4, "PathFinding" }, { 32, "Class32" }, { 3, "PlayAnim" },
+			{ 28, "PlaySound" }, { 20, "Sekensor" }, { 25, "StartEvent" }, { 13, "StreamAlone" }, { 10, "Stream" },
+			{ 14, "StreamGroupBloc" }, { 26, "Sky" } };
+		CKYellowPages* y2 = YellowPages();
+		char* ev = y2 ? *(char**)((char*)y2 + 0x6C) : nullptr;
+		auto targets = [&](unsigned id, char* out, size_t cap) {
+			out[0] = 0;
+			unsigned g = (id & 0xFFFF) >> 3;
+			if (!ev || g == 0x1FFF) return;
+			unsigned n = (unsigned)*(uint16_t*)(ev + 0x1C) + *(uint16_t*)(ev + 0x1E) + *(uint16_t*)(ev + 0x20);
+			if (g >= n) return;
+			uint8_t* tab = *(uint8_t**)(ev + 0xC);
+			char** objs = *(char***)(ev + 0x10);
+			uint16_t* msgs = *(uint16_t**)(ev + 0x14);
+			unsigned first = 0;
+			for (unsigned k = 0; k < g; k++) first += tab[k * 3];
+			for (unsigned k = 0; k < tab[g * 3] && strlen(out) + 24 < cap; k++) {
+				char* o = objs[first + k];
+				sprintf(out + strlen(out), " %06X<-%04X", o ? (unsigned)*(uintptr_t*)o & 0xFFFFFF : 0, msgs[first + k]);
+			}
+		};
+		for (auto& k : kinds) {
+			for (unsigned i = 0, n = GetNumLvlClassInstances(8, k.id); i < n && i < 4096; i++) {
+				char* nd = (char*)GetLvlObject(8, k.id, i);
+				bool door = k.id == 1 || k.id == 2 || k.id == 11 || k.id == 17;
+				if (!nd || *(char**)(nd + 0x1C) != sc) continue;
+				uint16_t st = *(uint16_t*)(nd + 8), fi = *(uint16_t*)(nd + 0xA), cnt = *(uint16_t*)(nd + 0xC);
+				char out[512] = "", tg[256] = "";
+				// start-edge targets (started when this node finishes), then finish-edge ones (stopped)
+				unsigned a0 = st, n1 = st == 0xFFFF ? 0 : fi == 0xFFFF ? cnt : (unsigned)(fi - st);
+				unsigned b0 = fi, n2 = fi == 0xFFFF ? 0 : st == 0xFFFF ? cnt : (unsigned)(cnt - (fi - st));
+				for (unsigned e = 0; e < n1 && a0 + e < ne && strlen(out) < 400; e++) sprintf(out + strlen(out), " +%p", edges[a0 + e]);
+				for (unsigned e = 0; e < n2 && b0 + e < ne && strlen(out) < 400; e++) sprintf(out + strlen(out), " x%p", edges[b0 + e]);
+				if (k.id == 25) targets(*(uint16_t*)(nd + 0x2C), tg, sizeof(tg));
+				Log("autotest:   %-16s %p flags %08X grp %p%s%s%s%s", k.name, nd, *(uint32_t*)(nd + 0x14), *(void**)(nd + 0x18),
+				    door ? "" : "", out, k.id == 25 ? " | event" : "", tg);
+				if (door) Log("autotest:     door: inputs %d of %d", *(int*)(nd + 0x20), *(int*)(nd + 0x24));
+				else if (k.id == 25) Log("autotest:     event %04X, waits for sekens %d line %d", *(uint16_t*)(nd + 0x2C), *(int*)(nd + 0x20), *(int*)(nd + 0x24));
+				else if (*(int*)(nd + 0x20) != -1) Log("autotest:     waits for sekens %d line %d", *(int*)(nd + 0x20), *(int*)(nd + 0x24));
+			}
+		}
 		break;
 	}
 	case S_PULLLEVER: {   // lever a (CKHkActivator 2,52) worked as a punch on it does (FUN_0053B610, thiscall)
@@ -7982,6 +8136,17 @@ void RunStep(const Step& s) {
 			for (unsigned i = 0; i < n && i < 128; i++)
 				Log("autotest:   scene %u %p: f20=%04X f30=%02X", i, scenes[i],
 					*(uint16_t*)(scenes[i] + 0x20), *(uint8_t*)(scenes[i] + 0x30));
+			break;
+		}
+		if (s.a == -5) {   // as Enter skips (CKSrvCinematic::vf17): playing scenes that end on Enter
+			typedef void(__fastcall* SkipFn)(void* scene, void* edx);
+			for (unsigned i = 0; i < n && i < 512; i++) {
+				uint16_t f = *(uint16_t*)(scenes[i] + 0x20);
+				if ((f & 1) && (f & 0x1000) && (f & 0x180) != 0x80 && *(int8_t*)(scenes[i] + 0x30) >= 0) {
+					Log("autotest: skipping scene %u as Enter does (f20=%04X)", i, f);
+					((SkipFn)0x461A80)(scenes[i], nullptr);
+				}
+			}
 			break;
 		}
 		if (s.a == -4) {

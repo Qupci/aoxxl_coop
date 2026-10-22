@@ -1351,6 +1351,171 @@ static void MakeCutscenesSkippable() {
 	Log("coop: skip_cutscenes: %u of %u cutscenes now end on Enter", changed, n);
 }
 
+// A skipped cutscene (Enter: CKSrvCinematic::vf17 -> FUN_00461A80, which drops
+// the scene's running nodes and fades it out) lost what its later nodes would
+// have done: their level events (CKStartEventCinematicBloc, event id at +0x2C,
+// flagged when it starts -- level 1's music after the intro, LV2-10's boss gate
+// that brings the hero left behind). The scene's graph (CKCinematicNode: +4 next
+// running, +8/+0xA/+0xC edges into the scene's +4 list: [+8, +0xA) started and
+// [+0xA, ...) stopped when the node ends, +0x14 flags (1 started, 4 done, 0x40
+// its edges count; a path or camera bloc runs off the list), +0x18 group,
+// doors' inputs +0x20 of +0x24) is run on from its running nodes without time
+// first: each StartEvent bloc reached has its event flagged, in order (a
+// stopped one, as the game's stop, does not).
+typedef void(__fastcall* SkipSceneFn)(char* scene, void* edx);
+const uintptr_t kSkipScene = 0x461A80;
+const uint8_t   kSkipScenePrologue[6] = { 0x57, 0x8B, 0xF9, 0x8A, 0x47, 0x30 };
+const uintptr_t kMenuSkipReturn = 0x524359;   // CKHkInterfaceMain::vf18 (the menus' scene): left as it was
+SkipSceneFn g_origSkipScene = nullptr;
+
+static void RunOnSkippedScene(char* sc) {
+	const uintptr_t kAnd = 0x62495C, kOr = 0x6249A4, kRand = 0x6249EC, kStartDoor = 0x624A34;
+	const uintptr_t kGroup = 0x624B54, kStreamGroup = 0x624F48, kStartEvent = 0x624E70;
+	char** edges = *(char***)(sc + 4);
+	unsigned ne = *(unsigned*)(sc + 8);
+	CKYellowPages* yp = YellowPages();
+	char* evs = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+	if (!edges || !evs) return;
+	const unsigned kMax = 512;
+	static char*   node[kMax];
+	static uint8_t st[kMax];     // 1 started, 2 ended, 4 its event flagged
+	static int     inputs[kMax];
+	unsigned n = 0;
+	auto vt = [](char* x) { return *(uintptr_t*)x; };
+	auto isDoor = [&](char* x) { uintptr_t v = vt(x); return v == kAnd || v == kOr || v == kRand || v == kStartDoor; };
+	auto isGroup = [&](char* x) { return vt(x) == kGroup || vt(x) == kStreamGroup; };
+	auto slot = [&](char* x) -> int {
+		for (unsigned i = 0; i < n; i++) if (node[i] == x) return (int)i;
+		if (n >= kMax) return -1;
+		node[n] = x;
+		st[n] = 0;
+		inputs[n] = isDoor(x) ? *(int*)(x + 0x20) : 0;
+		return (int)n++;
+	};
+	struct Op { char* x; int op; };   // 0 reached, 1 ended, 2 stopped
+	const unsigned kOps = 2048;
+	static Op q[kOps];
+	unsigned qh = 0, qt = 0;
+	auto push = [&](char* x, int op) { if (x && qt < kOps) q[qt++] = { x, op }; };
+	static const bool trace = getenv("XXL_SKIPLOG") != nullptr;   // diagnostics: every step of the run-on
+	// Running: on the scene's list, or started and not done off it (a path or a
+	// camera bloc waiting for its actor: LV1's walk to Obelix led to the music).
+	static char* run[kMax];
+	unsigned nRun = 0;
+	for (char* x = *(char**)(sc + 0xC); x && nRun < kMax; x = *(char**)(x + 4)) run[nRun++] = x;
+	static const unsigned kNodeIds[] = { 1, 2, 11, 17, 9, 22, 5, 7, 27, 23, 15, 16, 12, 4, 32, 3, 28, 20, 25, 13, 10, 14, 26 };
+	for (unsigned id : kNodeIds) {
+		for (unsigned k = 0, m = GetNumLvlClassInstances(8, id); k < m && k < 4096 && nRun < kMax; k++) {
+			char* x = (char*)GetLvlObject(8, id, k);
+			if (!x || *(char**)(x + 0x1C) != sc || (*(uint32_t*)(x + 0x14) & 5) != 1) continue;
+			bool listed = false;
+			for (unsigned r = 0; r < nRun && !listed; r++) listed = run[r] == x;
+			if (!listed) run[nRun++] = x;
+		}
+	}
+	for (unsigned r = 0; r < nRun; r++) {
+		char* x = run[r];
+		int i = slot(x);
+		if (i < 0) continue;
+		st[i] |= 1;
+		if (trace) Log("coop:   skip: running %p vt %06X flags %08X", x, (unsigned)vt(x), *(uint32_t*)(x + 0x14));
+		if (isDoor(x)) {
+			uintptr_t v = vt(x);
+			if (v != kAnd || inputs[i] >= *(int*)(x + 0x24)) push(x, 1);
+		} else if (isGroup(x)) {
+			char* second = *(char**)(x + 0x38);
+			if (second && (*(uint32_t*)(second + 0x14) & 4)) push(x, 1);
+		} else {
+			if (vt(x) == kStartEvent) push(x, 0);   // waiting for its line, or not ticked yet: its event
+			else push(x, 1);
+		}
+	}
+	char fired[160] = "";
+	unsigned nFired = 0, nOps = 0;
+	while (qh < qt) {
+		Op o = q[qh++];
+		int i = slot(o.x);
+		if (i < 0) continue;
+		nOps++;
+		uintptr_t v = vt(o.x);
+		if (trace && nOps < 400) Log("coop:   skip: %s %p vt %06X state %d", o.op == 0 ? "reach" : o.op == 1 ? "end" : "stop", o.x, (unsigned)v, st[i]);
+		if (o.op == 0) {   // reached (started by an edge)
+			if (st[i] & 2) continue;   // (each node ends once here: no loops)
+			if (isDoor(o.x)) {   // a door runs again whenever reached (its +0x14 bit 2 stays from the level's load)
+				st[i] |= 1;
+				inputs[i]++;
+				if (v == kOr || v == kRand || inputs[i] >= *(int*)(o.x + 0x24)) push(o.x, 1);
+				continue;
+			}
+			if ((st[i] & 1) && vt(o.x) != kStartEvent) continue;   // running already: it ends from the seed
+			bool once = (*(uint32_t*)(o.x + 0x14) & 0x84) == 0x84;   // done before, and only once: ends at once
+			st[i] |= 1;
+			if (once) {
+				push(o.x, 1);
+			} else if (v == kStartEvent) {
+				uint16_t ev = *(uint16_t*)(o.x + 0x2C);
+				if ((ev >> 3) != 0x1FFF && !(st[i] & 4)) {
+					st[i] |= 4;
+					((void(__fastcall*)(char*, void*, unsigned))0x460C20)(evs, nullptr, ev);
+					if (strlen(fired) + 6 < sizeof(fired)) sprintf(fired + strlen(fired), " %04X", ev);
+					nFired++;
+				}
+				push(o.x, 1);
+			} else if (isGroup(o.x)) {
+				push(*(char**)(o.x + 0x34), 0);   // its first inner node; it ends with its second
+			} else {
+				push(o.x, 1);
+			}
+			continue;
+		}
+		if (st[i] & 2) continue;
+		if (o.op == 2 && isDoor(o.x)) continue;   // (a door's stop does nothing)
+		if (o.op == 2) {   // stopped: no effect of its own (a group's running inner nodes end quietly)
+			st[i] |= 1;
+			if (isGroup(o.x)) {
+				for (unsigned k = 0; k < n; k++)
+					if (*(char**)(node[k] + 0x18) == o.x && (st[k] & 1)) st[k] |= 2;
+			}
+		}
+		st[i] |= 2;
+		// Its edges (a random door's own end follows none, as the game's)
+		uint32_t f = *(uint32_t*)(o.x + 0x14);
+		char* grp = *(char**)(o.x + 0x18);
+		int gi = grp ? slot(grp) : -1;
+		bool counts = v != kRand && ((f & 0x40) || (gi >= 0 && (st[gi] & 1)));
+		uint16_t s0 = *(uint16_t*)(o.x + 8), f0 = *(uint16_t*)(o.x + 0xA), cnt = *(uint16_t*)(o.x + 0xC);
+		if (trace && nOps < 400) Log("coop:   skip:   edges %04X/%04X/%u flags %08X group %p: %s", s0, f0, cnt, f, grp, counts ? "followed" : "not followed");
+		if (counts) {
+			unsigned n1 = s0 == 0xFFFF ? 0 : f0 == 0xFFFF ? cnt : (unsigned)(f0 - s0);
+			unsigned n2 = f0 == 0xFFFF ? 0 : s0 == 0xFFFF ? cnt : (unsigned)(cnt - (f0 - s0));
+			for (unsigned e = 0; e < n1 && s0 + e < ne; e++) push(edges[s0 + e], 0);
+			for (unsigned e = 0; e < n2 && f0 + e < ne; e++) push(edges[f0 + e], 2);
+		}
+		// The group it is the end of ends with it.
+		if (grp && gi >= 0 && *(char**)(grp + 0x38) == o.x && !(st[gi] & 2)) push(grp, 1);
+	}
+	static int s_told = 0;
+	if (s_told < 40) {
+		s_told++;
+		Log("coop: cutscene %p skipped: run on without time (%u nodes, %u steps)%s%s", sc, n, nOps,
+		    nFired ? " -- its later events flagged:" : " -- no later events", fired);
+	}
+}
+
+static void __fastcall SkipSceneHook(char* sc, void* edx) {
+	uintptr_t ret = (uintptr_t)_ReturnAddress();
+	// (A scene of kind 0x80 -- level 1's scene 0, behind the others -- is never skipped by Enter.)
+	uint16_t f = sc ? *(uint16_t*)(sc + 0x20) : 0;
+	if (ret != kMenuSkipReturn && (f & 1) && (f & 0x180) != 0x80 && *(int8_t*)(sc + 0x30) >= 0) {
+		__try {
+			RunOnSkippedScene(sc);
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			Log("coop: the skipped cutscene's run-on failed (exception)");
+		}
+	}
+	g_origSkipScene(sc, edx);
+}
+
 // A Roman agent's dialogue (CKHkClueMan, trio event 0x5120, parameter: +4 the
 // spot to walk to, then directions and a second point, 0x34 bytes) has the
 // trio walk the *leader* there (situation 09); the dialogue starts when the
@@ -4149,6 +4314,8 @@ void CoopInit() {
 	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");
 	InstallDetour(kFreezeWorld, (void*)FreezeWorldHook, (void**)&g_origFreeze, kFreezePrologue,
 	              sizeof(kFreezePrologue), "world pause (not for the merchant in co-op)");
+	InstallDetour(kSkipScene, (void*)SkipSceneHook, (void**)&g_origSkipScene, kSkipScenePrologue,
+	              sizeof(kSkipScenePrologue), "cutscene skip (its later events still flagged)");
 	PatchCallSite(kShopMenuInputOff, kShopMenuInputOffBytes, sizeof(kShopMenuInputOffBytes), (void*)ShopMenuInputOff,
 	              "merchant's menu input (player 1's controls on while player 2 shops)");
 	InstallDetour(kSetPreset, (void*)SetPresetHook, (void**)&g_origSetPreset, kSetPresetPrologue,

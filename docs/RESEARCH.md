@@ -2609,3 +2609,30 @@ both halves).
   0x301 needs the punch's shape on the lever. New step S_FLAGEV (an event flagged in the event service).
   Line endings: src/autotest.cpp and this file are LF (this file since b5e1b50); rounds 143-144 added CRLF lines
   to both -- converted back to LF. The other sources are CRLF.
+- Round 146 (user: a cutscene skipped with Enter / A lost what its later parts would have done -- level 1's music
+  after the intro and after finding Obelix; LV2-10's boss: Asterix not brought along). The skip (CKSrvCinematic::vf17
+  -> FUN_00461A80 on a scene with 0x1000; skip_cutscenes gives it to all) calls +0x44 on the running nodes (an empty
+  function for most blocs), clears the running list (scene +0xC) and fades out (FUN_00461B10); the scene's own end
+  event (+0x64, FUN_004609E0) still fires, nodes not reached yet never run. Cinematic graph (XXL-Editor
+  CKCinematicNode.h + the game's code): scene +4/+8 the edge list (target nodes), +0x10/+0x14 scene datas, +0x20
+  flags, +0x28 start door; node +4 next running, +8 / +0xA / +0xC first "start" edge / first "stop" edge / count,
+  +0x14 flags (1 started, 4 done, 0x40 its edges count, 0x80 once), +0x18 group, +0x1C scene; blocs +0x10 scene
+  data, +0x20/+0x24 the sekens line they wait for; doors (And 0x62495C, Or 0x6249A4, Rand 0x6249EC, StartDoor
+  0x624A34) +0x20 inputs of +0x24, done bit kept from the load (only blocs clear it), run again whenever reached.
+  vtable +0x34 start, +0x38 end (start-edge targets +0x34, stop-edge targets +0x40; FUN_00460D90 mode 1 / 2), +0x3C
+  tick, +0x40 stop (sets done, then +0x38: its edges follow; a StartEvent bloc stopped flags nothing; a door's does
+  nothing). CKStartEventCinematicBloc (0x624E70): event +0x2C flagged in its tick (FUN_00460C20) -- the level's
+  hooks into a cutscene: e.g. 0501 to a CKManageEventCinematicBloc (0x624C2C, starts its node: a music stream) and
+  0500 to a CKManagerEventStopCinematicBloc (0x624C74). Groups (0x624B54/0x624F48): +0x34 first inner node, +0x38
+  the inner node they end with. Path / camera blocs run with bit 0 up off the running list. Now FUN_00461A80 is
+  detoured (not for CKHkInterfaceMain::vf18's call, return 0x524359; not for scenes of kind 0x80): the graph is run
+  on from its started nodes without time -- doors count inputs, each node ends once, stops follow the game's rules
+  -- and every StartEvent bloc reached has its event flagged, in order (RunOnSkippedScene; XXL_SKIPLOG traces it).
+  Level 1: the intro skipped 1.5 s in flags 0020 -> music stream 10, as at its end (57 s); before, no stream. The
+  Obelix cutscene skipped flags 0050 -> stream 0 (34 s when played; the squad 4D0E too). LV2-10's boss cutscene
+  (scene 5) has no StartEvent bloc (its end event 0B50 fires either way): boss210u / boss210v (the user's spots,
+  userlogs xxl_coop.lv2-10_asterix_no_tp.log: Asterix 9 units behind when Obelix wakes the boss) bring Asterix
+  along with and without the skip on this build; the user's run (Oct 22 build, freedom on) logged the boss run but
+  no bring-along -- not reproduced. Autotest steps: S_CINEDUMP (a scene's graph and events), CINE_ENTER (skip as
+  Enter does). Autotests skip1, intro1, obelix1s, obelix1f, boss210s, boss210f, boss210u, boss210v; lvl1obelix,
+  boss210t unchanged.
