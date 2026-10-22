@@ -103,7 +103,8 @@ struct CoopState {
 
 	bool    suspended = false;
 	bool    shopping = false;            // a merchant's menu is open
-	int     shopper = -1;                // ... by this hero (the leader when it opened)
+	int     shopper = -1;                // ... by this hero (leading or not)
+	int     shopHero = -1;               // the merchant's hero from its X until it is out of situation 0A
 	bool    oneScreen = false;           // Twister Fusion: co-op on, split screen off
 	bool    held[HERO_COUNT] = {};       // a player's hero the game has borrowed (scripted AI order)
 	uint8_t lastOrder[HERO_COUNT] = {};
@@ -616,6 +617,7 @@ void ForgetP2() {
 	g.p2ValuesReady = false;
 	g.suspended = false;
 	g.shopping = false;
+	g.shopHero = -1;
 	g.shopLeadBack = false;
 	g.dying = -1;
 	g.dyingLeads = false;
@@ -834,6 +836,7 @@ int  CoopP1Hero()    { return g.p1Hero; }
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
 int  CoopShopper() { return g.p2Joined && g.shopping && !g.suspended ? g.shopper : -1; }
+int  CoopShopHero() { return g.p2Joined && !g.suspended ? g.shopHero : -1; }
 const uint8_t* CoopP2Values() { return g.p2Joined && g.p2ValuesReady ? g.p2Values : nullptr; }
 bool CoopOneScreen() { return g.oneScreen; }
 // Player 2's input for the game camera (CKSrvCamera +0x580: an input view whose
@@ -1688,6 +1691,9 @@ void CloseShopFor(const char* why) {
 		}
 		g.shopClosedHero = g.shopper;
 		g.shopClosedAt = GetTickCount();
+		// The game's camera follows the leader again (its hero's own camera handed
+		// back above): the other player's launcher takes it over for its flight.
+		g.shopHero = -1;
 		// and the leaving state's exit (state 5, FUN_004C1B90(2, x), thiscall ret 8),
 		// which the natural end goes through: the world unpaused and the game manager's
 		// "at the merchant" bit (+0x5C 0x4000000: the shop's screen, bars) cleared
@@ -2693,7 +2699,9 @@ void CoopFrame() {
 		shopping = s && (*(uint8_t*)(s + 8) & 7) != 0;
 	}
 	if (shopping && !g.shopping) {
-		g.shopper = t.Leader();
+		// (Opened by the hero not leading: known since its tick -- CoopAfterLifeTick.)
+		g.shopper = g.shopHero >= 0 ? g.shopHero : t.Leader();
+		g.shopHero = g.shopper;
 		Log("coop: %s is at the merchant -- in that player's half; the other player plays on", HeroName(g.shopper));
 	}
 	if (g.shopCloseCheck > 0 && --g.shopCloseCheck == 0) {
@@ -2713,6 +2721,7 @@ void CoopFrame() {
 	// back on the goodbye's last frames, the hero reset through the AI went back
 	// in (0x48EF) as the companion -- the visit ran again as the leader's.
 	WatchShopCamera(t);
+	if (g.shopHero >= 0 && !shopping && !ShopBusy(t)) g.shopHero = -1;   // the game's camera back to the leader's
 	if (g.shopLeadBack && !ShopBusy(t)) {
 		g.shopLeadBack = false;
 		if (!g.suspended) GiveBackLead(t);   // no suspension to resume from any more
@@ -3570,10 +3579,17 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			// the AI companion, which ended that state, and the dialogue never went
 			// on (level 3 sector 2).
 			bool startedTalk = sh && sitNow == kSituationTalk && g.sitBefore != kSituationTalk;
-			// Opening the merchant's shop (situation 0A). Left the companion, the
-			// shop's camera went to the other player's view and the leader's hero
-			// was sent to the shop as "the companion".
-			bool startedShop = sh && sitNow == kSituationShop && g.sitBefore != kSituationShop;
+			// Opening the merchant's shop (situation 0A). The lead stays: the
+			// merchant's tick runs with this hero as the leader (proximity.cpp)
+			// and the game's camera -- which the shop takes over -- is handed to
+			// it for the visit (gamecam.cpp). (It took the lead for the visit
+			// before: the shop's camera went to the leader's half otherwise.)
+			if (sh && sitNow == kSituationShop && g.sitBefore != kSituationShop && trio[0x2C] == g.slicedHero) {
+				g.shopHero = g.slicedHero;
+				Log("coop: %s opened the merchant's shop while not leading -- %s keeps the lead; the merchant and the game's camera are %s's",
+				    HeroName(g.slicedHero), HeroName(g.savedLeader), HeroName(g.slicedHero));
+				GameCamHandTo(g.slicedHero, "the merchant");
+			}
 			// Getting on a machine (X at a machinegun: trio 0x4809, mode 2) -- the
 			// trio's mode events act on the leader, and back as the companion the
 			// hero was made the AI companion of that mode, unable to shoot (level 3
@@ -3586,13 +3602,13 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 				startedMode = false;
 				Log("coop: Asterix took the machine gun while not leading -- %s keeps the lead", HeroName(g.savedLeader));
 			}
-			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && (startedGroup || startedTalk || startedShop || startedMode)) {
+			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && (startedGroup || startedTalk || startedMode)) {
 				// It started a group action (a launcher, a lifter): that sequence
 				// asks the trio for its leader all along, outside this tick too --
 				// with the other hero still leading it kept putting that one on
 				// the activator's spot. The hero that started it leads from now.
 				Log("coop: %s started %s while not leading -- it leads until it is over", HeroName(g.slicedHero),
-				    startedTalk ? "a Roman agent's dialogue" : startedShop ? "the merchant's shop" : startedMode ? "a machine (mode change)" : "a group action");
+				    startedTalk ? "a Roman agent's dialogue" : startedMode ? "a machine (mode change)" : "a group action");
 				g.groupTookLead = g.slicedHero;
 				g.groupPrevLeader = g.savedLeader;
 				// (A launcher -- trio 0x4804 from 0x49C699 in this tick; lifters send

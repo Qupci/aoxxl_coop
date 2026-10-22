@@ -67,6 +67,7 @@ const uintptr_t kLifterVtbl = 0x625E2C;          // CKHkLifter (2,47)
 // the leader goes out of that range. While no spy is spawned there is no node,
 // so its tick was never sliced: only the leader made it appear.
 const uintptr_t kClueManVtbl = 0x6261F4;
+const uintptr_t kShopVtbl = 0x6263CC;      // CKHkAsterixShop (2,172)
 // Blocks to push (CKHkPushPullAsterix, 2,147). Their tick (vf15, 0x4B5140)
 // lets go of the hero pushing them (+0x18 bit 4 cleared, vf27 0x6C) when the
 // trio's leader (trio vfA0) is a hero the block is not for (+0x14 bits 6/7).
@@ -378,6 +379,15 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	if (hook && *(uintptr_t*)hook == kBonusSpitterVtbl && SpitsPotion(hook)) {
 		nearest = HERO_ASTERIX;
 		range2 = 1e30f;
+	}
+	// The merchant at its hero's (the one at it, leading or not): its states
+	// ask the trio for the shopper (a purchase's 0x907, its camera's target).
+	if (hook && *(uintptr_t*)hook == kShopVtbl) {
+		int sh = CoopShopHero();
+		if (sh == p1 || sh == p2) {
+			nearest = sh;
+			range2 = 1e30f;
+		}
 	}
 	if (hook && *(uintptr_t*)hook == kClueManVtbl) {
 		float r = *(const float*)(hook + 0x68);

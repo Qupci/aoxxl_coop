@@ -996,7 +996,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	float m2[16];
 	bool own2 = P2CamMatrix(m2);
 	if (SplitDebug() & 2) { own2 = false; d2 = Vector3(); }   // diagnostics: player 1's camera in both halves
-	bool p2Leads = t && t.Leader() == CoopP2Hero() && g_config.gameCamera;
+	// (The game's camera's hero: the leader, or the hero not leading at the merchant.)
+	int camHero = GameCamLiveHero() >= 0 ? GameCamLiveHero() : t ? t.Leader() : -1;
+	bool p2Leads = t && camHero == CoopP2Hero() && g_config.gameCamera;
 	auto placeP2 = [&] {
 		RwCameraSetViewWindow(cam, half2);
 		planesFor(CoopP2Hero());

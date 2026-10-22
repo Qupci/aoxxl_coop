@@ -76,6 +76,9 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) {
 	g_trioEventCaller = _ReturnAddress();
 	if (CoopDeferTrioEvent(self, event)) return 0;
+	// (Again: an event sent in there -- the merchant's close, 0x5124, for a
+	// launcher's 0x4804 -- set its own.)
+	g_trioEventCaller = _ReturnAddress();
 	CoopNoteTrioEvent(self, event, param);
 	bool ride = CoopRideSliceBegin(event, _ReturnAddress());
 	bool beam = CoopBeamCatchBegin(event, _ReturnAddress());

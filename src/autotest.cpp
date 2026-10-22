@@ -2213,6 +2213,76 @@ const Step kShopLaunch4[] = {
 	END(41000),
 };
 
+// shoplaunch4b: Obelix leads (4801); player 1's Asterix (not leading) opens the
+// merchant, into the item menu; player 2's Obelix (the leader) takes the
+// launcher. After the landing both sticks move their heroes.
+const Step kShopLaunch4b[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -860.383f, 41.897f, -608.083f), PLACEAT(3000, HERO_OBELIX, -887.753f, 10.971f, -634.670f),
+	{ 3500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 4500, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5200, 0, 0, 0, "p1 release"),
+	P1(8500, PAD_X, 0, 0, "p1 X (words)"), P1(8700, 0, 0, 0, "p1 release"),
+	P1(10000, PAD_X, 0, 0, "p1 X (words)"), P1(10200, 0, 0, 0, "p1 release"),
+	P1(11500, PAD_X, 0, 0, "p1 X (words)"), P1(11700, 0, 0, 0, "p1 release"),
+	SHOT(12500, "shoplaunch4b_1"),
+	PLACEAT(13000, HERO_OBELIX, -887.753f, 10.971f, -634.670f),
+	VPAD(13500, 1, PAD_X, 0, 0, "p2 X"), VPAD(13700, 1, 0, 0, 0, "p2 release"),
+	SHOT(14000, "shoplaunch4b_2"),
+	SHOT(36000, "shoplaunch4b_3"),
+	P1(37000, 0, 0, 1.0f, "p1 stick up"), VPAD(37000, 1, 0, 0, 1.0f, "p2 stick up"),
+	P1(39000, 0, 0, 0, "p1 release"), VPAD(39000, 1, 0, 0, 0, "p2 release"),
+	SHOT(40000, "shoplaunch4b_4"),
+	END(41000),
+};
+
+// shoplaunch4c: Asterix leads; player 2's Obelix (not leading) opens the
+// merchant, into the item menu; player 1's Asterix (the leader) takes the
+// launcher.
+const Step kShopLaunch4c[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, -860.383f, 41.897f, -608.083f), PLACEAT(3000, HERO_ASTERIX, -887.753f, 10.971f, -634.670f),
+	{ 4500, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(5000, 1, PAD_X, 0, 0, "p2 X"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	VPAD(8500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(8700, 1, 0, 0, 0, "p2 release"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(10200, 1, 0, 0, 0, "p2 release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(11700, 1, 0, 0, 0, "p2 release"),
+	SHOT(12500, "shoplaunch4c_1"),
+	PLACEAT(13000, HERO_ASTERIX, -887.753f, 10.971f, -634.670f),
+	P1(13500, PAD_X, 0, 0, "p1 X"), P1(13700, 0, 0, 0, "p1 release"),
+	SHOT(14000, "shoplaunch4c_2"),
+	SHOT(36000, "shoplaunch4c_3"),
+	P1(37000, 0, 0, 1.0f, "p1 stick up"), VPAD(37000, 1, 0, 0, 1.0f, "p2 stick up"),
+	P1(39000, 0, 0, 0, "p1 release"), VPAD(39000, 1, 0, 0, 0, "p2 release"),
+	SHOT(40000, "shoplaunch4c_4"),
+	END(41000),
+};
+
+// shoplaunch4d: Obelix leads (4801) and opens the merchant (player 2), into the
+// item menu; player 1's Asterix (not leading) takes the launcher.
+const Step kShopLaunch4d[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, -860.383f, 41.897f, -608.083f), PLACEAT(3000, HERO_ASTERIX, -887.753f, 10.971f, -634.670f),
+	{ 3500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 4500, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(5000, 1, PAD_X, 0, 0, "p2 X"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	VPAD(8500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(8700, 1, 0, 0, 0, "p2 release"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(10200, 1, 0, 0, 0, "p2 release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(11700, 1, 0, 0, 0, "p2 release"),
+	SHOT(12500, "shoplaunch4d_1"),
+	PLACEAT(13000, HERO_ASTERIX, -887.753f, 10.971f, -634.670f),
+	P1(13500, PAD_X, 0, 0, "p1 X"), P1(13700, 0, 0, 0, "p1 release"),
+	SHOT(14000, "shoplaunch4d_2"),
+	SHOT(36000, "shoplaunch4d_3"),
+	P1(37000, 0, 0, 1.0f, "p1 stick up"), VPAD(37000, 1, 0, 0, 1.0f, "p2 stick up"),
+	P1(39000, 0, 0, 0, "p1 release"), VPAD(39000, 1, 0, 0, 0, "p2 release"),
+	SHOT(40000, "shoplaunch4d_4"),
+	END(41000),
+};
+
 // shopjoin (level 2): single player at the merchant, player 2 presses Start --
 // refused while the shop is open; after leaving it, Start joins.
 const Step kShopJoin[] = {
@@ -2470,6 +2540,29 @@ const Step kPf23[] = {
 	SHOT(7000, "pf23_1"), SHOT(10000, "pf23_2"),
 	PFDUMP(11000, HERO_ASTERIX, 20.0f), REACH(11200),
 	END(12000),
+};
+
+// shopa (level 2): Obelix leads (4801), player 1's Asterix (not leading) opens
+// the merchant with X, reads the words, backs out, the goodbye; then walks. The
+// lead stays Obelix's throughout; the shop's camera is in Asterix's half.
+const Step kShopA[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	SHOT(3500, "shopa_0"),
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4200, 0, 0, 0, "p1 release"),
+	SHOT(6000, "shopa_1"),
+	P1(7500, PAD_X, 0, 0, "p1 X (words)"), P1(7700, 0, 0, 0, "p1 release"),
+	SHOT(9500, "shopa_2"),
+	P1(11000, PAD_B, 0, 0, "p1 B (back)"), P1(11200, 0, 0, 0, "p1 release"),
+	P1(14000, PAD_X, 0, 0, "p1 X (words)"), P1(14200, 0, 0, 0, "p1 release"),
+	SHOT(17000, "shopa_3"),
+	SHOT(21000, "shopa_4"),
+	P1(22000, 0, 0, 1.0f, "p1 forward"), P1(23500, 0, 0, 0, "p1 stop"),
+	SHOT(24000, "shopa_5"),
+	END(25000),
 };
 
 // shopo (level 2): player 2's Obelix (not leading) opens the merchant with X.
@@ -5642,6 +5735,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("catapulta", kCatapultA),
 	SCENARIO("shop", kShop),
 	SCENARIO("shopo", kShopO),
+	SCENARIO("shopa", kShopA),
 	SCENARIO("shopox", kShopOX),
 	SCENARIO("shopsplit", kShopSplit),
 	SCENARIO("shoppause", kShopPause),
@@ -5683,6 +5777,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopsas", kShopSas),
 	SCENARIO("shopsas0", kShopSas0),
 	SCENARIO("shoplaunch4", kShopLaunch4),
+	SCENARIO("shoplaunch4b", kShopLaunch4b),
+	SCENARIO("shoplaunch4c", kShopLaunch4c),
+	SCENARIO("shoplaunch4d", kShopLaunch4d),
 	SCENARIO("shoplift", kShopLift),
 	SCENARIO("shopbossrun", kShopBossRun),
 	SCENARIO("shopboss", kShopBoss),

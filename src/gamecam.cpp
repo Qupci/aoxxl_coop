@@ -443,19 +443,26 @@ void __fastcall TickHook(char* svc, void* edx, void* frame) {
 		g_copyTrio = t.raw();
 		g_liveOwner = -1;
 	}
-	int lead = t.Leader();
-	if (g_liveOwner < 0) g_liveOwner = lead;
-	if (lead != g_liveOwner && !HandOver(svc, lead, "the leader changed")) {
-		void* target = TargetOf(lead);
+	// The game's camera is the leader's -- or, while the hero not leading is at
+	// the merchant (whose camera takes over the game's), that hero's.
+	int lead = t.Leader(), own = lead, copyHero = other;
+	int shop = CoopShopHero();
+	if (shop == other) own = other, copyHero = lead;
+	if (g_liveOwner < 0) g_liveOwner = own;
+	static bool s_shopOwned = false;   // the game's camera went to the merchant's hero
+	const char* why = own != lead ? "the merchant's hero" : s_shopOwned ? "the merchant's visit is over" : "the leader changed";
+	s_shopOwned = own != lead;
+	if (own != g_liveOwner && !HandOver(svc, own, why)) {
+		void* target = TargetOf(own);
 		if (target) g_origSetTarget(svc, nullptr, target, 0.0f, 1);
 	}
 	ShareShake(svc);
 	InputSwap s;
-	UseInputOf(lead, s);
-	ApplyFight(svc, lead);
+	UseInputOf(own, s);
+	ApplyFight(svc, own);
 	g_origTick(svc, edx, frame);
 	Unswap(s);
-	TickCopy(svc, frame, other);
+	TickCopy(svc, frame, copyHero);
 }
 
 void __fastcall SetTargetHook(char* svc, void* edx, void* target, float time, char cut) {
@@ -571,6 +578,14 @@ void GameCamAimAtHero(int hero) {
 		Log("gamecam: the game's camera (%s) aimed at its hero again (it followed %p)", HeroName(hero),
 		    *(void**)(g_svc + 0xE8));
 		g_origSetTarget(g_svc, nullptr, target, 0.0f, 1);
+	}
+}
+
+void GameCamHandTo(int hero, const char* why) {
+	if (!g_active || g_inCopy || !g_svc || g_liveOwner < 0 || hero == g_liveOwner) return;
+	if (!HandOver(g_svc, hero, why)) {
+		void* target = TargetOf(hero);
+		if (target) g_origSetTarget(g_svc, nullptr, target, 0.0f, 1);
 	}
 }
 

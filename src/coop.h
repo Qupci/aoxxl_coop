@@ -42,6 +42,9 @@ int  CoopPromptPlayer();   // the player whose hero the HUD's action prompt is f
 bool CoopSuspended();   // co-op paused for a scripted mode (ride, cinematic...)
 bool CoopOneScreen();   // co-op running, but on one screen for now (Twister Fusion)
 int  CoopShopper();      // the hero at the merchant while co-op goes on around it (-1: none)
+// The hero at the merchant from its X until it is out of the shop's situation
+// (-1: none): the merchant ticks as its and the game's camera is its.
+int  CoopShopHero();
 // Gives hero `idx` the trio's lead the game's way (switch event), as a player's
 // hero (individual heroes: a leader that went down).
 void CoopGiveLead(int idx, const char* why);

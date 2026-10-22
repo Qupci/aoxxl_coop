@@ -37,3 +37,6 @@ void GameCamDropCopy(int hero);
 // Hero `hero`'s camera (the copy or the game's) aimed at the hero again, with a
 // cut: a sequence undone (the cable car had it follow the car).
 void GameCamAimAtHero(int hero);
+// The game's camera goes to hero `hero` now (its copy and the game's change
+// places): the merchant opened by the hero not leading.
+void GameCamHandTo(int hero, const char* why);

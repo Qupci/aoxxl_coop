@@ -2557,3 +2557,20 @@ both halves).
   before Asterix, now Obelix, walked by player 1), launch53 (-Level 5 sector 3: Obelix leads, player 1's Asterix
   launches -- before Obelix after landing, now Asterix), launchp2 / launch48 (player 2's Obelix launches: he keeps
   it, the landing ground's switch hands it to Asterix), p2basic as before.
+- Round 143 (user: the hero not leading took the lead while at the merchant -- seen with Asterix; Obelix did the
+  same, the show_leader tag in his half under the shop's screen). The merchant no longer moves the lead: its X in
+  the non-leader's sliced tick (situation 0x0A) sets g.shopHero (until the shop's state is 0 and the hero is out of
+  0x0A, or a forced close). CKHkAsterixShop (vt 0x6263CC) ticks with that hero as the trio's leader (proximity.cpp;
+  its states use the game manager, yp +0x8C, whose +0x14 is the trio -- 0x5122 offer, a purchase's 0x907). The game's
+  camera, which the shop's states take over (state 1's shop track, state 5's hand-back), is that hero's for the
+  visit: gamecam's live owner is CoopShopHero() when that is the non-leader (TickHook; GameCamHandTo at the X, right
+  after the hero's tick, so a camera set up in that tick -- in its copy -- comes along). Player 2's half took the
+  game's camera only when player 2's hero led (splitscreen.cpp p2Leads): now when it is the camera's hero
+  (GameCamLiveHero) -- else it showed player 1's camera shifted (the sea, LV2-1). CloseShopFor clears shopHero: a
+  launcher's flight (shoplaunch4: Asterix leading at the merchant, Obelix launches) ran on Asterix's camera kept for
+  the shop -- both halves fog after the landing. Also: TrioSendEventHook sets g_trioEventCaller again after
+  CoopDeferTrioEvent -- the shop's close (0x5124) sent in there overwrote the launcher's 0x49C699, so round 142's
+  "launcher keeps the lead" was lost with a shop open. Autotests shopa (new: Obelix leads, Asterix shops), shopo,
+  shopsplit, shopspy, shopzone, shopboss, shoplaunch4 + new 4b (Obelix leads, Asterix shops, Obelix launches), 4c
+  (Asterix leads, Obelix shops, Asterix launches), 4d (Obelix leads and shops, Asterix launches): the lead stays,
+  the shop in the shopper's half, each half on its hero after the landing.
