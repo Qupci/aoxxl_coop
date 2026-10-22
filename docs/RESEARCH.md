@@ -2452,3 +2452,20 @@ both halves).
   with that hero as the leader whoever is nearer (BlockHero). Autotest pull28 (level 2 sector 8; the user's ini
   had freedom off, so XXL_FREEDOM=1): before, no 0901 after the pillar; now 0901 and 151 pull steps, the platform
   carries Asterix -- the same as with XXL_FREEDOM=0. pushkeg5 (-Level 5) as before.
+- Round 136 (user, LV2-8, userlogs\xxl_coop.lv2-8_rotarybeam.log: in freedom mode the rotary beam by the turnstile
+  (Asterix on the cutscene platform 41.0 58.4 -89.6, zone 02B0; Obelix at the turnstile 45.5 52.6 -66.6 hitting
+  it) did not take Asterix when he jumped; LV4-2's still did). The beam's catch is trio 0x0C02 from the beam
+  (0x53F348): FUN_00481d50 case 2 hangs the companion (trio+0x2D) on it -- AI order 8, +0x874.. its target, beam
+  0x0C04 -- only while the companion's order (+0x564) is 3 and it is within trio +0x50 of the beam; freedom's
+  WatchFreedomBeam then hands a hero that jumped within 1 s to the game for the ride. The 3 comes from the
+  platform's pillar ("Obelix leads, Asterix waits", round 135's), kept as a value while freedom leaves Asterix
+  free; any lead switch since sets the other hero's order to 0 (trio 4800/4801) -- in the user's run their
+  R3 + X, and they hit it without the cheat too (which switch then is not known). Now in freedom mode a companion
+  player's hero that jumped in the last second gets order 3 for the 0x0C02 (CoopBeamCatchBegin/End around the
+  trio's sendEvent; put back if not caught). Autotests beam28 (level 2 sector 8, the natural order: the
+  platform's pillar, Asterix onto the cutscene platform, Obelix kept at the turnstile on the ice with S_NEAROBJ
+  (2,45) hitting it, Asterix jumping: caught, before and after) and beam28b (the lead to Asterix and back after the
+  cutscene: before, 0x0C02 took nobody; now "taken as waiting", caught). Not covered: a jumper who is the leader
+  (the catch only ever takes the companion). The user's other report -- Obelix could not be teleported to the
+  turnstile after the cutscene unless leading -- did not reproduce with the autotest's placement (tele28: he
+  stays there); open, waiting for how the user teleports.

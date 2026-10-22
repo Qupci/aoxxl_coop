@@ -71,6 +71,10 @@ void CoopAfterTrioEvent(int event, int cookie);
 // (cable_car_rider_leads off): run with the rider as the leader. End with what
 // Begin returned.
 bool CoopRideSliceBegin(int event, void* caller);
+// Freedom mode: the rotary beam's catch (0x0C02) for a companion that jumped
+// for it, its wait order lost to a lead switch. End with what Begin returned.
+bool CoopBeamCatchBegin(int event, void* caller);
+void CoopBeamCatchEnd(bool began);
 void CoopRideSliceEnd(bool began);
 // Also called before CKGrpTrio::sendEvent, with the event's parameter.
 void CoopNoteTrioEvent(void* trio, int event, void* param);

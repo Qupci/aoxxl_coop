@@ -1815,6 +1815,40 @@ static void WatchTelepherRider(Trio t) {
 	GiveLead(t, who);
 }
 
+// Freedom mode, the rotary beam's catch: trio 0x0C02 from the beam (0x53F348;
+// FUN_00481d50 case 2) hangs the companion on it (AI order 8) only while its order
+// is 3, "wait here", and it is within the trio's +0x50 of the beam. The circle's
+// wait gives Asterix that 3 (LV2-8: the platform's pillar), but a lead switch since
+// sets the other hero's order to 0 (the user's R3 + X; a level's switch, a cable
+// car...) and the beam took nobody. A companion player's hero that jumped in the
+// last second counts as waiting for the catch; not caught, its order is put back.
+DWORD g_beamJumpAt[2] = {};   // a player's hero's last jump (body 0x0E), set by WatchFreedomBeam
+struct BeamCatch { int hero = -1; uint8_t order = 0; } g_beamCatch;
+
+bool CoopBeamCatchBegin(int ev, void* caller) {
+	if ((ev & 0xFFFF) != 0x0C02 || (uintptr_t)caller != 0x53F348 || !g_config.freedom || !g.p2Joined || g.suspended) return false;
+	Trio t = GetTrio();
+	if (!t) return false;
+	int c = ((uint8_t*)t.raw())[0x2D];
+	if (c != g.p1Hero && c != g.p2Hero) return false;
+	Hero h = t.GetHero(c);
+	uint8_t* order = h ? (uint8_t*)(h.raw() + 0x564) : nullptr;
+	if (!h || g.held[c] || *order == AI_WAIT || GetTickCount() - g_beamJumpAt[c] > 1000) return false;
+	g_beamCatch = { c, *order };
+	*order = AI_WAIT;
+	Log("coop: freedom: %s jumped as the rotary beam came (AI order %d) -- taken as waiting for its catch", HeroName(c),
+	    g_beamCatch.order);
+	return true;
+}
+
+void CoopBeamCatchEnd(bool began) {
+	if (!began || g_beamCatch.hero < 0) return;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(g_beamCatch.hero) : Hero();
+	if (h && h.Order() != AI_HANG_ON_BEAM) *(uint8_t*)(h.raw() + 0x564) = g_beamCatch.order;   // not caught (too far)
+	g_beamCatch = {};
+}
+
 bool CoopRideSliceBegin(int ev, void* caller) {
 	ev &= 0xFFFF;
 	if (g_rideSlice.on || g_autoRide.rider < 0 || !g.p2Joined) return false;
@@ -1859,7 +1893,7 @@ void CoopRideSliceEnd(bool began) {
 // under it cuts the delay; a jump up to 1 s before the order still counts.
 static void WatchFreedomBeam(Trio t) {
 	if (!g_config.freedom || !t || !g.p2Joined || g.suspended) return;
-	static DWORD s_jumpAt[2] = {};
+	DWORD* s_jumpAt = g_beamJumpAt;
 	const int players[2] = { g.p1Hero, g.p2Hero };
 	for (int idx : players) {
 		Hero h = t.GetHero(idx);
