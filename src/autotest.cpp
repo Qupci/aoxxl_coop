@@ -822,6 +822,57 @@ const Step kShadow29[] = {
 	END(10500),
 };
 
+// shadow29d (-Level 2, XXL_SHADOWLOG=1): the user's LV2-9 spot near the boxes
+// (1536.1 -638.3 -883.8): Asterix at 1512.3 -641.1 -847.4, player 2's Obelix 10,
+// 40, 50, 55 and 65 units away towards -902.4, then Obelix given the lead.
+const Step kShadow29D[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 9),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1512.319f, -641.06f, -847.377f), PLACEAT(3000, HERO_OBELIX, 1512.319f, -641.0f, -857.377f),
+	SECTORS(3500), SHOT(6000, "d10"),
+	PLACEAT(6500, HERO_OBELIX, 1512.319f, -639.0f, -887.377f), SHOT(9000, "d40"),
+	PLACEAT(9500, HERO_OBELIX, 1512.319f, -638.5f, -897.377f), SHOT(12000, "d50"),
+	PLACEAT(12500, HERO_OBELIX, 1512.319f, -637.86f, -902.377f), SHOT(15000, "d55"),
+	PLACEAT(15500, HERO_ASTERIX, 1512.319f, -641.06f, -837.377f), SHOT(18000, "d65"),
+	{ 18500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" }, SHOT(21000, "d65o"),
+	PLACEAT(21500, HERO_ASTERIX, 1512.319f, -641.06f, -847.377f), SHOT(24000, "d55o"),
+	END(24500),
+};
+
+// crates29 (-Level 2): the boxes at 1536.1 -638.3 -883.8 seen by player 2's Obelix
+// (1512.3 -637.9 -902.4, camera turned to them) with Asterix 10, 55 and 65 units
+// away, then 65 with Obelix leading; live crate objects near the boxes logged.
+#define CRATES29(t, n) { t, S_P2LOOK, 0, 0, 0, 1536.139f, -638.294f, "p2 camera at the boxes", -883.842f }, \
+	{ t + 2500, S_CRATE, 0, -2, 0, 1536.139f, -638.294f, n, -883.842f }, SHOT(t + 2500, n)
+const Step kCrates29[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 9),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 1512.319f, -637.86f, -902.377f), PLACEAT(3000, HERO_ASTERIX, 1512.319f, -640.0f, -892.377f),
+	SECTORS(3500), CRATES29(4000, "c10"),
+	PLACEAT(7000, HERO_ASTERIX, 1512.319f, -641.06f, -847.377f), CRATES29(7500, "c55"),
+	PLACEAT(10500, HERO_ASTERIX, 1512.319f, -641.06f, -837.377f), CRATES29(11000, "c65"),
+	PLACEAT(14000, HERO_ASTERIX, 1512.319f, -640.0f, -892.377f), CRATES29(14500, "c10b"),
+	PLACEAT(17500, HERO_ASTERIX, 1512.319f, -641.06f, -837.377f),
+	{ 17600, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" }, CRATES29(18000, "c65o"),
+	END(21000),
+};
+
+// crates44 (-Level 4): sector 4, a wall between the heroes: Asterix at -709.3 6.0
+// -232.7, player 2's Obelix beside him, then at -712.1 12.0 -142.4 (90 units),
+// then Obelix leading; live crates within 30 units of each spot logged.
+#define CRATES44(t, n) { t, S_CRATE, 0, -2, 0, -709.263f, 5.95f, n " (asterix's spot)", -232.708f }, \
+	{ t, S_CRATE, 0, -2, 0, -712.051f, 11.99f, n " (obelix's spot)", -142.356f }, SHOT(t, n)
+const Step kCrates44[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -709.263f, 5.95f, -232.708f), PLACEAT(3000, HERO_OBELIX, -706.263f, 5.95f, -232.708f),
+	SECTORS(3500), CRATES44(6000, "w0"),
+	PLACEAT(6500, HERO_OBELIX, -712.051f, 11.99f, -142.356f), SECTORS(7000), CRATES44(9500, "w90"), CRATES44(12500, "w90b"),
+	{ 13000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" }, CRATES44(16000, "w90o"),
+	PLACEAT(16500, HERO_OBELIX, -706.263f, 5.95f, -232.708f), CRATES44(19500, "w0o"),
+	END(20000),
+};
+
 // anim2: player 1 taps forward with player 2 in (split screen); XXL_ANIMLOG logs
 // Asterix's animation blends per walk, XXL_ANIMFIX=0 the game's own.
 const Step kAnim2[] = {
@@ -4660,6 +4711,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("shadow33", kShadow33),
 	SCENARIO("shadow3s", kShadow3S),
 	SCENARIO("shadow29", kShadow29),
+	SCENARIO("shadow29d", kShadow29D),
+	SCENARIO("crates29", kCrates29),
+	SCENARIO("crates44", kCrates44),
 	SCENARIO("anim2", kAnim2),
 	SCENARIO("lbsp", kLbSp),
 	SCENARIO("rbp2", kRbP2),
@@ -6535,6 +6589,23 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_CRATE: {
+		if (s.b == -2) {   // live crate objects (a beacon at +0x58) within 30 units of (x, y, z), and the free ones
+			unsigned n = GetNumLvlClassInstances(2, 112), live = 0, nearby = 0, intact = 0;
+			for (unsigned i = 0; i < n; i++) {
+				char* c = (char*)GetLvlObject(2, 112, i);
+				if (!c || *(int*)(c + 0x58) == -1) continue;
+				live++;
+				char* node = *(char**)(c + 0x10);
+				char* frame = node ? *(char**)(node + 4) : nullptr;
+				if (!frame) continue;
+				Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2]);
+				if ((p - Vector3(s.x, s.y, s.z)).len2() > 30.0f * 30.0f) continue;
+				nearby++;
+				if (*(uint32_t*)(c + 8) & 7) intact++;
+			}
+			Log("autotest: %s: %u crate objects, %u live, %u of them within 30 units (%u intact)", s.name, n, live, nearby, intact);
+			break;
+		}
 		if (s.b < 0) {
 			if (at.watchCrate)
 				Log("autotest: crate %p has %u pieces left", at.watchCrate, *(uint32_t*)(at.watchCrate + 8) & 7);

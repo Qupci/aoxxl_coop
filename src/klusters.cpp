@@ -15,7 +15,8 @@
 // union test -- a kluster counts if it is in either player's frustum -- and the
 // distance to the nearer of the two cameras as its sort key. Player 2's planes
 // come from the game's own builder (FUN_00457170) run on a stand-in camera
-// service whose frame is player 2's camera.
+// service whose frame is player 2's camera and whose view window is its half's;
+// the game camera gets a second frustum with the window of the half showing it.
 
 #include "klusters.h"
 #include "coop.h"
@@ -48,8 +49,8 @@ typedef void(__fastcall* BuildPlanesFn)(void* svc, void* edx);
 
 QueryFn g_origQuery = nullptr;
 
-// Stand-in camera service for FUN_00457170: +0x18 the real one's view object
-// (near/far planes, view window), +0x1C -> object whose +4 is the frame, planes
+// Stand-in camera service for FUN_00457170: +0x18 a view object (near/far planes,
+// view window: the half's), +0x1C -> object whose +4 is the frame, planes
 // written at +0x4F0..+0x54C.
 struct FakeFrameOwner { void* vtbl; char* frame; };
 // Up to two extra views: player 2's camera, and player 1's own camera while the
@@ -62,6 +63,16 @@ FakeFrameOwner g_fakeOwner[kViews] = { { nullptr, g_fakeFrame[0] }, { nullptr, g
 bool  g_viewOn[kViews] = {};
 float g_viewPos[kViews][3];
 bool  g_p2Planes = false;
+// The game camera again, with the view window of the half that shows it. A half
+// is narrower than the screen but, with split_fov, taller: the camera service's
+// full-screen frustum (+0x500) left out the top and bottom of each half, and
+// crates and Romans there came in only when the camera turned to them.
+alignas(16) char g_gameHalfSvc[0x800];
+bool  g_gameHalfOn = false;
+// Stand-in view objects (svc +0x18) for the builder: +0x10 -> a copy of the main
+// camera (view window +0x68/+0x6C, near / far +0x80/+0x84) with a half's window.
+alignas(16) char g_fakeCam[kViews + 1][0x90];
+char* g_fakeRend[kViews + 1][5];
 volatile long g_queries = 0, g_p2Only = 0;
 
 bool InFrustum(const char* planes, const float* c, float r) {
@@ -141,6 +152,14 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 				key = (uint32_t)(-(int)(d * scale) - 1);
 			}
 			bool in1 = InFrustum(svc + 0x500, c, r);
+			if (!in1 && g_gameHalfOn && InFrustum(g_gameHalfSvc + 0x500, c, r)) {
+				in1 = true;
+				static long halfOnly = 0;
+				long n = InterlockedIncrement(&halfOnly);
+				if (n <= 8 || n % 1000 == 0)
+					Log("klusters: handler %d (flags %u): kluster (%.0f %.0f %.0f r%.0f) in the game camera's half only, not its full-screen frustum (%ld)",
+					    handler & 0xFF, flags, c[0], c[1], c[2], r, n);
+			}
 			bool inV[kViews] = {};
 			bool in = in1;
 			for (int v = 0; v < kViews; v++)
@@ -236,24 +255,49 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 
 void KlusterSetP2Camera() {
 	g_p2Planes = false;
+	g_gameHalfOn = false;
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
-	if (!svc || !*(void**)(svc + 0x18)) return;
+	char* rend = svc ? *(char**)(svc + 0x18) : nullptr;
+	if (!rend) return;
+	char* cam = *(char**)(rend + 0x10);
+	// The view object to build view i's planes with: player `player`'s half window.
+	auto halfView = [&](int i, int player) -> void* {
+		float w[2];
+		if (!cam || !SplitHalfWindow(player, w)) return nullptr;
+		memcpy(g_fakeCam[i], cam, sizeof(g_fakeCam[i]));
+		*(float*)(g_fakeCam[i] + 0x68) = w[0];
+		*(float*)(g_fakeCam[i] + 0x6C) = w[1];
+		g_fakeRend[i][4] = g_fakeCam[i];
+		return g_fakeRend[i];
+	};
 	for (int v = 0; v < kViews; v++) {
 		float m[16];
 		g_viewOn[v] = v == 0 ? P2CamMatrix(m) : P1CamMatrix(m);
 		if (!g_viewOn[v]) continue;
+		void* view = halfView(v, v == 0 ? 1 : 0);
 		memcpy(g_fakeFrame[v] + 0x10, m, sizeof(m));
-		*(void**)(g_fakeSvc[v] + 0x18) = *(void**)(svc + 0x18);
+		*(void**)(g_fakeSvc[v] + 0x18) = view ? view : rend;
 		*(void**)(g_fakeSvc[v] + 0x1C) = &g_fakeOwner[v];
 		((BuildPlanesFn)kBuildPlanes)(g_fakeSvc[v], nullptr);
 		g_viewPos[v][0] = m[12]; g_viewPos[v][1] = m[13]; g_viewPos[v][2] = m[14];
 	}
-	g_p2Planes = g_viewOn[0] || g_viewOn[1];
+	// The half showing the game camera: player 1's unless it has its own camera,
+	// else player 2's when its hero leads and it has none.
+	int gameHalf = !g_viewOn[1] ? 0 : !g_viewOn[0] ? 1 : -1;
+	void* view = gameHalf >= 0 ? halfView(kViews, gameHalf) : nullptr;
+	if (view && *(void**)(svc + 0x1C)) {
+		*(void**)(g_gameHalfSvc + 0x18) = view;
+		*(void**)(g_gameHalfSvc + 0x1C) = *(void**)(svc + 0x1C);
+		((BuildPlanesFn)kBuildPlanes)(g_gameHalfSvc, nullptr);
+		g_gameHalfOn = true;
+	}
+	g_p2Planes = g_viewOn[0] || g_viewOn[1] || g_gameHalfOn;
 }
 
 bool KlusterSphereInOtherViews(const float* c, float r) {
 	if (!g_p2Planes || !SplitActive()) return false;
+	if (g_gameHalfOn && InFrustum(g_gameHalfSvc + 0x500, c, r)) return true;
 	for (int v = 0; v < kViews; v++)
 		if (g_viewOn[v] && InFrustum(g_fakeSvc[v] + 0x500, c, r)) return true;
 	return false;
@@ -270,6 +314,7 @@ bool KlusterSphereInAnyView(const float* c, float r, float maxDist) {
 	};
 	if (svc && closeTo((const float*)(svc + 0x5B0)) && InFrustum(svc + 0x500, c, r)) return true;
 	if (!g_p2Planes || !SplitActive()) return false;
+	if (svc && g_gameHalfOn && closeTo((const float*)(svc + 0x5B0)) && InFrustum(g_gameHalfSvc + 0x500, c, r)) return true;
 	for (int v = 0; v < kViews; v++)
 		if (g_viewOn[v] && closeTo(g_viewPos[v]) && InFrustum(g_fakeSvc[v] + 0x500, c, r)) return true;
 	return false;

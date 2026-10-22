@@ -5,8 +5,9 @@
 
 bool KlusterInstallHooks();
 void KlusterSetP2Camera();   // once per frame, after player 2's camera moved
-// Is the sphere in a view the game camera does not cover (player 2's, or player
-// 1's own while player 2's hero leads)? Same test as the camera service's planes.
+// Is the sphere in a view the game camera's planes do not cover (player 2's,
+// player 1's own while player 2's hero leads, or the top and bottom of the half
+// showing the game camera)? Same test as the camera service's planes.
 bool KlusterSphereInOtherViews(const float* c, float r);
 // In any player's view (the game camera's too) within maxDist of that camera?
 bool KlusterSphereInAnyView(const float* c, float r, float maxDist);

@@ -2394,3 +2394,30 @@ both halves).
   of a 5x7 block font, black box behind), with the viewport (47 / 48) set to the whole screen and put back: no
   render state touched. Screen size from the renderer's camera raster (+0x10 camera, frameBuffer +0x0C / +0x10).
   Autotests carleadu33 / carlead33 with XXL_SHOWLEADER=1 (tag in P2's half while Obelix leads, P1's after zone 0830).
+- Round 133 (user: LV2-9, heroes 50+ units apart -> the non-leader's shadow goes, ~60 apart both; a lead switch
+  brings it back; boxes maybe different; boxes / enemies popping in at the corner of a half). (1) Shadows:
+  CKSrvShadow (vt 0x62520C) lists: +0x30/+0x34 shadows with a mesh slot ({next, shadow, ...}, shadow +8 def, +0xC
+  node), +0x40/+0x44 waiting ({next, def, node, ...}), +0x2C free slots, +0x3C free list nodes, +0xC most drawn
+  (30). Tick vf17 0x470A70: waiting shadows get a slot (FUN_00471050 -> shadow vf2 0x46F890: colour = def +0x1C,
+  full) when their node is stamped this frame (+0x14 == 0x6464C4) and within def +0x14 of camera svc +0x5BC (look
+  point); then each slotted shadow's update (vf3 = 0x46F980) returns 0 drawn, 1 dropped -> slot back, shadow
+  waits (FUN_00471160), 2 removed. Update drops on node not stamped or distance to svc +0x5B0 >= def +0x14; fade
+  from def +0x18. Heroes: range 50, full 40. In split the game's tick (leader's camera) dropped the other hero's
+  shadow at 50 and the halves' passes (round 2 of the shadow fix: tick per half with svc +0x5B0 = the half's eye)
+  dropped the leader's too in the far half, re-admitted next tick -> at 65 neither had a shadow. Now the game's
+  tick measures each shadow from the nearer half's camera (last pass's eyes, same frame id), a half's pass turns
+  result 1 into 3 (vf17 ignores it: not drawn, slot kept), and the passes set svc +0x5BC to the half's eye so a
+  waiting shadow gets its slot in the half whose camera is near. Autotest shadow29d (-Level 2, XXL_SHADOWLOG=1: per
+  walk result changes and list state; =2 also every shadow's node): before, Obelix waiting from 50 apart, both from
+  65 with Obelix leading; now both slotted at 50/55/65 either way. LV2-9's boxes have no shadows (only heroes,
+  Idefix, Romans). (2) Boxes: no difference with distance found (crates29: 16 live crate objects near the boxes at
+  10/55/65 apart, either leader; CKCrateCpnt has no camera-distance test). But the kluster frustums (crates,
+  helmets, squad keep / marker spawn tests) were built with the full-screen view window (renderer svc +0x18 -> +0x10
+  RwCamera +0x68/+0x6C window, +0x80/+0x84 near/far, read by FUN_00457170), while with split_fov = 20 a half is
+  0.686 x 0.773 against 0.934 x 0.525: each half shows ~47% more vertically -> crates / Romans in the top or bottom
+  band of a half weren't live / kept. Now P2's and P1's own views are built with their half's window (stand-in view
+  object with a copy of the camera), and the game camera gets a second frustum with the window of the half showing
+  it (g_gameHalfSvc; in the union, KlusterSphereInOtherViews / InAnyView). Autotest crates44 (-Level 4, sector 4,
+  user's spots -709.3 6.0 -232.7 / -712.1 12.0 -142.4): "half only" log -- crate klusters (handler 3, flags 7) at
+  (-712 14 -137/-141) and helmets (handler 12) in P1's half but outside the old frustum. Not seen on screen in the
+  autotest; the user's pad test decides.

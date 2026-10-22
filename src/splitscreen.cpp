@@ -363,6 +363,17 @@ void __fastcall SkyWalkHook(char* self, void* edx, void** lists, void* dt) {
 // nudge straight up instead showed the shadow above the feet. In split screen the
 // tick runs again before each half is drawn, with that half's camera position
 // and no frame time (fades and smoothing advance once, in the game's own tick).
+//
+// A shadow has a slot in the mesh only while it is within its range (+8 -> +0x14,
+// 50 units for the heroes) of the camera: out of range, the tick takes the slot
+// back and the shadow waits in a list until it is in range of the camera's look
+// point (+0x5BC) again. With the leader's camera alone deciding that, the other
+// hero's shadow went for good once the heroes were 50 units apart (LV2-9), and
+// the half passes took away slots the other half needed: past ~60 units neither
+// hero had a shadow. Now a slot is kept while either half's camera is in range:
+// the game's tick measures each shadow from the nearer one, a half's pass only
+// leaves out of its mesh what its camera is too far from, and a waiting shadow
+// gets its slot back in the pass of the half whose camera is near it.
 const uintptr_t kShadowSrvVtbl = 0x62520C;
 typedef void(__fastcall* ShadowTickFn)(char* self, void* edx, void* time);
 const ShadowTickFn ShadowTick = (ShadowTickFn)0x470A70;
@@ -370,6 +381,10 @@ const uintptr_t kShadowUpdate = 0x46F980;
 const size_t    kShadowUpdateSlot = 26;   // of 0x62520C (the shadows' own vtable is 0x625268, slot 3)
 typedef int(__fastcall* ShadowUpdateFn)(char* self, void* edx, void* a, void* b, void* c, void* d);
 ShadowUpdateFn g_origShadowUpdate = nullptr;
+bool     g_shadowPass = false;    // a half's own shadow tick is running
+float    g_shadowEye[2][3];       // each half's camera position in its last pass
+uint16_t g_shadowEyeFrame[2];     // the frame id of that pass
+bool     g_shadowEyeSet[2] = {};
 
 int ShadowMode() {   // XXL_SHADOWFIX (diagnostics): 0 the game's own shadows, 1 (default) each half's
 	static const int mode = getenv("XXL_SHADOWFIX") ? getenv("XXL_SHADOWFIX")[0] - '0' : 1;
@@ -391,31 +406,143 @@ char* ShadowService() {
 	return cached;
 }
 
-// Rebuilds the shadow mesh for a camera at `eye` (before a half is drawn).
+// Where a node's shadow is in the service's lists (diagnostics): 'A' has a slot
+// (+0x30 / +0x34: {next, shadow, ...}, shadow +0xC = node), 'P' waits for one
+// (+0x40 / +0x44: {next, def, node, ...}), '-' neither.
+char ShadowListState(char* srv, char* node) {
+	for (int off = 0x30; off <= 0x34; off += 4)
+		for (char** e = *(char***)(srv + off); e; e = (char**)e[0])
+			if (*(char**)(e[1] + 0xC) == node) return 'A';
+	for (int off = 0x40; off <= 0x44; off += 4)
+		for (char** e = *(char***)(srv + off); e; e = (char**)e[0])
+			if (e[2] == node) return 'P';
+	return '-';
+}
+
+void LogShadowLists(char* srv, const char* when) {
+	static const bool log = getenv("XXL_SHADOWLOG") != nullptr;
+	static char last[3][8] = {};
+	static unsigned changes = 0;
+	Trio t = GetTrio();
+	if (!log || !t || changes >= 300) return;
+	char now[8] = {};
+	for (int i = 0; i < 2; i++) {
+		Hero h = t.GetHero(i);
+		now[i] = h ? ShadowListState(srv, (char*)h.hook->node) : '?';
+	}
+	int w = g_walkPlayer % 3;
+	if (!strcmp(now, last[w])) return;
+	strcpy(last[w], now);
+	changes++;
+	int slots = 0, waiting = 0;
+	for (int off = 0x30; off <= 0x34; off += 4)
+		for (char** e = *(char***)(srv + off); e; e = (char**)e[0]) slots++;
+	for (int off = 0x40; off <= 0x44; off += 4)
+		for (char** e = *(char***)(srv + off); e; e = (char**)e[0]) waiting++;
+	Log("split: shadow lists %s walk %d: Asterix %c, Obelix %c (A has a slot, P waits); %d with a slot, %d waiting, %u drawn at most",
+	    when, w, now[0], now[1], slots, waiting, *(unsigned*)(srv + 0xC));
+	static unsigned dumps = 0;
+	if (getenv("XXL_SHADOWLOG")[0] != '2' || dumps++ >= 20) return;
+	for (int off = 0x30; off <= 0x44; off += 4) {   // XXL_SHADOWLOG=2: every shadow's node and range
+		if (off == 0x38 || off == 0x3C) continue;
+		for (char** e = *(char***)(srv + off); e; e = (char**)e[0]) {
+			char* node = off < 0x40 ? *(char**)(e[1] + 0xC) : e[2];
+			const char* def = off < 0x40 ? *(const char**)(e[1] + 8) : e[1];
+			const float* p = (const float*)(*(char**)(node + 4) + 0x80);
+			Log("split:   %s node %p (vt %p) at (%.1f %.1f %.1f), range %.0f", off < 0x40 ? "slot" : "wait", node, *(void**)node,
+			    p[0], p[1], p[2], *(const float*)(def + 0x14));
+		}
+	}
+}
+
+// Rebuilds the shadow mesh for a camera at `eye` (before a half is drawn). The
+// look point (+0x5BC), which a waiting shadow must be in range of to get a slot,
+// is the same camera position: the pass of the half whose camera is near gives it.
 void ShadowsFor(const float eye[3], void* dt) {
 	if (ShadowMode() == 0 || !dt) return;
 	char* srv = ShadowService();
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
 	if (!srv || !svc) return;
+	LogShadowLists(srv, "before");
+	int k = g_walkPlayer == 2 ? 1 : 0;
+	memcpy(g_shadowEye[k], eye, sizeof(g_shadowEye[k]));
+	g_shadowEyeFrame[k] = *(uint16_t*)kFrameId;
+	g_shadowEyeSet[k] = true;
 	float* cam = (float*)(svc + 0x5B0);
-	float saved[3] = { cam[0], cam[1], cam[2] };
-	cam[0] = eye[0]; cam[1] = eye[1]; cam[2] = eye[2];
+	float saved[6];
+	memcpy(saved, cam, sizeof(saved));
+	cam[0] = cam[3] = eye[0]; cam[1] = cam[4] = eye[1]; cam[2] = cam[5] = eye[2];
 	uint8_t time[0x40];
 	memcpy(time, dt, sizeof(time));
 	*(float*)(time + 0xC) = 0.0f;
+	g_shadowPass = true;
 	ShadowTick(srv, nullptr, time);
-	cam[0] = saved[0]; cam[1] = saved[1]; cam[2] = saved[2];
+	g_shadowPass = false;
+	memcpy(cam, saved, sizeof(saved));
 }
 
-// Diagnostics (XXL_SHADOWLOG): the heroes' shadow offsets from their ground points.
+// The camera a shadow is measured from in the game's own tick while the split
+// screen is up: the nearer of the two halves' cameras, or null (the game camera).
+const float* ShadowEyeFor(char* shadow) {
+	uint16_t frame = *(uint16_t*)kFrameId;
+	const float* p = (const float*)(*(char**)(*(char**)(shadow + 0xC) + 4) + 0x80);
+	const float* best = nullptr;
+	float bestD = 0.0f;
+	for (int k = 0; k < 2; k++) {
+		if (!g_shadowEyeSet[k] || g_shadowEyeFrame[k] != frame) continue;
+		float dx = p[0] - g_shadowEye[k][0], dy = p[1] - g_shadowEye[k][1], dz = p[2] - g_shadowEye[k][2];
+		float dd = dx * dx + dy * dy + dz * dz;
+		if (!best || dd < bestD) { best = g_shadowEye[k]; bestD = dd; }
+	}
+	return best;
+}
+
+// The game's tick keeps a shadow's slot while either half's camera is in range; a
+// half's pass leaves a shadow out of range of its camera out of its mesh only
+// (result 3: neither drawn nor sent to wait, see CKSrvShadow::vf17 0x470A70).
+// Diagnostics (XXL_SHADOWLOG): the heroes' shadow offsets from their ground points,
+// and each update's result (0 drawn, 1 dropped) when it changes, per walk (0 = the
+// game's own tick), with the distance to the camera it used and the shadow's range.
 int __fastcall ShadowUpdateHook(char* self, void* edx, void* a, void* b, void* c, void* d) {
-	int r = g_origShadowUpdate(self, edx, a, b, c, d);
+	CKYellowPages* yp = YellowPages();
+	float* cam = yp && *(char**)((char*)yp + 0x68) ? (float*)(*(char**)((char*)yp + 0x68) + 0x5B0) : nullptr;
+	const float* eye = !g_shadowPass && cam && ShadowMode() != 0 ? ShadowEyeFor(self) : nullptr;
+	float used[3] = {};
+	if (cam) memcpy(used, eye ? eye : cam, sizeof(used));
+	int r;
+	if (eye) {
+		float saved[3] = { cam[0], cam[1], cam[2] };
+		memcpy(cam, eye, sizeof(saved));
+		r = g_origShadowUpdate(self, edx, a, b, c, d);
+		memcpy(cam, saved, sizeof(saved));
+	} else {
+		r = g_origShadowUpdate(self, edx, a, b, c, d);
+		if (g_shadowPass && r == 1) r = 3;
+	}
 	static const bool log = getenv("XXL_SHADOWLOG") != nullptr;
 	if (!log) return r;
 	static unsigned n[2][3] = {};
+	static int lastR[2][3] = { { -1, -1, -1 }, { -1, -1, -1 } };
+	static unsigned changes = 0;
 	Trio t = GetTrio();
 	char* node = *(char**)(self + 0xC);
+	for (int i = 0; t && i < 2; i++) {
+		Hero h = t.GetHero(i);
+		int w = g_walkPlayer % 3;
+		if (!h || (char*)h.hook->node != node || lastR[i][w] == r || changes >= 300) continue;
+		lastR[i][w] = r;
+		changes++;
+		const float* p = (const float*)(*(char**)(node + 4) + 0x80);
+		const char* def = *(const char**)(self + 8);
+		float dx = p[0] - used[0], dy = p[1] - used[1], dz = p[2] - used[2];
+		Hero other = t.GetHero(1 - i);
+		Vector3 to = other ? other.Pos() - h.Pos() : Vector3();
+		Log("split: %s's shadow (%s, walk %d) -> %d: %.1f from the camera, range %.1f (full %.1f); stamp %u/%u; heroes %.1f apart",
+		    HeroName(i), t.Leader() == i ? "leader" : "not leading", w, r, sqrtf(dx * dx + dy * dy + dz * dz),
+		    *(const float*)(def + 0x14), *(const float*)(def + 0x18), *(uint16_t*)(node + 0x14),
+		    *(uint16_t*)kFrameId, sqrtf(to.x * to.x + to.z * to.z));
+	}
 	for (int i = 0; t && i < 2 && r == 0; i++) {
 		Hero h = t.GetHero(i);
 		if (!h || (char*)h.hook->node != node || (n[i][g_walkPlayer % 3]++ % 60) != 0) continue;
@@ -691,6 +818,8 @@ void LogFrustum(const char* tag, RwCamera* cam) {
 }
 bool          g_splitActive = false;
 bool          g_loggedLayout = false;
+float         g_halfWindow[2][2];      // each player's half: the view window it was drawn with
+bool          g_halfWindowSet = false;
 
 // The render of one frame with two 3D passes. Mirrors FUN_00413EC0 step for step.
 int SplitDebug() {
@@ -832,6 +961,9 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	halfWindow(p1cam.window, half);
 	if (P1CamWindow(win)) halfWindow(win, half1); else { half1[0] = half[0]; half1[1] = half[1]; }
 	if (P2CamWindow(win)) halfWindow(win, half2); else { half2[0] = half[0]; half2[1] = half[1]; }
+	memcpy(g_halfWindow[0], half1, sizeof(half1));
+	memcpy(g_halfWindow[1], half2, sizeof(half2));
+	g_halfWindowSet = true;
 	if (!g_loggedLayout) {
 		g_loggedLayout = true;
 		char* frame = *(char**)((char*)cam + 4);
@@ -1197,6 +1329,13 @@ void __fastcall PresentHook(char* renderer, void* edx) {
 
 bool SplitActive() { return g_splitActive; }
 long SplitFrames() { return g_splitFrames; }
+
+bool SplitHalfWindow(int player, float out[2]) {
+	if (!g_splitActive || !g_halfWindowSet || player < 0 || player > 1) return false;
+	out[0] = g_halfWindow[player][0];
+	out[1] = g_halfWindow[player][1];
+	return true;
+}
 
 bool SplitInstallHooks() {
 	bool ok = PatchVtableSlot(kGraphicVtbl, kGraphicTickSlot, kGraphicTick,

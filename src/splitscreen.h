@@ -20,3 +20,7 @@ bool SplitInstallHooks();
 // For the watchdog / autotest.
 bool SplitActive();
 long SplitFrames();
+
+// The view window a player's half was last drawn with (player 0 = player 1's
+// half), false while the split screen is down.
+bool SplitHalfWindow(int player, float out[2]);
