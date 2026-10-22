@@ -2346,3 +2346,27 @@ both halves).
   Round 129 also fixes LV2-1's rope car (unlockcar21: no lead back on Oct 21, 4800 after R3 + B now). Circles
   (LV2-1 corkscrew, unlockpillar / unlockseq) were already right: their 4801 comes from an event group, so the
   lock's picture is taken before it (g_prePic). pillar36l sends 4801 / 4802 directly, so it does not show that.
+- Round 130 (user: a hero boarding a cable car while not leading -- the camera bug was that; make both cars work
+  for a non-leader rider, and put the lead switch on boarding behind an option, default off). New [coop]
+  cable_car_rider_leads (default off, env XXL_RIDERLEADS): on = round 109's WatchTelepherRider (the automatic car's
+  rider takes the lead). Rope cable car (CKHkTowedTelepher): its boarding (the rider's own tick, 0x49ACB9 4801)
+  already hands the lead to the puller in single player, so there is no lead to force; boarded by the hero not
+  leading, the 4801 runs inside that hero's tick with its game camera copy swapped in (GameCamBeginHeroTick), and
+  the trio's switch follow-up (CKSrvCamera::SetTarget from kSwitchFollowup) aimed that copy at Obelix: P1's camera
+  followed Obelix once the car's end freed Asterix (zone 0830 in LV3-3, 48B7 in LV2-4). SetTargetHook now drops a
+  switch follow-up aimed at another hero while a copy is in. R3 + B after such a boarding gives back the real
+  leader (g.savedLeader during the slice), not the rider posing as leader. Automatic car (CKHkTelepher, vf15
+  0x5485F0): +0x84 is its own ground; it checks the leader's ground (trio vf29 = leader +0x280; event 0xB00) each
+  tick and drops the rider otherwise -- proximity's tick slice keeps it going. Trio 0x0C09 (FUN_00481d50 case 9):
+  a leader in situation 2 gets +0x3F0 |= 0x200 and its jump target (+0x568, +0x574); anyone else's becomes 0x4805
+  (the companion's AI order 2: freedom left the rider on the car). Now with the option off a non-leader rider is
+  noted (g_autoRide, from 0x0C0D 0x548757 via WatchTelepherRider; over when its situation leaves 2) and the car's
+  0x0C09 (from 0x549BA5) and game companion orders (0x4813..0x4876, 0x48BB..0x48EC: LV3-6's 481C from zone 03C8)
+  run with trio +0x2C/+0x2D set to the rider / the other (CoopRideSliceBegin/End around the trio's sendEvent).
+  Helmets: the bonus pools' leader check uses trio vf27 = the leader's node position (+0x80 of its frame); the
+  non-leader's check used the hero's own +0x6C, which stays at the boarding spot during a ride -- now the node
+  (CollectPos). Autotests: carlead33 (-Level 3: Obelix leads, Asterix boards the rope car, pulled through zone
+  0830 -- P1's view on Asterix after; before, on Obelix), carleadu33 (R3 + B leaves Obelix leading), carunlock33 as
+  round 129; pillar36 (-Level 3): Asterix rides while Obelix leads, 481C to Obelix, the end's 0C09 makes Asterix jump
+  off to (-159.7 0.8 -133.6), 9 helmets his; XXL_RIDERLEADS=1 as round 109; XXL_FREEDOM=0: Obelix handed to the
+  game for 481C as with Asterix leading; boss210t as before.

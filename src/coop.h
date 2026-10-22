@@ -67,6 +67,11 @@ void CoopAfterLifeTick(int heroIndex, Hero hero);
 // Called around CKGrpTrio::sendEvent. `before` returns a cookie for `after`.
 int  CoopBeforeTrioEvent(int event, void* caller);
 void CoopAfterTrioEvent(int event, int cookie);
+// A trio event of the automatic cable car's ride whose rider is not leading
+// (cable_car_rider_leads off): run with the rider as the leader. End with what
+// Begin returned.
+bool CoopRideSliceBegin(int event, void* caller);
+void CoopRideSliceEnd(bool began);
 // Also called before CKGrpTrio::sendEvent, with the event's parameter.
 void CoopNoteTrioEvent(void* trio, int event, void* param);
 // A trio event to hold back for now (sent again later by the mod).

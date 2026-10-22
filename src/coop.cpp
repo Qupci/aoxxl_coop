@@ -1770,12 +1770,82 @@ static void WatchPendingLead(Trio t) {
 // AI order not followed, the helmets not his. The rider takes the lead the next
 // frame -- before the walk order (0.3 s later), as in a ride boarded leading.
 int g_telepherRider = -1;
+
+// With cable_car_rider_leads off the lead stays where it was; the ride's own
+// events then treat the rider as the leader they expect (CoopRideSliceBegin):
+// the car's 0x0C09 at its end (from 0x549BA5: the leader on the car's ground --
+// situation 2 -- jumps off, +0x3F0 |= 0x200 and its target; anyone else's turns
+// into 0x4805, the companion's AI order 2: the rider stayed on the car) and the
+// level's orders for the companion (0x481C at the boarding: the one not riding
+// walks to the end). The car itself only checks that the leader stands on its
+// ground (+0x84 vs trio vf29, the leader's +0x280), and proximity ticks it with
+// the nearest player's hero posing as the leader.
+struct AutoRide { int rider = -1; char* car = nullptr; } g_autoRide;
+struct RideSlice { bool on = false; uint8_t leader = 0, companion = 0, rider = 0, other = 0; } g_rideSlice;
+
+static char* AutoCarUnder(Hero h) {
+	char* ground = h ? *(char**)(h.raw() + 0x280) : nullptr;
+	for (unsigned i = 0, n = ground ? GetNumLvlClassInstances(2, 158) : 0; i < n; i++) {
+		char* c = (char*)GetLvlObject(2, 158, i);
+		if (c && *(char**)(c + 0x84) == ground) return c;
+	}
+	return nullptr;
+}
+
 static void WatchTelepherRider(Trio t) {
 	int who = g_telepherRider;
 	g_telepherRider = -1;
-	if (who < 0 || !t || !g.p2Joined || t.Leader() == who || !g_config.carRiderLeads) return;
+	if (g_autoRide.rider >= 0) {
+		Hero r = t ? t.GetHero(g_autoRide.rider) : Hero();
+		if (!r || !g.p2Joined || Situation(r) != 0x02 || t.Leader() == g_autoRide.rider) {
+			Log("coop: %s's automatic cable car ride is over (situation %02X)", HeroName(g_autoRide.rider), r ? Situation(r) : 0xFF);
+			g_autoRide = {};
+		}
+	}
+	if (who < 0 || !t || !g.p2Joined || t.Leader() == who) return;
+	if (!g_config.carRiderLeads) {
+		if (g_autoRide.rider == who) return;   // (0x0C0D comes with each of its ticks while boarding)
+		Hero r = t.GetHero(who);
+		g_autoRide = { who, AutoCarUnder(r) };
+		Log("coop: %s boarded an automatic cable car while %s led -- the ride's events treat the rider as the leader (car %p)",
+		    HeroName(who), HeroName(t.Leader()), g_autoRide.car);
+		return;
+	}
 	Log("coop: %s boarded an automatic cable car while %s led -- the lead to the rider", HeroName(who), HeroName(t.Leader()));
 	GiveLead(t, who);
+}
+
+bool CoopRideSliceBegin(int ev, void* caller) {
+	ev &= 0xFFFF;
+	if (g_rideSlice.on || g_autoRide.rider < 0 || !g.p2Joined) return false;
+	uintptr_t from = (uintptr_t)caller;
+	bool endJump = ev == 0x0C09 && from == 0x549BA5;
+	bool companionOrder = ((ev >= 0x4813 && ev <= 0x4876) || (ev >= 0x48BB && ev <= 0x48EC)) && from >= 0x400000 && from < 0x800000;
+	if (!endJump && !companionOrder) return false;
+	Trio t = GetTrio();
+	if (!t || t.Leader() == g_autoRide.rider) return false;
+	uint8_t* trio = (uint8_t*)t.raw();
+	g_rideSlice = { true, trio[0x2C], trio[0x2D], (uint8_t)g_autoRide.rider,
+	                (uint8_t)(g_autoRide.rider == g.p1Hero ? g.p2Hero : g.p1Hero) };
+	trio[0x2C] = g_rideSlice.rider;
+	trio[0x2D] = g_rideSlice.other;
+	static int s_told = 0;
+	if (s_told++ < 20)
+		Log("coop: trio event %04X from %p for %s's automatic cable car ride -- %s as the leader for it", ev, caller,
+		    HeroName(g_autoRide.rider), HeroName(g_autoRide.rider));
+	return true;
+}
+
+void CoopRideSliceEnd(bool began) {
+	if (!began || !g_rideSlice.on) return;
+	g_rideSlice.on = false;
+	Trio t = GetTrio();
+	if (!t) return;
+	uint8_t* trio = (uint8_t*)t.raw();
+	if (trio[0x2C] == g_rideSlice.rider && trio[0x2D] == g_rideSlice.other) {
+		trio[0x2C] = g_rideSlice.leader;
+		trio[0x2D] = g_rideSlice.companion;
+	}
 }
 
 // Freedom mode and the rotary beam (CKHkRotaryBeam 2,57; LV4-2): the level asks
@@ -2331,6 +2401,7 @@ void CoopFrame() {
 		g.lastLevel = level;
 		g_trackBeforeSpy = nullptr;   // the old level's camera tracks are gone
 		g_corkRide = {};              // (and its corkscrews)
+		g_autoRide = {};
 		g.groupTookLead = g.groupPrevLeader = -1;
 		g_spyWalk.on = false;
 		g.joinHintPending = level > 0;

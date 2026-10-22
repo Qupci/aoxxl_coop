@@ -860,6 +860,15 @@ bool P2MayCollect(char* pool, Trio t, Hero h2) {
 	return ok;
 }
 
+// Where a hero collects bonuses: its model (the node), as the game's check uses
+// for the leader (trio vf27) -- a hero riding a cable car keeps its own position
+// (+0x6C) at the boarding spot while the car carries the model on.
+Vector3 CollectPos(Hero h) {
+	Vector3 at;
+	if (h.hook->node && NodePos(h.hook->node, &at)) return at;
+	return h.Pos();
+}
+
 void AttractToPlayer2(char* pool) {
 	Trio t = GetTrio();
 	int nl = CoopNonLeaderPlayer();
@@ -871,7 +880,7 @@ void AttractToPlayer2(char* pool) {
 	char* radiusObj = *(char**)(pool + 0x3C);
 	if (!radiusObj) return;
 	float r2 = *(float*)(radiusObj + 4);
-	Vector3 p2 = h2.Pos();
+	Vector3 p2 = CollectPos(h2);
 	for (char* b = *(char**)(pool + 0x30); b; b = *(char**)(b + 0x14)) {
 		if (((BoolFn)(*(void***)b)[19])(b, nullptr)) continue;   // already following someone
 		Vector3 at;
@@ -919,7 +928,7 @@ void __cdecl BeaconCheck(char* pool, char* bonus, char* frame) {
 	int nl = CoopNonLeaderPlayer();
 	Hero h2 = t && nl >= 0 ? t.GetHero(nl) : Hero();
 	if (!h2 || HeroOut(nl) || !P2MayCollect(pool, t, h2)) return;
-	Vector3 p = h2.Pos();
+	Vector3 p = CollectPos(h2);
 	float dx = b[0] - p.x, dy = b[1] - p.y, dz = b[2] - p.z;
 	if (dx * dx + dy * dy + dz * dz <= r2) {
 		attract(bonus, nullptr, h2.hook, beacon);

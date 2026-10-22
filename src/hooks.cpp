@@ -77,9 +77,11 @@ int __fastcall TrioSendEventHook(void* self, void* edx, int event, void* param) 
 	g_trioEventCaller = _ReturnAddress();
 	if (CoopDeferTrioEvent(self, event)) return 0;
 	CoopNoteTrioEvent(self, event, param);
+	bool ride = CoopRideSliceBegin(event, _ReturnAddress());
 	int cookie = CoopBeforeTrioEvent(event, _ReturnAddress());
 	int r = g_origTrioSendEvent(self, edx, event, param);
 	CoopAfterTrioEvent(event, cookie);
+	CoopRideSliceEnd(ride);
 	return r;
 }
 
