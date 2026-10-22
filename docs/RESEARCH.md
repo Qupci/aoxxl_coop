@@ -2314,3 +2314,14 @@ both halves).
   since page 0 at 1024 is what marks the font done. Autotest icons21: both pages logged swapped (xxl_coop.asi
   still draws its pad prompts over the game's icons there); with xxl_coop.asi moved aside, the title screen's
   "Press Validate" confirm icon at 1920 x 1080 is the new one.
+- Round 128 (2026-10-22, user's answers to the design doc's open questions). (1) Fallen leader: the heroes are
+  equal and either can set off a leader switch, so the level's intended switches are the ones made with both
+  players standing -- nothing is kept for after a revive. Round 114b's levelLead (individual.cpp, set by
+  IndivNoteLevelLead from proximity.cpp's lead-only zone pass) is removed: a hero that led when it fell gets the
+  lead back after the revive whatever lead-only zone fired meanwhile (the zone is still let through, round 114).
+  Autotest lead510o (-Level 5, XXL_DOWNAT=1:2000 XXL_UPAT=12000): 0308 let through with Obelix down, revived at
+  12 s -> trio 4801, "Obelix takes the lead from Asterix (revived, it led when it fell)", no switch after.
+  (2) [coop] freedom now defaults to on (config.h, dist ini); freedom_corkscrews stays on, [experimental]
+  freedom_romans stays off (not final). (3) The ini's revive time comment said 8 s; it is 5 s since round 69.
+  (4) Round 113's rule (a hero's own Twister shake on its player's camera only, world shakes on both) is
+  user-confirmed.

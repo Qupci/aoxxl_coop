@@ -62,9 +62,6 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float before[3]);
 // A Roman agent's talk reached by the standing hero: it stays shut (the caller
 // holds it back), the hero is not put back -- it can walk on past the agent.
 bool IndivBlockTalk(const char* what);
-// The level gave the lead to `hero` (a zone let through) while the other is
-// down: who leads after the revive is the level's choice.
-void IndivNoteLevelLead(int hero);
 // Hero `hero` onto its last solid ground (a sequence undone).
 void IndivPutOnSafeGround(int hero);
 // Hero `hero` about to board a cable car (situation 2): out of it and onto its

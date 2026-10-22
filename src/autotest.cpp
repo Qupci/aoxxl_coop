@@ -2931,7 +2931,8 @@ const Step kLead510[] = {
 };
 // lead510o (-Level 5, XXL_DOWNAT=1:2000 XXL_UPAT=12000): lead510 with Obelix
 // leading when he falls: he still counts as the fallen leader (brought-to-leader
-// checks), and after the revive Asterix keeps the lead the rectangle gave him.
+// checks), and after the revive he gets the lead back although the rectangle
+// gave it to Asterix meanwhile (round 128).
 const Step kLead510O[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 10),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),

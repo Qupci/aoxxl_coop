@@ -26,7 +26,7 @@ struct CoopConfig {
 	bool  safeSequence  = true;   // the non-leading player can't set off levers meant for the leader's switch
 	int   sectorCatchUpMs = 1000; // a hero left in an unloaded sector this long is brought to the other
 	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with
-	bool  freedom       = false;  // the level never takes a player's hero (waits, walks to markers); cable cars still do
+	bool  freedom       = true;   // the level never takes a player's hero (waits, walks to markers); cable cars still do
 	bool  freedomCorkscrews = true;   // freedom mode: a corkscrew's circle (light pillar launching its hero) still locks it
 	float deadzone      = 0.24f;
 
