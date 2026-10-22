@@ -2422,3 +2422,20 @@ both halves).
   (-712 14 -137/-141) and helmets (handler 12) in P1's half but outside the old frustum. Not seen on screen in the
   autotest. User pad test (Oct 22): LV4-4 boxes no longer pop in, floating collectibles no longer vanish at the
   view's edges, shadows fine; their "boxes act differently far apart" was this pop-in.
+
+- Round 134 (user: with Obelix leading, the light pillar's circle (corkscrew) can't be set off by Asterix, and
+  Obelix on it locks Asterix where he stands -- the user's go-ahead for the suggestion of round 132).
+  CKHkCorkscrew::vf15 (0x53C3F0, ret 4): armed (+8 bit 1) and not landed (bit 0), it flags its landing event
+  (+0x40; LV2-1's 0050: trio 4801 + 4802, pillar 0901, detectors) and sets bit 0 when the trio's leader (trio
+  vf25, its node +0x80) is within +0x3C of its circle; at the top of its turn it asks the trio 0xB01 (FUN_00481c90
+  case 1: the companion's ground, trio+0x2D's +0x280; 0xB00 is the leader's) and, on its own ground (+0x30), sends
+  0x0C09 (-> 4805: the companion's AI order 2, the launch) and its end event (+0x42). So only the landing check
+  wants "the leader", and the event makes the hero on the circle the companion. Now proximity's TickLife ticks an
+  armed, not landed corkscrew whose landing event both switches the lead and tells the companion to wait (4800 /
+  48B7 -> made for Obelix, 4801 / 48B8 -> for Asterix; 4802 / 4849) with that hero posing as the leader when the
+  real leader is the other one (TickCorkscrew; not when that hero is out or not a player's): he lands on it as in
+  single player, the leader standing there sets nothing off. Autotests corklead21 (level 2: 4801, Asterix onto
+  the spinning platform's circle -- before: nothing; now 0050, the freedom corkscrew lock, 03C8's 4803 held back,
+  the ride to 0058) and corkobelix21 (Obelix leading onto the circle, Asterix 4.2 units off -- before: 0050, Asterix
+  told to wait; now nothing, Asterix walks off). turnstile21 / 21b / corkdown as before. LV3-6's pillar (live only
+  after its fight) not run: same class and code.

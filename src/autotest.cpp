@@ -3565,6 +3565,59 @@ const Step kLifterLock[] = {
 	END(44000),
 };
 
+// corklead21 (level 2): turnstile21 with Obelix leading (4801 first): Asterix
+// on the spinning platform's circle sets it off all the same (its event 0050
+// makes him wait); Obelix turns it, Asterix rides to the top (0058).
+const Step kCorkLead21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	{ 1600, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(5300, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 1500),
+	GLIDEAT(6900, HERO_OBELIX, -775.878f, 515.614f, -990.0f, 2000),
+	GLIDEAT(9000, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),
+	SHOT(9500, "corklead21_1"),
+	VPAD(10000, 1, PAD_X, 0, 0, "p2 X"), VPAD(10150, 1, 0, 0, 0, "p2 release"),
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X"), VPAD(10650, 1, 0, 0, 0, "p2 release"),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"), VPAD(11150, 1, 0, 0, 0, "p2 release"),
+	VPAD(11500, 1, PAD_X, 0, 0, "p2 X"), VPAD(11650, 1, 0, 0, 0, "p2 release"),
+	VPAD(12000, 1, PAD_X, 0, 0, "p2 X"), VPAD(12150, 1, 0, 0, 0, "p2 release"),
+	VPAD(12500, 1, PAD_X, 0, 0, "p2 X"), VPAD(12650, 1, 0, 0, 0, "p2 release"),
+	VPAD(13000, 1, PAD_X, 0, 0, "p2 X"), VPAD(13150, 1, 0, 0, 0, "p2 release"),
+	VPAD(13500, 1, PAD_X, 0, 0, "p2 X"), VPAD(13650, 1, 0, 0, 0, "p2 release"),
+	VPAD(14000, 1, PAD_X, 0, 0, "p2 X"), VPAD(14150, 1, 0, 0, 0, "p2 release"),
+	VPAD(14500, 1, PAD_X, 0, 0, "p2 X"), VPAD(14650, 1, 0, 0, 0, "p2 release"),
+	VPAD(15000, 1, PAD_X, 0, 0, "p2 X"), VPAD(15150, 1, 0, 0, 0, "p2 release"),
+	VPAD(15500, 1, PAD_X, 0, 0, "p2 X"), VPAD(15650, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X"), VPAD(16150, 1, 0, 0, 0, "p2 release"),
+	VPAD(16500, 1, PAD_X, 0, 0, "p2 X"), VPAD(16650, 1, 0, 0, 0, "p2 release"),
+	VPAD(17000, 1, PAD_X, 0, 0, "p2 X"), VPAD(17150, 1, 0, 0, 0, "p2 release"),
+	VPAD(17500, 1, PAD_X, 0, 0, "p2 X"), VPAD(17650, 1, 0, 0, 0, "p2 release"),
+	VPAD(18000, 1, PAD_X, 0, 0, "p2 X"), VPAD(18150, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "corklead21_2"),
+	END(24000),
+};
+
+// corkobelix21 (level 2): Obelix leads and walks onto the spinning platform's
+// circle, Asterix 3 units off: the circle (made for Asterix: "Obelix leads,
+// Asterix waits") must not go off for him.
+const Step kCorkObelix21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1500, HERO_OBELIX, -746.5f, 514.5f, -981.4f),
+	{ 1600, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	GLIDEAT(1800, HERO_ASTERIX, -775.0f, 517.0f, -980.0f, 1500),
+	GLIDEAT(1800, HERO_OBELIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_OBELIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(6000, "corkobelix21_1"),
+	P1(7000, 0, -1.0f, 0, "p1 walks off"), P1(8500, 0, 0, 0, "p1 stops"),
+	SHOT(9500, "corkobelix21_2"),
+	END(10500),
+};
+
 // turnstile21 (level 2, XXL_LIFTLOG=1): the spinning platform as meant -- Asterix
 // on its circle, Obelix through zone 03C8 to the turnstile (the user's spot) and
 // X again and again: the platform rises with Asterix, nothing set back.
@@ -4799,6 +4852,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("lifterlock", kLifterLock),
 	SCENARIO("lifterlock2", kLifterLock2),
 	SCENARIO("turnstile21", kTurnstile21),
+	SCENARIO("corklead21", kCorkLead21),
+	SCENARIO("corkobelix21", kCorkObelix21),
 	SCENARIO("turnstile21c", kTurnstile21c),
 	SCENARIO("turnstile21d", kTurnstile21d),
 	SCENARIO("turnstile21e", kTurnstile21e),

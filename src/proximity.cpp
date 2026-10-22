@@ -167,6 +167,7 @@ bool LifePos(int* life, bool isGroup, Vector3* out) {
 int GroupSwitchTarget(unsigned ev);
 bool GroupMessagesTrio(unsigned ev);
 bool GroupCommandsTrio(unsigned ev);
+int GroupTargets(unsigned ev, char** objsOut, uint16_t* msgsOut, int max);
 
 // Plain pressure plates (CKHkPressionStone, flags +8: bit 0x10 "activatable by
 // hero" -- pressed while the object under the trio leader's feet, trio vf29, is
@@ -212,6 +213,54 @@ void TickPlate(int* life, void* dt, char* plate, Trio t) {
 			Log("proximity: pressure plate %p pressed by %s (not leading)", plate, HeroName(nl));
 		}
 	}
+}
+
+// A corkscrew's circle (CKHkCorkscrew 2,44: LV2-1's spinning platform, LV3-6's
+// light pillars), armed (+8 bit 1) and not landed on (bit 0), sets off its
+// "landing" event (+0x40) when the trio's leader (trio vf25: its node) is within
+// +0x3C of its circle. That event gives the lead away and tells the companion to
+// wait there (LV2-1's 0050: 4801 + 4802): it is meant for the hero it makes wait
+// -- Asterix for "Obelix leads" -- who is launched once the turn is done (its
+// check: the companion's ground, trio 0xB01, is the corkscrew's; then 0x0C09 ->
+// 4805, the companion's AI order 2). With Obelix leading, Asterix on the circle
+// set nothing off, and Obelix on it set it off for Asterix wherever he stood
+// (locked there by freedom_corkscrews when near). Its landing is now checked
+// with that hero posing as the leader; after the event the trio has him as the
+// companion anyway, as in single player.
+int CorkscrewHero(char* cork) {
+	char* objs[32];
+	uint16_t msgs[32];
+	int n = GroupTargets(*(uint16_t*)(cork + 0x40), objs, msgs, 32), to = -1;
+	bool wait = false;
+	for (int k = 0; k < n; k++) {
+		if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
+		unsigned m = msgs[k];
+		if (m == 0x4802 || m == 0x4849) wait = true;
+		if (m == 0x4800 || m == 0x48B7) to = HERO_ASTERIX;
+		if (m == 0x4801 || m == 0x48B8) to = HERO_OBELIX;
+	}
+	if (!wait || to < 0) return -1;
+	return to == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;   // the one who waits
+}
+
+bool TickCorkscrew(int* life, void* dt, char* cork, Trio t) {
+	if ((*(uint32_t*)(cork + 8) & 3) != 2 || !CoopP2Joined() || CoopSuspended()) return false;
+	int who = CorkscrewHero(cork);
+	if (who < 0 || who == t.Leader() || (who != CoopP1Hero() && who != CoopP2Hero()) || HeroOut(who)) return false;
+	TickFn tick = (TickFn)(*(void***)life)[17];
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	tr[0x2C] = (uint8_t)who;
+	tr[0x2D] = leader;
+	tick(life, nullptr, dt);
+	if (tr[0x2C] == (uint8_t)who) { tr[0x2C] = leader; tr[0x2D] = companion; }
+	if (*(uint32_t*)(cork + 8) & 1) {
+		static int s_told = 0;
+		if (s_told++ < 20)
+			Log("proximity: corkscrew %p landed on by %s (not leading) -- its event %04X", cork, HeroName(who),
+			    *(uint16_t*)(cork + 0x40));
+	}
+	return true;
 }
 
 // Romans passed from one player to the other (LB): flying (state +0x21 == 4),
@@ -276,6 +325,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 		TickPlate(life, dt, hook, t);
 		return;
 	}
+	if (hook && *(uintptr_t*)hook == kCorkscrewVtbl && TickCorkscrew(life, dt, hook, t)) return;
 	bool plate = hook && (*(uintptr_t*)hook == kPressionStoneVtbl || *(uintptr_t*)hook == kCorkscrewVtbl);
 	// A carried torch (CKHkTorch 2,32, +0x3E state 1) burns down only while the
 	// trio's leader is Asterix (trio vf40, its tick at 0x4AF790); the HUD reads the
