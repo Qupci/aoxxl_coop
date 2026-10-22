@@ -1106,6 +1106,43 @@ const Step kMgun33J[] = {
 	SHOT(18500, "mgun33j_after"),
 	END(19500),
 };
+// mgun33l (-Level 3): mgun33j with Obelix leading (4801 first): Asterix takes the
+// gun as the hero not leading -- Obelix keeps the lead throughout (the cable cars'
+// equality); the gun turns and fires for player 1, Obelix joins and turns it,
+// Asterix leaves with A.
+const Step kMgun33L[] = {
+	MGUN33_SETUP,
+	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 280.0f, 31.92f, -326.0f),
+	{ 4500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "mgun33l_solo"),
+	P1(8500, 0, -1.0f, 0, "p1 turns"), P1(9500, PAD_X, 0, 0, "p1 fires"), P1(9900, 0, 0, 0, "p1 release"),
+	SHOT(9800, "mgun33l_fire"),
+	PLACEAT(10000, HERO_OBELIX, 293.9f, 31.92f, -326.5f),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"), VPAD(11200, 1, 0, 0, 0, "p2 release"),
+	SHOT(13500, "mgun33l_joined"),
+	VPAD(14000, 1, 0, -1.0f, 0, "p2 turns"), VPAD(15000, 1, 0, 0, 0, "p2 release"),
+	P1(16000, PAD_A, 0, 0, "p1 A (leave)"), P1(16200, 0, 0, 0, "p1 release"),
+	SHOT(18500, "mgun33l_after"),
+	END(19500),
+};
+// mgun33d (-Level 3, XXL_DOWNAT=1:9000 XXL_UPAT=20000): Obelix leads, Asterix
+// takes the LV3-3 gun (not leading), Obelix is put by the rope cable car's start
+// (307.6 10.6 -209.2: across the river from the gun) and goes down there; Asterix
+// stays on the gun -- nothing moves him -- and leaves it: brought to Obelix (out of
+// reach, he led), and after the revive back where he stood by the gun.
+const Step kMgun33D[] = {
+	MGUN33_SETUP,
+	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 280.0f, 31.92f, -326.0f),
+	{ 4500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
+	PLACEAT(7000, HERO_OBELIX, 307.582f, 10.6f, -209.154f),
+	SHOT(11000, "mgun33d_ongun"),
+	P1(13000, PAD_A, 0, 0, "p1 A (leave)"), P1(13200, 0, 0, 0, "p1 release"),
+	SHOT(18000, "mgun33d_brought"),
+	SHOT(23000, "mgun33d_back"),
+	END(24000),
+};
 const Step kMgun33A[] = {
 	MGUN33_SETUP,
 	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 284.4f, 31.92f, -325.9f),
@@ -5151,6 +5188,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("mgun33o", kMgun33O),
 	SCENARIO("mgun33a", kMgun33A),
 	SCENARIO("mgun33j", kMgun33J),
+	SCENARIO("mgun33l", kMgun33L),
+	SCENARIO("mgun33d", kMgun33D),
 	SCENARIO("boat49o", kBoat49O),
 	SCENARIO("boat49a", kBoat49A),
 	SCENARIO("hintjoin", kHintJoin),

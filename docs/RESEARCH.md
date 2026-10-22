@@ -2496,3 +2496,21 @@ both halves).
   sector 8: the pillar, Asterix at the beam's spot, Obelix put up on the turnstile hopping): before, 03B8 "(the
   other hero's zone)" and 4800; now none in two runs. camfall28 (Asterix's own fall still starts over, cameras off),
   pull28, beam28 as before.
+- Round 139 (user, LV3-3, userlogs\xxl_coop.lv3-3_machinegun.log: Asterix taking the machine gun while not leading
+  took the lead until he left it -- by design since round 21 (CoopAfterLifeTick: a mode change started in the
+  hero's own sliced tick kept the slice as the lead, groupTookLead); asked for the cable cars' equality). The gun
+  itself never asks the trio (no trio call in CKHkMachinegun / its Life but sendEvent); the trio's 0x4809 runs in
+  Asterix's tick with his camera copy in. Now a mode 2 started by Asterix's own tick (gunAlone) restores the slice:
+  the real leader stays, Asterix keeps mode 2 in the player variant (f18 08) and turns and fires it (gun 0x4A02),
+  the gun's camera in his half. Obelix joining (JoinGun: held, AI order 7 to the handles, then 0x480A) needs Obelix
+  as the companion -- a leading hero is handed back to its player at once -- so while Obelix leads, joining gives
+  Asterix the lead for the joined part (one screen, co-op suspended) and GiveBackLead returns it. GiveBackLead had
+  skipped a held previous leader -- Obelix is still held when 0x4806 resumes co-op and let go later that frame --,
+  so after a joined gun the lead never went back (the pre-change build too); a held hero whose order is already
+  0 now counts as free. A leader who falls while Asterix is on the gun alone: IndivFrame's "the lead stays with a
+  hero still standing" and BringToFallenLeader wait while the standing hero is not in a playable mode (the switch
+  refuses a mode 2 target; teleporting a gunner) -- once off the gun he gets the lead and is brought to the fallen
+  leader out of reach, and sent back by the gun after the revive. Autotests mgun33l (Obelix leads: solo use, Obelix
+  joins, leave -- Obelix leads again), mgun33d (XXL_DOWNAT=1:9000 XXL_UPAT=20000: Obelix down at the rope cable car,
+  across the river; Asterix untouched on the gun, brought once off it, back by the gun after the revive);
+  mgun33j / mgun33o / mgun33a as before.

@@ -3536,6 +3536,12 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 			// sector 6).
 			uint8_t modeNow = sh ? HeroMode(*F18(sh)) : 0;
 			bool startedMode = sh && HeroModePlayable(g.f18Before) && (modeNow == 1 || modeNow == 2);
+			// (The machine gun, mode 2, Asterix alone: he stays the hero not leading -- GunSolo.)
+			bool gunAlone = startedMode && modeNow == 2 && g.slicedHero == HERO_ASTERIX;
+			if (gunAlone) {
+				startedMode = false;
+				Log("coop: Asterix took the machine gun while not leading -- %s keeps the lead", HeroName(g.savedLeader));
+			}
 			if (trio[0x2C] == g.slicedHero && trio[0x2D] == g.slicedOther && (startedGroup || startedTalk || startedShop || startedMode)) {
 				// It started a group action (a launcher, a lifter): that sequence
 				// asks the trio for its leader all along, outside this tick too --
@@ -3749,6 +3755,18 @@ static void JoinGun(Trio t, const char* why) {
 	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
 	Vector3 pos, dir;
 	if (!o || g.held[HERO_OBELIX] || !GunHandles(t, &pos, &dir)) return;
+	// Asterix took the gun while Obelix led (he stays the hero not leading on it
+	// alone): the walk to the handles is the companion's -- a leading hero is
+	// handed back to its player at once. Asterix leads while both are at the gun
+	// (one screen), and the lead goes back when they leave it (GiveBackLead).
+	uint8_t* tr = (uint8_t*)t.raw();
+	if (tr[0x2C] == HERO_OBELIX && g.groupTookLead < 0) {
+		g.groupTookLead = HERO_ASTERIX;
+		g.groupPrevLeader = HERO_OBELIX;
+		tr[0x2C] = HERO_ASTERIX;
+		tr[0x2D] = HERO_OBELIX;
+		Log("coop: Obelix joins the gun while leading -- Asterix leads while both are at it");
+	}
 	Hold(t, HERO_OBELIX, why, true);
 	uint8_t* ai = (uint8_t*)(o.raw() + 0x561);
 	if (*ai == 0xFF) *ai = 0;
@@ -3766,7 +3784,11 @@ static void GiveBackLead(Trio t) {
 	if (g.groupTookLead < 0 || !t) return;
 	int took = g.groupTookLead, prev = g.groupPrevLeader;
 	g.groupTookLead = g.groupPrevLeader = -1;
-	if (t.Leader() == took && prev >= 0 && prev != took && !g.held[prev]) {
+	// (Held with its order already back to "follow" -- Obelix at the gun's handles
+	// once Asterix leaves it, 0x4806 -- it is let go this same frame: not held.)
+	Hero ph = prev >= 0 ? t.GetHero(prev) : Hero();
+	bool held = prev >= 0 && g.held[prev] && !(ph && ph.Order() == AI_FOLLOW_LEADER);
+	if (t.Leader() == took && prev >= 0 && prev != took && !held) {
 		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 		int ev = prev == HERO_ASTERIX ? 0x4800 : 0x4801;
 		Log("coop: %s's group action is over; %s leads again (trio event %04X)", HeroName(took), HeroName(prev), ev);

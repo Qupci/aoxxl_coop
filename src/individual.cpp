@@ -574,6 +574,7 @@ Vector3 SpotBesideFallen(int down, const Vector3& at) {
 // mid-jump over a gap's cells) before the move.
 void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
+	if (!HeroModePlayable(o.Flags18())) return;   // (on the machine gun: brought once off it)
 	g.reachAt[down] = now;
 	int r = PfReachable(o.Pos(), h.Pos());
 	if (r != g.reachTold[down]) {
@@ -1061,8 +1062,11 @@ void IndivFrame() {
 		}
 	}
 
-	// The lead stays with a hero still standing.
-	if (g.fallen[lead] && !g.fallen[Other(lead)] && !CoopSuspended()) {
+	// The lead stays with a hero still standing -- once it is in a mode a player
+	// drives (Asterix alone on the machine gun, mode 2, not leading: the switch
+	// takes no hero out of it; he gets it when he leaves the gun).
+	Hero standing = t.GetHero(Other(lead));
+	if (g.fallen[lead] && !g.fallen[Other(lead)] && !CoopSuspended() && standing && HeroModePlayable(standing.Flags18())) {
 		CoopGiveLead(Other(lead), "the leader is down");
 		lead = t.Leader();
 		Use(lead);
