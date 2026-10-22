@@ -323,6 +323,11 @@ void NoteTrioEventFlagged(unsigned eventId) {
 	g_prePic.event = eventId & 0xFFFF;
 }
 
+// A cable car's boarding (the hero's own tick, 0x49ACB9) switches the lead to
+// the puller (4801) just before it takes the rider (4812): the lock's picture,
+// taken then, had the puller as "the leader before" -- R3 + B left Obelix leading.
+struct CarSwitch { int leader = -1; DWORD at = 0; } g_carSwitch;
+
 static void NoteLock(int hero, const char* why) {
 	// (the same lock noted twice -- its 0x4802, then the held order -- keeps the
 	// first picture)
@@ -331,6 +336,8 @@ static void NoteLock(int hero, const char* why) {
 	if (pre) g_lock.pic = g_prePic;
 	else TakePicture(g_lock.pic);
 	g_prePic.at = 0;
+	if (g_carSwitch.at && GetTickCount() - g_carSwitch.at < 500) g_lock.pic.leader = g_carSwitch.leader;
+	g_carSwitch.at = 0;
 	g_lock.hero = hero;
 	g_lock.wait = false;
 	g_lock.since = GetTickCount();
@@ -2017,6 +2024,11 @@ static void NoteFreedomLock(Trio t, int waiter) {
 
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	extern void* g_trioEventCaller;
+	if (g.p2Joined && ((event & 0xFFFF) == 0x4800 || (event & 0xFFFF) == 0x4801) &&
+	    (uintptr_t)g_trioEventCaller >= 0x49AC80 && (uintptr_t)g_trioEventCaller < 0x49AD00) {
+		Trio tl = GetTrio();
+		if (tl) g_carSwitch = { tl.Leader(), GetTickCount() };   // (before the switch)
+	}
 	if (g.p2Joined && (event & 0xFFFF) == 0x0C0D && (uintptr_t)g_trioEventCaller == 0x548757) {
 		Trio tl = GetTrio();
 		if (tl) g_telepherRider = tl.Leader();   // (the leader its tick saw: the rider)

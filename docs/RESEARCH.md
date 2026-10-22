@@ -2331,3 +2331,15 @@ both halves).
   levelLead / IndivNoteLevelLead restored as in round 114b (individual.cpp, individual.h, proximity.cpp,
   autotest.cpp from 5bc702f~1). Autotest lead510o: "the level gave the lead to Asterix with Obelix down", no
   lead back after the revive. Freedom on by default and the 5 s ini comment stay.
+
+- Round 129 (user, userlogs\xxl_coop.car-lead-20261022.log, LV2 sector 4's rope cable car): Asterix boards (his
+  own tick: 4801 from 0x49ACB9 gives Obelix the lead, then 4812 from 0x49ACC7 holds him, AI order 9); R3 + B undid
+  the lock but the lead stayed with Obelix. The lock's picture (NoteLock, "as now FFFF": no pre-event picture) is
+  taken after the car's 4801, so its "leader before" was already Obelix; UndoLock's GiveLeadLater(before) gave it
+  to him. Now the leader just before a boarding switch (4800/4801 from 0x49AC80..0x49AD00, CoopNoteTrioEvent runs
+  before the trio) is kept (g_carSwitch) and becomes the picture's leader when the lock follows within 0.5 s.
+  The user also saw P1's camera on Obelix when finishing a ride later: with Obelix leading, the ride's shot (both
+  cameras take the sector track, vt 6244EC in LV2-4) is the game's camera's; not reproduced in LV3-3 (P1's view on
+  Asterix in every shot). Autotest carunlock33 (-Level 3): board, P1's R3 + B -> 4800, Asterix leads again
+  (11.17 s); boards again, Obelix pulls to the end. cabled33: Obelix (leading only for the car) falls -> no lead
+  back after the revive; swingundo / cross33 as before.

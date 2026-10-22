@@ -2674,6 +2674,24 @@ const Step kCable33[] = {
 	END(12500),
 };
 
+// carunlock33 (-Level 3): the user's LV2 report on LV3-3's car -- Asterix boards
+// (the car's code gives Obelix the lead, 4801), player 1's R3 + B: the lead must
+// go back to Asterix. Then he boards again and player 2's Obelix pulls to the end.
+const Step kCarUnlock33[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 307.582f, 13.073f, -209.154f), PLACEAT(2500, HERO_OBELIX, 307.582f, 10.34f, -209.154f),
+	SHOT(4000, "carunlock33_1"),
+	{ 5000, S_UNLOCKHERO, HERO_ASTERIX, 0, 0, 0, 0, "player 1's R3 + B" },
+	SHOT(6500, "carunlock33_2"),
+	PLACEAT(9000, HERO_ASTERIX, 307.582f, 13.073f, -209.154f),
+	SHOT(10500, "carunlock33_3"),
+	VPAD(11000, 1, PAD_X, 0, 0, "p2 X"),
+	VPAD(12000, 1, PAD_X, -1.0f, 0, "p2 X + left"), SHOT(14000, "carunlock33_4"), SHOT(17000, "carunlock33_5"),
+	VPAD(19000, 1, 0, 0, 0, "p2 release"), SHOT(20000, "carunlock33_6"),
+	END(21000),
+};
+
 // cabled33 (-Level 3, XXL_DOWNAT=1:9000 XXL_UPAT=12000): cable33, Obelix falls
 // with the car halfway -- it must be back at its start, then ride again.
 const Step kCableD33[] = {
@@ -4733,6 +4751,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("camjump", kCamJump),
 	SCENARIO("p2dir", kP2Dir),
 	SCENARIO("cable33", kCable33),
+	SCENARIO("carunlock33", kCarUnlock33),
 	SCENARIO("cam32s", kCam32S),
 	SCENARIO("fight4o", kFight4O),
 	SCENARIO("camfight", kCamFight),
