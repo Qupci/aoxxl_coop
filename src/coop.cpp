@@ -236,6 +236,8 @@ struct LockPicture {
 	size_t  nFlags = 0;
 	DWORD   at = 0;
 	int     leader = -1;   // the trio's leader then (the circle's 4801 hands the lead to the other)
+	struct Cam { char* sec; uint8_t f; } cams[256];   // camera sectors (CKCameraSector, service +0x24): +0x29
+	size_t  nCams = 0;
 };
 struct LockState {
 	int         hero = -1;           // the locked hero
@@ -308,6 +310,11 @@ static void TakePicture(LockPicture& p) {
 			for (unsigned i = 0; e && i < n && p.n < sizeof(p.bits); i++) p.bits[p.n++] = (uint8_t)e[8 * i + 4];
 		}
 	}
+	CKYellowPages* yp = YellowPages();
+	char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	p.nCams = 0;
+	for (char* sec = cs ? *(char**)(cs + 0x24) : nullptr; sec && p.nCams < 256; sec = *(char**)(sec + 4))
+		p.cams[p.nCams++] = { sec, *(uint8_t*)(sec + 0x29) };
 	static const unsigned kCircleIds[] = { 21, 44 };
 	for (unsigned id : kCircleIds)
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n; i++) {
@@ -317,10 +324,28 @@ static void TakePicture(LockPicture& p) {
 		}
 }
 
+static int CamerasBack(const LockPicture& p);
+
 void NoteTrioEventFlagged(unsigned eventId) {
 	if (!g.p2Joined) return;
 	TakePicture(g_prePic);
 	g_prePic.event = eventId & 0xFFFF;
+	// The level starting a wait's sequence over (LV2-8's zone 03B8, Asterix off the
+	// platforms: the light pillar on again, 0x900, and the companion freed, 4803):
+	// the cameras it switched on meanwhile go back off too.
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = ProximityGroupTargets(eventId, objs, msgs, 64);
+	bool pillar = false, freed = false;
+	for (int i = 0; i < n; i++) {
+		uintptr_t vt = objs[i] ? *(uintptr_t*)objs[i] : 0;
+		if (vt == 0x629030 && msgs[i] == 0x900) pillar = true;
+		if (vt == 0x6256A0 && msgs[i] == 0x4803) freed = true;
+	}
+	const LockPicture* pic = g_lock.hero >= 0 && g_lock.wait ? &g_lock.pic : g_seqLive ? &g_seqPic : nullptr;
+	if (!pillar || !freed || !pic) return;
+	int off = CamerasBack(*pic);
+	if (off) Log("coop: event %04X starts the wait's sequence over -- %d camera sectors it switched on are off again", eventId & 0xFFFF, off);
 }
 
 // A cable car's boarding (the hero's own tick, 0x49ACB9) switches the lead to
@@ -395,8 +420,22 @@ static bool SequenceUnderWay() {
 	return false;
 }
 
+// Camera sectors switched on (+0x29 bit 1) since the picture, switched off again:
+// a camera picks the first one on whose box holds its target and keeps it until
+// it is in another's -- LV2-8's platforms' shot (on with the second block pushed
+// into place) covers the ground below too, and after Asterix fell off (the
+// level's start over, zone 03B8) player 1's camera kept it.
+static int CamerasBack(const LockPicture& p) {
+	int n = 0;
+	for (size_t i = 0; i < p.nCams; i++) {
+		uint8_t& f = *(uint8_t*)(p.cams[i].sec + 0x29);
+		if ((f & 2) && !(p.cams[i].f & 2)) { f &= ~2; n++; }
+	}
+	return n;
+}
+
 static void RestoreLockPicture(const LockPicture& p) {
-	int changed = 0, shown = 0, flags = 0;
+	int changed = 0, shown = 0, flags = 0, cams = CamerasBack(p);
 	if (char* det = DetectionService()) {
 		size_t k = 0;
 		const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
@@ -424,8 +463,8 @@ static void RestoreLockPicture(const LockPicture& p) {
 		uint32_t& f = *(uint32_t*)(p.flags[i].hook + 8);
 		if (f != p.flags[i].f) { f = p.flags[i].f; flags++; }
 	}
-	Log("coop: as before the lock: %d detectors, %d light pillars switched back, %d circles' states put back", changed, shown,
-	    flags);
+	Log("coop: as before the lock: %d detectors, %d light pillars switched back, %d circles' states put back, %d camera sectors off",
+	    changed, shown, flags, cams);
 }
 
 // Freedom mode ([coop] freedom): the level never takes a player's hero -- no

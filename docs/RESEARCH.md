@@ -2469,3 +2469,19 @@ both halves).
   (the catch only ever takes the companion). The user's other report -- Obelix could not be teleported to the
   turnstile after the cutscene unless leading -- did not reproduce with the autotest's placement (tele28: he
   stays there); open, waiting for how the user teleports.
+- Round 137 (user, LV2-8, userlogs\xxl_coop.lv2-8_freedom_on_camera_fail.log: freedom on, Asterix off the platforms
+  on purpose -- the lead came back to him, but player 1's camera kept the platforms' shot). CKSrvCamera tick
+  (0x454620): each frame the first camera sector (service +0x24, CKCameraSector 12,8: +0x29 bit 1 on, box +8..+0x1C,
+  track +0x20) whose box holds the camera's target (+0xF0..+0xF8) is taken; only a different one changes the track
+  (+0x4EC the last) -- leaving a box changes nothing unless another holds the target. With the second block pushed
+  into place (zone 02E9; the user: moving the platform starts the camera script) the platforms' sector (15.5 36.7
+  -126.5)-(46.5 84.1 -98.8), before the area's own (-10.6 29.8 -197.6)-(81.6 88.6 -77.5) in the list, was switched
+  on; its box covers the ground below too. The level's start over when Asterix falls (zone 03B8: trio 4800 + 4803,
+  the blocks back 09A2/09A3/0996/0998, detectors, the light pillar 0x900) does not switch it off -- in single player
+  Asterix waits on the pillar there and never falls. Now LockPicture keeps the camera sectors' +0x29, and a flagged
+  group that lights a light pillar (0x900) and frees the companion (4803) while a wait's picture is held (g_lock with
+  wait, else g_seqPic) switches off the sectors switched on since (CamerasBack, in NoteTrioEventFlagged); the mod's own
+  undos (RestoreLockPicture: R3 + B, a fall) do it too. Autotest camfall28 (level 2 sector 8: the pillar, Obelix's
+  pull, new step S_CAMSECTOR switching on the platforms' sector as 02E9 does, Asterix off the platform through 03B8):
+  before, both cameras stayed on its track; now "03B8 starts the wait's sequence over -- 1 camera sectors ... off",
+  both back on the area's track. turnstile21b / corkdown / lockcircle / carunlock33 / pull28 as before.

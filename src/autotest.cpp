@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -3585,6 +3585,35 @@ const Step kPull28[] = {
 	END(14000),
 };
 
+// camfall28 (level 2, sector 8; freedom on): the user's LV2-8 -- the platform's
+// pillar (Obelix leads), Obelix pulls the platform with Asterix on it, Asterix
+// jumps off it (29.4 57.7 -117.4: the platform's camera, zone 02E9) and falls to
+// the ground (31.1 51.0 -106.4: the reset, 03B8 -- the lead back to Asterix):
+// player 1's camera must not stay on the platform's shot.
+const Step kCamFall28[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, 16.913f, 51.4f, -133.0f),
+	GLIDEAT(2300, HERO_ASTERIX, 16.913f, 51.4f, -127.5f, 1000),
+	PLACEAT(4000, HERO_OBELIX, 37.923f, 51.5f, -120.156f),
+	PLACEAT(4200, HERO_ASTERIX, 42.057f, 57.5f, -120.097f),
+	VPAD(7000, 1, PAD_X, 0, 0, "p2 X"),
+	VPAD(7500, 1, PAD_X, 1.0f, 0, "p2 X + right"),
+	VPAD(17500, 1, 0, 0, 0, "p2 release"), SHOT(18000, "camfall28_1"),
+	PLACEAT(18500, HERO_OBELIX, 36.2f, 51.6f, -103.2f),
+	// (zone 02E9 -- the second block pushed into place -- switches on the
+	// platforms' camera sector (15.5 36.7 -126.5)-(46.5 84.1 -98.8): as its 0x701)
+	{ 19000, S_CAMSECTOR, 0, 0, 0, 17.0f, 45.0f, "the platforms' camera (02E9)", -124.0f },
+	SHOT(21000, "camfall28_2"),
+	GLIDEAT(22000, HERO_ASTERIX, 29.35f, 57.8f, -117.35f, 600),
+	GLIDEAT(22700, HERO_ASTERIX, 31.08f, 51.2f, -106.4f, 800),   // off the platform: the reset, 03B8
+	SHOT(25000, "camfall28_3"),
+	GLIDEAT(25500, HERO_ASTERIX, 33.6f, 51.2f, -117.67f, 1500),
+	GLIDEAT(27500, HERO_ASTERIX, 41.2f, 51.2f, -123.8f, 1500),
+	SHOT(30000, "camfall28_4"),
+	END(31000),
+};
+
 // tele28 (level 2, sector 8): Asterix leading walks into LV2-8's beam cutscene
 // zone (41.0 58.4 -89.6, ~8 s), then player 2's Obelix is put by the turnstile
 // (45.52 52.58 -66.59): the user's -- he did not stay there unless leading.
@@ -5149,6 +5178,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("corklead21", kCorkLead21),
 	SCENARIO("pull28", kPull28),
+	SCENARIO("camfall28", kCamFall28),
 	SCENARIO("tele28", kTele28),
 	SCENARIO("beam28", kBeam28),
 	SCENARIO("beam28b", kBeam28B),
@@ -6588,6 +6618,22 @@ void RunStep(const Step& s) {
 				if (eg < n) dumpGroup(eg, "    ");
 			}
 		}
+		break;
+	}
+	case S_CAMSECTOR: {   // the smallest switched-off camera sector around (x, y, z) switched on (as its 0x701)
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		char* best = nullptr;
+		float bv = 1e30f;
+		for (char* sec = cs ? *(char**)(cs + 0x24) : nullptr; sec; sec = *(char**)(sec + 4)) {
+			const float* b = (const float*)(sec + 8);
+			if ((*(uint8_t*)(sec + 0x29) & 2) || s.x <= b[0] || s.x >= b[3] || s.y <= b[1] || s.y >= b[4] || s.z <= b[2] || s.z >= b[5]) continue;
+			float v = (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]);
+			if (v < bv) { bv = v; best = sec; }
+		}
+		if (best) *(uint8_t*)(best + 0x29) |= 2;
+		Log("autotest: camera sector %p around (%.1f %.1f %.1f) switched on (track %p)", best, s.x, s.y, s.z,
+		    best ? *(void**)(best + 0x20) : nullptr);
 		break;
 	}
 	case S_CAMDUMP: {   // the camera service (yellow pages +0x68): state, tracks, sectors, input view
