@@ -1502,8 +1502,36 @@ static void RunOnSkippedScene(char* sc) {
 	}
 }
 
+// Level 0 (the game's start) is the exception: its intro (scene 0) runs into the
+// opening film (scene 1), which brings the title -- the logo, "Press Validate" --
+// and later flies on over Gaul (the title music stopped, game manager 0x530A).
+// Run on, a skip went past the title at once: no logo. There a skip ends the
+// scene the game's way (scene 1's end starts scene 3, the title), and one skip
+// of the intro (scene 0) skips the film too as it starts.
+static DWORD g_level0SkipAt = 0;   // the intro skipped: the film that follows is skipped too
+static char* g_level0Skipped = nullptr;
+
+static int CurrentLevelNow() {
+	CKYellowPages* yp = YellowPages();
+	return (yp && yp->gameManager) ? *(int*)((char*)yp->gameManager + ax::kGM_currentLevel) : -1;
+}
+
 static void __fastcall SkipSceneHook(char* sc, void* edx) {
 	uintptr_t ret = (uintptr_t)_ReturnAddress();
+	if (CurrentLevelNow() == 0) {
+		CKYellowPages* yp = YellowPages();
+		char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+		char** scenes = cin && *(unsigned*)(cin + 0x14) ? *(char***)(cin + 0x10) : nullptr;
+		bool intro = scenes && scenes[0] == sc;   // (scene 1, the film, brings the title: no chain from it)
+		if (ret != kMenuSkipReturn && intro && (*(uint16_t*)(sc + 0x20) & 1) && *(int8_t*)(sc + 0x30) >= 0) {
+			g_level0SkipAt = GetTickCount();
+			g_level0Skipped = sc;
+		}
+		if (ret != kMenuSkipReturn)
+			Log("coop: level 0's cutscene %p skipped the game's way%s", sc, g_level0Skipped == sc && g_level0SkipAt ? " (the film after it too)" : "");
+		g_origSkipScene(sc, edx);
+		return;
+	}
 	// (A scene of kind 0x80 -- level 1's scene 0, behind the others -- is never skipped by Enter.)
 	uint16_t f = sc ? *(uint16_t*)(sc + 0x20) : 0;
 	if (ret != kMenuSkipReturn && (f & 1) && (f & 0x180) != 0x80 && *(int8_t*)(sc + 0x30) >= 0) {
@@ -2722,6 +2750,21 @@ void CoopFrame() {
 	TrackStuckModes(t);
 	WatchSectors(t, now);   // every frame: the heroes' sectors are tracked in single player too
 	MakeCutscenesSkippable();
+	if (g_level0SkipAt) {   // level 0: the film after a skipped intro is skipped as it starts
+		CKYellowPages* ypc = YellowPages();
+		char* cin = ypc ? *(char**)((char*)ypc + 0x80) : nullptr;
+		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+		unsigned ns = cin ? *(unsigned*)(cin + 0x14) : 0;
+		for (unsigned i = 0; level == 0 && scenes && i < ns && i < 512; i++) {
+			uint16_t f = *(uint16_t*)(scenes[i] + 0x20);
+			if (scenes[i] == g_level0Skipped || !(f & 1) || (f & 0x180) == 0x80 || *(int8_t*)(scenes[i] + 0x30) < 0) continue;
+			Log("coop: level 0: the cutscene after the skipped one (%p) skipped as well", scenes[i]);
+			((void(__fastcall*)(char*, void*))kSkipScene)(scenes[i], nullptr);
+			g_level0SkipAt = 0;
+			break;
+		}
+		if (level != 0 || (g_level0SkipAt && now - g_level0SkipAt > 6000)) g_level0SkipAt = 0;
+	}
 	{   // diagnostics: the streamed sector (level object = yellow pages +0x90, current +0x24, next +0x34)
 		static int lastSector = -99;
 		char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;

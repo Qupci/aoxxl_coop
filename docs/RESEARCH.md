@@ -2636,3 +2636,17 @@ both halves).
   no bring-along -- not reproduced. Autotest steps: S_CINEDUMP (a scene's graph and events), CINE_ENTER (skip as
   Enter does). Autotests skip1, intro1, obelix1s, obelix1f, boss210s, boss210f, boss210u, boss210v; lvl1obelix,
   boss210t unchanged.
+- Round 147 (user: LV2-10 closed -- the round 146 skip fixed it. force_level -1: since round 146 the game's start
+  skipped past the title -- no logo; before, A after ~10 s skipped the intro, the film after it came up (its
+  camera off the level), a second A landed on the title with its logo). Level 0 (autotest boot0, XXL_LEVEL=-1:
+  the timeline starts with level 0's first cutscene, nothing pressed): scene 0 the intro (10.2 s after launch, 16 s;
+  skippable only through skip_cutscenes), scene 1 the film (5901, the game's own Enter skip -- "after ~25 s"), the
+  title ~76 s in: its flight's And door sends the title music (0028: ManageEvent 0501) and game manager
+  (CKAsterixGameManager 0x627F6C) 5309/5305, a later one stops the music (0030) and sends 530A as the flight goes
+  on over Gaul (scene 2, kind 0x80). Run on, a skip of scene 1 fired both at once: past the title. Skipped the
+  game's way, scene 1's end starts scene 3, the title (music stream 1, the logo). Now level 0 skips the game's
+  way, and a skip of its first scene (scenes[0], the intro) also skips the film as it starts (CoopFrame watch,
+  6 s): one press at either time lands on the title. Autotests boot1 (skip 2 s into the intro, ~12 s after
+  launch), boot2 (17 s in, ~27 s, the film): logo and title music ~4 s later. Test steps S_WATCHCINE (scene
+  flags as they change); "boot..." scenarios start with level 0's first cutscene and press nothing (the WAIT
+  phase's Enter for the no-controller notice is keybd_event). skip1 unchanged.

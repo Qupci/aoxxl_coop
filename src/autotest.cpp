@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -505,6 +505,28 @@ const Step kSectorZone[] = {
 	SHOT(8000, "sectorzone_1"),
 	END(10000),
 };
+
+// boot0 (XXL_LEVEL=-1): the game's start untouched -- level 0's intro, the logo,
+// the title screen: every scene's flags as they change, screenshots.
+const Step kBoot0[] = {
+	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" },
+	{ 300, S_CINEDUMP, -1, 0, 0, 0, 0, "the intro" },
+	{ 17000, S_CINEDUMP, 1, 0, 0, 0, 0, "scene 1" }, { 17100, S_CINEDUMP, 3, 0, 0, 0, 0, "scene 3" },
+	{ 17200, S_CINEDUMP, 4, 0, 0, 0, 0, "scene 4" },
+	SHOT(5000, "boot0_05"), SHOT(12000, "boot0_12"), SHOT(20000, "boot0_20"), SHOT(27000, "boot0_27"),
+	SHOT(35000, "boot0_35"), SHOT(45000, "boot0_45"), SHOT(55000, "boot0_55"), SHOT(65000, "boot0_65"),
+	SHOT(80000, "boot0_80"), SHOT(95000, "boot0_95"), SHOT(110000, "boot0_110"), SHOT(125000, "boot0_125"),
+	SHOT(140000, "boot0_140"), SHOT(155000, "boot0_155"), SHOT(170000, "boot0_170"), SHOT(185000, "boot0_185"),
+	SHOT(200000, "boot0_200"), SHOT(220000, "boot0_220"),
+	END(240000),
+};
+
+// boot1 / boot2 (XXL_LEVEL=-1): one skip at the game's start -- in the intro, 2 s
+// in (about 12 s after launch), or in the film after it, 17 s in (about 27 s):
+// either lands on the title, its logo shown ("Press Validate").
+#define BOOT_SKIP(at, n) 	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" }, 	CINE_ENTER(at), 	SHOT(at + 1500, n "_a"), SHOT(at + 4000, n "_b"), SHOT(at + 7000, n "_c"), SHOT(at + 12000, n "_d"), 	END(at + 16000)
+const Step kBoot1[] = { BOOT_SKIP(2000, "boot1") };
+const Step kBoot2[] = { BOOT_SKIP(17000, "boot2") };
 
 // cine1 (-Level 1): the cinematic scenes' graphs -- the one playing (the intro)
 // and the first few.
@@ -5867,6 +5889,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("sas", kSas),
 	SCENARIO("sectorzone", kSectorZone),
 	SCENARIO("cine1", kCine1),
+	SCENARIO("boot0", kBoot0),
+	SCENARIO("boot1", kBoot1),
+	SCENARIO("boot2", kBoot2),
 	SCENARIO("skip1", kSkip1),
 	SCENARIO("intro1", kIntro1),
 	SCENARIO("torch", kTorch),
@@ -6176,6 +6201,7 @@ struct AutotestState {
 	char*   watchClue = nullptr;    // CKHkClueMan (the spy), WATCHCLUE
 	char*   watchTorch = nullptr;   // CKHkTorch nearest Asterix, TORCH
 	bool    watchCam = false;       // the game camera (service +0x5B0 pos, +0x5BC look, track), WATCHCAM
+	bool    watchCine = false;      // every cinematic scene's +0x20 / +0x30 changes, WATCHCINE
 	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
 	bool    watchEnemies = false;   // Romans and squads near enemyPoint, WATCHENEMIES
 	bool    enemiesPrimed = false;
@@ -7422,6 +7448,7 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_WATCHCAM: at.watchCam = true; break;
+	case S_WATCHCINE: at.watchCine = true; break;
 	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
 	case S_WATCHENEMIES: at.watchEnemies = true; at.enemyPoint = Vector3(s.x, s.y, s.z); break;
 	case S_CPNTCHECK: {   // a > 0: writes to +0x54 of Roman #b of class a watched as well
@@ -8263,6 +8290,25 @@ void AutotestFrame() {
 	DWORD now = GetTickCount();
 	SubclassWindow();
 
+	if (at.phase == AutotestState::WAIT && _strnicmp(at.sc->name, "boot", 4) == 0) {
+		// Boot scenarios (run with XXL_LEVEL=-1): the game's own start -- the run
+		// starts with level 0's first cutscene, and nothing is pressed for it.
+		CKYellowPages* yp = YellowPages();
+		int level = (yp && yp->gameManager) ? *(int*)((char*)yp->gameManager + ax::kGM_currentLevel) : -1;
+		char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+		unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
+		bool playing = false;
+		for (unsigned i = 0; scenes && i < n && i < 512; i++) playing |= (*(uint16_t*)(scenes[i] + 0x20) & 1) != 0;
+		if (level != 0 || !playing) {
+			if ((int)(now - at.bootTick) > 120000) Finish("level 0's cutscene never played");
+			return;
+		}
+		at.phase = AutotestState::RUN;
+		at.runStart = now;
+		at.next = 0;
+		Log("autotest: === run '%s' === (level 0's first cutscene, %.1f s after boot)", at.sc->name, (now - at.bootTick) / 1000.0f);
+	}
 	if (at.phase == AutotestState::WAIT) {
 		bool live = CoopGameplayLive() && GetNumLvlClassInstances(ax::kCKHkObelix) > 0;
 		// Only the forced level counts: the menu's attract-mode demo also has
@@ -8299,6 +8345,25 @@ void AutotestFrame() {
 	}
 
 	int t = (int)(now - at.runStart);
+	if (at.watchCine) {
+		static uint16_t f20[64];
+		static uint8_t  f30[64];
+		static bool     seen[64];
+		static int      lines = 0;
+		CKYellowPages* yp = YellowPages();
+		char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+		char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
+		unsigned n = cin ? *(unsigned*)(cin + 0x14) : 0;
+		int level = (yp && yp->gameManager) ? *(int*)((char*)yp->gameManager + ax::kGM_currentLevel) : -1;
+		for (unsigned i = 0; scenes && i < n && i < 64 && lines < 400; i++) {
+			uint16_t a = *(uint16_t*)(scenes[i] + 0x20);
+			uint8_t b = *(uint8_t*)(scenes[i] + 0x30);
+			if (seen[i] && a == f20[i] && b == f30[i]) continue;
+			seen[i] = true; f20[i] = a; f30[i] = b; lines++;
+			Log("autotest: cine %.2f s: level %d scene %u %p f20=%04X f30=%02X running %p", t / 1000.0f, level, i, scenes[i], a, b,
+			    *(void**)(scenes[i] + 0xC));
+		}
+	}
 	while (at.phase == AutotestState::RUN && at.next < at.sc->count && at.sc->steps[at.next].t <= t)
 		RunStep(at.sc->steps[at.next++]);
 	{
