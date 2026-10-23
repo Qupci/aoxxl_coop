@@ -1,6 +1,7 @@
 #include "pathfind.h"
 #include "log.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -301,6 +302,58 @@ int PfReachable(const Vector3& from, const Vector3& to) {
 	for (int c : b)
 		if (seen[c]) return PF_YES;
 	return PF_NO;
+}
+
+int PfConnected(const Vector3& a, const Vector3& b) {
+	Graph g;
+	if (!Load(&g)) return PF_UNKNOWN;
+	std::vector<int> sa, sb;
+	Seeds(g, a, &sa);
+	Seeds(g, b, &sb);
+	if (sa.empty() || sb.empty()) return PF_UNKNOWN;
+	std::vector<uint8_t> seen;
+	Flood(g, sa, &seen);
+	for (int c : sb)
+		if (seen[c]) return PF_YES;
+	Flood(g, sb, &seen);
+	for (int c : sa)
+		if (seen[c]) return PF_YES;
+	return PF_NO;
+}
+
+bool PfSpotCutOff(const Vector3& from, float minDist, float maxDist, Vector3* out) {
+	Graph g;
+	if (!Load(&g)) return false;
+	std::vector<int> seeds;
+	Seeds(g, from, &seeds);
+	if (seeds.empty()) return false;
+	std::vector<uint8_t> reached, back;
+	Flood(g, seeds, &reached);
+	struct Cand { float d2; int ni, x, z; };
+	std::vector<Cand> cands;
+	for (int ni = 0; ni < (int)g.nodes.size(); ni++) {
+		const Node& n = g.nodes[ni];
+		for (int z = 0; z < n.nz; z++)
+			for (int x = 0; x < n.nx; x++) {
+				if (reached[n.base + z * n.nx + x] || !Walkable(g, ni, x, z)) continue;
+				Vector3 c = Centre(n, x, z);
+				float dx = c.x - from.x, dz = c.z - from.z, d2 = dx * dx + dz * dz;
+				if (d2 >= minDist * minDist && d2 <= maxDist * maxDist) cands.push_back({ d2, ni, x, z });
+			}
+	}
+	std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) { return a.d2 < b.d2; });
+	for (size_t i = 0; i < cands.size() && i < 40; i++) {
+		const Node& n = g.nodes[cands[i].ni];
+		std::vector<int> s(1, n.base + cands[i].z * n.nx + cands[i].x);
+		Flood(g, s, &back);
+		bool way = false;
+		for (int c : seeds) way |= back[c] != 0;
+		if (way) continue;
+		*out = Centre(n, cands[i].x, cands[i].z);
+		out->y = n.mx[1] + 0.5f;
+		return true;
+	}
+	return false;
 }
 
 void PfDump(const Vector3* around, float radius) {

@@ -32,7 +32,8 @@ struct CoopConfig {
 	bool  carRiderLeads = false;      // a hero boarding a cable car while the other leads takes the lead at once
 	float deadzone      = 0.24f;
 
-	// Experimental rules ([experimental]; read at startup, single player too)
+	// Experimental rules ([experimental]; read at startup)
+	bool  coopOnly         = true;  // squads and combo bar: only while player 2 plays (single player: the game's own)
 	float squadAliveFactor = 2.0f;  // Romans of a squad alive at once
 	float squadCountFactor = 2.0f;  // Romans of each squad pool (phase) to defeat
 	float priceFactor      = 2.0f;  // the merchant's prices

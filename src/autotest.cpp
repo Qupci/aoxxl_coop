@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -2570,6 +2570,12 @@ const Step kPit26A[] = {
 // lever (86.2 2.4 -396.5) and the bridge comes out -- a way over.
 #define PFDUMP(t, hero, r) { t, S_PFDUMP, hero, 0, 0, r, 0, "pf dump" }
 #define REACH(t)           { t, S_REACH, 0, 0, 0, 0, 0, "reach" }
+// hero `hero` put where hero `from` can't walk to nor come from (`minD`..`maxD` units off)
+#define APARTSPOT(t, hero, from, minD, maxD) { t, S_APARTSPOT, hero, from, 0, minD, maxD, "apart spot" }
+// the squads within s.x units of hero `hero` in the log: box, active, pools
+#define SQUADS(t, hero, r) { t, S_SQUADS, hero, 0, 0, r, 0, "squads" }
+// every active squad put away the game's way (vf34, as when left out of view): its Romans back to their pools
+#define SQUADRESET(t)      { t, S_SQUADRESET, 0, 0, 0, 0, 0, "squad reset" }
 const Step kPf26[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3106,6 +3112,57 @@ const Step kLock4[] = {
 	GLIDEAT(1500, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
 	SHOT(3000, "lock4_1"), SHOT(4500, "lock4_2"), SHOT(7000, "lock4_3"),
 	END(8000),
+};
+
+// rules4d / rules4t / rules4p (-Level 4): LV4-1's fight lock (lock4: 94 + 6
+// hiding Romans) with player 2 in, Asterix fights it with the potion.
+// rules4d (XXL_DOWNAT=1:1000 XXL_UPAT=20000): Obelix is down as the fight
+// starts (the squads woken at the level's start are put away at 2 s and wake
+// again) -- the level's numbers (100) -- and revived at 20 s: doubled for the
+// rest (the gate jumps), the at-once numbers and the combo bar the rules' again.
+// Obelix lies away from the fight and is put back there after the revive: a
+// player's view on the fight turns down the reinforcement points behind the
+// other's camera (the fight stalls).
+// rules4t: both heroes there from the start (200). rules4p: Obelix put where
+// Asterix (in the fight lock) can't walk to (the graph), the squads put away at
+// 4.5 s (they wake again: 100), Obelix brought beside him at 21 s (doubled).
+#define RULES4A(other, mid) 	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), other, 	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800), POTION(3900), mid, 	SHOT(5000, "rules4_1"), TAPS1(5500), TAPS1(10500), TAPS1(15500), SHOT(20200, "rules4_2")
+#define RULES4B 	TAPS1(21000), TAPS1(26000), POTION(30500), TAPS1(31000), SHOT(36000, "rules4_3"), END(37000)
+const Step kRules4D[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(900, HERO_OBELIX, -261.66f, 0.8f, 52.83f), SQUADRESET(2000),
+	RULES4A(MARK(2600, "obelix down since 1 s"), SQUADS(4500, HERO_ASTERIX, 10.0f)),
+	PLACEAT(20600, HERO_OBELIX, -261.66f, 0.8f, 52.83f), RULES4B,
+};
+const Step kRules4T[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	RULES4A(PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f), MARK(4000, "fight")), RULES4B,
+};
+const Step kRules4P[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1000, HERO_ASTERIX, -288.15f, 0.8f, 117.27f), APARTSPOT(1500, HERO_OBELIX, HERO_ASTERIX, 8.0f, 80.0f),
+	REACH(2400), SQUADS(3000, HERO_ASTERIX, 10.0f), REACH(3500), POTION(3900), SQUADRESET(4500),
+	SHOT(5500, "rules4_1"), TAPS1(6000), TAPS1(11000), TAPS1(16000), SHOT(20700, "rules4_2"),
+	PLACEAT(21000, HERO_OBELIX, -286.15f, 0.8f, 118.0f), REACH(21500),
+	TAPS1(22000), TAPS1(27000), POTION(31500), TAPS1(32000), SHOT(37000, "rules4_3"), END(38000),
+};
+
+// rules4l (-Level 4): rules4t, then player 2 leaves at 15 s (coop_only: the
+// fight goes back to the level's numbers, the combo bar the game's) and comes
+// in again at 21 s (doubled again).
+const Step kRules4L[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800), POTION(3900),
+	SHOT(5000, "rules4l_1"), TAPS1(5500), TAPS1(10500),
+	VPAD(15200, 1, PAD_START, 0, 0, "p2 start (leave)"), VPAD(15400, 1, 0, 0, 0, "p2 release"),
+	SHOT(15800, "rules4l_2"), TAPS1(16000),
+	VPAD(21200, 1, PAD_START, 0, 0, "p2 start (join)"), VPAD(21400, 1, 0, 0, 0, "p2 release"),
+	SHOT(22000, "rules4l_3"), TAPS1(22500), TAPS1(27500), SHOT(32500, "rules4l_4"), END(33500),
 };
 
 // fight4h (-Level 4): fight4a at LV4-1's hiding Romans (squad 21: a hiding spot at -263.7 0.2 52.8).
@@ -6005,6 +6062,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("shopspyw", kShopSpyW),
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
+	SCENARIO("rules4d", kRules4D),
+	SCENARIO("rules4t", kRules4T),
+	SCENARIO("rules4p", kRules4P),
+	SCENARIO("rules4l", kRules4L),
 	SCENARIO("lockcircle", kLockCircle),
 	SCENARIO("slidecross3", kSlideCross3),
 	SCENARIO("slidecross", kSlideCross),
@@ -7045,6 +7106,64 @@ void RunStep(const Step& s) {
 		Log("autotest: reach obelix->asterix %s, asterix->obelix %s (asterix %.1f %.1f %.1f, obelix %.1f %.1f %.1f)",
 		    kName[PfReachable(o.Pos(), a.Pos()) + 1], kName[PfReachable(a.Pos(), o.Pos()) + 1], a.Pos().x, a.Pos().y,
 		    a.Pos().z, o.Pos().x, o.Pos().y, o.Pos().z);
+		break;
+	}
+	case S_SQUADRESET: {   // every active squad (4,26 / 4,64) put away by its vf34
+		const int classes[2] = { 26, 64 };
+		int n = 0;
+		for (int c : classes)
+			for (unsigned i = 0, k = GetNumLvlClassInstances(4, c); i < k; i++) {
+				char* sq = (char*)GetLvlObject(4, c, i);
+				if (!sq || !(*(uint8_t*)(sq + 0x152) & 2)) continue;
+				typedef void(__fastcall* ResetFn)(char* self, void* edx);
+				((ResetFn)(*(void***)sq)[34])(sq, nullptr);
+				n++;
+			}
+		Log("autotest: %d active squad(s) put away", n);
+		break;
+	}
+	case S_SQUADS: {   // squads (4,26 / 4,64) whose box is within s.x units of hero a
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		const Vector3& p = h.Pos();
+		const int classes[2] = { 26, 64 };
+		for (int c : classes)
+			for (unsigned i = 0, k = GetNumLvlClassInstances(4, c); i < k; i++) {
+				char* sq = (char*)GetLvlObject(4, c, i);
+				if (!sq) continue;
+				const float* f = (const float*)sq;   // box: max +0x11C, min +0x128
+				float dx = p.x < f[0x4A] ? f[0x4A] - p.x : p.x > f[0x47] ? p.x - f[0x47] : 0.0f;
+				float dz = p.z < f[0x4C] ? f[0x4C] - p.z : p.z > f[0x49] ? p.z - f[0x49] : 0.0f;
+				if (dx * dx + dz * dz > s.x * s.x) continue;
+				char buf[300];
+				int len = _snprintf(buf, sizeof(buf), "autotest: squad %p box x %.1f..%.1f z %.1f..%.1f (%s from %s), active %d, gate %d:",
+				                    sq, f[0x4A], f[0x47], f[0x4C], f[0x49], dx || dz ? "away" : "in", HeroName(s.a),
+				                    (*(uint8_t*)(sq + 0x152) >> 1) & 1, *(int8_t*)(sq + 0x154));
+				char* recs = *(char**)(sq + 0x144);
+				for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); recs && r < nr && r < 4 && len > 0 && len < (int)sizeof(buf); r++)
+					len += _snprintf(buf + len, sizeof(buf) - len, " [%u: %d to defeat, sent %u]", r,
+					                 *(int16_t*)(recs + 0x1C * r + 0x18), *(uint16_t*)(recs + 0x1C * r + 0x16));
+				buf[sizeof(buf) - 1] = 0;
+				Log("%s", buf);
+			}
+		break;
+	}
+	case S_APARTSPOT: {   // hero a where hero b can't walk to nor come from (s.x..s.y units off)
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero(), f = t ? t.GetHero(s.b) : Hero();
+		Vector3 at;
+		if (!h || !f || !PfSpotCutOff(f.Pos(), s.x, s.y, &at)) {
+			Log("autotest: no spot cut off from %s within %.0f..%.0f units", HeroName(s.b), s.x, s.y);
+			break;
+		}
+		h.Pos() = at;
+		if (h.hook->node && h.hook->node->matrix) {
+			float* m = (float*)((char*)h.hook->node->matrix + 0x40);
+			m[0] = at.x; m[1] = at.y; m[2] = at.z;
+		}
+		Log("autotest: %s put at %.1f %.1f %.1f, cut off from %s (%.1f %.1f %.1f)", HeroName(s.a), at.x, at.y, at.z,
+		    HeroName(s.b), f.Pos().x, f.Pos().y, f.Pos().z);
 		break;
 	}
 	case S_NEAROBJ: {   // hero a put s.x units from the nearest object of class (2, b), facing it

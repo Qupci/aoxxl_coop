@@ -83,3 +83,8 @@ bool IndivHoldsBack(char* hook);
 
 // The stats of `hero` (for the HUD): health points, shields, combo hits.
 bool IndivStats(int hero, int* hp, int* shields, int* hits = nullptr, float* gauge = nullptr);
+// The combo bar's levels changed (experimental rules): `fn` on the combo bar of
+// each hero whose stats are kept in a copy, not in the game's place (those are
+// the caller's): hits, full bar's gauge, decay timer, full.
+typedef void (*IndivComboFn)(uint32_t* hits, float* gauge, float* decay, bool full);
+void IndivEachComboCopy(IndivComboFn fn);

@@ -127,6 +127,8 @@ void CoopConfig::Load(const char* iniPath) {
 	comboFactor      = readFactor("combo_bar_fill", comboFactor);
 	comboDrainFactor = readFactor("combo_bar_drain", comboDrainFactor);
 	comboFullDrainFactor = readFactor("combo_bar_full_drain", comboFullDrainFactor);
+	coopOnly = ReadBool("experimental", "coop_only", coopOnly, full);
+	if (getenv("XXL_COOPONLY")) coopOnly = atoi(getenv("XXL_COOPONLY")) != 0;   // autotests
 
 	GetPrivateProfileStringA("coop", "deadzone", "0.24", buf, sizeof(buf), full);
 	deadzone = (float)atof(buf);
@@ -134,8 +136,9 @@ void CoopConfig::Load(const char* iniPath) {
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
 		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d freedom=%d (corkscrews %d) riderLeads=%d "
-		"experimental: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f, freedom romans %d",
+		"experimental: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f (%s), freedom romans %d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
 		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual,
-		freedom, freedomCorkscrews, carRiderLeads, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor, freedomRomans);
+		freedom, freedomCorkscrews, carRiderLeads, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
+		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too", freedomRomans);
 }

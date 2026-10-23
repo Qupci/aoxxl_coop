@@ -1,8 +1,11 @@
 // Experimental rules (ini [experimental]) for a harder game with two players:
 // more Romans at once in a squad, more Romans to defeat, a dearer merchant, a
-// slower combo bar. They
-// change the level data as it loads -- single player too, and whatever co-op
-// is doing -- so they are read once, at startup.
+// slower combo bar. Read once, at startup. The merchant's prices change as the
+// level loads; the squads' numbers and the combo bar follow the game: on while
+// both players play together, the game's own while the heroes are apart (one
+// held by the level, down, or where the other can't walk to it) and, with
+// coop_only, in single player. A fight's Romans to defeat are set as it starts
+// and only go up (the heroes together again) -- down only with player 2 gone.
 //
 // A squad (CKGrpSquad, deserialize 0x52DE80) keeps one 0x1C record per pool of
 // Romans (squad +0x144, count +0x14C; the editor's "Pools", one per phase):

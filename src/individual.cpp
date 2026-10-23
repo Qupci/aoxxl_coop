@@ -890,6 +890,13 @@ bool IndivStats(int hero, int* hp, int* shields, int* hits, float* gauge) {
 	return true;
 }
 
+void IndivEachComboCopy(IndivComboFn fn) {
+	if (g.active)
+		for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++)
+			if (i != g.ctx) fn(&g.st[i].hits, &g.st[i].gauge, &g.st[i].decay, g.st[i].full);
+	if (g.kept) fn(&g.keptStats.hits, &g.keptStats.gauge, &g.keptStats.decay, g.keptStats.full);
+}
+
 // A launcher needs both heroes and may stand where the fallen one can't be
 // reached: the hero at it revives its partner there and then.
 void IndivReviveAtLauncher(int up) {

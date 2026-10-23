@@ -2650,3 +2650,35 @@ both halves).
   launch), boot2 (17 s in, ~27 s, the film): logo and title music ~4 s later. Test steps S_WATCHCINE (scene
   flags as they change); "boot..." scenarios start with level 0's first cutscene and press nothing (the WAIT
   phase's Enter for the no-controller notice is keybd_event). skip1 unchanged.
+- Round 148 (user request: the squads' and combo bar's rules follow who is fighting). [experimental] coop_only (on by
+  default; env XXL_COOPONLY): squads and combo bar only while player 2 plays. Modes (experimental.cpp ModeNow): GAME
+  (single player with coop_only), APART (player 2 in; a hero held -- CoopHeroHeld --, fallen, or the heroes apart by
+  the graph), ON. Apart: pathfind.cpp PfConnected (one graph load, a flood each way; either way open = together),
+  every 0.5 s, 3 noes in a row -> apart, the first yes -> together, not known (a place in no node: LV4-1's level
+  start -288 124 is outside the graph) -> as it was; ~0.5 ms a look-up in LV4. Romans at once (script numbers, U1
+  +0x10 always, U2 +0x11 while the squad has not woken and still holds one of the two values) and the combo bar
+  (thresholds gm +0xB8..BA/+0xC8, drains +0x9C/+0xA0) are the rules' only in ON. A bar under way keeps its share:
+  hits x new/old full (not full: below it), gauge +0xA4 and decay +0xA8 x their ratios, for the hero in the game's
+  place and individual heroes' copies (IndivEachComboCopy; also the kept stats of a player 2 who left). Romans to
+  defeat are no longer scaled at load: the squad's records keep the level's numbers, the mod's additions per pool
+  (own = its doubling, extra = others' shares) go in each frame (UpdateSquads). A squad is under way once a pool has
+  sent in, queued or fallen (+0x16/+0x14/+0x15; vf34 un-sends the Romans it returns, so a squad put away before
+  any fell is fresh again; FUN_0052D460 / vf33's idle-restart zero +0x16). Fresh: follows the mode. Under way:
+  raised (Raise) when the mode is ON, lowered (Lower: what is not sent in yet) only in GAME (player 2 gone). Raise
+  mid-fight gives each scaled pool still in the fight (left to send, queued, fallen or alive -- vf42 0x4C81E0, 0
+  while the squad is inactive) its share; a beaten pool's share goes to the pool with the most left to send of the
+  squad, else of the gate's squads (GateFrame), never to kept pools (placed-only, turtles). GateFrame gives the kept
+  pools' doubling only to a scaled squad of the gate (the share waits while the fight runs at the level's numbers;
+  a Lower hands it back). Cond 16 (sent in so far) scaled only for a scaled squad. Safety net (TrimStuck): a gate
+  squad's pool with the mod's Romans left to send but none queued / fallen / alive for 6 s while active loses them.
+  Autotests (-Level 4; LV4-1's lock squad 94 + hiding 6, box x -361.6..-245.8 z -6.3..156.0, wakes at the level's
+  start): rules4t (together: 200), rules4d (XXL_DOWNAT=1:1000 XXL_UPAT=20000: squads put away at 2 s -> fight
+  starts with Obelix down: 100; revive: 185 left + 15 beaten = 200), rules4p (Obelix on a ledge -303.9 2.8 46.5
+  cut off both ways -> apart 1.4 s later; fight 100; brought beside: 195 + 5 = 200), rules4l (player 2 leaves at
+  15 s: 90 left + 10 beaten = 100; back at 21 s: 180 + 20 = 200), lock4 (single player: 100; XXL_COOPONLY=0: 200).
+  Test steps S_APARTSPOT (pathfind PfSpotCutOff: the nearest walkable cell cut off both ways), S_SQUADS (boxes,
+  active, gate, pools), S_SQUADRESET (every active squad's vf34). Test lesson (user): a player's view on the fight
+  turns down the reinforcement points behind the other's camera (proximity SpawnPointHook, retried each frame) --
+  with Obelix standing or lying by LV4-1's lock and both cameras on the arena no Roman came back (~1600 refusals);
+  the tests keep Obelix's view off the fight. Not changed in the game (a fallback after a while of refusals was
+  written and reverted).
