@@ -78,7 +78,7 @@ void CoopConfig::Load(const char* iniPath) {
 	freedom = ReadBool("coop", "freedom", freedom, full);
 	freedomCorkscrews = ReadBool("coop", "freedom_corkscrews", freedomCorkscrews, full);
 	carRiderLeads = ReadBool("coop", "cable_car_rider_leads", carRiderLeads, full);
-	freedomRomans = ReadBool("experimental", "freedom_romans", freedomRomans, full);
+	freedomRomans = ReadBool("coop_difficulty.experimental", "freedom_romans", freedomRomans, full);
 	if (getenv("XXL_FREEDOM")) freedom = atoi(getenv("XXL_FREEDOM")) != 0;   // autotests
 	if (getenv("XXL_FREEDOMCORK")) freedomCorkscrews = atoi(getenv("XXL_FREEDOMCORK")) != 0;
 	if (getenv("XXL_RIDERLEADS")) carRiderLeads = atoi(getenv("XXL_RIDERLEADS")) != 0;
@@ -115,7 +115,7 @@ void CoopConfig::Load(const char* iniPath) {
 
 	auto readFactor = [&](const char* key, float def) {
 		char fb[32] = {};
-		GetPrivateProfileStringA("experimental", key, "", fb, sizeof(fb), full);
+		GetPrivateProfileStringA("coop_difficulty", key, "", fb, sizeof(fb), full);
 		if (!fb[0]) return def;
 		if (!_stricmp(fb, "off")) return 1.0f;
 		float f = (float)atof(fb);
@@ -127,8 +127,16 @@ void CoopConfig::Load(const char* iniPath) {
 	comboFactor      = readFactor("combo_bar_fill", comboFactor);
 	comboDrainFactor = readFactor("combo_bar_drain", comboDrainFactor);
 	comboFullDrainFactor = readFactor("combo_bar_full_drain", comboFullDrainFactor);
-	coopOnly = ReadBool("experimental", "coop_only", coopOnly, full);
+	if (getenv("XXL_FACTORS1"))   // autotests: every squad and combo bar factor the game's own
+		squadAliveFactor = squadCountFactor = comboFactor = comboDrainFactor = comboFullDrainFactor = 1.0f;
+	coopOnly = ReadBool("coop_difficulty", "difficulty_coop_only", coopOnly, full);
+	rulesStatic = ReadBool("coop_difficulty", "difficulty_static", rulesStatic, full);
+	apartByPath = ReadBool("coop_difficulty", "difficulty_pathfinding", apartByPath, full);
+	toDefeatStays = ReadBool("coop_difficulty", "difficulty_to_defeat_stays", toDefeatStays, full);
 	if (getenv("XXL_COOPONLY")) coopOnly = atoi(getenv("XXL_COOPONLY")) != 0;   // autotests
+	if (getenv("XXL_STATIC")) rulesStatic = atoi(getenv("XXL_STATIC")) != 0;
+	if (getenv("XXL_APARTPATH")) apartByPath = atoi(getenv("XXL_APARTPATH")) != 0;
+	if (getenv("XXL_DEFEATSTAYS")) toDefeatStays = atoi(getenv("XXL_DEFEATSTAYS")) != 0;
 
 	GetPrivateProfileStringA("coop", "deadzone", "0.24", buf, sizeof(buf), full);
 	deadzone = (float)atof(buf);
@@ -136,9 +144,11 @@ void CoopConfig::Load(const char* iniPath) {
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
 		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d freedom=%d (corkscrews %d) riderLeads=%d "
-		"experimental: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f (%s), freedom romans %d",
+		"co-op difficulty: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f (%s, %s, "
+		"pathfinding %d, to defeat stays %d), freedom romans %d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
 		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual,
 		freedom, freedomCorkscrews, carRiderLeads, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
-		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too", freedomRomans);
+		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too",
+		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, freedomRomans);
 }

@@ -32,15 +32,18 @@ struct CoopConfig {
 	bool  carRiderLeads = false;      // a hero boarding a cable car while the other leads takes the lead at once
 	float deadzone      = 0.24f;
 
-	// Experimental rules ([experimental]; read at startup)
+	// Co-op difficulty ([coop_difficulty]; read at startup)
 	bool  coopOnly         = true;  // squads and combo bar: only while player 2 plays (single player: the game's own)
+	bool  rulesStatic      = false; // ... on all the time in co-op, not the game's own while the heroes are apart
+	bool  apartByPath      = true;  // the heroes are apart too where neither can walk to the other (pathfinding)
+	bool  toDefeatStays    = false; // a fight begun with the heroes apart keeps the level's Romans to defeat
 	float squadAliveFactor = 2.0f;  // Romans of a squad alive at once
 	float squadCountFactor = 2.0f;  // Romans of each squad pool (phase) to defeat
 	float priceFactor      = 2.0f;  // the merchant's prices
 	float comboFactor      = 0.5f;  // combo bar hits counted per Roman hit
 	float comboDrainFactor = 1.5f;  // the combo bar losing its hits (before it is full)
 	float comboFullDrainFactor = 1.5f; // a full combo bar running out
-	bool  freedomRomans    = false; // freedom mode: Romans come for a hero the level would have kept waiting
+	bool  freedomRomans    = false; // freedom mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

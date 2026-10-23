@@ -11,10 +11,10 @@
 #include <cstdio>
 #include <cstdlib>
 
-// Freedom mode's Romans ([experimental] freedom_romans): while the level would
-// have kept a player's hero waiting -- a scripted order freedom mode leaves
-// unfollowed (CoopFreedomWaiting) -- Romans come for it now and then, so the
-// free player has something to do until the other lifts the wait.
+// Freedom mode's Romans ([coop_difficulty.experimental] freedom_romans): while
+// the level would have kept a player's hero waiting -- a scripted order freedom
+// mode leaves unfollowed (CoopFreedomWaiting) -- Romans come for it now and
+// then, so the free player has something to do until the other lifts the wait.
 //
 // Romans come from a squad's pools: vf55 (CKGrpSquadEnemy, the squad script's
 // "send in at a point", thiscall(args) -- args { count, Vector3* point, pool or

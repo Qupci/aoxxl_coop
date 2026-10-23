@@ -28,22 +28,26 @@ DeserializeFn   g_origShopDeserialize = nullptr;
 // When the squads' and the combo bar's rules count. Co-op on (player 2 in),
 // the heroes are apart while one is held by the level (a cable car ride, a
 // wait), down waiting to be revived, or where the other can't walk to it (the
-// level's pathfinding graph): the one left fights with the game's numbers --
-// Romans at once and the combo bar as the level has them, and a fight that
-// starts then has the level's Romans to defeat until the heroes are together
-// again (UpdateSquads). Single player: the rules on, or with coop_only the
-// game's own numbers.
+// level's pathfinding graph; difficulty_pathfinding): the one left fights with
+// the game's numbers -- Romans at once and the combo bar as the level has
+// them, and a fight that starts then has the level's Romans to defeat until
+// the heroes are together again (UpdateSquads; difficulty_to_defeat_stays: for
+// good). difficulty_static: never apart, the rules on all through co-op.
+// Single player: the rules on, or with coop_only the game's own numbers.
 enum Mode { MODE_GAME, MODE_APART, MODE_ON };
 const char* const kModeName[] = { "single player, the game's own", "the heroes apart", "on" };
 
 // Can the heroes walk to each other (either way, pathfind.cpp)? Asked every
 // 0.5 s while player 2 plays; apart after three noes in a row (not a hero in
 // mid-jump over a gap's cells), together again on the first yes. Not known (a
-// hero on a lifter, in the air): as it was.
+// hero on a lifter, in the air): as it was. Not asked with the rules static,
+// with difficulty_pathfinding off, or with no squad or combo bar factor (the
+// game's own all through).
+bool g_pathCheck = false;
 struct Apart { bool apart = false; int noes = 0; DWORD at = 0; int told = 0, timed = 0; } g_apart;
 
 void ApartFrame() {
-	if (!CoopP2Joined() || !KalLevelIsLoaded()) {
+	if (!g_pathCheck || !CoopP2Joined() || !KalLevelIsLoaded()) {
 		g_apart.apart = false;
 		g_apart.noes = 0;
 		return;
@@ -75,6 +79,7 @@ void ApartFrame() {
 
 Mode ModeNow() {
 	if (!CoopP2Joined()) return g_config.coopOnly ? MODE_GAME : MODE_ON;
+	if (g_config.rulesStatic) return MODE_ON;
 	if (CoopHeroHeld(HERO_ASTERIX) || CoopHeroHeld(HERO_OBELIX) || IndivFallen(HERO_ASTERIX) ||
 	    IndivFallen(HERO_OBELIX) || (g_apart.apart && KalLevelIsLoaded()))
 		return MODE_APART;
@@ -92,6 +97,7 @@ struct SquadOrig {
 	bool     shareChecked = false;
 	// Romans to defeat now
 	bool     full = false;       // scaled
+	bool     startApart = false; // its fight began with the heroes apart (difficulty_to_defeat_stays: not scaled)
 	int      own[8] = {};        // added to the pool's count: its own doubling
 	int      extra[8] = {};      // ... the share of other pools (beaten ones, kept ones)
 	char*    gaveTo[8] = {};     // a kept pool: the squad its doubling went to (GateFrame)
@@ -408,12 +414,17 @@ void TrimStuck(char* sq, SquadOrig& o, DWORD now) {
 // Roman in yet (or started over) takes the mode as it is. Once its fight is
 // under way its Romans to defeat stay as they began when the heroes come
 // apart; a fight begun with the heroes apart is scaled as soon as the rules
-// are on again (Raise), and goes back to the level's when player 2 leaves with
-// coop_only. Starting Romans: U1 (+0x10, read at a restart) follows the mode,
+// are on again (Raise; with difficulty_to_defeat_stays never, while player 2
+// stays in), and goes back to the level's when player 2 leaves with coop_only.
+// A fight gate's squads go as one: a squad behind a gate whose fight is under
+// way (as of the last frame) keeps that fight's numbers before it sends a
+// Roman in. Starting Romans: U1 (+0x10, read at a restart) follows the mode,
 // U2 (+0x11) too while the squad has not woken.
 void UpdateSquads(Mode m, DWORD now) {
 	bool on = m == MODE_ON;
 	int freshUp = 0, freshDown = 0;
+	static bool s_gateBegun = false, s_gateApart = false;
+	bool gateBegun = false, gateApart = false;
 	const int classes[2] = { 26, 64 };   // CKGrpSquadEnemy, CKGrpSquadJetPack
 	for (int c : classes)
 		for (unsigned k = 0, n = GetNumLvlClassInstances(4, c); k < n; k++) {
@@ -441,13 +452,19 @@ void UpdateSquads(Mode m, DWORD now) {
 					if (fresh && !active && (u2 == s2 || u2 == o.origU2[i])) u2 = (uint8_t)(up ? s2 : o.origU2[i]);
 				}
 			if (g_config.squadCountFactor == 1.0f) continue;
-			bool raise = fresh ? on && !o.full : on && !o.full;
-			bool lower = fresh ? !on && o.full : m == MODE_GAME && o.full;
+			bool gated = *(int8_t*)(sq + 0x154) >= -1;
+			bool begun = !fresh || (gated && s_gateBegun);
+			if (!begun) o.startApart = m == MODE_APART;
+			else if (m == MODE_GAME) o.startApart = false;   // player 2 gone: scaled like any fight when they come back
+			else if (fresh) o.startApart = s_gateApart;
+			if (gated && !fresh) { gateBegun = true; gateApart = gateApart || o.startApart; }
+			bool raise = on && !o.full && !(g_config.toDefeatStays && o.startApart);
+			bool lower = begun ? m == MODE_GAME && o.full : !on && o.full;
 			if (raise || lower) {
 				char before[400];
-				if (!fresh) PoolsLine(sq, o, before, sizeof(before));
+				if (begun) PoolsLine(sq, o, before, sizeof(before));
 				int d = raise ? Raise(sq, o) : -Lower(sq, o);
-				if (fresh) {
+				if (!begun) {
 					(raise ? freshUp : freshDown)++;
 				} else {
 					static int s_told = 0;
@@ -458,8 +475,10 @@ void UpdateSquads(Mode m, DWORD now) {
 						    raise ? "scaled" : "as the level has them", d, kModeName[m], before, after);
 				}
 			}
-			if (!fresh && active && *(int8_t*)(sq + 0x154) >= -1) TrimStuck(sq, o, now);
+			if (!fresh && active && gated) TrimStuck(sq, o, now);
 		}
+	s_gateBegun = gateBegun;
+	s_gateApart = gateApart;
 	static int s_toldFresh = 0;
 	if ((freshUp || freshDown) && s_toldFresh++ < 60)
 		Log("experimental: Romans to defeat %s for %d squad(s) not under way (rules %s)",
@@ -700,6 +719,11 @@ void ExperimentalFrame() {
 bool ExperimentalInstallHooks() {
 	bool ok = true;
 	bool squads = g_config.squadAliveFactor != 1.0f || g_config.squadCountFactor != 1.0f;
+	bool combo = g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f;
+	g_pathCheck = (squads || combo) && !g_config.rulesStatic && g_config.apartByPath;
+	Log("experimental: squad and combo bar rules %s; the heroes' path %s", !squads && !combo ? "none (the game's own)" :
+	    g_config.rulesStatic ? "static (on all through co-op)" : "dynamic (the game's own while the heroes are apart)",
+	    g_pathCheck ? "looked up every 0.5 s in co-op" : "not looked up");
 	g_logCmds = getenv("XXL_SQUADCMDS") != nullptr;
 	if (squads || g_logCmds) {
 		ok &= InstallDetour(kSquadDeserialize, (void*)SquadDeserializeHook, (void**)&g_origSquadDeserialize,

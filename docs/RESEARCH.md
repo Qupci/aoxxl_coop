@@ -2682,3 +2682,19 @@ both halves).
   with Obelix standing or lying by LV4-1's lock and both cameras on the arena no Roman came back (~1600 refusals);
   the tests keep Obelix's view off the fight. Not changed in the game (a fallback after a while of refusals was
   written and reverted).
+- Round 149 (user, after a pad test of round 148: "fine so far"; options). The [experimental] section is now
+  [coop_difficulty] (squads, merchant, combo bar and the modes); freedom_romans moved to [coop_difficulty.experimental];
+  coop_only is difficulty_coop_only. New: difficulty_static (off; env XXL_STATIC): ModeNow never APART in co-op --
+  the rules on all through (difficulty_coop_only still counts). difficulty_pathfinding (on; env XXL_APARTPATH): the
+  graph check as an apart reason. The 0.5 s PfConnected look-up (ApartFrame) runs only with g_pathCheck = some squad
+  or combo factor != 1, not static, pathfinding on (logged at install: "rules none / static / dynamic; the heroes'
+  path looked up / not looked up"). difficulty_to_defeat_stays (off; env XXL_DEFEATSTAYS): a squad whose fight began
+  APART (SquadOrig startApart, set while it is fresh, cleared in GAME) is not raised when ON comes. Also: a fight
+  gate's squads latch as one -- a squad behind a gate (+0x154 >= -1) that has not sent a Roman in yet, while another
+  of the gate's is under way (last frame), counts as under way (not lowered when the heroes come apart, its startApart
+  the gate's); before, such a squad followed the mode and the gate's number could drop with a hero going down (LV4-1's
+  gate has no such squad: both wake with the lock). Test aid XXL_FACTORS1 (the five squad and combo factors at 1).
+  Autotests (-Level 4): rules4d + XXL_DEFEATSTAYS=1: 100, stays after the revive (76 left at 42 s); rules4d +
+  XXL_STATIC=1: 200 with Obelix down, path not looked up; rules4p + XXL_APARTPATH=0: Obelix cut off, 200; rules4p +
+  XXL_FACTORS1=1: no look-up; rules4d (defaults): 100, revive: 184 left + 16 beaten = 200. Not done (user): a
+  reinforcement fallback for the views-on-the-arena stall.

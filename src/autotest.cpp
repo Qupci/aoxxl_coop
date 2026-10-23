@@ -3126,6 +3126,9 @@ const Step kLock4[] = {
 // rules4t: both heroes there from the start (200). rules4p: Obelix put where
 // Asterix (in the fight lock) can't walk to (the graph), the squads put away at
 // 4.5 s (they wake again: 100), Obelix brought beside him at 21 s (doubled).
+// Options: rules4d with XXL_DEFEATSTAYS=1 stays at 100 after the revive, with
+// XXL_STATIC=1 is 200 from the start; rules4p with XXL_APARTPATH=0 is 200 from
+// the start, with XXL_FACTORS1=1 the path is never looked up.
 #define RULES4A(other, mid) 	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), other, 	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800), POTION(3900), mid, 	SHOT(5000, "rules4_1"), TAPS1(5500), TAPS1(10500), TAPS1(15500), SHOT(20200, "rules4_2")
 #define RULES4B 	TAPS1(21000), TAPS1(26000), POTION(30500), TAPS1(31000), SHOT(36000, "rules4_3"), END(37000)
 const Step kRules4D[] = {
