@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -6014,6 +6014,42 @@ const Step kSurvey[] = {
 	MARK(0, "survey"), { 0, S_DETECT, 0, 0, 0, 0, 0, "detect" }, SHOT(100, "survey"), END(300),
 };
 
+// towerscan: the level's mobile towers (CKHkMobileTower, 2,176), Obelix put by the nearest.
+const Step kTowerScan[] = {
+	MARK(0, "towerscan"), { 2000, S_NEAROBJ, HERO_OBELIX, 176, 0, 6.0f, 0, "obelix by a mobile tower" }, SHOT(2500, "tower"), END(3000),
+};
+
+// A stand-in for an area hit's source (S_AREAHIT): it answers "the hit's
+// damage" (0x0C0A: byte 0 the points, dword 1 the kind) as a mobile tower does
+// (CKHkMobileTower::sendEvent, from its parameters +0x54: +9, +4 & 7). A level's
+// own tower stays in its pool, parameters unset, until its squad sends it.
+int __fastcall StandInTowerEvent(void* self, void* edx, int event, uint32_t* reply) {
+	if ((event & 0xFFFF) == 0x0C0A && reply) { reply[0] = 3; reply[1] = 0; }
+	return 0;
+}
+void* g_standInTowerVt[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, (void*)StandInTowerEvent, nullptr, nullptr };
+void* g_standInTower = g_standInTowerVt;   // the object: its vtable at +0
+
+// towerhit: the mobile tower's shockwave (trio event 0x4C14) hits Obelix,
+// player 2's, not leading -- his health goes down, not Asterix's
+// (caesar_challenge_24_10.log: Obelix's hits drained Asterix to a game over).
+const Step kTowerHit[] = {
+	MARK(0, "towerhit"),
+	VPAD(500, 1, PAD_START, 0, 0, "p2 start"), VPAD(700, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
+	{ 2500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }, SHOT(2600, "hit1"),
+	{ 4500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }, SHOT(4600, "hit2"),
+	{ 6500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" },
+	{ 8500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }, SHOT(8600, "hit4"),
+	{ 10500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" },
+	{ 12500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }, SHOT(12600, "hit6"),
+	{ 14500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" },
+	{ 16500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }, SHOT(16600, "hit8"),
+	{ 18500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" },
+	{ 20500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }, SHOT(20600, "hit10"),
+	SHOT(23000, "after"), END(24000),
+};
+
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
 const Step kIdle[] = {
 	MARK(0, "baseline"), SHOT(100, "idle_00"), SHOT(3000, "idle_01"), END(3500),
@@ -6098,6 +6134,8 @@ struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
+	SCENARIO("towerscan", kTowerScan),
+	SCENARIO("towerhit", kTowerHit),
 	SCENARIO("survey", kSurvey),
 	SCENARIO("bossscan", kBossScan),
 	SCENARIO("lifter", kLifter),
@@ -7983,6 +8021,22 @@ void RunStep(const Step& s) {
 		if (best) *(uint8_t*)(best + 0x29) |= 2;
 		Log("autotest: camera sector %p around (%.1f %.1f %.1f) switched on (track %p)", best, s.x, s.y, s.z,
 		    best ? *(void**)(best + 0x20) : nullptr);
+		break;
+	}
+	case S_AREAHIT: {   // the trio's area hit (event 0x4C14, a mobile tower's shockwave) on hero a, from a stand-in tower
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		int hp[2] = { -1, -1 }, sh[2] = { -1, -1 };
+		for (int i = 0; i < 2; i++) IndivStats(i, &hp[i], &sh[i]);
+		// x, y, z, radius, the source (answers 0x0C0A with the damage), "a hero hit" (byte)
+		struct { float x, y, z, r; void* source; uint8_t hit; } sphere = { h.Pos().x, h.Pos().y + 0.5f, h.Pos().z, 1.5f, &g_standInTower, 0 };
+		typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+		((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4C14, &sphere);
+		int hp2[2] = { -1, -1 }, sh2[2] = { -1, -1 };
+		for (int i = 0; i < 2; i++) IndivStats(i, &hp2[i], &sh2[i]);
+		Log("autotest: area hit on %s (%s leads): health Asterix %d -> %d, Obelix %d -> %d", HeroName(s.a), HeroName(t.Leader()),
+		    hp[0], hp2[0], hp[1], hp2[1]);
 		break;
 	}
 	case S_BIND:   // bindings a, b and buttons (> 0) pressed in the game's values for x frames (at least 1; menus)

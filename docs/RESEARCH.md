@@ -2753,3 +2753,21 @@ both halves).
   Obelix saves: after the menu "the game's camera (Obelix's) follows Asterix" -> "follows Obelix"), shopsaveo
   (Asterix leads, Obelix shops, Asterix saves: "(Asterix's) follows Obelix" -> "follows Asterix"; walk in the visit
   -0.03 / 1.00 -> 0.98 / -0.19). shopsplit, shopzone, shoplaunch4b / 4c (-Level 4) as before.
+- Round 152 (user, Caesar's Challenge level 1, userlogs xxl_coop.caesar_challenge_24_10.log, at its end: P2 Obelix's
+  hits shown on P1 Asterix's HUD from his second hit on, P2's HUD frozen). The hits were Asterix's, not only shown:
+  the trio's area hit (event 0x4C14, FUN_004829D0, case 0x14: a sphere x, y, z, r, the source +0x10, "hit" byte
+  +0x14) is the mobile tower's shockwave (CKHkMobileTower 2,176, FUN_004E8DD0 from its vf30: 0x4E944C / 0x4E9667,
+  3600 of them in the log); it calls the hit itself, FUN_00495FA0 (thiscall(hero, source, sphere, 0, 0), ret 0x10;
+  the damage asked of the source with 0x0C0A: byte 0 points, dword 1 kind -- the tower answers from its parameters
+  +0x54: +9, +4 & 7), on the leader in the sphere, then the companion, outside both heroes' sendEvents -- with the
+  leader's stats in the game's place. Single player never sees it (no damage for an AI hero, +0x18 bit 0). Obelix
+  stayed at 8 (healed to 9 later) while Asterix was drained to 0 with no fall noted: at 3830 s his HUD read "no
+  health" and he died (sit 0E, the game's own game over: respawn at the checkpoint, 3837 s). Now FUN_00495FA0 is
+  detoured (coop.cpp HitHook): the hit hero's own stats (IndivEnter), none for a fallen hero, and a fall from it
+  noted (IndivHeroDown / NoteDeath, "a hit from 482AE4") unless the hero's own sendEvent is under way (it notes its
+  own: g_inHeroEvent). A level's own tower stays in its pool with its parameters unset until its squad sends it
+  (LV5's at 590.1 -441.6 -184.4; its 0x0C0A crashed, +0x54 null): the test step S_AREAHIT sends 0x4C14 at a hero
+  with a stand-in source (answers 3 points). Autotests (-Level 2): towerhit (Asterix leads, ten shockwaves on Obelix
+  5 units ahead: before A 15 -> 0, game over, O 15 kept; after O 15 -> 0, "Obelix is down", A 15 kept), down2a as
+  before (Roman hit, "hero event 0300", revive). towerscan (a level's towers, Obelix by the nearest): LV3/4/6 none
+  with a node, LV5 one.

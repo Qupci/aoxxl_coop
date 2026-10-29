@@ -3945,6 +3945,7 @@ void CoopAfterLifeTick(int heroIndex, Hero hero) {
 // to 0 is the one that died.
 typedef int(__fastcall* HeroSendEventFn)(char* hero, void* edx, int event, void* param);
 HeroSendEventFn g_origHeroSendEvent = nullptr, g_origHeroSendEvent2 = nullptr;   // the same function
+int g_inHeroEvent[2] = {};   // a hero's sendEvent under way: it notes that hero's fall itself
 int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) {
 	Trio t = GetTrio();
 	int idx = -1;
@@ -3952,6 +3953,7 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 		if (t.GetHero(i).raw() == hero) idx = i;
 	if (IndivDropEvent(idx, event)) return 1;   // no more hits for a fallen hero
 	int prev = IndivEnter(idx);                 // its own health and combo bar
+	if (idx >= 0) g_inHeroEvent[idx]++;
 	int before = Health();
 	// Two heroes touching: contact event 0x0300 (a list: +0 next, +4 the pair of
 	// collision volumes, each one's owner at +0x20). Touched by a player's hero,
@@ -3999,6 +4001,36 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 	if (before > 0 && Health() == 0 && g.p2Joined && idx >= 0) {
 		char how[32];
 		sprintf(how, "hero event %04X", event & 0xFFFF);
+		if (!IndivHeroDown(idx, how)) NoteDeath(idx, how);
+	}
+	if (idx >= 0) g_inHeroEvent[idx]--;
+	IndivLeave(prev);
+	return r;
+}
+
+// The hit itself (FUN_00495FA0, thiscall(hero, source, sphere, 0, 0), ret 0x10:
+// the damage asked of the source with 0x0C0A) takes the health in the game's
+// place. Through the hero's sendEvent that is the hero's own (above); the
+// trio's area hit (event 0x4C14, FUN_004829D0: a mobile tower's shockwave)
+// hits the leader, then the companion, with whatever is in place -- the
+// leader's: Obelix's hits drained Asterix, down to a game over with no revive
+// (caesar_challenge_24_10.log). Now the hit hero's own, and its fall noted.
+typedef char(__fastcall* HitFn)(char* hero, void* edx, void* source, void* sphere, int a3, int a4);
+HitFn g_origHit = nullptr;
+const uintptr_t kHit = 0x495FA0;
+const uint8_t   kHitPrologue[7] = { 0x83, 0xEC, 0x0C, 0x55, 0x8B, 0xE9, 0x57 };
+char __fastcall HitHook(char* hero, void* edx, void* source, void* sphere, int a3, int a4) {
+	Trio t = GetTrio();
+	int idx = -1;
+	for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
+		if (t.GetHero(i).raw() == hero) idx = i;
+	if (IndivFallen(idx)) return 0;   // no more hits for a fallen hero
+	int prev = IndivEnter(idx);
+	int before = Health();
+	char r = g_origHit(hero, edx, source, sphere, a3, a4);
+	if (idx >= 0 && !g_inHeroEvent[idx] && before > 0 && Health() == 0 && g.p2Joined) {
+		char how[32];
+		sprintf(how, "a hit from %06X", (unsigned)(uintptr_t)_ReturnAddress());
 		if (!IndivHeroDown(idx, how)) NoteDeath(idx, how);
 	}
 	IndivLeave(prev);
@@ -4377,6 +4409,8 @@ void CoopInit() {
 	PatchVtableSlot(0x625A8C, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent,
 	                "CKHkAsterix::sendEvent (who died)");
 	PatchVtableSlot(0x625BB0, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent2, "CKHkObelix::sendEvent (who died)");
+	InstallDetour(kHit, (void*)HitHook, (void**)&g_origHit, kHitPrologue, sizeof(kHitPrologue),
+	              "hero hit (the hit hero's own health: the trio's area hits)");
 	PadsInit();
 	if (g_config.p1Pad >= 0) PadIdentForce(g_config.p1Pad, PAD_ROLE_GAME);
 	Log("coop: init (player 1 pad: %s)", g_config.p1Pad >= 0 ? "fixed by ini" : "auto-detect");
