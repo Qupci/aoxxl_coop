@@ -2816,3 +2816,14 @@ both halves).
   white bursts) -- find who zeroes the hits in the fall's frame (the death's entry? the lead switch?); (b) after the
   full drain a white bottom segment stays lit (node +0xC0, the level marker shown by the state-4 bit-4 branch, not
   hidden by the exit?) -- compare with a full bar running out with no fall.
+- Round 156 (round 155's OPEN items; user's pad test: both bars drain to 0, no white segment after a full one --
+  (b) was a test artifact: 40 hits in one frame never put P1's bar in state 4 before the fall). (a) The level-up
+  replay at the fall: in P1's interface tick (IndivEnter(P1 hero)) the health part's refresh (FUN_0051B550,
+  ShieldsShownHook: a scope of its own) ended with IndivLeave -> Use(StandingOr(prev)) -- a fallen P1 hero's tick
+  went on with the standing hero's stats, and the combo bar (FUN_00518190, after the health part in vf18 0x5180E0:
+  0x51CD80, 0x51A140, 0x51C160, 0x51BA70, then the bar) saw Obelix's 0 hits (+0x2C0 = 0, the hits-0 path at
+  0x5188FC), then the drain's 18: level-ups replayed (bounce bits 27-28, white bursts). Only in frames where the
+  health part refreshes. Now IndivLeave restores the outer scope's hero exactly while depth > 0 (StandingOr only at
+  depth 0). Also seen: [coop_difficulty] going APART at the fall rescales the fallen hero's copy (25 -> 19 hits,
+  full at 38 -> 30) -- as designed. Autotests downcombop (seen 25 -> 19 -> 18 ..., no bounce), downcombo (state 4
+  -> 2 0.47 s after the fall), down2a, towerhit, shopbuyo as before.

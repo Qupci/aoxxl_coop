@@ -909,7 +909,11 @@ static int StandingOr(int idx) {
 void IndivLeave(int prev) {
 	if (!g.active || prev < 0) return;
 	if (g.depth > 0) g.depth--;
-	Use(StandingOr(prev));
+	// Still inside another hero's business: that hero's own, fallen or not --
+	// player 1's fallen hero's HUD tick went on with the standing hero's stats
+	// after the shields' refresh (ShieldsShownHook, a scope of its own): its
+	// combo bar saw the other hero's hits.
+	Use(g.depth > 0 ? prev : StandingOr(prev));
 }
 
 bool IndivFallen(int hero) { return g.active && (hero == HERO_ASTERIX || hero == HERO_OBELIX) && g.fallen[hero]; }
