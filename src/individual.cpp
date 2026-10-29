@@ -933,6 +933,20 @@ bool IndivHeroDown(int hero, const char* how) {
 	}
 	g.fallen[hero] = true;
 	g.revive[hero] = 0;
+	{
+		// Its combo bar empties, "full" and all, as the game's respawn empties it
+		// (CKAsterixGameManager::vf13: hits, chain, +0xC4, gauge, level, +0x160) --
+		// a fallen hero kept a full bar through its revive (user).
+		Stats& s = Current(hero);
+		bool had = s.full || s.hits || s.gauge > 0.0f;
+		s.hits = s.chain = s.c4 = 0;
+		s.gauge = s.decay = 0.0f;
+		s.level = 0;
+		s.full = false;
+		s.barFlags = 0;
+		Commit(hero);
+		if (had) Log("indiv: %s's combo bar emptied (down)", HeroName(hero));
+	}
 	g.fellLeading[hero] = g.lastLead == hero;
 	g.levelLead[hero] = false;
 	g.fellAt[hero] = GetTickCount();

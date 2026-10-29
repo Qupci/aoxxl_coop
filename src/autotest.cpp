@@ -6076,6 +6076,42 @@ const Step kShieldJump[] = {
 	END(10500),
 };
 
+// downcombo: player 1's Asterix with a full combo bar goes down (area hits);
+// his bar empties, "full" and all; Obelix's (half full) stays. Player 2's
+// Obelix revives him: Asterix starts with an empty bar.
+const Step kDownCombo[] = {
+	MARK(0, "downcombo"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
+	{ 2000, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2000, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "obelix's combo bar part full" },
+	SHOT(3000, "full"),
+	{ 3500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 5000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
+	{ 6500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 8000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
+	{ 9500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit: down" },
+	SHOT(9600, "down1"), SHOT(11000, "down2"),
+	{ 11500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 0, 0, "obelix to asterix" },
+	VPAD(12000, 1, PAD_B, 0, 0, "p2 holds B"),
+	VPAD(18000, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "revived"), SHOT(21000, "after"),
+	END(21500),
+};
+
+// downcomboo: downcombo's other half -- player 2's Obelix (his HUD the copy)
+// with a full bar goes down; his bar empties.
+const Step kDownComboO[] = {
+	MARK(0, "downcomboo"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
+	{ 2000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	VPAD(2500, 1, PAD_BACK, 0, 0, "p2 holds back (his HUD up)"), SHOT(3000, "full"),
+	{ 3500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" }, { 5000, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" },
+	{ 6500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" }, { 8000, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" },
+	{ 9500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit: down" },
+	SHOT(9600, "down1"), SHOT(11000, "down2"), VPAD(11500, 1, 0, 0, 0, "p2 release"),
+	END(12000),
+};
+
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
 const Step kIdle[] = {
 	MARK(0, "baseline"), SHOT(100, "idle_00"), SHOT(3000, "idle_01"), END(3500),
@@ -6163,6 +6199,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("towerscan", kTowerScan),
 	SCENARIO("towerhit", kTowerHit),
 	SCENARIO("shieldjump", kShieldJump),
+	SCENARIO("downcombo", kDownCombo),
+	SCENARIO("downcomboo", kDownComboO),
 	SCENARIO("survey", kSurvey),
 	SCENARIO("bossscan", kBossScan),
 	SCENARIO("lifter", kLifter),

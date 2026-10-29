@@ -2790,3 +2790,14 @@ both halves).
   (-Level 2: 1985 helmets poked, five shields, a hit then points back; slide-out ~6.2 s): before, frames s32-s34 the
   last shield beside the counter; after, in its row. hudreq / hudlayout (-Level 4) and shopsplit: the rule never
   fires, same pictures as Oct 22.
+- Round 154 (user: a fallen hero's combo bar, full state and all, stays through the fall and the revive -- reset it
+  on the defeat, individual heroes). The game's own respawn empties it (CKAsterixGameManager::vf13, 0x501940: gm +0xB4
+  chain, +0xB0 hits, +0xC4, +0xA4 gauge = 0, +0xCC bits 9-10 level cleared, +0x160 bits 4 and 6 cleared); the full
+  gauge's run-out in the gm tick (FUN_00504080) clears chain, hits, +0xC4, gauge and the stats' +0x10 bit 14. Now
+  IndivHeroDown (individual.cpp) empties the fallen hero's Stats the same way -- hits, chain, c4, gauge, decay,
+  level, full, barFlags (+0x160 bits 2 / 4) -- and commits them (logged "combo bar emptied (down)" when it had any).
+  A game over is the game's respawn as before. Autotests (-Level 2): downcombo (Asterix, P1, full bar from 40 "hit
+  landed", downed by area hits, revived by P2's grab: before, hits 38 / gauge 30 down and 19.9 after the revive --
+  the "COMBO" bar still lit on the fallen hero; after, 0 / not full from the fall on, empty after the revive),
+  downcomboo (Obelix, P2's HUD copy: 38 / full -> 0 / not full). A note from the first try: NEXTTO 5 units ahead of
+  Obelix put Asterix in LV2's sea (swimming heroes take no hits) -- move Obelix instead.
