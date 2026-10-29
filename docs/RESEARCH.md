@@ -2698,3 +2698,27 @@ both halves).
   XXL_STATIC=1: 200 with Obelix down, path not looked up; rules4p + XXL_APARTPATH=0: Obelix cut off, 200; rules4p +
   XXL_FACTORS1=1: no look-up; rules4d (defaults): 100, revive: 184 left + 16 beaten = 200. Not done (user): a
   reinforcement fallback for the views-on-the-arena stall.
+- Round 150 (user, LV3-4: Obelix left in the library 126.8 -1.2 -325.8, Asterix in the courtyard's fight 103.3 -1.3
+  -313.6 -- the gate doubled). The graph saw it (reach no / no; the library's doors are slide doors, CKHkSlideDoor
+  2,100: +0x18 open, +0x28 steps, +0x2A step, +0x2B flags, +0x2C / +0x38 the two ends -- not read by pathfind.cpp,
+  the graph's own transitions part the rooms). The cause: a squad counted as under way from its first Roman sent,
+  and LV3-4's courtyard squad (box x 23.2..170.4 z -378.9..-258.5; pools 1, 1 placed guards, then 2, 6, 40, 10)
+  places its two guards as the sector loads -- latched doubled with the heroes together, long before its fight.
+  The fight: the user's editor shots -- sphere detector 99.9 -4.0 -315.3 r 25 (not on at start; a cross rectangle
+  at x 117.4, z -317.6..-280.9, crossed from the x 125.9 side, switches it on), its event list #175 (event id =
+  list * 8 + bit: 0x578): activator 090F fight lock with icon, squad 0D17 add all pools to the lock (+0x154 = -1),
+  detector 1C06 off, trio 4821 sidekick to a marker, a cinematic 0501. LV4-1's lock squad is the same case (wakes
+  at the level's start, 6 placed). Now (experimental.cpp GateStartFrame): a fight behind a gate begins as the gate
+  takes its squads (some squad +0x154 >= -1, none before) and is set 2.5 s later (kGateSettleMs: the path look-up's
+  three noes after doors the lock shuts) with the mode then -- the gate's squads as one; before that a squad
+  follows the mode whatever it has sent. Without a gate: at its first Roman beaten of a scaled pool (Beaten: +0x15,
+  or sent > alive). Also (user): Raise / Lower scale the Romans still to defeat (Remaining = count - sent + alive)
+  instead of the level's numbers -- doubled from where the fight stands (91 left -> 182; player 2 leaving 191 ->
+  96, back 92 -> 184); a pool with none left to send passes its share on (BestPool / gate); kept pools' share in
+  GateFrame from their Romans still to defeat; Lower takes the others' shares first, then halves the pool's own.
+  Script cond 16 (sent in so far) scaled by the pool's (level + own) / level. Test steps: S_DOORS (swing / slide
+  doors near a hero). Autotests (-Level 3): lock34 / lock34f (exploration: doors, graph dump, squads), lock34g (the
+  user's case via event 0x578: 60, Obelix brought beside at 21 s: 120), lock34t (together: 120); (-Level 4) rules4n
+  (rules4d without the squad reset: 100; revive: 91 -> 182), rules4t 200, rules4l (191 -> 96 -> 184), rules4p
+  (gate 200, Obelix cut off 1.9 s later: 100 within the settle; reunion doubled), rules4n + XXL_DEFEATSTAYS=1 (100,
+  stays), lock4 (single player 100).

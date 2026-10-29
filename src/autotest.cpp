@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -2576,6 +2576,8 @@ const Step kPit26A[] = {
 #define SQUADS(t, hero, r) { t, S_SQUADS, hero, 0, 0, r, 0, "squads" }
 // every active squad put away the game's way (vf34, as when left out of view): its Romans back to their pools
 #define SQUADRESET(t)      { t, S_SQUADRESET, 0, 0, 0, 0, 0, "squad reset" }
+// the swing and slide doors within s.x units of hero `hero` in the log: place, how far open, steps
+#define DOORS(t, hero, r)  { t, S_DOORS, hero, 0, 0, r, 0, "doors" }
 const Step kPf26[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3138,6 +3140,16 @@ const Step kRules4D[] = {
 	RULES4A(MARK(2600, "obelix down since 1 s"), SQUADS(4500, HERO_ASTERIX, 10.0f)),
 	PLACEAT(20600, HERO_OBELIX, -261.66f, 0.8f, 52.83f), RULES4B,
 };
+// rules4n: rules4d without the squads put away -- LV4-1's lock squad woke at
+// the level's start with the heroes together, its fight begins at the lock with
+// Obelix down (100).
+const Step kRules4N[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(900, HERO_OBELIX, -261.66f, 0.8f, 52.83f),
+	RULES4A(MARK(2600, "obelix down since 1 s"), SQUADS(4500, HERO_ASTERIX, 10.0f)),
+	PLACEAT(20600, HERO_OBELIX, -261.66f, 0.8f, 52.83f), RULES4B,
+};
 const Step kRules4T[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3166,6 +3178,68 @@ const Step kRules4L[] = {
 	SHOT(15800, "rules4l_2"), TAPS1(16000),
 	VPAD(21200, 1, PAD_START, 0, 0, "p2 start (join)"), VPAD(21400, 1, 0, 0, 0, "p2 release"),
 	SHOT(22000, "rules4l_3"), TAPS1(22500), TAPS1(27500), SHOT(32500, "rules4l_4"), END(33500),
+};
+
+// lock34 (-Level 3): the user's LV3-4 spots -- Obelix behind the doors at
+// 126.8 -1.2 -325.8 while Asterix walks into the fight at 103.3 -1.3 -313.6:
+// the doors, the squads, the graph's verdict as it goes.
+const Step kLock34[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f),
+	DOORS(3500, HERO_ASTERIX, 80.0f), SQUADS(3600, HERO_ASTERIX, 60.0f), REACH(3700), SHOT(4000, "lock34_1"),
+	GLIDEAT(5000, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 2000),
+	DOORS(7500, HERO_ASTERIX, 80.0f), SQUADS(7600, HERO_ASTERIX, 60.0f), REACH(7700), SHOT(8000, "lock34_2"),
+	DOORS(11000, HERO_ASTERIX, 80.0f), SQUADS(11100, HERO_ASTERIX, 60.0f), REACH(11200), SHOT(12000, "lock34_3"),
+	END(13000),
+};
+// lock34f (-Level 3): lock34 with the graph around the library's doors (117.8
+// -1.2 -328.4), Asterix walking out through them and fighting in the courtyard.
+const Step kLock34F[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f),
+	PFDUMP(3500, HERO_OBELIX, 12.0f), REACH(3700),
+	GLIDEAT(4000, HERO_ASTERIX, 120.5f, -0.8f, -327.5f, 800), REACH(5000), SQUADS(5100, HERO_ASTERIX, 60.0f),
+	GLIDEAT(5500, HERO_ASTERIX, 114.0f, -0.8f, -326.0f, 800), REACH(6500), SQUADS(6600, HERO_ASTERIX, 60.0f), SHOT(6700, "lock34f_1"),
+	GLIDEAT(7000, HERO_ASTERIX, 108.0f, -0.8f, -319.0f, 800), REACH(8000),
+	GLIDEAT(8500, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 800), REACH(9500), SQUADS(9600, HERO_ASTERIX, 60.0f),
+	DOORS(9700, HERO_ASTERIX, 40.0f), SHOT(9800, "lock34f_2"), POTION(10000),
+	TAPS1(10500), SQUADS(13000, HERO_ASTERIX, 60.0f), DOORS(13100, HERO_ASTERIX, 40.0f), REACH(13200),
+	TAPS1(15500), SQUADS(18000, HERO_ASTERIX, 60.0f), SHOT(18100, "lock34f_3"),
+	TAPS1(20500), TAPS1(25500), SQUADS(28000, HERO_ASTERIX, 60.0f), DOORS(28100, HERO_ASTERIX, 40.0f), REACH(28200),
+	SHOT(28500, "lock34f_4"), END(29000),
+};
+// lock34g (-Level 3): LV3-4's fight lock with Obelix left in the library --
+// Asterix walks out to the fight (lock34f's way) and the lock's sphere (99.9
+// -4.0 -315.3, r 25; switched on by a cross rectangle at x 117.4) is set off
+// as he is in it: its event list #175 (0x578: fight lock with icon, squad 0D17
+// "add all pools to the lock", sidekick to a marker, a cinematic).
+const Step kLock34G[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f), POTION(3200),
+	GLIDEAT(4000, HERO_ASTERIX, 120.5f, -0.8f, -327.5f, 800), GLIDEAT(5500, HERO_ASTERIX, 114.0f, -0.8f, -326.0f, 800),
+	GLIDEAT(7000, HERO_ASTERIX, 108.0f, -0.8f, -319.0f, 800), GLIDEAT(8000, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 800),
+	SQUADS(8900, HERO_ASTERIX, 60.0f), { 9000, S_FLAGEV, 0x578, 0, 0, 0, 0, "lock34 sphere" },
+	SQUADS(10500, HERO_ASTERIX, 60.0f), DOORS(10600, HERO_OBELIX, 20.0f), REACH(10700), SHOT(10800, "lock34g_1"),
+	TAPS1(12000), SQUADS(15000, HERO_ASTERIX, 60.0f), REACH(15100), SHOT(15200, "lock34g_2"),
+	TAPS1(17000), PLACEAT(21000, HERO_OBELIX, 101.6f, -0.8f, -316.2f), REACH(21500), TAPS1(22000),
+	SQUADS(27000, HERO_ASTERIX, 60.0f), REACH(27200), SHOT(27500, "lock34g_3"), TAPS1(28000), SHOT(33000, "lock34g_4"),
+	END(33500),
+};
+// lock34t (-Level 3): lock34g with Obelix beside Asterix as the sphere goes off
+// (the heroes together: the fight doubled).
+const Step kLock34T[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f), POTION(3200),
+	GLIDEAT(4000, HERO_ASTERIX, 120.5f, -0.8f, -327.5f, 800), GLIDEAT(5500, HERO_ASTERIX, 114.0f, -0.8f, -326.0f, 800),
+	GLIDEAT(7000, HERO_ASTERIX, 108.0f, -0.8f, -319.0f, 800), GLIDEAT(8000, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 800),
+	PLACEAT(8000, HERO_OBELIX, 101.6f, -0.8f, -316.2f), REACH(8800),
+	SQUADS(8900, HERO_ASTERIX, 60.0f), { 9000, S_FLAGEV, 0x578, 0, 0, 0, 0, "lock34 sphere" },
+	SQUADS(12500, HERO_ASTERIX, 60.0f), SHOT(12600, "lock34t_1"), TAPS1(13000), TAPS1(18000), SHOT(23000, "lock34t_2"),
+	END(23500),
 };
 
 // fight4h (-Level 4): fight4a at LV4-1's hiding Romans (squad 21: a hiding spot at -263.7 0.2 52.8).
@@ -6066,9 +6140,14 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight4h", kFight4H),
 	SCENARIO("lock4", kLock4),
 	SCENARIO("rules4d", kRules4D),
+	SCENARIO("rules4n", kRules4N),
 	SCENARIO("rules4t", kRules4T),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),
+	SCENARIO("lock34", kLock34),
+	SCENARIO("lock34f", kLock34F),
+	SCENARIO("lock34g", kLock34G),
+	SCENARIO("lock34t", kLock34T),
 	SCENARIO("lockcircle", kLockCircle),
 	SCENARIO("slidecross3", kSlideCross3),
 	SCENARIO("slidecross", kSlideCross),
@@ -7149,6 +7228,41 @@ void RunStep(const Step& s) {
 					                 *(int16_t*)(recs + 0x1C * r + 0x18), *(uint16_t*)(recs + 0x1C * r + 0x16));
 				buf[sizeof(buf) - 1] = 0;
 				Log("%s", buf);
+			}
+		break;
+	}
+	case S_DOORS: {   // swing doors (2,98) and slide doors (2,100) within s.x units of hero a
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		const Vector3& p = h.Pos();
+		const int classes[2] = { 98, 100 };
+		for (int c : classes)
+			for (unsigned i = 0, k = GetNumLvlClassInstances(2, c); i < k; i++) {
+				char* d = (char*)GetLvlObject(2, c, i);
+				if (!d || IsBadReadPtr(d, 0x50)) continue;
+				Vector3 at[2];
+				bool ok = true;
+				for (int n = 0; n < 2 && ok; n++) {   // swing: its node, leaves +0x2C / +0x30; slide: nodes +0x10 / +0x14
+					char* node = *(char**)(d + (c == 98 ? 0x2C + 4 * n : 0x10 + 4 * n));
+					char* fr = node && !IsBadReadPtr(node, 8) ? *(char**)(node + 4) : nullptr;
+					if (!fr || IsBadReadPtr(fr, 0x8C)) { ok = false; break; }
+					at[n] = Vector3(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+				}
+				if (!ok) continue;
+				float dx = at[0].x - p.x, dz = at[0].z - p.z;
+				if (dx * dx + dz * dz > s.x * s.x) continue;
+				if (c == 98)
+					Log("autotest: swing door %p leaves at %.1f %.1f %.1f / %.1f %.1f %.1f: open %.2f, step %u/%u, leaf cos %.2f / %.2f",
+					    d, at[0].x, at[0].y, at[0].z, at[1].x, at[1].y, at[1].z, *(float*)(d + 0x18), *(uint8_t*)(d + 0x2A),
+					    *(uint8_t*)(d + 0x28), *(float*)(*(char**)(*(char**)(d + 0x2C) + 4) + 0x10),
+					    *(float*)(*(char**)(*(char**)(d + 0x30) + 4) + 0x10));
+				else
+					Log("autotest: slide door %p at %.1f %.1f %.1f, moving part %.1f %.1f %.1f: open %.2f, step %u/%u (start %u), "
+					    "flags %02X, ends %.1f %.1f %.1f / %.1f %.1f %.1f", d, at[0].x, at[0].y, at[0].z, at[1].x, at[1].y, at[1].z,
+					    *(float*)(d + 0x18), *(uint8_t*)(d + 0x2A), *(uint8_t*)(d + 0x28), *(uint8_t*)(d + 0x29), *(uint8_t*)(d + 0x2B),
+					    ((float*)(d + 0x2C))[0], ((float*)(d + 0x2C))[1], ((float*)(d + 0x2C))[2], ((float*)(d + 0x38))[0],
+					    ((float*)(d + 0x38))[1], ((float*)(d + 0x38))[2]);
 			}
 		break;
 	}

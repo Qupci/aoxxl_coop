@@ -97,7 +97,8 @@ struct SquadOrig {
 	bool     shareChecked = false;
 	// Romans to defeat now
 	bool     full = false;       // scaled
-	bool     startApart = false; // its fight began with the heroes apart (difficulty_to_defeat_stays: not scaled)
+	bool     begun = false;      // its fight has begun (GateStartFrame, Beaten)
+	bool     startApart = false; // ... with the heroes apart (difficulty_to_defeat_stays: not scaled)
 	int      own[8] = {};        // added to the pool's count: its own doubling
 	int      extra[8] = {};      // ... the share of other pools (beaten ones, kept ones)
 	char*    gaveTo[8] = {};     // a kept pool: the squad its doubling went to (GateFrame)
@@ -205,8 +206,8 @@ int __fastcall ShopDeserializeHook(char* self, void* edx, void* file, int pass) 
 //   20 keep args[0] Romans of pool args[1] alive (vf54)
 // (LV4-1's first squad: "if pool 0 alive <= 6: replace 1", over and over.)
 // The numbers are scaled on a copy -- at once while the rules are on, sent in
-// so far while the squad's Romans to defeat are; a 0 or 1 in a condition is
-// left alone ("all fallen").
+// so far as the pool's count is (the level's and the mod's own doubling); a 0
+// or 1 in a condition is left alone ("all fallen").
 typedef uint32_t(__fastcall* SquadCmdFn)(char* self, void* edx, uint32_t cmd, uint32_t* args);
 SquadCmdFn g_origSquadCmd = nullptr, g_origJetCmd = nullptr;
 bool g_logCmds = false;
@@ -249,7 +250,14 @@ uint32_t SquadCmd(SquadCmdFn orig, char* self, void* edx, uint32_t cmd, uint32_t
 		switch (cmd) {
 		case 5:  if (n >= 2 && atOnce && all(o->atOnce)) f = g_config.squadAliveFactor; break;
 		case 8: case 12: case 19: case 20: if (n >= 1 && atOnce && all(o->atOnce)) f = g_config.squadAliveFactor; break;
-		case 16: if (n >= 2 && o->full && all(o->scaled)) f = g_config.squadCountFactor; break;
+		case 16:   // as the pool's count is now: scaled where it stood (Raise)
+			if (n >= 2 && all(o->scaled)) {
+				int was = 0, is = 0;
+				for (unsigned i = 0; i < o->n; i++)
+					if (pool < 0 || pool == (int)i) { was += o->origCount[i]; is += o->origCount[i] + o->own[i]; }
+				if (was > 0) f = (float)is / was;
+			}
+			break;
 		}
 	}
 	uint32_t b[4] = { a[0], a[1], a[2], a[3] };
@@ -278,6 +286,13 @@ int Alive(char* sq, unsigned pool) {
 }
 
 int Left(const char* rec) { return *(const int16_t*)(rec + 0x18) - *(const uint16_t*)(rec + 0x16); }
+
+// Romans of a pool still to defeat: to send in, and alive (what the gate shows).
+int Remaining(char* sq, const char* rec, unsigned pool) {
+	if (*(const int16_t*)(rec + 0x18) < 0) return 0;
+	int r = Left(rec) + ((*(uint8_t*)(sq + 0x152) & 2) ? Alive(sq, pool) : 0);
+	return r > 0 ? r : 0;
+}
 
 // A pool still in the fight: Romans left to send in, queued, to replace or
 // alive. One with none (beaten) is done with in its squad's script.
@@ -335,21 +350,24 @@ int PoolsLine(char* sq, const SquadOrig& o, char* buf, int size) {
 	return len;
 }
 
-// Romans to defeat scaled for squad `sq`: each scaled pool gets its share. In
-// a fight under way the share of a pool already beaten -- its part of the
-// script is over: Romans added there would never come, and a gate would wait
-// for them -- goes to the pool with the most left to send in, of the squad,
-// else of the squads its fight gate counts (GateFrame). Never to the kept
-// pools (Romans placed on their spots, turtles). Returns the Romans added.
+// Romans to defeat scaled for squad `sq`: each scaled pool's Romans still to
+// defeat are scaled where they stand (a fight under way at 85 goes to 170; the
+// ones beaten are not made up for). The share of a pool with none left to send
+// in -- its part of the script may be over: Romans added there might never
+// come, and a gate would wait for them -- goes to the pool with the most left
+// to send in, of the squad, else of the squads its fight gate counts
+// (GateFrame). Never to the kept pools (Romans placed on their spots,
+// turtles). Returns the Romans added.
 int Raise(char* sq, SquadOrig& o) {
 	char* rec0 = *(char**)(sq + 0x144);
 	int pending = 0, added = 0;
 	for (unsigned i = 0; i < o.n; i++) {
 		if (!o.scaled[i]) continue;
 		char* rec = rec0 + i * 0x1C;
-		int share = Scaled(o.origCount[i], g_config.squadCountFactor, 32767) - o.origCount[i] - o.own[i];
+		int rem = Remaining(sq, rec, i);
+		int share = Scaled(rem, g_config.squadCountFactor, 32767) - rem;
 		if (share <= 0) continue;
-		if (Live(sq, rec, i)) {
+		if (Left(rec) > 0) {
 			int before = o.own[i];
 			Give(&o.own[i], rec, share);
 			added += o.own[i] - before;
@@ -375,13 +393,21 @@ int Raise(char* sq, SquadOrig& o) {
 	return added;
 }
 
-// Back to the level's Romans to defeat: what the mod gave the squad and is not
-// sent in yet. Returns the Romans taken away.
+// Back to the game's Romans to defeat, where they stand: the other pools'
+// shares taken away (given again with the rules), each pool's own Romans
+// still to defeat scaled back (170 -> 85) -- of what the mod gave it and is
+// not sent in yet. Returns the Romans taken away.
 int Lower(char* sq, SquadOrig& o) {
 	char* rec0 = *(char**)(sq + 0x144);
 	int removed = 0;
-	for (unsigned i = 0; i < o.n; i++)
-		if (o.own[i] || o.extra[i]) removed += Take(o, rec0 + i * 0x1C, i, o.own[i] + o.extra[i]);
+	for (unsigned i = 0; i < o.n; i++) {
+		if (!o.own[i] && !o.extra[i]) continue;
+		char* rec = rec0 + i * 0x1C;
+		removed += Take(o, rec, i, o.extra[i]);
+		int rem = Remaining(sq, rec, i);
+		int n = rem - Scaled(rem, 1.0f / g_config.squadCountFactor, 32767);
+		removed += Take(o, rec, i, n < o.own[i] ? n : o.own[i]);
+	}
 	o.full = false;
 	for (auto& e : g_squads)   // kept pools whose share was here: theirs to give again
 		for (unsigned j = 0; j < e.second.n; j++)
@@ -410,21 +436,64 @@ void TrimStuck(char* sq, SquadOrig& o, DWORD now) {
 	}
 }
 
-// Each frame: the squads' numbers for the mode. A squad that has not sent a
-// Roman in yet (or started over) takes the mode as it is. Once its fight is
-// under way its Romans to defeat stay as they began when the heroes come
-// apart; a fight begun with the heroes apart is scaled as soon as the rules
-// are on again (Raise; with difficulty_to_defeat_stays never, while player 2
-// stays in), and goes back to the level's when player 2 leaves with coop_only.
-// A fight gate's squads go as one: a squad behind a gate whose fight is under
-// way (as of the last frame) keeps that fight's numbers before it sends a
-// Roman in. Starting Romans: U1 (+0x10, read at a restart) follows the mode,
-// U2 (+0x11) too while the squad has not woken.
+// When a fight begins. A squad wakes as its place comes in (the sector loaded,
+// the heroes near), its starting Romans placed -- often long before its fight:
+// LV3-4's courtyard squad places its two guards as the sector loads, and its
+// fight only begins as a hero walks into the lock's sphere. So a fight behind
+// a gate begins as the gate takes its squads (the lock's "add all pools to the
+// lock": squad +0x154 >= -1), and is set kGateSettleMs later -- time for the
+// path look-up to see doors the lock shuts between the heroes. The gate's
+// squads go as one. A fight without a gate begins at its first Roman beaten
+// (of a scaled pool: not a guard placed on its spot).
+const DWORD kGateSettleMs = 2500;
+struct GateStart { bool on = false, begun = false, apart = false; DWORD since = 0; } g_gateStart;
+
+void GateStartFrame(Mode m, DWORD now) {
+	bool any = false;
+	const int classes[2] = { 26, 64 };   // CKGrpSquadEnemy, CKGrpSquadJetPack
+	for (int c : classes)
+		for (unsigned k = 0, n = GetNumLvlClassInstances(4, c); k < n && !any; k++) {
+			char* sq = (char*)GetLvlObject(4, c, k);
+			any = sq && *(int8_t*)(sq + 0x154) >= -1;
+		}
+	if (!any) {
+		g_gateStart = GateStart();
+		return;
+	}
+	if (!g_gateStart.on) {
+		g_gateStart.on = true;
+		g_gateStart.since = now;
+	}
+	if (!g_gateStart.begun && now - g_gateStart.since >= kGateSettleMs) {
+		g_gateStart.begun = true;
+		g_gateStart.apart = m == MODE_APART;
+		static int s_told = 0;
+		if (s_told++ < 60) Log("experimental: fight gate: its fight begins (rules %s)", kModeName[m]);
+	}
+	if (m == MODE_GAME) g_gateStart.apart = false;   // player 2 gone: scaled like any fight when they come back
+}
+
+bool Beaten(char* sq, const SquadOrig& o) {
+	if (!(*(uint8_t*)(sq + 0x152) & 2)) return false;
+	char* rec0 = *(char**)(sq + 0x144);
+	for (unsigned i = 0; i < o.n; i++) {
+		const char* rec = rec0 + i * 0x1C;
+		if (o.scaled[i] && (*(const uint8_t*)(rec + 0x15) || *(const uint16_t*)(rec + 0x16) > Alive(sq, i))) return true;
+	}
+	return false;
+}
+
+// Each frame: the squads' numbers for the mode. A squad whose fight has not
+// begun takes the mode as it is. Once it has, its Romans to defeat stay as
+// they are when the heroes come apart; a fight begun with the heroes apart is
+// scaled as soon as the rules are on again (Raise; with
+// difficulty_to_defeat_stays never, while player 2 stays in), and goes back
+// to the game's when player 2 leaves with coop_only. Starting Romans: U1
+// (+0x10, read at a restart) follows the mode, U2 (+0x11) too while the squad
+// has not woken.
 void UpdateSquads(Mode m, DWORD now) {
 	bool on = m == MODE_ON;
 	int freshUp = 0, freshDown = 0;
-	static bool s_gateBegun = false, s_gateApart = false;
-	bool gateBegun = false, gateApart = false;
 	const int classes[2] = { 26, 64 };   // CKGrpSquadEnemy, CKGrpSquadJetPack
 	for (int c : classes)
 		for (unsigned k = 0, n = GetNumLvlClassInstances(4, c); k < n; k++) {
@@ -453,12 +522,19 @@ void UpdateSquads(Mode m, DWORD now) {
 				}
 			if (g_config.squadCountFactor == 1.0f) continue;
 			bool gated = *(int8_t*)(sq + 0x154) >= -1;
-			bool begun = !fresh || (gated && s_gateBegun);
-			if (!begun) o.startApart = m == MODE_APART;
-			else if (m == MODE_GAME) o.startApart = false;   // player 2 gone: scaled like any fight when they come back
-			else if (fresh) o.startApart = s_gateApart;
-			if (gated && !fresh) { gateBegun = true; gateApart = gateApart || o.startApart; }
-			bool raise = on && !o.full && !(g_config.toDefeatStays && o.startApart);
+			if (gated) {
+				o.begun = g_gateStart.begun;
+				o.startApart = g_gateStart.apart;
+			} else if (fresh) {
+				o.begun = false;
+			} else if (!o.begun && Beaten(sq, o)) {
+				o.begun = true;
+				o.startApart = m == MODE_APART;
+			} else if (m == MODE_GAME) {
+				o.startApart = false;   // player 2 gone: scaled like any fight when they come back
+			}
+			bool begun = o.begun;
+			bool raise = on && !o.full && !(g_config.toDefeatStays && begun && o.startApart);
 			bool lower = begun ? m == MODE_GAME && o.full : !on && o.full;
 			if (raise || lower) {
 				char before[400];
@@ -477,11 +553,9 @@ void UpdateSquads(Mode m, DWORD now) {
 			}
 			if (!fresh && active && gated) TrimStuck(sq, o, now);
 		}
-	s_gateBegun = gateBegun;
-	s_gateApart = gateApart;
 	static int s_toldFresh = 0;
 	if ((freshUp || freshDown) && s_toldFresh++ < 60)
-		Log("experimental: Romans to defeat %s for %d squad(s) not under way (rules %s)",
+		Log("experimental: Romans to defeat %s for %d squad(s) whose fight has not begun (rules %s)",
 		    freshUp ? "scaled" : "as the level has them", freshUp + freshDown, kModeName[m]);
 }
 
@@ -489,12 +563,12 @@ void UpdateSquads(Mode m, DWORD now) {
 // (squad +0x154: -1 all its pools, n pool n, 0xFE none): every frame each
 // such squad adds count - sent in + alive (FUN_0052D340) to game manager
 // +0x64, the number shown. A pool kept as the level has it (set piece, turtle)
-// gives what its doubling would have added to the pool with the most left to
-// send in of a squad the same gate counts with its Romans to defeat scaled, so
-// the gate shows the whole total doubled; so does a squad scaled mid-fight
-// with none of its own pools left to take its beaten ones' share (Raise).
-// While no squad of the gate is scaled (its fight began with the heroes apart)
-// the kept pools' share waits.
+// gives what doubling its Romans still to defeat would add to the pool with
+// the most left to send in of a squad the same gate counts with its Romans to
+// defeat scaled, so the gate shows the whole number doubled; so does a squad
+// scaled mid-fight whose pools with Romans to send take none of the others'
+// share (Raise). While no squad of the gate is scaled (its fight began with
+// the heroes apart) the kept pools' share waits.
 void GateFrame(Mode m) {
 	int pending = g_gatePending;
 	g_gatePending = 0;
@@ -554,7 +628,8 @@ void GateFrame(Mode m) {
 		const Locked& L = locked[k];
 		for (unsigned i = 0; i < L.o->n; i++)
 			if ((L.sel < 0 || L.sel == (int)i) && !L.o->scaled[i] && !L.o->gaveTo[i] && L.o->origCount[i] > 0) {
-				deficit += Scaled(L.o->origCount[i], g_config.squadCountFactor, 32767) - L.o->origCount[i];
+				int rem = Remaining(L.sq, *(char**)(L.sq + 0x144) + i * 0x1C, i);
+				deficit += Scaled(rem, g_config.squadCountFactor, 32767) - rem;
 				L.o->gaveTo[i] = targetL->sq;
 			}
 	}
@@ -709,7 +784,9 @@ void ExperimentalFrame() {
 		s_mode = m;
 	}
 	CheckSharedPools();
-	UpdateSquads(m, GetTickCount());
+	DWORD now = GetTickCount();
+	GateStartFrame(m, now);
+	UpdateSquads(m, now);
 	GateFrame(m);
 	if (g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f)
 		ComboFrame(m);

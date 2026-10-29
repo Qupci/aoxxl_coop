@@ -5,8 +5,9 @@
 // both players play together, the game's own while the heroes are apart (one
 // held by the level, down, or where the other can't walk to it) and, with
 // difficulty_coop_only, in single player (difficulty_static: on all through
-// co-op). A fight's Romans to defeat are set as it starts and only go up (the
-// heroes together again) -- down only with player 2 gone.
+// co-op). A fight's Romans to defeat are set as it begins (behind a gate: as
+// the gate takes its squads) and only go up (the heroes together again: those
+// left doubled) -- down only with player 2 gone.
 //
 // A squad (CKGrpSquad, deserialize 0x52DE80) keeps one 0x1C record per pool of
 // Romans (squad +0x144, count +0x14C; the editor's "Pools", one per phase):
