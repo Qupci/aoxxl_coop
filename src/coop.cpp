@@ -1881,6 +1881,12 @@ void CloseShopFor(const char* why) {
 			Log("coop: the merchant's camera was in %s's copy -- the copy starts over", HeroName(g.shopper));
 		} else if (cs && *(void**)(sh + 0x118) && *(void**)(cs + 0x38) == *(void**)(sh + 0x118)) {
 			HandBackShopCamera(cs, sh, *(void**)(sh + 0x19C));
+			// The shopper not leading: the game's camera is the leader's own again
+			// now, as at a visit's natural end. The save menu suspends co-op this
+			// frame, which drops the copy -- the game's camera, the shopper's and
+			// aimed at it, went on as the leader's (the other player's view after
+			// the menu: Obelix's half on Asterix, LV2-10).
+			if (t && live == g.shopper && live != t.Leader()) GameCamHandTo(t.Leader(), "the merchant closed");
 		} else if (cs && *(void**)(sh + 0x118)) {
 			g.shopCamPending = sh;
 			g.shopCamSince = GetTickCount();
@@ -3642,8 +3648,13 @@ void CoopBeforeLifeTick(int heroIndex, Hero hero) {
 		}
 	}
 
-	// Player 1 steers relative to its own camera while player 2's hero leads.
-	if (heroIndex == g.p1Hero && t.Leader() == g.p2Hero) P1CamBeginHeroTick();
+	// Player 1 steers relative to its own camera while the game's camera is
+	// player 2's hero's: it leads, or it is at the merchant (whose camera the
+	// game's is for the visit -- Asterix leading steered by the shop's view).
+	{
+		int camHero = GameCamLiveHero() >= 0 ? GameCamLiveHero() : t.Leader();
+		if (heroIndex == g.p1Hero && camHero == g.p2Hero) P1CamBeginHeroTick();
+	}
 
 	if (heroIndex == g.p2Hero && g.p2ValuesReady) {
 		InputManager im = GetInputManager();

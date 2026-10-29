@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -2226,6 +2226,120 @@ const Step kShopZone[] = {
 	VPAD(19500, 1, 0, 0, -1.0f, "p2 walks"), VPAD(21000, 1, 0, 0, 0, "p2 stops"),
 	SHOT(22000, "shopzone_4"),
 	END(22500),
+};
+
+// shopbuyo (level 2, individual heroes; userlogs xxl_coop.merchant_issues.log):
+// Asterix leads, player 2's Obelix (not leading) buys three items at the
+// merchant, both heroes at 5 health: what he buys is his (it went to the
+// leader). Meanwhile player 1's Asterix walks with the stick up: along his own
+// camera's forward (he steered by the shop's view), and again after the visit.
+const Step kShopBuyO[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_POKE8, -10, 0x50, 0, 5.0f, 0, "asterix health 5" },
+	{ 1000, S_POKE8, -11, 0x50, 0, 5.0f, 0, "obelix health 5" },
+	{ 1000, S_POKE8, -1, 0x6A, 0, 2.0f, 0, "helmets (+0x68) 131072 more" },
+	GLIDEAT(1500, HERO_OBELIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(4000, 1, PAD_X, 0, 0, "p2 X"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	VPAD(7500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(7700, 1, 0, 0, 0, "p2 release"),
+	SHOT(9500, "shopbuyo_1"),
+	VPAD(10000, 1, PAD_A, 0, 0, "p2 A (buy)"), VPAD(10200, 1, 0, 0, 0, "p2 release"),
+	VPAD(12000, 1, 0, 1.0f, 0, "p2 right"), VPAD(12300, 1, 0, 0, 0, "p2 release"),
+	VPAD(13000, 1, PAD_A, 0, 0, "p2 A (buy)"), VPAD(13200, 1, 0, 0, 0, "p2 release"),
+	VPAD(15000, 1, 0, 1.0f, 0, "p2 right"), VPAD(15300, 1, 0, 0, 0, "p2 release"),
+	VPAD(16000, 1, PAD_A, 0, 0, "p2 A (buy)"), VPAD(16200, 1, 0, 0, 0, "p2 release"),
+	SHOT(17500, "shopbuyo_2"),
+	{ 18000, S_STEERCHECK, HERO_ASTERIX, 0, 0, 0, 0, "asterix's place" },
+	P1(18000, 0, 0, 1.0f, "p1 forward"), P1(19500, 0, 0, 0, "p1 stop"),
+	{ 19600, S_STEERCHECK, HERO_ASTERIX, 1, 0, 0, 0, "asterix's walk (obelix shopping)" },
+	SHOT(19700, "shopbuyo_3"),
+	VPAD(20000, 1, PAD_B, 0, 0, "p2 B (back)"), VPAD(20200, 1, 0, 0, 0, "p2 release"),
+	VPAD(23000, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(23200, 1, 0, 0, 0, "p2 release"),
+	SHOT(26000, "shopbuyo_4"),
+	{ 26500, S_STEERCHECK, HERO_ASTERIX, 0, 0, 0, 0, "asterix's place" },
+	P1(26500, 0, 0, 1.0f, "p1 forward"), P1(28000, 0, 0, 0, "p1 stop"),
+	{ 28100, S_STEERCHECK, HERO_ASTERIX, 1, 0, 0, 0, "asterix's walk (after the visit)" },
+	END(29000),
+};
+
+// shopsavea (-Level 2, sector 10; userlogs xxl_coop.LV2_10_merchant_save.log):
+// the save point's zone (05A0, "Asterix leads", one shot) set off first, then
+// Obelix leads; player 1's Asterix (not leading) at the merchant, player 2's
+// Obelix opens the save point's menu: the shop closes. The menu left (cancel,
+// left, confirm), each camera follows its own hero (Obelix's half was on
+// Asterix) and both heroes walk along their own views.
+const Step kShopSaveA[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1652.0f, -744.5f, -1205.0f), PLACEAT(3000, HERO_OBELIX, 1658.87f, -743.3f, -1216.27f),
+	PLACEAT(3400, HERO_ASTERIX, 1652.0f, -744.5f, -1205.0f), PLACEAT(3400, HERO_OBELIX, 1658.87f, -743.3f, -1216.27f),
+	SECTORS(3600),
+	GLIDEAT(3800, HERO_ASTERIX, 1661.5f, -743.8f, -1217.3f, 2500),
+	{ 7000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	GLIDEAT(7500, HERO_ASTERIX, 1647.88f, -744.5f, -1208.53f, 2000),
+	{ 10000, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	P1(10500, PAD_X, 0, 0, "p1 X"), P1(10700, 0, 0, 0, "p1 release"),
+	P1(14000, PAD_X, 0, 0, "p1 X (words)"), P1(14200, 0, 0, 0, "p1 release"),
+	SHOT(15500, "shopsavea_1"),
+	{ 15600, S_CAMTARGET, 0, 0, 0, 0, 0, "cameras (asterix shopping)" },
+	VPAD(16000, 1, PAD_X, 0, 0, "p2 X (save point)"), VPAD(16200, 1, 0, 0, 0, "p2 release"),
+	SHOT(18000, "shopsavea_2"),
+	{ 19000, S_BIND, 21, 0, 0, 0, 0, "cancel" },
+	SHOT(20000, "shopsavea_3"),
+	{ 20500, S_BIND, 18, 34, 54, 6.0f, 0, "left (the D-pad's bindings; 54 the message box's)" },
+	{ 21500, S_BIND, 20, 44, 56, 3.0f, 0, "confirm (the A button's bindings; 56 the message box's)" },
+	SHOT(23500, "shopsavea_4"),
+	{ 24000, S_CAMTARGET, 0, 0, 0, 0, 0, "cameras (after the save menu)" },
+	{ 24000, S_STEERCHECK, HERO_ASTERIX, 0, 0, 0, 0, "asterix's place" },
+	{ 24000, S_STEERCHECK, HERO_OBELIX, 0, 0, 0, 0, "obelix's place" },
+	P1(24000, 0, 0, 1.0f, "p1 forward"), VPAD(24000, 1, 0, 0, 1.0f, "p2 forward"),
+	P1(25200, 0, 0, 0, "p1 stop"), VPAD(25200, 1, 0, 0, 0, "p2 stop"),
+	{ 25300, S_STEERCHECK, HERO_ASTERIX, 1, 0, 0, 0, "asterix's walk" },
+	{ 25300, S_STEERCHECK, HERO_OBELIX, 1, 0, 0, 0, "obelix's walk" },
+	SHOT(25500, "shopsavea_5"),
+	END(26500),
+};
+
+// shopsaveo (-Level 2, sector 10; userlogs xxl_coop.LV2_10_merchant_save2.log):
+// Asterix leads, player 2's Obelix at the merchant (player 1's Asterix walks
+// meanwhile: along his own view), player 1's Asterix opens the save point's
+// menu: the shop closes. After the menu (cancel, left, confirm) each camera
+// follows its own hero (player 1's half was on Obelix).
+const Step kShopSaveO[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 10),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 1652.0f, -744.5f, -1205.0f), PLACEAT(3000, HERO_OBELIX, 1647.88f, -744.5f, -1208.53f),
+	PLACEAT(3400, HERO_ASTERIX, 1652.0f, -744.5f, -1205.0f), PLACEAT(3400, HERO_OBELIX, 1647.88f, -744.5f, -1208.53f),
+	SECTORS(3600),
+	GLIDEAT(3800, HERO_ASTERIX, 1661.5f, -743.8f, -1217.3f, 2500),
+	{ 6800, S_NEAROBJ, HERO_OBELIX, 172, 0, 1.6f, 0, "obelix at the merchant" },
+	VPAD(7000, 1, PAD_X, 0, 0, "p2 X"), VPAD(7200, 1, 0, 0, 0, "p2 release"),
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X (words)"), VPAD(10700, 1, 0, 0, 0, "p2 release"),
+	SHOT(12000, "shopsaveo_1"),
+	{ 12100, S_CAMTARGET, 0, 0, 0, 0, 0, "cameras (obelix shopping)" },
+	{ 12500, S_STEERCHECK, HERO_ASTERIX, 0, 0, 0, 0, "asterix's place" },
+	P1(12500, 0, 0, 1.0f, "p1 forward"), P1(13500, 0, 0, 0, "p1 stop"),
+	{ 13600, S_STEERCHECK, HERO_ASTERIX, 1, 0, 0, 0, "asterix's walk (obelix shopping)" },
+	GLIDEAT(13700, HERO_ASTERIX, 1658.87f, -743.3f, -1216.27f, 1000),
+	SHOT(15400, "shopsaveo_2a"),
+	P1(15500, 0, -1.0f, 0, "p1 left (turns to the druid)"), P1(15700, 0, 0, 0, "p1 neutral"),
+	P1(16000, PAD_X, 0, 0, "p1 X (save point)"), P1(16200, 0, 0, 0, "p1 release"),
+	SHOT(17500, "shopsaveo_2"),
+	{ 18500, S_BIND, 21, 0, 0, 0, 0, "cancel" },
+	SHOT(19500, "shopsaveo_3"),
+	{ 20000, S_BIND, 18, 34, 54, 6.0f, 0, "left (the D-pad's bindings; 54 the message box's)" },
+	{ 21000, S_BIND, 20, 44, 56, 3.0f, 0, "confirm (the A button's bindings; 56 the message box's)" },
+	SHOT(23000, "shopsaveo_4"),
+	{ 23500, S_CAMTARGET, 0, 0, 0, 0, 0, "cameras (after the save menu)" },
+	{ 23500, S_STEERCHECK, HERO_ASTERIX, 0, 0, 0, 0, "asterix's place" },
+	{ 23500, S_STEERCHECK, HERO_OBELIX, 0, 0, 0, 0, "obelix's place" },
+	P1(23500, 0, 0, 1.0f, "p1 forward"), VPAD(23500, 1, 0, 0, 1.0f, "p2 forward"),
+	P1(24700, 0, 0, 0, "p1 stop"), VPAD(24700, 1, 0, 0, 0, "p2 stop"),
+	{ 24800, S_STEERCHECK, HERO_ASTERIX, 1, 0, 0, 0, "asterix's walk" },
+	{ 24800, S_STEERCHECK, HERO_OBELIX, 1, 0, 0, 0, "obelix's walk" },
+	SHOT(25000, "shopsaveo_5"),
+	END(26000),
 };
 
 // combodrain (level 2, individual heroes): player 2's Obelix (not leading)
@@ -6170,6 +6284,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("combodrain", kComboDrain),
 	SCENARIO("shopzone", kShopZone),
 	SCENARIO("shopsave", kShopSave),
+	SCENARIO("shopbuyo", kShopBuyO),
+	SCENARIO("shopsavea", kShopSaveA),
+	SCENARIO("shopsaveo", kShopSaveO),
 	SCENARIO("cabled33", kCableD33),
 	SCENARIO("liftcab33", kLiftCab33),
 	SCENARIO("liftcab33w", kLiftCab33W),
@@ -6332,6 +6449,8 @@ struct AutotestState {
 
 	bool     p1Active = false;
 	int      p1Combo = -1;          // P1COMBO: combo k's action for player 1 next frame
+	int      bind[3] = { -1, -1, -1 };   // S_BIND: bindings pressed in the game's values
+	int      bindFrames = 0;            // ... for that many more frames
 	PadState p1;
 	uint16_t p1Prev = 0;
 	PadState vpad[kMaxPads];
@@ -6917,6 +7036,48 @@ void LogTick(float t) {
 				((float*)(frame + 0x80))[2]);
 	}
 	Log("%s", line.c_str());
+}
+
+// Whom a camera service state follows (its target +0xE8: a hero's +0x10).
+const char* CamFollows(Trio t, const char* svc) {
+	void* tg = *(void* const*)(svc + 0xE8);
+	for (int k = 0; k < 2; k++) {
+		Hero x = t.GetHero(k);
+		if (x && *(void**)(x.raw() + 0x10) == tg) return HeroName(k);
+	}
+	return "something else";
+}
+
+// S_STEERCHECK: hero `hero`'s walk since its place was noted (report 0),
+// against its player's view -- its camera copy, else the game's camera.
+float g_steerFrom[2][3];
+void SteerCheck(int hero, int report) {
+	Trio t = GetTrio();
+	Hero h = t && hero >= 0 && hero < 2 ? t.GetHero(hero) : Hero();
+	if (!h) return;
+	Vector3 p = h.Pos();
+	float* from = g_steerFrom[hero];
+	if (!report) { from[0] = p.x, from[1] = p.y, from[2] = p.z; return; }
+	float m[16];
+	bool own = hero == CoopP1Hero() ? P1CamMatrix(m) : P2CamMatrix(m);
+	if (!own) {
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		char* cam = cs ? *(char**)(cs + 0x1C) : nullptr;
+		char* frame = cam ? *(char**)(cam + 4) : nullptr;
+		if (!frame) return;
+		memcpy(m, frame + 0x10, sizeof(m));
+	}
+	float dx = p.x - from[0], dz = p.z - from[2];
+	float len = sqrtf(dx * dx + dz * dz);
+	float fl = sqrtf(m[8] * m[8] + m[10] * m[10]), rl = sqrtf(m[0] * m[0] + m[2] * m[2]);
+	if (len < 0.1f || fl < 1e-3f || rl < 1e-3f) {
+		Log("autotest: %s walked %.2f units (too little to tell)", HeroName(hero), len);
+		return;
+	}
+	float along = (dx * m[8] + dz * m[10]) / (len * fl), side = (dx * m[0] + dz * m[2]) / (len * rl);
+	Log("autotest: %s walked %.1f units: %.2f along %s forward, %.2f along its right", HeroName(hero), len, along,
+	    own ? "its own camera's" : "the game's camera's", side);
 }
 
 void RunStep(const Step& s) {
@@ -7824,6 +7985,28 @@ void RunStep(const Step& s) {
 		    best ? *(void**)(best + 0x20) : nullptr);
 		break;
 	}
+	case S_BIND:   // bindings a, b and buttons (> 0) pressed in the game's values for x frames (at least 1; menus)
+		at.bind[0] = s.a;
+		at.bind[1] = s.b > 0 ? s.b : -1;
+		at.bind[2] = s.buttons > 0 ? s.buttons : -1;
+		at.bindFrames = s.x >= 1.0f ? (int)s.x : 1;
+		Log("autotest: bindings %d %d %d pressed for %d frames", at.bind[0], at.bind[1], at.bind[2], at.bindFrames);
+		break;
+	case S_STEERCHECK:   // hero a: b = 0 notes its place; b = 1 its walk since, against its player's camera
+		SteerCheck(s.a, s.b);
+		break;
+	case S_CAMTARGET: {   // whom the game's camera and the copy follow (camera service +0xE8: a hero's +0x10)
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		Trio t = GetTrio();
+		if (!cs || !t) break;
+		int live = GameCamLiveHero();
+		Log("autotest: the game's camera (%s's) follows %s; leader %s", HeroName(live >= 0 ? live : t.Leader()),
+		    CamFollows(t, cs), HeroName(t.Leader()));
+		for (int k = 0; k < 2; k++)
+			if (const char* c = GameCamCopyState(k)) Log("autotest: %s's camera (copy) follows %s", HeroName(k), CamFollows(t, c));
+		break;
+	}
 	case S_CAMDUMP: {   // the camera service (yellow pages +0x68): state, tracks, sectors, input view
 		CKYellowPages* yp = YellowPages();
 		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
@@ -8502,6 +8685,18 @@ void InjectP1() {
 	}
 }
 
+// S_BIND: one binding of the game's values for one frame -- the menus'
+// (interface left 18, right 19, confirm 20, cancel 21), which player 1's
+// scripted pad does not fill.
+void InjectBind() {
+	if (at.bindFrames <= 0) return;
+	at.bindFrames--;
+	InputManager im = GetInputManager();
+	uint8_t* values = im.Values();
+	for (int i = 0; i < 3 && values; i++)
+		if (at.bind[i] >= 0 && at.bind[i] < im.NumActions()) values[at.bind[i]] = 0xFF;
+}
+
 } // namespace
 
 void AutotestInit() {
@@ -8659,6 +8854,7 @@ void AutotestFrame() {
 
 	RunGlides(now);
 	InjectP1();
+	InjectBind();
 	HudDiffFrame();
 	// XXL_GATESHOTS: shots as the fight gate's counter (interface +0x24 bits
 	// 17-18) slides in and when it goes (state 3, its sparkle); the run ends 3 s

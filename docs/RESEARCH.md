@@ -2722,3 +2722,34 @@ both halves).
   (rules4d without the squad reset: 100; revive: 91 -> 182), rules4t 200, rules4l (191 -> 96 -> 184), rules4p
   (gate 200, Obelix cut off 1.9 s later: 100 within the settle; reunion doubled), rules4n + XXL_DEFEATSTAYS=1 (100,
   stays), lock4 (single player 100).
+- Round 151 (user, after round 143's merchant without a lead switch; userlogs xxl_coop.merchant_issues.log,
+  xxl_coop.LV2_10_merchant_save.log, xxl_coop.LV2_10_merchant_save2.log). (1) What the hero not leading bought went
+  to the leader: the merchant's item menu (FUN_004BFC50, its state 3) writes the health and shields straight into
+  the game manager's +0x40 block (items 0-2 a ham: +0x50 += shop +0x114[code]; 3-5 a shield: +0x51 + 1, health
+  topped up by shop +0x111[code]; 6+ a combo: block +0x10 bit (code - 6), shared) and reads them for its "full"
+  refusals; helmets +0x68 are shared. Individual heroes kept the leader's there outside any one hero's business.
+  Now the shop's tick (proximity.cpp, kShopVtbl, already sliced to g.shopHero) runs inside IndivEnter(shopper);
+  a purchase is logged ("bought from the merchant: helmets, health"). (2) Asterix leading steered by the shop's
+  camera while Obelix shopped (stick up -> sideways): player 1's tick took its own camera's basis only when player
+  2's hero led (coop.cpp CoopBeforeLifeTick, P1CamBeginHeroTick); round 143 made the game's camera the shopper's
+  for the visit. Now: when the game's camera's hero (GameCamLiveHero, else the leader) is player 2's. (3) The save
+  menu (bars) closing the shop of the hero not leading left the leader's view on the shopper after the menu
+  (Obelix's half on Asterix / Asterix's on Obelix): CloseShopFor handed the shop's camera back aimed at the shopper
+  in the game's camera (the shopper's for the visit), then co-op suspended the same frame -- the copy (the leader's
+  own camera) dropped before the camera tick's "visit over" swap. Now CloseShopFor, after that hand-back, gives the
+  game's camera to the leader at once (GameCamHandTo: the two states change places), as a natural end does. The
+  launcher's close (4804, camera already the launcher's: "not up" branch) is unchanged. (4) Not changed: the
+  leader switch after the save menu (save2, Obelix leading) is the level's: LV2-10's zone 05A0 by the save point
+  (group 0B4: detector 1622, corkscrew 0999, trio 4800 + 4803, light pillar 0900; one shot) sent "Asterix leads" as
+  Asterix walked to the druid; round 70 holds it until the visit ends (without the shop it switches at once).
+  Test aids: S_STEERCHECK (a hero's walk against its player's view: copy, else the game's camera), S_CAMTARGET
+  (whom the game's camera and the copy follow: svc +0xE8 vs a hero's +0x10), S_BIND (up to three bindings of the
+  game's values for x frames). The save menu's "Cancel save?" message box reads its own bindings: 54 / 55 left /
+  right, 56 A (the user's preset: D-pad); the save menu itself 21 (cancel). The druid's X needs Asterix facing it
+  (a glide keeps the old facing: X punched). Autotests (all -Level 2; before -> after): shopbuyo (Asterix leads,
+  Obelix buys a ham and a shield, both at 5 health: before A 5/3 -> 20/4 and O 5/3 kept, after O 5/3 -> 20/4
+  and A 5/3 kept; Asterix's walk in the visit
+  -0.10 / -1.00 -> 1.00 / -0.05 along / across his own camera), shopsavea (sector 10; Obelix leads, Asterix shops,
+  Obelix saves: after the menu "the game's camera (Obelix's) follows Asterix" -> "follows Obelix"), shopsaveo
+  (Asterix leads, Obelix shops, Asterix saves: "(Asterix's) follows Obelix" -> "follows Asterix"; walk in the visit
+  -0.03 / 1.00 -> 0.98 / -0.19). shopsplit, shopzone, shoplaunch4b / 4c (-Level 4) as before.

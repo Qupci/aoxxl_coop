@@ -394,11 +394,38 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	}
 	// The merchant at its hero's (the one at it, leading or not): its states
 	// ask the trio for the shopper (a purchase's 0x907, its camera's target).
+	// A purchase writes the health and shields in the game's place (FUN_004BFC50:
+	// a ham heals, a shield is added; "full" refusals read them): the shopper's
+	// (individual heroes) -- they were the leader's, who got what the other bought.
+	struct ShopStats {
+		int prev = -1, hero = -1;
+		uint8_t hp = 0, shields = 0;
+		uint32_t helmets = 0;
+		static char* Block() {
+			CKYellowPages* yp = YellowPages();
+			char* gm = yp ? (char*)yp->gameManager : nullptr;
+			return gm ? *(char**)(gm + 0x40) : nullptr;
+		}
+		void Enter(int h) {
+			hero = h;
+			prev = IndivEnter(h);
+			if (char* cb = Block()) hp = cb[0x50], shields = cb[0x51], helmets = *(uint32_t*)(cb + 0x68);
+		}
+		~ShopStats() {
+			if (hero < 0) return;
+			char* cb = Block();
+			if (cb && *(uint32_t*)(cb + 0x68) != helmets)
+				Log("proximity: %s bought from the merchant: helmets %u -> %u, health %u/%u -> %u/%u", HeroName(hero), helmets,
+				    *(uint32_t*)(cb + 0x68), hp, shields, (uint8_t)cb[0x50], (uint8_t)cb[0x51]);
+			IndivLeave(prev);
+		}
+	} shopStats;
 	if (hook && *(uintptr_t*)hook == kShopVtbl) {
 		int sh = CoopShopHero();
 		if (sh == p1 || sh == p2) {
 			nearest = sh;
 			range2 = 1e30f;
+			shopStats.Enter(sh);
 		}
 	}
 	if (hook && *(uintptr_t*)hook == kClueManVtbl) {
