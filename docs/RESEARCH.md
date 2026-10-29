@@ -2827,3 +2827,19 @@ both halves).
   depth 0). Also seen: [coop_difficulty] going APART at the fall rescales the fallen hero's copy (25 -> 19 hits,
   full at 38 -> 30) -- as designed. Autotests downcombop (seen 25 -> 19 -> 18 ..., no bounce), downcombo (state 4
   -> 2 0.47 s after the fall), down2a, towerhit, shopbuyo as before.
+- Round 157 (user, Game Files\xxl_coop.catapult_shared_combo.log, LV3-1 at 106.0 1.0 11.5: player 2's Obelix, not
+  leading, hitting the Roman catapult put the hits on both heroes' combo bars; Asterix not leading does the same;
+  with the hitter leading it is fine). CKHkCatapult (2,130, vt 0x628238; Life CKHkCatapultLife 3,108, tick
+  FUN_00508E70). Its sendEvent (0x508190) on a contact 0x0300 with its kind-3 volume (+0x19 == 3): two attacker
+  slots (volumes +0x94 / +0x98, owner at +0x20; timers +0x30 / +0x34, a slot dropped at > 0.05, dt added at each
+  tick's end); a new attacker takes the older slot, its timer 0, gets "a hit landed" (0x4C0E to the owner's
+  sendEvent -- the hero's own scope) and +0x14 |= 0x42. The next tick with bit 0x40 runs FUN_005093A0: health
+  +0x1E down, and the hit on the combo bar *again*, straight into the game manager (+0xB0 / +0xB4 += 1, or 3 under
+  the potion; decay +0xA8 from +0x9C; FUN_0048C860; full: gauge +0xA4 += +0xA0 / +0xC8, Bits8 2) -- two hits a
+  blow in single player. That tick ran with the leader's stats in place: one for the hitter, one for the leader.
+  Now TickLife (proximity.cpp) ticks a catapult with bit 0x40 inside IndivEnter(hitter): the slot with the smaller
+  timer, its volume's owner matched to a hero (CatapultHitter; log "catapult ... hit by X (not leading)", 20 max).
+  Autotests catapultcombo (-Level 3; P2's Obelix by the catapult, 6 blows: before A 1 / O 1 a blow, after A 0 / O
+  2) and catapultcomboa (-Level 3, XXL_P2HERO=asterix, Obelix leads via 4801: A 2 a blow, O 0). Same direct-add
+  pattern, not looked at in co-op yet: CKHkJetPackRoman::vf28 (0x4E25A0) and CKHkMobileTower::vf28 (0x4EB170),
+  Roman state code that runs in the squads' tick (the leader's stats, or the posing hero's slice).

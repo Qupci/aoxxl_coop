@@ -92,6 +92,29 @@ static bool SpitsPotion(char* spitter) {
 	if (item == -1) item = *(int*)(spitter + 0x1C);
 	return item == kPotionPoolType;
 }
+// Roman catapults (CKHkCatapult, 2,130; LV3-1). A hero's blow (contact 0x0300
+// on its volume of kind 3) gives the hitter "a hit landed" (0x4C0E) and sets
+// +0x14 bit 0x40; the catapult's next tick then puts the hit on the combo bar
+// once more itself (FUN_005093A0: game manager +0xB0 / +0xB4, or the full
+// gauge) -- two a blow in single player. Ticked with the leader's stats in
+// place, the non-leader's blows went on both heroes' bars (catapult_shared_combo.log).
+// It ticks with the hitter's: the newer of its two attackers (volumes +0x94 /
+// +0x98, owner at +0x20), whose timer (+0x30 / +0x34, dt added each tick) a
+// blow sets to 0.
+const uintptr_t kCatapultVtbl = 0x628238;
+static int CatapultHitter(char* cat, Trio t) {
+	if (!(*(uint8_t*)(cat + 0x14) & 0x40)) return -1;
+	char* by = nullptr;
+	float newest = 1e30f;
+	for (int k = 0; k < 2; k++) {
+		char* vol = *(char**)(cat + 0x94 + k * 4);
+		float since = *(float*)(cat + 0x30 + k * 4);
+		if (vol && !IsBadReadPtr(vol, 0x24) && since < newest) { newest = since; by = *(char**)(vol + 0x20); }
+	}
+	for (int i = HERO_ASTERIX; by && i <= HERO_OBELIX; i++)
+		if (t.GetHero(i).raw() == by) return i;
+	return -1;
+}
 // The one hero a block is for (+0x14 bit 6 Asterix, bit 7 Obelix; it offers its
 // push or pull, 0x900 to trio vf25, only while that hero leads), else -1. LV2-8's
 // platform under a light pillar is Obelix's to pull with Asterix on the pillar:
@@ -329,6 +352,18 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	uintptr_t vt = *(uintptr_t*)life;
 	Vector3 at;
 	char* hook = isGroup ? nullptr : *(char**)((char*)life + 0x10);
+	struct HitterStats {   // a catapult's blow on its hitter's combo bar (individual heroes)
+		int prev = -1;
+		~HitterStats() { IndivLeave(prev); }
+	} hitterStats;
+	if (hook && *(uintptr_t*)hook == kCatapultVtbl) {
+		int by = CatapultHitter(hook, t);
+		if (by >= 0) hitterStats.prev = IndivEnter(by);
+		static int s_told = 0;
+		if (by >= 0 && by != t.Leader() && IndivActive() && s_told++ < 20)
+			Log("proximity: catapult %p hit by %s (not leading) -- its tick puts the blow on that hero's combo bar", hook,
+			    HeroName(by));
+	}
 	// Individual heroes: what needs both heroes skips its tick while the standing
 	// hero is at it with the other down (the hero is put back too): it cannot start.
 	if (hook && IndivHoldsBack(hook)) return;

@@ -6129,6 +6129,38 @@ const Step kDownComboO[] = {
 	END(12000),
 };
 
+// catapultcombo (level 3): player 2's Obelix (not leading) hits LV3-1's Roman
+// catapult (CKHkCatapult 2,130; user: 106.0 1.0 11.5) -- his combo bar takes
+// every hit, Asterix's (leading, far off at the level's start) none
+// (catapult_shared_combo.log: both bars went up).
+const Step kCatapultCombo[] = {
+	MARK(0, "catapultcombo"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_OBELIX, 106.008f, 0.951f, 11.521f),
+	{ 1800, S_NEAROBJ, HERO_OBELIX, 130, 0, 2.5f, 0, "obelix by the catapult" }, SHOT(2200, "before"),
+	VPAD(2500, 1, PAD_X, 0, 0, "p2 X"), VPAD(2700, 1, 0, 0, 0, "p2 release"),
+	VPAD(3500, 1, PAD_X, 0, 0, "p2 X"), VPAD(3700, 1, 0, 0, 0, "p2 release"), SHOT(3900, "hit2"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"), VPAD(4700, 1, 0, 0, 0, "p2 release"),
+	VPAD(5500, 1, PAD_X, 0, 0, "p2 X"), VPAD(5700, 1, 0, 0, 0, "p2 release"), SHOT(5900, "hit4"),
+	VPAD(6500, 1, PAD_X, 0, 0, "p2 X"), VPAD(6700, 1, 0, 0, 0, "p2 release"),
+	VPAD(7500, 1, PAD_X, 0, 0, "p2 X"), VPAD(7700, 1, 0, 0, 0, "p2 release"), SHOT(7900, "hit6"),
+	END(8500),
+};
+// catapultcomboa (level 3, XXL_P2HERO=asterix): the same with player 2's
+// Asterix, Obelix leading.
+const Step kCatapultComboA[] = {
+	MARK(0, "catapultcomboa"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(1500, HERO_ASTERIX, 106.008f, 0.951f, 11.521f),
+	{ 1800, S_NEAROBJ, HERO_ASTERIX, 130, 0, 2.0f, 0, "asterix by the catapult" }, SHOT(2200, "before"),
+	VPAD(2500, 1, PAD_X, 0, 0, "p2 X"), VPAD(2700, 1, 0, 0, 0, "p2 release"),
+	VPAD(3500, 1, PAD_X, 0, 0, "p2 X"), VPAD(3700, 1, 0, 0, 0, "p2 release"), SHOT(3900, "hit2"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"), VPAD(4700, 1, 0, 0, 0, "p2 release"),
+	VPAD(5500, 1, PAD_X, 0, 0, "p2 X"), VPAD(5700, 1, 0, 0, 0, "p2 release"), SHOT(5900, "hit4"),
+	END(6500),
+};
+
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
 const Step kIdle[] = {
 	MARK(0, "baseline"), SHOT(100, "idle_00"), SHOT(3000, "idle_01"), END(3500),
@@ -6219,6 +6251,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("downcombo", kDownCombo),
 	SCENARIO("downcombop", kDownComboP),
 	SCENARIO("downcomboo", kDownComboO),
+	SCENARIO("catapultcombo", kCatapultCombo),
+	SCENARIO("catapultcomboa", kCatapultComboA),
 	SCENARIO("survey", kSurvey),
 	SCENARIO("bossscan", kBossScan),
 	SCENARIO("lifter", kLifter),
