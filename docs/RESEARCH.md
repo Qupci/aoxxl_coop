@@ -2801,3 +2801,18 @@ both halves).
   the "COMBO" bar still lit on the fallen hero; after, 0 / not full from the fall on, empty after the revive),
   downcomboo (Obelix, P2's HUD copy: 38 / full -> 0 / not full). A note from the first try: NEXTTO 5 units ahead of
   Obelix put Asterix in LV2's sea (swimming heroes take no hits) -- move Obelix instead.
+- Round 155 (user, userlogs xxl_coop.combo_bar_full.log / _partial.log; shots XXL-Editor\screenshots
+  Snipaste_2026-10-30_01-01-33 / 01-04-06: after round 154 the fallen hero's bar still showed full, running down,
+  or kept one or two levels lit). The HUD's bar (FUN_00518190, interface +0x24 bits 12-14): full (state 4) it draws
+  its own fill (+0x2E8 toward +0x2E0 = 0 at +0x2E4 = height / gm +0xA0 a second), reads the gauge only on gm +0x160
+  bit 2, and while its "Combo" word plays (node +0xB4 shown) sets gm +0xA4 back to +0xA0; it leaves state 4 when the
+  fill is 0 (hits, chain 0, FUN_0048C860 = level from the hits). Part full (state 2): a level's glow goes out only
+  when the hits go under it with some left (+0x2C0 the last seen); hits 0 skip that. Now IndivHeroDown only clears
+  chain / c4 / decay and sets g.drain; DrainCombo (IndivFrame, after RunDownCombo): full -> gauge down in 0.5 s with
+  bit 2 each step, at 0 the run-out (hits, full off); else one hit a frame; then level 0. Autotests downcombo (full
+  in two gives so the bar enters state 4: state 4 -> 2 0.44 s after the fall, hidden 5 s later), downcombop (25
+  hits a second before the fall: drained in ~0.9 s, glows out, hidden ~6 s later). OPEN: (a) at the fall P1's bar
+  sees hits 0 for one tick (combodbg: "seen 0 hits 19"), then the drain's 18 -> it replays its level-ups (bounce,
+  white bursts) -- find who zeroes the hits in the fall's frame (the death's entry? the lead switch?); (b) after the
+  full drain a white bottom segment stays lit (node +0xC0, the level marker shown by the state-4 bit-4 branch, not
+  hidden by the exit?) -- compare with a full bar running out with no fall.

@@ -44,6 +44,7 @@ struct State {
 	int      ctx = -1;                 // whose stats are in the game's place (-1: the game's own)
 	int      depth = 0;                // IndivEnter scopes open (a hero's tick, event, pickup...)
 	bool     fallen[2] = {};
+	bool     drain[2] = {};            // its combo bar draining to empty (DrainCombo)
 	float    revive[2] = {};           // seconds the other player has held the grab button by it
 	bool     gameOver = false;
 	SafeSpot safe[2][kSafeSpots];
@@ -639,6 +640,7 @@ void Respawned() {
 	for (int i = 0; i < 2; i++) {
 		g.brought[i] = false;
 		g.fallen[i] = false;
+		g.drain[i] = false;
 		g.fellLeading[i] = false;
 		g.levelLead[i] = false;
 		g.revive[i] = 0;
@@ -659,6 +661,7 @@ void Activate(Trio t) {
 	g.active = true;
 	g.gameOver = false;
 	memset(g.fallen, 0, sizeof(g.fallen));
+	memset(g.drain, 0, sizeof(g.drain));
 	memset(g.revive, 0, sizeof(g.revive));
 	memset(g.safe, 0, sizeof(g.safe));
 	g.p2Hero = CoopP2Hero();
@@ -700,6 +703,7 @@ void Deactivate(Trio t) {
 		if (h) Raise(h);
 		g.fallen[i] = false;
 	}
+	memset(g.drain, 0, sizeof(g.drain));
 	g.active = false;
 	g.ctx = -1;
 	HintHide(HINT_REVIVE);
@@ -735,6 +739,40 @@ void RunDownCombo(int idx) {
 		else if (s.gauge <= dt) s.gauge = 0.0f;
 		else s.gauge -= dt;
 	}
+}
+
+// A fallen hero's combo bar drains to empty, as the HUD's bar (FUN_00518190)
+// can show it. Full (its state 4), the bar draws a fill of its own, counted down
+// at the gauge's pace from the full height and read from the gauge (game manager
+// +0xA4 of +0xA0) only on +0x160 bit 2 -- zeroed stats left it full, running down
+// for its whole time; while its "Combo" word plays it even sets the gauge back to
+// +0xA0. So the gauge runs out in kDrainSeconds with bit 2 set at each step, and
+// at 0 the bar ends its full state the game's way (hits, chain off). Not full (its
+// state 2), a level's glow goes out only as the hits go under that level with
+// some still in -- straight to 0 left one or two lit: one hit a frame.
+const float kDrainSeconds = 0.5f;
+void DrainCombo(int idx, float dt) {
+	char* gm = GM();
+	if (!g.drain[idx] || !gm) return;
+	Stats& s = Current(idx);
+	if (s.full) {
+		float max = *(float*)(gm + 0xA0);
+		s.gauge -= (max > 0.0f ? max : 1.0f) * dt / kDrainSeconds;
+		s.barFlags |= 4;
+		if (s.gauge <= 0.0f) {   // the gm tick's run-out (FUN_00504080)
+			s.gauge = 0.0f;
+			s.hits = s.chain = s.c4 = 0;
+			s.full = false;
+		}
+	} else if (s.hits) {
+		s.hits--;
+		s.decay = 0.0f;
+	} else {
+		s.level = 0;
+		g.drain[idx] = false;
+		Log("indiv: %s's combo bar is empty", HeroName(idx));
+	}
+	Commit(idx);
 }
 
 // Bonuses that heal (FUN_004BB260, thiscall(game manager, points), ret 4) or
@@ -935,17 +973,14 @@ bool IndivHeroDown(int hero, const char* how) {
 	g.revive[hero] = 0;
 	{
 		// Its combo bar empties, "full" and all, as the game's respawn empties it
-		// (CKAsterixGameManager::vf13: hits, chain, +0xC4, gauge, level, +0x160) --
-		// a fallen hero kept a full bar through its revive (user).
+		// (CKAsterixGameManager::vf13) -- a fallen hero kept a full bar through its
+		// revive (user). Drained, not zeroed: DrainCombo.
 		Stats& s = Current(hero);
-		bool had = s.full || s.hits || s.gauge > 0.0f;
-		s.hits = s.chain = s.c4 = 0;
-		s.gauge = s.decay = 0.0f;
-		s.level = 0;
-		s.full = false;
-		s.barFlags = 0;
+		s.chain = s.c4 = 0;
+		s.decay = 0.0f;
 		Commit(hero);
-		if (had) Log("indiv: %s's combo bar emptied (down)", HeroName(hero));
+		g.drain[hero] = s.full || s.hits > 0;
+		if (g.drain[hero]) Log("indiv: %s's combo bar drains (down: %s, %u hits)", HeroName(hero), s.full ? "full" : "not full", s.hits);
 	}
 	g.fellLeading[hero] = g.lastLead == hero;
 	g.levelLead[hero] = false;
@@ -1022,6 +1057,7 @@ void IndivFrame() {
 		g.ctx = -1;
 		g.gameOver = false;
 		memset(g.fallen, 0, sizeof(g.fallen));
+		memset(g.drain, 0, sizeof(g.drain));
 		memset(g.fellLeading, 0, sizeof(g.fellLeading));
 		memset(g.levelLead, 0, sizeof(g.levelLead));
 		memset(g.brought, 0, sizeof(g.brought));
@@ -1053,6 +1089,7 @@ void IndivFrame() {
 	}
 	Use(StandingOr(lead));   // the game manager, the HUD and the rest see the leader's (standing)
 	RunDownCombo(Other(lead));
+	for (int i = 0; i < 2; i++) DrainCombo(i, dt);
 
 	// The hero brought to its fallen leader goes back once it has revived it --
 	// unless it has gone on more than 10 units from where it was put (a sector

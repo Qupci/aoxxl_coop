@@ -6077,25 +6077,42 @@ const Step kShieldJump[] = {
 };
 
 // downcombo: player 1's Asterix with a full combo bar goes down (area hits);
-// his bar empties, "full" and all; Obelix's (half full) stays. Player 2's
-// Obelix revives him: Asterix starts with an empty bar.
+// his bar drains to empty in half a second, "full" and all -- the HUD's bar
+// too; Obelix's (part full) runs down as before. Player 2's Obelix revives
+// him: Asterix starts with an empty bar.
 const Step kDownCombo[] = {
 	MARK(0, "downcombo"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	{ 1500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
-	{ 2000, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2000, S_GIVE, HERO_ASTERIX, 3, 0, 30.0f, 0, "asterix's combo bar: 30 hits" },
+	{ 2500, S_GIVE, HERO_ASTERIX, 3, 0, 10.0f, 0, "10 more: full (the bar sees it fill)" },
 	{ 2000, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "obelix's combo bar part full" },
 	SHOT(3000, "full"),
 	{ 3500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 5000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
 	{ 6500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 8000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
-	{ 9500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit: down" },
-	SHOT(9600, "down1"), SHOT(11000, "down2"),
-	{ 11500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 0, 0, "obelix to asterix" },
-	VPAD(12000, 1, PAD_B, 0, 0, "p2 holds B"),
-	VPAD(18000, 1, 0, 0, 0, "p2 release"),
-	SHOT(19000, "revived"), SHOT(21000, "after"),
-	END(21500),
+	SHOT(9400, "d_before"), { 9500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit: down" },
+	SHOT(9560, "d00"), SHOT(9650, "d01"), SHOT(9750, "d02"), SHOT(9850, "d03"), SHOT(9950, "d04"), SHOT(10100, "d05"), SHOT(10300, "d06"), SHOT(10600, "d07"), SHOT(11000, "d08"), SHOT(12000, "d09"), SHOT(13500, "d10"), SHOT(15500, "d11"),
+	{ 16000, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 0, 0, "obelix to asterix" },
+	VPAD(16500, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(22500, 1, 0, 0, 0, "p2 release"),
+	SHOT(23500, "revived"), END(24000),
 };
+// downcombop: downcombo with Asterix's bar part full (two levels lit): the
+// glows go out one by one as it drains, then the bar hides.
+const Step kDownComboP[] = {
+	MARK(0, "downcombop"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
+	{ 2000, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "obelix's combo bar part full" },
+	{ 3500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 5000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
+	{ 6500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 8000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
+	{ 8300, S_GIVE, HERO_ASTERIX, 3, 0, 25.0f, 0, "asterix's combo bar part full (25 hits, a second before the fall)" },
+	SHOT(9400, "d_before"), { 9500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit: down" },
+	SHOT(9560, "d00"), SHOT(9650, "d01"), SHOT(9750, "d02"), SHOT(9850, "d03"), SHOT(9950, "d04"), SHOT(10100, "d05"), SHOT(10300, "d06"), SHOT(10600, "d07"), SHOT(11000, "d08"), SHOT(12000, "d09"), SHOT(13500, "d10"), SHOT(15500, "d11"),
+	{ 16000, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 0, 0, "obelix to asterix" },
+	VPAD(16500, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(22500, 1, 0, 0, 0, "p2 release"),
+	SHOT(23500, "revived"), END(24000),
+};
+
 
 // downcomboo: downcombo's other half -- player 2's Obelix (his HUD the copy)
 // with a full bar goes down; his bar empties.
@@ -6200,6 +6217,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("towerhit", kTowerHit),
 	SCENARIO("shieldjump", kShieldJump),
 	SCENARIO("downcombo", kDownCombo),
+	SCENARIO("downcombop", kDownComboP),
 	SCENARIO("downcomboo", kDownComboO),
 	SCENARIO("survey", kSurvey),
 	SCENARIO("bossscan", kBossScan),
