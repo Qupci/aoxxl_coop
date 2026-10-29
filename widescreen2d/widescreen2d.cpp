@@ -372,20 +372,40 @@ void CloseRows(const char* cam, const float* camLtm, float s, int n) {
 		y[k] = d[0] * uu[0] + d[1] * uu[1] + d[2] * uu[2];
 		group[k] = k;
 	}
-	// models on a plate go nearer its anchor with it, and are no row's
+	// models on a plate go nearer its anchor with it, and are no row's -- but a
+	// row's end reaching onto a plate stays the row's: a model with another, on no
+	// plate, beside it on its line. (The co-op HUD's helmet counter, in the middle,
+	// its plate four digits wide, slid past the last of five shields: that shield
+	// jumped onto it.)
 	HudMap hm;
 	float sp = PlateSqueeze();
-	if (sp < 0.995f && GetHudMap(cam, hm))
-		for (int k = 0; k < n; k++) {
-			float px = (hm.vpX + hm.vpW * (0.5f - x[k] / (2.0f * hm.winX))) / hm.fullW;
-			float py = 1.0f - (hm.vpY + hm.vpH * (0.5f - y[k] / (2.0f * hm.winY))) / hm.fullH;
-			const Plate* on = PlateAt(px, py);
-			if (!on) continue;
-			float dx = -(on->anchor + (px - on->anchor) * sp - px) * hm.fullW * 2.0f * hm.winX / hm.vpW;
-			float* p = g_saved[k].ltm + 12;
-			for (int c = 0; c < 3; c++) p[c] += dx * ru[c];
-			group[k] = -1;
+	static const Plate* on[256];
+	static float px[256];
+	bool mapped = sp < 0.995f && GetHudMap(cam, hm);
+	for (int k = 0; k < n; k++) {
+		on[k] = nullptr;
+		if (!mapped) continue;
+		px[k] = (hm.vpX + hm.vpW * (0.5f - x[k] / (2.0f * hm.winX))) / hm.fullW;
+		float py = 1.0f - (hm.vpY + hm.vpH * (0.5f - y[k] / (2.0f * hm.winY))) / hm.fullH;
+		on[k] = PlateAt(px[k], py);
+	}
+	for (int k = 0; k < n; k++) {
+		if (!on[k]) continue;
+		bool rowEnd = false;
+		for (int j = 0; j < n && !rowEnd; j++)
+			rowEnd = j != k && !on[j] && fabsf(y[j] - y[k]) < kRowLine && fabsf(x[j] - x[k]) < kRowGap;
+		if (rowEnd) {
+			static int told = 0;
+			if (told++ < 4)
+				Log("rows: a row's end at x %d (x1000) is inside the plate %d..%d -- it stays the row's", (int)(px[k] * 1000),
+				    (int)(on[k]->left * 1000), (int)(on[k]->right * 1000));
+			continue;
 		}
+		float dx = -(on[k]->anchor + (px[k] - on[k]->anchor) * sp - px[k]) * hm.fullW * 2.0f * hm.winX / hm.vpW;
+		float* p = g_saved[k].ltm + 12;
+		for (int c = 0; c < 3; c++) p[c] += dx * ru[c];
+		group[k] = -1;
+	}
 	// neighbours join a group (merging until nothing changes)
 	for (bool changed = true; changed;) {
 		changed = false;

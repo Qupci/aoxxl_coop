@@ -6050,6 +6050,32 @@ const Step kTowerHit[] = {
 	SHOT(23000, "after"), END(24000),
 };
 
+// shieldjump: player 1's Asterix with five shields, the helmet counter counting
+// up to 1985 in the middle (four digits: a wide plate), then sliding out past
+// the health row (a hit, then points back: the fifth shield part full, as in the
+// user's) -- with xxl_widescreen2d.asi the last shield jumped right as the
+// counter passed it.
+const Step kShieldJump[] = {
+	MARK(0, "shieldjump"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
+	{ 1000, S_POKE8, -1, 0x68, 0, 193.0f, 0, "1985 helmets: the counter shows, counting up" }, { 1000, S_POKE8, -1, 0x69, 0, 7.0f, 0, "" },
+	{ 1100, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "a shield" }, { 1150, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "a shield" },
+	{ 1200, S_GIVE, HERO_ASTERIX, 0, 0, 10.0f, 0, "health" },
+	{ 2500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit: the health row stays up" }, SHOT(3000, "s00"), SHOT(3100, "s01"), SHOT(3200, "s02"), SHOT(3300, "s03"), SHOT(3400, "s04"), SHOT(3500, "s05"),
+	SHOT(3600, "s06"), SHOT(3700, "s07"), SHOT(3800, "s08"), SHOT(3900, "s09"), { 4000, S_GIVE, HERO_ASTERIX, 0, 0, 1.0f, 0, "a point back: the health row stays up, the fifth shield part full" }, SHOT(4000, "s10"), SHOT(4100, "s11"),
+	SHOT(4200, "s12"), SHOT(4300, "s13"), SHOT(4400, "s14"), SHOT(4500, "s15"), SHOT(4600, "s16"), SHOT(4700, "s17"), SHOT(4800, "s18"),
+	SHOT(4900, "s19"), SHOT(5000, "s20"), SHOT(5100, "s21"), SHOT(5200, "s22"), SHOT(5300, "s23"), SHOT(5400, "s24"), { 5500, S_GIVE, HERO_ASTERIX, 0, 0, 1.0f, 0, "a point back: the health row stays up, the fifth shield part full" },
+	SHOT(5500, "s25"), SHOT(5600, "s26"), SHOT(5700, "s27"), SHOT(5800, "s28"), SHOT(5900, "s29"), SHOT(6000, "s30"), SHOT(6100, "s31"),
+	SHOT(6200, "s32"), SHOT(6300, "s33"), SHOT(6400, "s34"), SHOT(6500, "s35"), SHOT(6600, "s36"), SHOT(6700, "s37"), SHOT(6800, "s38"),
+	SHOT(6900, "s39"), { 7000, S_GIVE, HERO_ASTERIX, 0, 0, 1.0f, 0, "a point back: the health row stays up, the fifth shield part full" }, SHOT(7000, "s40"), SHOT(7100, "s41"), SHOT(7200, "s42"), SHOT(7300, "s43"), SHOT(7400, "s44"),
+	SHOT(7500, "s45"), SHOT(7600, "s46"), SHOT(7700, "s47"), SHOT(7800, "s48"), SHOT(7900, "s49"), SHOT(8000, "s50"), SHOT(8100, "s51"),
+	SHOT(8200, "s52"), SHOT(8300, "s53"), SHOT(8400, "s54"), { 8500, S_GIVE, HERO_ASTERIX, 0, 0, 1.0f, 0, "a point back: the health row stays up, the fifth shield part full" }, SHOT(8500, "s55"), SHOT(8600, "s56"), SHOT(8700, "s57"),
+	SHOT(8800, "s58"), SHOT(8900, "s59"), SHOT(9000, "s60"), SHOT(9100, "s61"), SHOT(9200, "s62"), SHOT(9300, "s63"), SHOT(9400, "s64"),
+	SHOT(9500, "s65"), SHOT(9600, "s66"), SHOT(9700, "s67"), SHOT(9800, "s68"), SHOT(9900, "s69"),
+	END(10500),
+};
+
 // idle: just boot to gameplay, log and screenshot. Smoke test for the harness.
 const Step kIdle[] = {
 	MARK(0, "baseline"), SHOT(100, "idle_00"), SHOT(3000, "idle_01"), END(3500),
@@ -6136,6 +6162,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("towerscan", kTowerScan),
 	SCENARIO("towerhit", kTowerHit),
+	SCENARIO("shieldjump", kShieldJump),
 	SCENARIO("survey", kSurvey),
 	SCENARIO("bossscan", kBossScan),
 	SCENARIO("lifter", kLifter),

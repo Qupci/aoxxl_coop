@@ -2771,3 +2771,22 @@ both halves).
   5 units ahead: before A 15 -> 0, game over, O 15 kept; after O 15 -> 0, "Obelix is down", A 15 kept), down2a as
   before (Roman hit, "hero event 0300", revive). towerscan (a level's towers, Obelix by the nearest): LV3/4/6 none
   with a node, LV5 one.
+- Round 153 (user's recording, screenshots Oct 27: P1's shields "jumping" -- the last of five shields drawn at
+  ~800 px of 1920 beside the helmet counter (1985) for a few frames as the health row and the counter slid). It is
+  xxl_widescreen2d.asi's plate rule (CloseRows): a HUD model whose unsqueezed 2D place lies in a stretched plate's
+  unsqueezed rectangle (this frame's or the last one's) is moved with the plate's squeeze towards its anchor, and is
+  no row's. hud2's layout puts the counter (plate +0x134, drawn leftwards from its place, width text + 0.075 -- it
+  grows with the digits in state 2 and only shrinks when hidden) at 3/4 size in the top middle; at four digits its
+  recorded left edge is 0.364 (960 x 540: plate 0.273 wide natively, 0.205 after hud2), and five shields fitted to
+  0.28 by ScaleHealth put the last one's unsqueezed centre at 0.368 (the user's 0.361). The counter rests at y 0.815
+  (native 0.915 - 0.1), under the shields' 0.90, and slides in / out from 0.975: passing the row (+-0.028), the last
+  shield was "on" its plate -> 0.423 (the user's 800 px). An empty last shield is not drawn in the list, so only a
+  part-full one jumps (the user's was "slightly damaged"). Now (widescreen2d.cpp CloseRows): a model on a plate with
+  another model, on no plate, beside it on its line (kRowLine 0.03, kRowGap 0.15) is a row's end reaching onto the
+  plate and stays the row's; the counter's helmet model (0.511) has no such neighbour (the off-plate shields are
+  0.2+ away), so it still moves with its plate. Logged ("rows: a row's end ... stays the row's", 4 lines). The
+  counter shows from its hidden state when the helmets (+0x68) differ from its shown count (itf +0x344), gm +0x5C
+  bits 0x1000800, x3 time +0x98 > 0, or bit 6 (kept set by the game: an XOR poke toggles it). Autotest shieldjump
+  (-Level 2: 1985 helmets poked, five shields, a hit then points back; slide-out ~6.2 s): before, frames s32-s34 the
+  last shield beside the counter; after, in its row. hudreq / hudlayout (-Level 4) and shopsplit: the rule never
+  fires, same pictures as Oct 22.
