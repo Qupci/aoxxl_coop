@@ -2918,3 +2918,31 @@ both halves).
   sector 8's lifter floor, CDynamicGround; Obelix lands on it with him, as before). As before: slidecross3
   (XXL_DOWNAT=1:1000, all put back short of z -903.82), reach26 (XXL_DOWNAT=0:5000), unlockpillar, warp25;
   sasnl21w's catch-up now lands 1.7 units beside Obelix on his own ground.
+- Round 161 (user: in freedom mode the rotary beam's ride can end in a lock -- LV3-2, Asterix on the light pillar
+  266.18 11.07 -97.09 (lit by the hearth 252.74 9.07 -90.54), Obelix hitting the turnstile 251.26 6.07 -97.85 until
+  the beam drops Asterix; LV2-5 likewise; then add an option that locks the beam's pillar as with freedom off, off by
+  default; and rename freedom). (1) The ride's hold (WatchFreedomBeam -> Hold modOwn after the player's jump) was let
+  go only on "order done" (0) or "leads again"; the beam's drop (0x0C03 from 0x53F4C3, FUN_00481d50 case 3) leaves
+  the rider order 3, so only a landing event freed him: LV4-2's landing zone sends 4800 + 4803 in the drop's frame,
+  LV3-2's landing (247.7 7.1 -118.5, on a CDynamicGround) sends nothing (zone 0718 is a camera), LV2-5's sends 4814
+  (AI order 1, a walk to a mark: 131.0 2.6 -457.6, then order 3). Now g_beamRider marks that hold and it ends when
+  the order leaves 8 ("the rotary beam let go"); the landing's walk is then "not followed". (2) Freedom mode is now
+  no-lock mode: [coop] nolock, nolock_except_corkscrews (was freedom_corkscrews: on = corkscrews still lock -- named
+  "except" so on doesn't read as "no lock for corkscrews"), [coop_difficulty.experimental] nolock_romans; env
+  XXL_NOLOCK / XXL_NOLOCKCORK / XXL_NOLOCKROMANS / XXL_NOLOCKBEAMS; freedom.cpp -> nolock.cpp; log lines "nolock:".
+  The rounds above say "freedom" for it. (3) New nolock_except_rotarybeams (default off): at the 4802, a waiter in
+  line with a rotary beam's arm over its circle is kept (g_keptLock "a rotary beam's circle", as for corkscrews).
+  CKHkRotaryBeam: pivot = node frame +0x80; angles +0x28 now, +0x38 target, +0x4C rest / +0x50 over the circle /
+  +0x54 far end; its arm points along (sin, cos) of the angle in x-z (vf15 state 5 compares the hang point's
+  direction with them); 0x0903 to the beam (a turnstile hit) steps +0x38 by (next - this) / ((+8 >> 3) & 0x1F).
+  RotaryBeamCircle: within 0.3 rad of +0x50, 1-60 units from the pivot, 10 in height. Measured: LV3-2 (pivot 246.5
+  12.3 -98.5) 19.2 units / 0.09 rad, LV4-2 (-414.7 2.9 -118.7) 20.4 / 0.03, LV2-5 (133.5 4.7 -481.3; light pillar
+  153.4 2.5 -484.4) 20.4 / 0.06, LV2-8 (47.5 58.9 -70.3; the pillar on the platform Obelix pulls under it) 50.1 /
+  0.24. The beam then takes the waiting hero by itself (0x0C02 with order 3) and the landing's wait / walk is the
+  level's, as with nolock off (LV3-2: held with order 3 after landing, exactly as nolock = off; LV2-5: walks to its
+  mark, then waits). Autotests beam32 (-Level 3, XXL_P2HERO=asterix XXL_NOLOCK=1 XXL_LIFTLOG=1: before, Asterix
+  held with order 3 after the drop and P2's walk did nothing; after, "let go", jumps and walks; XXL_NOLOCKBEAMS=1 and
+  XXL_NOLOCK=0 give the same locked flow), beam25 (level 2: LV2-5's nearest hearth / light pillar; the beam turned by
+  S_OBJEV 0x0903 -- its turnstile is up on the beam's pole, S_NEAROBJ put Obelix in the water). As before: beam42f
+  (now let go at the drop, the landing's 4800 in the same frame, same landing spot), beam42l (leads again), beam28.
+  XXL_LIFTLOG's car line is 1024 chars (the beams were cut off) and logs each beam's angles and Asterix's distance.
