@@ -5658,6 +5658,92 @@ const Step kBeam42L[] = {
 	END(34000),
 };
 
+// beam32 (-Level 3, XXL_P2HERO=asterix XXL_FREEDOM=1 XXL_LIFTLOG=1): the user's LV3-2 --
+// Asterix lights the hearth (252.7 9.1 -90.5) and stands on the light pillar
+// (266.18 11.07 -97.09); player 1's Obelix hits the turnstile (251.3 6.1 -97.8)
+// until the rotary beam has carried Asterix across and let him go. He must be
+// his player's once landed (the walk at the end).
+const Step kBeam32[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), PLACEAT(2500, HERO_ASTERIX, 255.5f, 9.6f, -90.5f),
+	PLACEAT(2500, HERO_OBELIX, 258.0f, 9.6f, -94.0f), PLACEAT(3000, HERO_ASTERIX, 255.5f, 9.6f, -90.5f), PLACEAT(3000, HERO_OBELIX, 258.0f, 9.6f, -94.0f),
+	{ 3300, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 3500, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	{ 3800, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	GLIDEAT(4100, HERO_ASTERIX, 254.0f, 9.3f, -90.5f, 600),
+	VPAD(5000, 1, PAD_X, 0, 0, "p2 X: light the hearth"), VPAD(5200, 1, 0, 0, 0, "p2 release"), SHOT(6000, "beam32_0"),
+	GLIDEAT(6500, HERO_ASTERIX, 266.179f, 11.5f, -97.092f, 1500),
+	SHOT(8500, "beam32_1"),
+	{ 9000, S_NEAROBJ, HERO_OBELIX, 45, 0, 2.5f, 0, "obelix at the turnstile" },
+	P1(10000, PAD_X, 0, 0, "p1 X"), P1(10150, 0, 0, 0, "p1 release"), P1(10450, PAD_X, 0, 0, "p1 X"),
+	P1(10600, 0, 0, 0, "p1 release"), VPAD(10600, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(10800, 1, 0, 0, 0, "p2 release"),
+	P1(10900, PAD_X, 0, 0, "p1 X"), VPAD(11000, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(11050, 0, 0, 0, "p1 release"),
+	VPAD(11200, 1, 0, 0, 0, "p2 release"), P1(11350, PAD_X, 0, 0, "p1 X"), VPAD(11400, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(11500, 0, 0, 0, "p1 release"), VPAD(11600, 1, 0, 0, 0, "p2 release"), P1(11800, PAD_X, 0, 0, "p1 X"),
+	VPAD(11800, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(11950, 0, 0, 0, "p1 release"), VPAD(12000, 1, 0, 0, 0, "p2 release"),
+	VPAD(12200, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(12250, PAD_X, 0, 0, "p1 X"), P1(12400, 0, 0, 0, "p1 release"),
+	VPAD(12400, 1, 0, 0, 0, "p2 release"), VPAD(12600, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(12700, PAD_X, 0, 0, "p1 X"),
+	VPAD(12800, 1, 0, 0, 0, "p2 release"), P1(12850, 0, 0, 0, "p1 release"), VPAD(13000, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(13150, PAD_X, 0, 0, "p1 X"), VPAD(13200, 1, 0, 0, 0, "p2 release"), P1(13300, 0, 0, 0, "p1 release"),
+	VPAD(13400, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(13600, PAD_X, 0, 0, "p1 X"), VPAD(13600, 1, 0, 0, 0, "p2 release"),
+	P1(13750, 0, 0, 0, "p1 release"), VPAD(13800, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(14000, 1, 0, 0, 0, "p2 release"),
+	P1(14050, PAD_X, 0, 0, "p1 X"), P1(14200, 0, 0, 0, "p1 release"), VPAD(14200, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	VPAD(14400, 1, 0, 0, 0, "p2 release"), P1(14500, PAD_X, 0, 0, "p1 X"), VPAD(14600, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(14650, 0, 0, 0, "p1 release"), VPAD(14800, 1, 0, 0, 0, "p2 release"), P1(14950, PAD_X, 0, 0, "p1 X"),
+	VPAD(15000, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(15100, 0, 0, 0, "p1 release"), VPAD(15200, 1, 0, 0, 0, "p2 release"),
+	P1(15400, PAD_X, 0, 0, "p1 X"), VPAD(15400, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(15550, 0, 0, 0, "p1 release"),
+	VPAD(15600, 1, 0, 0, 0, "p2 release"), VPAD(15800, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(15850, PAD_X, 0, 0, "p1 X"),
+	P1(16000, 0, 0, 0, "p1 release"), VPAD(16000, 1, 0, 0, 0, "p2 release"), SHOT(16000, "beam32_2"),
+	VPAD(16200, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(16300, PAD_X, 0, 0, "p1 X"), VPAD(16400, 1, 0, 0, 0, "p2 release"),
+	P1(16450, 0, 0, 0, "p1 release"), VPAD(16600, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(16750, PAD_X, 0, 0, "p1 X"),
+	VPAD(16800, 1, 0, 0, 0, "p2 release"), P1(16900, 0, 0, 0, "p1 release"), VPAD(17000, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(17200, PAD_X, 0, 0, "p1 X"), VPAD(17200, 1, 0, 0, 0, "p2 release"), P1(17350, 0, 0, 0, "p1 release"),
+	VPAD(17400, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(17600, 1, 0, 0, 0, "p2 release"), P1(17650, PAD_X, 0, 0, "p1 X"),
+	P1(17800, 0, 0, 0, "p1 release"), VPAD(17800, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(18000, 1, 0, 0, 0, "p2 release"),
+	P1(18100, PAD_X, 0, 0, "p1 X"), VPAD(18200, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(18250, 0, 0, 0, "p1 release"),
+	VPAD(18400, 1, 0, 0, 0, "p2 release"), P1(18550, PAD_X, 0, 0, "p1 X"), VPAD(18600, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(18700, 0, 0, 0, "p1 release"), VPAD(18800, 1, 0, 0, 0, "p2 release"), P1(19000, PAD_X, 0, 0, "p1 X"),
+	VPAD(19000, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(19150, 0, 0, 0, "p1 release"), VPAD(19200, 1, 0, 0, 0, "p2 release"),
+	VPAD(19400, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(19450, PAD_X, 0, 0, "p1 X"), P1(19600, 0, 0, 0, "p1 release"),
+	VPAD(19600, 1, 0, 0, 0, "p2 release"), VPAD(19800, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(19900, PAD_X, 0, 0, "p1 X"),
+	VPAD(20000, 1, 0, 0, 0, "p2 release"), P1(20050, 0, 0, 0, "p1 release"), VPAD(20200, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(20350, PAD_X, 0, 0, "p1 X"), VPAD(20400, 1, 0, 0, 0, "p2 release"), P1(20500, 0, 0, 0, "p1 release"),
+	VPAD(20600, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(20800, PAD_X, 0, 0, "p1 X"), VPAD(20800, 1, 0, 0, 0, "p2 release"),
+	P1(20950, 0, 0, 0, "p1 release"), VPAD(21000, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(21200, 1, 0, 0, 0, "p2 release"),
+	P1(21250, PAD_X, 0, 0, "p1 X"), P1(21400, 0, 0, 0, "p1 release"), VPAD(21400, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	VPAD(21600, 1, 0, 0, 0, "p2 release"), P1(21700, PAD_X, 0, 0, "p1 X"), VPAD(21800, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(21850, 0, 0, 0, "p1 release"), VPAD(22000, 1, 0, 0, 0, "p2 release"), SHOT(22000, "beam32_3"),
+	P1(22150, PAD_X, 0, 0, "p1 X"), VPAD(22200, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(22300, 0, 0, 0, "p1 release"),
+	VPAD(22400, 1, 0, 0, 0, "p2 release"), P1(22600, PAD_X, 0, 0, "p1 X"), VPAD(22600, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(22750, 0, 0, 0, "p1 release"), VPAD(22800, 1, 0, 0, 0, "p2 release"), VPAD(23000, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(23050, PAD_X, 0, 0, "p1 X"), P1(23200, 0, 0, 0, "p1 release"), VPAD(23200, 1, 0, 0, 0, "p2 release"),
+	VPAD(23400, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(23500, PAD_X, 0, 0, "p1 X"), VPAD(23600, 1, 0, 0, 0, "p2 release"),
+	P1(23650, 0, 0, 0, "p1 release"), VPAD(23800, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(23950, PAD_X, 0, 0, "p1 X"),
+	VPAD(24000, 1, 0, 0, 0, "p2 release"), P1(24100, 0, 0, 0, "p1 release"), VPAD(24200, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(24400, PAD_X, 0, 0, "p1 X"), VPAD(24400, 1, 0, 0, 0, "p2 release"), P1(24550, 0, 0, 0, "p1 release"),
+	VPAD(24600, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(24800, 1, 0, 0, 0, "p2 release"), P1(24850, PAD_X, 0, 0, "p1 X"),
+	P1(25000, 0, 0, 0, "p1 release"), VPAD(25000, 1, PAD_A, 0, 0, "p2 A (jump)"), VPAD(25200, 1, 0, 0, 0, "p2 release"),
+	P1(25300, PAD_X, 0, 0, "p1 X"), VPAD(25400, 1, PAD_A, 0, 0, "p2 A (jump)"), P1(25450, 0, 0, 0, "p1 release"),
+	VPAD(25600, 1, 0, 0, 0, "p2 release"), P1(25750, PAD_X, 0, 0, "p1 X"), VPAD(25800, 1, PAD_A, 0, 0, "p2 A (jump)"),
+	P1(25900, 0, 0, 0, "p1 release"), VPAD(26000, 1, 0, 0, 0, "p2 release"), P1(26200, PAD_X, 0, 0, "p1 X"),
+	P1(26350, 0, 0, 0, "p1 release"), P1(26650, PAD_X, 0, 0, "p1 X"), P1(26800, 0, 0, 0, "p1 release"),
+	P1(27100, PAD_X, 0, 0, "p1 X"), P1(27250, 0, 0, 0, "p1 release"), P1(27550, PAD_X, 0, 0, "p1 X"),
+	P1(27700, 0, 0, 0, "p1 release"), P1(28000, PAD_X, 0, 0, "p1 X"), SHOT(28000, "beam32_4"),
+	P1(28150, 0, 0, 0, "p1 release"), P1(28450, PAD_X, 0, 0, "p1 X"), P1(28600, 0, 0, 0, "p1 release"),
+	P1(28900, PAD_X, 0, 0, "p1 X"), P1(29050, 0, 0, 0, "p1 release"), P1(29350, PAD_X, 0, 0, "p1 X"),
+	P1(29500, 0, 0, 0, "p1 release"), P1(29800, PAD_X, 0, 0, "p1 X"), P1(29950, 0, 0, 0, "p1 release"),
+	P1(30250, PAD_X, 0, 0, "p1 X"), P1(30400, 0, 0, 0, "p1 release"), P1(30700, PAD_X, 0, 0, "p1 X"),
+	P1(30850, 0, 0, 0, "p1 release"), P1(31150, PAD_X, 0, 0, "p1 X"), P1(31300, 0, 0, 0, "p1 release"),
+	P1(31600, PAD_X, 0, 0, "p1 X"), P1(31750, 0, 0, 0, "p1 release"), P1(32050, PAD_X, 0, 0, "p1 X"),
+	P1(32200, 0, 0, 0, "p1 release"), P1(32500, PAD_X, 0, 0, "p1 X"), P1(32650, 0, 0, 0, "p1 release"),
+	P1(32950, PAD_X, 0, 0, "p1 X"), P1(33100, 0, 0, 0, "p1 release"), P1(33400, PAD_X, 0, 0, "p1 X"),
+	P1(33550, 0, 0, 0, "p1 release"), P1(33850, PAD_X, 0, 0, "p1 X"), P1(34000, 0, 0, 0, "p1 release"),
+	SHOT(34000, "beam32_5"),
+	VPAD(38000, 1, 0, 0, 1, "p2 walks (stick up)"), VPAD(39500, 1, 0, 0, 0, "p2 release"), SHOT(40000, "beam32_6"),
+	END(42000),
+};
+
 // keg23 (-Level 2): the user's crash (xxl_coop.crash-10-22b.log) -- Asterix
 // crosses the detector at (-55.9 1.8 -569.6) -> (-48.1 2.2 -569.6) (a fight
 // starts), then lights the powder keg at (-40.2 1.9 -549.7) (511E): the game
@@ -6639,6 +6725,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("beam42", kBeam42),
 	SCENARIO("beam42f", kBeam42f),
 	SCENARIO("beam42l", kBeam42L),
+	SCENARIO("beam32", kBeam32),
 	SCENARIO("freeromans23", kFreeRomans23),
 	SCENARIO("keg23", kKeg23),
 	SCENARIO("keg23s", kKeg23S),
@@ -7009,7 +7096,7 @@ void LogTick(float t) {
 			         *(float*)(r + 0x34), *(void**)(r + 0x50));
 		}
 	if (getenv("XXL_LIFTLOG")) {   // rope cable cars (CKHkTowedTelepher 2,159): flags +0x7C, zone answer +0x20 vs +0x84
-		char cbuf[512];   // a line of its own (the tick line is full)
+		char cbuf[1024];   // a line of its own (the tick line is full)
 		LineBuf cars(cbuf);
 		cars.Add("cars at %6.2f", t);
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 159); i < n && i < 4; i++) {
@@ -7042,12 +7129,17 @@ void LogTick(float t) {
 				cars.Add(" | torch %u 3E %02X fire %d timer %.2f lead %d", i, *(uint8_t*)(tc + 0x3E), (*(uint8_t*)(tc + 0x3E) >> 2) & 7,
 				         *(float*)(tc + 0x1C), tr.Leader());
 		}
-		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n && i < 2; i++) {   // rotary beams (CKHkRotaryBeam 2,57)
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n && i < 4; i++) {   // rotary beams (CKHkRotaryBeam 2,57)
 			char* b = (char*)GetLvlObject(2, 57, i);
 			char* node = b ? *(char**)(b + 0x10) : nullptr;
 			char* fr = node ? *(char**)(node + 4) : nullptr;
 			if (fr) cars.Add(" | beam %u f8 %08X at %.1f %.1f %.1f", i, *(uint32_t*)(b + 8), ((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1],
 			                  ((float*)(fr + 0x80))[2]);
+			// its angle (+0x28) and target (+0x38); rest / over the circle / far end (+0x4C/+0x50/+0x54); Asterix's distance (x-z)
+			Hero ha = tr.GetHero(HERO_ASTERIX);
+			if (fr && ha) cars.Add(" ang %.2f to %.2f (%.2f %.2f %.2f) A %.1f", *(float*)(b + 0x28), *(float*)(b + 0x38), *(float*)(b + 0x4C),
+			                       *(float*)(b + 0x50), *(float*)(b + 0x54),
+			                       sqrtf(powf(ha.Pos().x - ((float*)(fr + 0x80))[0], 2) + powf(ha.Pos().z - ((float*)(fr + 0x80))[2], 2)));
 		}
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 44); i < n && i < 8; i++) {
 			char* c = (char*)GetLvlObject(2, 44, i);

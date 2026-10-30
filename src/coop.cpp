@@ -506,10 +506,17 @@ static bool FreedomKeepsLock(int idx) {
 // Asterix in a box (-263.9 16 352.5 / -261.9 20 354.5, event 0118: 4800 + 4803)
 // that frees him -- in the user's run it never went off, and he stayed the game's.
 struct CorkRide { int hero = -1; char* cork = nullptr; DWORD launched = 0; bool jumping = false; } g_corkRide;
+// The player's hero handed to the game for the rotary beam's ride (its jump,
+// WatchFreedomBeam), until the beam lets it go (its order leaves 8). The drop
+// leaves it "wait here" (0x0C03: order 8 -> 3), which only a level's event ends:
+// LV4-2's landing gives Asterix the lead, LV3-2's (247.7 7.1 -118.5) nothing,
+// and he stayed the game's.
+int g_beamRider = -1;
 
 void Hold(Trio t, int idx, const char* why, bool modOwn = false) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
+	if (g_beamRider == idx) g_beamRider = -1;
 	if (!modOwn && !FreedomLetsHold((int)h.Order()) && FreedomKeepsLock(idx))
 		Log("coop: freedom: %s locked all the same (%s)", HeroName(idx), g_freedomLock.what);
 	else if (!modOwn && !FreedomLetsHold((int)h.Order())) {
@@ -2286,6 +2293,7 @@ static void WatchFreedomBeam(Trio t) {
 		if (!h || g.held[idx] || h.Order() != AI_HANG_ON_BEAM || GetTickCount() - s_jumpAt[idx] > 1000) continue;
 		Log("coop: freedom: %s jumped for the rotary beam -- the game's for the ride", HeroName(idx));
 		Hold(t, idx, "jumped for the rotary beam", true);
+		if (g.held[idx]) g_beamRider = idx;
 	}
 }
 
@@ -3189,12 +3197,14 @@ void CoopFrame() {
 		if (!h) continue;
 		int order = (int)h.Order();
 		bool leads = t.Leader() == idx;
+		bool rides = leads || g_beamRider == idx;   // (riding the beam leading, or for its jump: held to its end)
 		if (!g.held[idx] && !leads && order != g.lastOrder[idx] && IsScriptedOrder(order)) {
 			Hold(t, idx, "new order");
-		} else if (g.held[idx] && ((leads && order != AI_HANG_ON_BEAM) || order == AI_FOLLOW_LEADER)) {   // (riding the beam leading: its end)
+		} else if (g.held[idx] && ((rides && order != AI_HANG_ON_BEAM) || order == AI_FOLLOW_LEADER)) {
 			g.held[idx] = false;
 			if (g_corkRide.hero == idx) g_corkRide = {};
-			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : "order done");
+			if (g_beamRider == idx) g_beamRider = -1;
+			Log("coop: %s back to its player (%s)", HeroName(idx), leads ? "leads again" : order == AI_FOLLOW_LEADER ? "order done" : "the rotary beam let go");
 		}
 		g.lastOrder[idx] = (uint8_t)order;
 	}
