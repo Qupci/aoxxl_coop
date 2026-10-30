@@ -2479,8 +2479,37 @@ static void WatchStrandedCar() {
 // The hero kept off cable cars now: the lifter waits for it, or its car was just sent back. Else -1.
 static int KeptOffCars() { return g.lifterWaitsFor >= 0 ? g.lifterWaitsFor : g_carWatch.keptOff; }
 
-// A 0x4802 no-lock mode keeps (g_keptLock): the boss's own, or the waiter on a
-// corkscrew's circle -- its node within 4 units (LV3-6's pillar: 0.4).
+// The rotary beam (CKHkRotaryBeam 2,57) whose circle `h` waits on: the hero in
+// line with the beam's arm over its circle (angle +0x50; the arm points along
+// (sin, cos) of the beam's angle in x-z, CKHkRotaryBeam::vf15 state 5), within
+// 0.3 rad of it, 60 units of its pivot and 10 of its height. LV3-2's circle is
+// under the arm (19.4 units off, 0.08 rad); LV2-8's light pillar stands on the
+// platform Obelix pulls under it (50.2 units off, 0.24 rad).
+static char* RotaryBeamCircle(Hero h) {
+	static int s_told = 0;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 57); i < n; i++) {
+		char* b = (char*)GetLvlObject(2, 57, i);
+		char* node = b ? *(char**)(b + 0x10) : nullptr;
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		if (!fr) continue;
+		const float* p = (const float*)(fr + 0x80);
+		float dx = h.Pos().x - p[0], dz = h.Pos().z - p[2], d = sqrtf(dx * dx + dz * dz);
+		float off = atan2f(dx, dz) - *(float*)(b + 0x50);
+		off = fabsf(off - 6.2831853f * floorf((off + 3.1415927f) / 6.2831853f));
+		bool on = d > 1.0f && d < 60.0f && off < 0.3f && fabsf(h.Pos().y - p[1]) < 10.0f;
+		if (d < 100.0f && s_told < 20) {
+			s_told++;
+			Log("coop: nolock: rotary beam %p: the waiter %.1f units from its pivot, %.2f rad off its arm over the circle, %.1f below%s", b, d,
+			    off, p[1] - h.Pos().y, on ? " -- its circle" : "");
+		}
+		if (on) return b;
+	}
+	return nullptr;
+}
+
+// A 0x4802 no-lock mode keeps (g_keptLock): the boss's own, the waiter on a
+// rotary beam's circle (nolock_except_rotarybeams), or on a corkscrew's circle
+// -- its node within 4 units (LV3-6's pillar: 0.4).
 static void NoteKeptLock(Trio t, int waiter) {
 	extern void* g_trioEventCaller;
 	if (!g_config.noLock) return;
@@ -2488,6 +2517,13 @@ static void NoteKeptLock(Trio t, int waiter) {
 	if (!h) return;
 	if ((uintptr_t)g_trioEventCaller == 0x4F317E) {
 		g_keptLock = { waiter, GetTickCount(), "on the boss's button" };
+		return;
+	}
+	// A rotary beam's circle: its wait as with nolock off -- the beam takes the
+	// waiting hero by itself (0x0C02 while its order is 3), and what the level
+	// does with it once the beam lets go (order 3, a walk) is the level's too.
+	if (g_config.noLockExceptBeams && RotaryBeamCircle(h)) {
+		g_keptLock = { waiter, GetTickCount(), "a rotary beam's circle" };
 		return;
 	}
 	if (!g_config.noLockExceptCorkscrews) return;

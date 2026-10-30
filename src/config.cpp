@@ -77,10 +77,12 @@ void CoopConfig::Load(const char* iniPath) {
 	individual = ReadBool("coop", "individual_heroes", individual, full);
 	noLock = ReadBool("coop", "nolock", noLock, full);
 	noLockExceptCorkscrews = ReadBool("coop", "nolock_except_corkscrews", noLockExceptCorkscrews, full);
+	noLockExceptBeams = ReadBool("coop", "nolock_except_rotarybeams", noLockExceptBeams, full);
 	carRiderLeads = ReadBool("coop", "cable_car_rider_leads", carRiderLeads, full);
 	noLockRomans = ReadBool("coop_difficulty.experimental", "nolock_romans", noLockRomans, full);
 	if (getenv("XXL_NOLOCK")) noLock = atoi(getenv("XXL_NOLOCK")) != 0;   // autotests
 	if (getenv("XXL_NOLOCKCORK")) noLockExceptCorkscrews = atoi(getenv("XXL_NOLOCKCORK")) != 0;
+	if (getenv("XXL_NOLOCKBEAMS")) noLockExceptBeams = atoi(getenv("XXL_NOLOCKBEAMS")) != 0;
 	if (getenv("XXL_RIDERLEADS")) carRiderLeads = atoi(getenv("XXL_RIDERLEADS")) != 0;
 	if (getenv("XXL_NOLOCKROMANS")) noLockRomans = atoi(getenv("XXL_NOLOCKROMANS")) != 0;
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
@@ -143,12 +145,12 @@ void CoopConfig::Load(const char* iniPath) {
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d nolock=%d (except corkscrews %d) riderLeads=%d "
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d nolock=%d (except corkscrews %d, rotary beams %d) riderLeads=%d "
 		"co-op difficulty: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f (%s, %s, "
 		"pathfinding %d, to defeat stays %d), nolock romans %d",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
 		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual,
-		noLock, noLockExceptCorkscrews, carRiderLeads, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
+		noLock, noLockExceptCorkscrews, noLockExceptBeams, carRiderLeads, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
 		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too",
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans);
 }
