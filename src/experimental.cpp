@@ -42,18 +42,22 @@ const char* const kModeName[] = { "single player, the game's own", "the heroes a
 // mid-jump over a gap's cells), together again on the first yes. Not known (a
 // hero on a lifter, in the air): as it was. Not asked with the rules static,
 // with difficulty_pathfinding off, or with no squad or combo bar factor (the
-// game's own all through).
+// game's own all through). The first answer after player 2 joins counts at
+// once, in the frame of the join: the join doubles a fight under way, and
+// LV3-6's had been doubled (200) a second before "apart" (Obelix left at the
+// level's start) -- too late to keep it at the level's 100.
 bool g_pathCheck = false;
-struct Apart { bool apart = false; int noes = 0; DWORD at = 0; int told = 0, timed = 0; } g_apart;
+struct Apart { bool apart = false, fresh = true; int noes = 0; DWORD at = 0; int told = 0, timed = 0; } g_apart;
 
 void ApartFrame() {
 	if (!g_pathCheck || !CoopP2Joined() || !KalLevelIsLoaded()) {
 		g_apart.apart = false;
+		g_apart.fresh = true;
 		g_apart.noes = 0;
 		return;
 	}
 	DWORD now = GetTickCount();
-	if (CoopSuspended() || now - g_apart.at < 500) return;
+	if (CoopSuspended() || (!g_apart.fresh && now - g_apart.at < 500)) return;
 	Trio t = GetTrio();
 	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
 	if (!a || !o) return;
@@ -67,7 +71,8 @@ void ApartFrame() {
 		Log("experimental: the heroes' path looked up in %.2f ms", (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart);
 	}
 	if (r == PF_YES) g_apart.noes = 0;
-	else if (r == PF_NO) g_apart.noes++;
+	else if (r == PF_NO) g_apart.noes = g_apart.fresh ? 3 : g_apart.noes + 1;
+	if (r != PF_UNKNOWN) g_apart.fresh = false;
 	bool apart = r == PF_YES ? false : r == PF_NO && g_apart.noes >= 3 ? true : g_apart.apart;
 	if (apart == g_apart.apart) return;
 	g_apart.apart = apart;
@@ -603,6 +608,17 @@ void GateFrame(Mode m) {
 	if (!nLocked) left = -1;
 	if (left != s_left && (s_left < 0 || left < 0 || left > s_left || left < s_left - 1) && s_told++ < 80)
 		Log("experimental: fight gate: %d squad(s), %d Romans left (rules %s)", nLocked, left, kModeName[m]);
+	// Pool by pool: as the count goes up (LV3-6's went from 197 back to 200 with
+	// nothing of the mod's logged); every change with XXL_GATELOG (autotests).
+	static const bool gateLog = getenv("XXL_GATELOG") != nullptr;
+	static int s_upTold = 0;
+	if ((gateLog && left != s_left) || (left > s_left && s_left >= 0 && s_upTold++ < 20))
+		for (int k = 0; k < nLocked; k++) {
+			char line[400];
+			PoolsLine(locked[k].sq, *locked[k].o, line, sizeof(line));
+			Log("experimental: gate %d -> %d, squad %p (active %d):%s", s_left, left, locked[k].sq,
+			    (*(uint8_t*)(locked[k].sq + 0x152) >> 1) & 1, line);
+		}
 	s_left = left;
 	if (!nLocked) {
 		if (pending) Log("experimental: %d Romans of beaten pools have no gate to go to", pending);

@@ -720,14 +720,14 @@ bool WallBetween(const float* a, const float* b) {
 // head, no wall in between)? Asked every frame while Romans are asked for:
 // answers kept per marker and eye.
 bool SeesMarker(const float* eye, const float* p) {
-	struct Seen { const float* p; float eye[3]; bool seen; };
+	struct Seen { float p[3], eye[3]; bool seen; };
 	static Seen s_seen[16] = {};
 	static int s_next = 0;
 	for (const Seen& s : s_seen)
-		if (s.p == p && s.eye[0] == eye[0] && s.eye[1] == eye[1] && s.eye[2] == eye[2]) return s.seen;
+		if (!memcmp(s.p, p, 12) && !memcmp(s.eye, eye, 12)) return s.seen;
 	float feet[3] = { p[0], p[1] + 0.5f, p[2] }, head[3] = { p[0], p[1] + 1.8f, p[2] };
 	Seen& s = s_seen[s_next++ & 15];
-	s.p = p;
+	memcpy(s.p, p, 12);
 	memcpy(s.eye, eye, 12);
 	s.seen = !WallBetween(eye, head) || !WallBetween(eye, feet);
 	return s.seen;
@@ -736,7 +736,7 @@ bool SeesMarker(const float* eye, const float* p) {
 volatile long g_markersBehindWalls = 0;
 
 // In a player's view within 40 units, with no wall in between.
-bool MarkerSeen(const float* p) {
+bool SpawnMarkerSeen(const float* p) {
 	const float* eyes[4];
 	int n = KlusterViewsSeeing(p, 1.5f, 40.0f, eyes);
 	for (int i = 0; i < n; i++)
@@ -774,7 +774,7 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 		const float* p = *(const float**)(list + i * 8);
 		if (p) {
 			Vector3 pv(p[0], p[1], p[2]);
-			if (MarkerSeen(p)) continue;
+			if (SpawnMarkerSeen(p)) continue;
 			if ((ha && (ha.Pos() - pv).len2() < 64.0f) || (ho && (ho.Pos() - pv).len2() < 64.0f)) continue;
 			if (other) {
 				float dx = p[0] - om[12], dy = p[1] - om[13], dz = p[2] - om[14];
@@ -800,7 +800,7 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 			float d = sqrtf(dx * dx + dy * dy + dz * dz);
 			float dot = d > 0 ? (dx * m2[8] + dy * m2[9] + dz * m2[10]) / d : 0;
 			Log("proximity: marker %u (%.1f %.1f %.1f): in a view %d, seen %d; other view %d at %.1f, cos to its axis %.2f",
-			    i, p[0], p[1], p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), MarkerSeen(p), have, d, dot);
+			    i, p[0], p[1], p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), SpawnMarkerSeen(p), have, d, dot);
 		}
 	}
 	// All in sight: the Romans wait -- the member group's +0x14 keeps them asked
@@ -1155,6 +1155,8 @@ void __fastcall FightHook(char* trio, void* edx, void* time) {
 }
 
 } // namespace
+
+bool MarkerSeen(const float* p) { return SpawnMarkerSeen(p); }
 
 bool ProximityHeroFighting(int hero) {
 	if (hero < 0 || hero > 1) return false;

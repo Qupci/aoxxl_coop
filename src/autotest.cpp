@@ -3301,6 +3301,26 @@ const Step kFight36V[] = {
 	SHOT(55000, "fight36v_end"),
 	END(56000),
 };
+// join36 (-Level 3; the user ran it with XXL_NOLOCK=1 XXL_NOLOCKROMANS=1): Asterix
+// teleported into LV3-6's fight in single player (Obelix left at the level's
+// start, sector 0), its gate closes (100); player 2 joins 1.5 s later and
+// Asterix fights. The heroes are apart from the join -- the fight stays at the
+// level's 100 (it was doubled by the join before the path look-up said
+// "apart"). Writes to the fight squad's "sent" counts are watched (S_WATCHRW x
+// = 9; XXL_GATELOG=1 logs the gate's count pool by pool at every change).
+const Step kJoin36[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f),
+	PLACEAT(4000, HERO_ASTERIX, -184.8f, 3.2f, -230.2f),
+	{ 4500, S_WATCHENEMIES, 0, 0, 0, -185.14f, 2.64f, "watch romans", -225.10f },
+	{ 4600, S_WATCHRW, HERO_ASTERIX, 0, 0, 9, 0, "fight squad 'sent' writes" },
+	POTION(4700),
+	VPAD(5500, 1, PAD_START, 0, 0, "p2 start"), VPAD(5700, 1, 0, 0, 0, "p2 release"),
+	SHOT(6500, "join36_1"),
+	TAPS1(7000), TAPS1(12000), SHOT(16500, "join36_2"), SQUADS(16800, HERO_ASTERIX, 5.0f),
+	TAPS1(17000), TAPS1(22000), SQUADS(26800, HERO_ASTERIX, 5.0f), SHOT(27000, "join36_end"),
+	END(27500),
+};
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -7004,6 +7024,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),
 	SCENARIO("fight36v", kFight36V),
+	SCENARIO("join36", kJoin36),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -8215,19 +8236,26 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
-		if (s.x == 9) {   // writes to "sent" (+0x16) of the member groups of the squad with spawn markers holding the hero, with stacks
-			for (unsigned i = 0, k = GetNumLvlClassInstances(4, 26); i < k; i++) {
-				char* sq = (char*)GetLvlObject(4, 26, i);
-				char* recs = sq ? *(char**)(sq + 0x144) : nullptr;
-				const float* f = (const float*)sq;   // box: max +0x11C, min +0x128
-				const Vector3& p = h.Pos();
-				if (!recs || !*(unsigned*)(sq + 0x64) || p.x < f[0x4A] || p.x > f[0x47] || p.z < f[0x4C] || p.z > f[0x49]) continue;
+		if (s.x == 9) {   // writes to "sent" (+0x16) of the member groups of the squad with spawn markers holding the hero
+			              // (a fight gate's first: +0x154 >= -1), with stacks
+			char* pick = nullptr;
+			for (int pass = 0; pass < 2 && !pick; pass++)
+				for (unsigned i = 0, k = GetNumLvlClassInstances(4, 26); i < k && !pick; i++) {
+					char* sq = (char*)GetLvlObject(4, 26, i);
+					const float* f = (const float*)sq;   // box: max +0x11C, min +0x128
+					const Vector3& p = h.Pos();
+					if (!sq || !*(char**)(sq + 0x144) || !*(unsigned*)(sq + 0x64) || p.x < f[0x4A] || p.x > f[0x47] ||
+					    p.z < f[0x4C] || p.z > f[0x49] || (pass == 0 && *(int8_t*)(sq + 0x154) < -1))
+						continue;
+					pick = sq;
+				}
+			if (pick) {
+				char* recs = *(char**)(pick + 0x144);
 				const void* w[4];
 				int nw = 0;
-				for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); r < nr && nw < 4; r++) w[nw++] = recs + 0x1C * r + 0x16;
+				for (unsigned r = 0, nr = *(unsigned*)(pick + 0x14C); r < nr && nw < 4; r++) w[nw++] = recs + 0x1C * r + 0x16;
 				WatchBytes(w, nw, 0, 0);
-				Log("autotest: watching writes to 'sent' of squad %p's %d member groups", sq, nw);
-				break;
+				Log("autotest: watching writes to 'sent' of squad %p's %d member groups", pick, nw);
 			}
 			break;
 		}

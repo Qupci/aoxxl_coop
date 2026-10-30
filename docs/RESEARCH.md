@@ -3011,3 +3011,24 @@ both halves).
   61 fps). fight36v: LV3-6's grass marker -195.2 2.6 -219.3 still counts as seen (no wall), a batch of 12 there came
   out of both views (shot 0.5 s later); gatedone ends at 22.3 s by the game's own end (Romans from marker 28).
   Limit: an infinite wall the camera looks over (a low ledge built as one) would count as hiding what is behind it.
+- Round 165 (user, userlogs xxl_coop.lv3-6_nolock_on.log, nolock_romans on: Asterix teleported into LV3-6's fight in
+  single player (gate 100 at 9.3 s), player 2 joined in the fight with Obelix left at the level's start -- the fight
+  stayed 200 instead of the level's 100 while apart). The join doubles a fight under way (rules GAME -> ON, Raise);
+  "apart" (difficulty_pathfinding) needed three noes 0.5 s apart, so it came ~1 s after the join: the gate's fight
+  begins kGateSettleMs (2.5 s) after the gate takes its squads, and once begun a fight never drops for "apart".
+  A join early in the settle window got "apart" before the fight began (Lower: 100 -- the user's good runs), a later
+  one did not (the log: begun 11.797, apart 11.813). nolock_romans did nothing in that run (no "nolock:" lines).
+  Now ApartFrame's first answer after player 2 joins (g_apart.fresh) counts at once and is asked without the 0.5 s
+  wait: autotest join36 (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1; Asterix into the fight in single player, player 2
+  joins 1.5 s after the gate) -- before 100 -> 200 at the join, apart 1 s later; after apart 32 ms after the join,
+  fight begins apart, 100 counting down. The 197 -> 200 the user saw at 19.8 s (logged as a jump up, nothing of the
+  mod's logged) was not reproduced (join36 with a step out of the fight zone, grabs) -- user: not needed for now.
+  Likeliest: squad vf34 (0x52F5A0, every listed Roman back to the pool, "sent" -1 each) -- beaten Romans stay in the
+  pool's member chain (+8 head, +0x50 next) until all are down, so a reset un-counts them; who would reset a squad
+  holding Asterix unknown. Bounded diagnostic kept: a jump up of the gate's count logs each pool (to defeat, sent,
+  alive); XXL_GATELOG=1 logs every change that way (test aid). Enemy vf42 (0x4C81E0): alive = listed members with
+  +0x24 bit 2 clear. The no-lock Romans' "in view" test is now the wall-aware one (MarkerSeen, public wrapper of
+  proximity.cpp SpawnMarkerSeen; SeesMarker's cache keyed by position values, not pointers). Regressions rules4t
+  (200), rules4l (leave: 194 -> 95), rules4d (XXL_DOWNAT=1:1000 XXL_UPAT=20000: 100 apart, scaled at the revive),
+  freeromans23 (XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_LIFTLOG=1: four Romans from Obelix's walk-to marker).
+  Test lesson (user): with the potion Asterix knocks Romans out in one punch -- no stun, so no grab; grab tests without it.

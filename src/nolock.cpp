@@ -5,6 +5,7 @@
 #include "klusters.h"
 #include "log.h"
 #include "pathfind.h"
+#include "proximity.h"
 #include "trio.h"
 
 #include <cmath>
@@ -67,9 +68,11 @@ char* SquadFor(const Vector3& at, int* pool) {
 	return best;
 }
 
+// Seen by a player as the squads' markers are (proximity.cpp): a wall between
+// counts as out of view.
 bool InAView(const Vector3& p) {
 	float c[3] = { p.x, p.y, p.z };
-	return KlusterSphereInAnyView(c, 1.5f, 40.0f);
+	return MarkerSeen(c);
 }
 
 // Where a Roman comes in for `h`, as squads bring theirs: a spawn marker the

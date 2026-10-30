@@ -34,6 +34,10 @@ int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max);
 // leader while it flies (state 4).
 void ProximityPassTo(char* roman, int receiver);
 
+// Would a Roman standing on the spawn marker at `p` be seen -- in a player's
+// view within 40 units, no collision wall in between?
+bool MarkerSeen(const float* p);
+
 // Whether hero `hero` has had an enemy within the trio's fight radius in the
 // last fight-ending delay (trio +0x404 s): the fight camera, per player.
 bool ProximityHeroFighting(int hero);
