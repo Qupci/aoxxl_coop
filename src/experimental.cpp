@@ -1,4 +1,5 @@
 #include "experimental.h"
+#include "nolock.h"
 #include "config.h"
 #include "coop.h"
 #include "individual.h"
@@ -526,6 +527,9 @@ void UpdateSquads(Mode m, DWORD now) {
 					if (fresh && !active && (u2 == s2 || u2 == o.origU2[i])) u2 = (uint8_t)(up ? s2 : o.origU2[i]);
 				}
 			if (g_config.squadCountFactor == 1.0f) continue;
+			// A fight no-lock mode ended with Romans of it out for a waiting hero: those
+			// are not Romans left to defeat, to double when the heroes meet again.
+			if (NoLockEndedFight(sq)) continue;
 			bool gated = *(int8_t*)(sq + 0x154) >= -1;
 			if (gated) {
 				o.begun = g_gateStart.begun;
@@ -789,6 +793,8 @@ void ComboFrame(Mode m) {
 }
 
 } // namespace
+
+bool EnemyKindKeptAsIs(char* cpnt) { return KeptAsIs(cpnt); }
 
 void ExperimentalFrame() {
 	ApartFrame();

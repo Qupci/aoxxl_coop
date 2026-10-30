@@ -26,3 +26,6 @@
 bool ExperimentalInstallHooks();
 // Once per frame: the combo bar's thresholds.
 void ExperimentalFrame();
+// Enemies a squad pool holds that are left as the level has them (turtles, the
+// mobile tower, jetpack Romans) -- by the pool record's enemy component (+4).
+bool EnemyKindKeptAsIs(char* cpnt);

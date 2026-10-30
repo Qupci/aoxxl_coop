@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -2786,6 +2786,13 @@ const Step kPit26A[] = {
 #define SQUADRESET(t)      { t, S_SQUADRESET, 0, 0, 0, 0, 0, "squad reset" }
 // the swing and slide doors within s.x units of hero `hero` in the log: place, how far open, steps
 #define DOORS(t, hero, r)  { t, S_DOORS, hero, 0, 0, r, 0, "doors" }
+// the fights behind gates won at once: every squad a gate counts put away, nothing left to send, its end sent
+#define ENDFIGHT(t)        { t, S_ENDFIGHT, 0, 0, 0, 0, 0, "end fight" }
+// ... the Romans within 15 units of hero `hero` left alive: the rest beaten (taken off their squads the game's
+// way), nothing left to send -- the fights' ends left to the game (and the mod)
+#define ENDFIGHTKEEP(t, hero) { t, S_ENDFIGHT, hero, 1, 0, 0, 0, "end fight, keep romans" }
+// the lever (CKHkActivator 2,52) nearest (X, Y, Z) worked as a punch on it does
+#define PULLLEVERAT(t, X, Y, Z) { t, S_PULLLEVER, -1, 0, 0, X, Y, "pull lever", Z }
 const Step kPf26[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3336,6 +3343,32 @@ const Step kNoLockMark36[] = {
 	TAPS1(22000), SHOT(27000, "nolockmark36_4"), TAPS1(28000), SHOT(33000, "nolockmark36_5"), TAPS1(34000),
 	SHOT(39000, "nolockmark36_end"),
 	END(40000),
+};
+// nolock34 (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0: the
+// potion for Asterix only, Obelix's Romans can hurt him): lock34g with no-lock
+// Romans -- Obelix left in the library behind its doors while Asterix fights in
+// the courtyard (the lock's sphere sends Obelix to a marker, 4821): what comes
+// for Obelix; then Asterix's part of the fight won (ENDFIGHTKEEP: the Romans by
+// Obelix left) and Asterix works the lever by the library's doors (115.7 -1.1
+// -321.6, the user's), the heroes together again.
+const Step kNoLock34[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f), POTION(3200),
+	{ 3500, S_LEVERS, 0, 0, 0, 0, 0, "levers" },
+	GLIDEAT(4000, HERO_ASTERIX, 120.5f, -0.8f, -327.5f, 800), GLIDEAT(5500, HERO_ASTERIX, 114.0f, -0.8f, -326.0f, 800),
+	GLIDEAT(7000, HERO_ASTERIX, 108.0f, -0.8f, -319.0f, 800), GLIDEAT(8000, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 800),
+	SQUADS(8900, HERO_ASTERIX, 60.0f), { 9000, S_FLAGEV, 0x578, 0, 0, 0, 0, "lock34 sphere" },
+	SQUADS(10500, HERO_ASTERIX, 60.0f), DOORS(10600, HERO_OBELIX, 20.0f), REACH(10700), SHOT(10800, "nolock34_1"),
+	{ 11000, S_WATCHENEMIES, 0, 0, 0, 126.8f, -1.2f, "watch romans by obelix", -325.8f },
+	TAPS1(12000), TAPS1(17000), SHOT(21500, "nolock34_2"), TAPS1(22000),
+	ENDFIGHTKEEP(27000, HERO_OBELIX), SQUADS(28000, HERO_ASTERIX, 60.0f), DOORS(28100, HERO_OBELIX, 20.0f), REACH(28200),
+	SHOT(29000, "nolock34_3"), SHOT(36000, "nolock34_4"),
+	PLACEAT(42000, HERO_ASTERIX, 113.6f, -0.6f, -320.6f), PULLLEVERAT(43000, 115.734f, -1.082f, -321.566f),
+	DOORS(45000, HERO_OBELIX, 20.0f), REACH(45100), SHOT(45500, "nolock34_5"),
+	GLIDEAT(47000, HERO_ASTERIX, 121.0f, -0.8f, -327.0f, 1500), REACH(49000), DOORS(49100, HERO_OBELIX, 20.0f),
+	SHOT(50000, "nolock34_6"), SHOT(58000, "nolock34_7"), SQUADS(58100, HERO_OBELIX, 60.0f),
+	END(59000),
 };
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
@@ -7042,6 +7075,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight36v", kFight36V),
 	SCENARIO("join36", kJoin36),
 	SCENARIO("nolockmark36", kNoLockMark36),
+	SCENARIO("nolock34", kNoLock34),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -7919,7 +7953,17 @@ void RunStep(const Step& s) {
 		break;
 	}
 	case S_PULLLEVER: {   // lever a (CKHkActivator 2,52) worked as a punch on it does (FUN_0053B610, thiscall)
-		char* l = (char*)GetLvlObject(2, 52, (unsigned)s.a);
+		char* l = s.a >= 0 ? (char*)GetLvlObject(2, 52, (unsigned)s.a) : nullptr;
+		float bd = 1e30f;
+		for (unsigned i = 0, n = s.a < 0 ? GetNumLvlClassInstances(2, 52) : 0; i < n; i++) {   // a < 0: the nearest (x, y, z)
+			char* o = (char*)GetLvlObject(2, 52, i);
+			char* node = o ? *(char**)(o + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
+			float d = (p - Vector3(s.x, s.y, s.z)).len2();
+			if (d < bd) { bd = d; l = o; }
+		}
 		if (!l) break;
 		((void(__fastcall*)(char*, void*))0x53B610)(l, nullptr);
 		Log("autotest: lever %d %p worked (events %04X/%04X)", s.a, l, *(uint16_t*)(l + 0x28), *(uint16_t*)(l + 0x2A));
@@ -7994,6 +8038,52 @@ void RunStep(const Step& s) {
 		Log("autotest: reach obelix->asterix %s, asterix->obelix %s (asterix %.1f %.1f %.1f, obelix %.1f %.1f %.1f)",
 		    kName[PfReachable(o.Pos(), a.Pos()) + 1], kName[PfReachable(a.Pos(), o.Pos()) + 1], a.Pos().x, a.Pos().y,
 		    a.Pos().z, o.Pos().x, o.Pos().y, o.Pos().z);
+		break;
+	}
+	case S_ENDFIGHT: {   // the fights behind gates won: each squad a gate counts (+0x154 >= -1) put away (vf34), nothing
+		int n = 0;       // left to send or replace, and its end as the game gives it (FUN_00530570: 0D16, +0x154 = -2)
+		for (unsigned i = 0, k = GetNumLvlClassInstances(4, 26); i < k; i++) {
+			char* sq = (char*)GetLvlObject(4, 26, i);
+			if (!sq || *(int8_t*)(sq + 0x154) < -1) continue;
+			void** vt = *(void***)sq;
+			if (s.b == 1) {   // members (vf12, chained +4) away from hero a taken off as beaten ones are (FUN_00530300)
+				Trio t = GetTrio();
+				Hero keep = t ? t.GetHero(s.a) : Hero();
+				char* off[64];
+				int nOff = 0, kept = 0;
+				char** head = ((char**(__fastcall*)(char*, void*))vt[12])(sq, nullptr);
+				for (char* m = head ? *head : nullptr; m && nOff < 64; m = *(char**)(m + 4)) {
+					char* node = *(char**)(m + 0x10);
+					char* fr = node ? *(char**)(node + 4) : nullptr;
+					Vector3 p = fr ? Vector3(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]) : Vector3();
+					if (keep && fr && (p - keep.Pos()).len2() < 15.0f * 15.0f) kept++;
+					else off[nOff++] = m;
+				}
+				for (int k = 0; k < nOff; k++) ((void(__fastcall*)(char*, void*, char*))0x530300)(sq, nullptr, off[k]);
+				char* recs = *(char**)(sq + 0x144);
+				for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); recs && r < nr && r < 16; r++) {
+					char* rec = recs + r * 0x1C;
+					rec[0x14] = 0;
+					rec[0x15] = 0;
+					*(int16_t*)(rec + 0x18) = (int16_t)*(uint16_t*)(rec + 0x16);
+				}
+				Log("autotest: squad %p: %d Romans taken off, %d by %s kept; nothing left to send", sq, nOff, kept, HeroName(s.a));
+				n++;
+				continue;
+			}
+			((void(__fastcall*)(char*, void*))vt[34])(sq, nullptr);
+			char* recs = *(char**)(sq + 0x144);
+			for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); recs && r < nr && r < 16; r++) {
+				char* rec = recs + r * 0x1C;
+				rec[0x14] = 0;
+				rec[0x15] = 0;
+				*(int16_t*)(rec + 0x18) = (int16_t)*(uint16_t*)(rec + 0x16);
+			}
+			((void(__fastcall*)(char*, void*, int, int))vt[5])(sq, nullptr, 0xD16, 0);
+			*(uint8_t*)(sq + 0x154) = 0xFE;
+			n++;
+		}
+		Log("autotest: %d fight squad(s) ended", n);
 		break;
 	}
 	case S_SQUADRESET: {   // every active squad (4,26 / 4,64) put away by its vf34

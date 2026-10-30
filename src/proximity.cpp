@@ -5,6 +5,7 @@
 #include "detour.h"
 #include "klusters.h"
 #include "log.h"
+#include "nolock.h"
 #include "p2cam.h"
 #include "trio.h"
 
@@ -973,7 +974,7 @@ void __fastcall SquadFreeHook(char* squad, void* edx) {
 	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
 		void** vt = *(void***)sq;
 		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604) || !(*(uint8_t*)(sq + 0x152) & 2)) continue;
-		if (InSquadBox(sq, lp)) continue;
+		if (InSquadBox(sq, lp) || NoLockKeepsSquad(sq)) continue;   // (its Romans out for a waiting hero stay)
 		if (InSquadBox(sq, pa) || InSquadBox(sq, po)) {
 			if (InterlockedIncrement(&g_squadsSpared) % 300 == 1)
 				Log("proximity: out of Romans; squad %p kept for the player in it", sq);
@@ -1056,7 +1057,9 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			const float* f = (const float*)sq;
 			float c[3] = { (f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f };
 			float hx = (f[0x47] - f[0x4A]) * 0.5f, hy = (f[0x48] - f[0x4B]) * 0.5f, hz = (f[0x49] - f[0x4C]) * 0.5f;
-			if (KlusterSphereInOtherViews(c, sqrtf(hx * hx + hy * hy + hz * hz))) {
+			if (NoLockKeepsSquad(sq)) {
+				// its Romans out for a waiting hero (nolock.cpp) go after that hero
+			} else if (KlusterSphereInOtherViews(c, sqrtf(hx * hx + hy * hy + hz * hz))) {
 				if (InterlockedIncrement(&g_keptSquads) % 600 == 1)
 					Log("proximity: squad %p kept: out of the game camera's view, in the other player's", sq);
 			} else {
@@ -1066,6 +1069,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			*(float*)(sq + 0x138) += *(float*)(dt + 0xC);
 		}
 		EndSpentSquad(sq);
+		NoLockSteer(sq);
 	}
 }
 
@@ -1104,7 +1108,8 @@ void __fastcall CheckpointHook(char* self, void* edx, int arg) {
 // refreshes +0x408; the fight ends +0x404 s after the last such enemy. Player
 // 2's Obelix fought Romans in silence (level 5 sector 1). The non-leading
 // player's hero gets a pass first, as the leader, so its fight starts and keeps
-// the fight alive; then the game's own pass for the real leader.
+// the fight alive; then the game's own pass for the real leader. Romans that
+// no-lock mode sent for a waiting hero start no fight (nolock.cpp).
 typedef void(__fastcall* FightFn)(char* trio, void* edx, void* time);
 const uintptr_t kFightMode = 0x481950;
 const uint8_t   kFightModePrologue[7] = { 0x51, 0x56, 0x8B, 0xF1, 0x57, 0x8B, 0x06 };
@@ -1121,6 +1126,7 @@ void __fastcall FightHook(char* trio, void* edx, void* time) {
 	float now = time ? *(float*)((char*)time + 4) : 0.0f;
 	float& last = *(float*)(trio + 0x408);
 	bool nlFound = false;
+	NoLockHideFromFight(true);
 	if (t && trio == t.raw() && nl >= 0 && CoopP2Joined() && !CoopSuspended() && !HeroOut(nl)) {
 		uint8_t* tr = (uint8_t*)trio;
 		uint8_t leader = tr[0x2C], companion = tr[0x2D];
@@ -1148,6 +1154,7 @@ void __fastcall FightHook(char* trio, void* edx, void* time) {
 	g_origFight(trio, edx, time);
 	if (last != mark && lead >= 0 && lead < 2) g_fightSeen[lead] = now;
 	if (nlFound && last == mark) last = now;
+	NoLockHideFromFight(false);
 	if (t && trio == t.raw()) {
 		g_fightNow = now;
 		g_fightDelay = *(float*)(trio + 0x404);

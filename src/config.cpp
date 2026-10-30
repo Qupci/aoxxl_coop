@@ -90,6 +90,7 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_NOLOCKROMANS")) noLockRomans = atoi(getenv("XXL_NOLOCKROMANS")) != 0;
 	if (getenv("XXL_NOLOCKROMANSANY")) noLockRomansAnyMarkers = atoi(getenv("XXL_NOLOCKROMANSANY")) != 0;
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
+	if (getenv("XXL_OBELIXPOTION")) obelixPotion = atoi(getenv("XXL_OBELIXPOTION")) != 0;
 	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
 	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
 

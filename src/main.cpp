@@ -17,6 +17,7 @@
 #include "individual.h"
 #include "hud2.h"
 #include "experimental.h"
+#include "nolock.h"
 #include "vtprofile.h"
 #include "render.h"
 #include "autotest.h"
@@ -129,6 +130,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	IndivInstallHooks();
 	Hud2InstallHooks();
 	ExperimentalInstallHooks();
+	NoLockInstallHooks();
 	CoopInit();
 	WatchdogStart();
 	Log("startup: ready");

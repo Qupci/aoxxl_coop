@@ -3045,3 +3045,37 @@ both halves).
   before SquadAtOwnMarker: no Roman at all; any markers on: #3's Romans sent at #4's marker -195.2 2.6 -219.3 and vf55
   placed none (alive 0 -> 0: #3 has none free); off now: #4's at its own marker (queued, +0x14, as #4 is at its at-once
   number; they come at its markers out of view). freeromans23 unchanged (walk-to marker, no squad markers near).
+- Round 167 (user, userlogs xxl_coop.nolock_romans_play*.log: no-lock Romans came one at a time; wants groups of 1-6,
+  a 20-90 s pause (about 30) after a group is beaten, Romans that chase the hero out of their fight zone, the big
+  Romans too, and no fight music from them; LV3-4 asked about -- the non-leader-only rule already covers it: only the
+  hero not leading can wait, CoopNoLockWaiting, so the one in the locked fight never gets them). nolock.cpp SendGroup:
+  1..6 Romans of one squad at one point, each from a pool picked at random by Romans left to send (endless 8, spent 1
+  with +1 to defeat -- never in a squad a gate counts, +0x154 >= -1) among pools with a free Roman (CKGrpPoolSquad
+  members: vf12 -> head, hooks chained +4) of a kind not kept (EnemyKindKeptAsIs = experimental's KeptAsIs); never
+  queued (vf55 with an empty free list queues, +0x14: taken back). Before: always the first pool with Romans left ->
+  never LV3-6's big ones (pool 1). Each Roman tracked (hook, squad and its index -- checked against GetLvlObject, a
+  level change frees them) until it leaves its pool record's list (+8, chained +0x50) or its hook +8 bit 0 is set
+  (finished: FUN_00530570 takes such members off with FUN_00530300, thiscall(member) ret 4 -- off the list, back to
+  the pool, alive -1); the hero's last one gone -> next group after 20 + 70 u^3 s. NoLockSteer after each squad's tick
+  (EnemyTickHook): a tracked Roman's slot (cpnt 0x46: +0 slot, +0x18 step, as SplitSquad) on a 2.5-unit ring round its
+  hero, a downed hero too (they stay on its side); squads with tracked Romans are neither reset (vf35) nor freed
+  (vf36). Music: the trio's fight mode (FUN_00481950) counts cached enemies (hooks) whose node +0x14 equals the frame
+  count (short at 0x6464C4) within trio +0x400 -- FightHook gives tracked Romans' nodes another stamp around both its
+  passes (NoLockHideFromFight); the user's log had "fight mode (music) started by Obelix" 0.7 s after a no-lock
+  Roman. A gate counts a squad's count - sent + alive: Romans from the squad Asterix's gate counts kept it shut until
+  Obelix beat his. Now a gated squad that is spent (FUN_00530570's test) with only tracked members alive is ended the
+  game's way (EndFightsLeftToOurs: vt[5] = sendEvent 0x4C7E70, thiscall(ev, arg) ret 8, 0D16; +0x154 = -2); the
+  game's 0D16 again as the last of them goes is dropped (CKGrpSquadEnemy vtable 0x6266B0 slot 5 hook) until 2 s
+  after -- also for a spent squad whose end came already that sends a group. experimental UpdateSquads skips such a
+  squad (NoLockEndedFight): the Raise at the heroes' meeting had doubled its tracked Romans as left to defeat (1 -> 4).
+  No groups for a downed hero (IndivFallen: one went for downed Asterix). The walk-to marker fallback needs
+  PfReachable too. LV3-4: lock sphere 0x578's 4821 sends Obelix to marker 121.4 0.4 -328.1 in the library; the
+  library's lever (lever 4, 115.9 -1.3 -321.5, events 0210) lifts the wait (order 0). Romans in the library hit
+  Obelix there, outside the courtyard squad's fight zone (the test potion had hidden it: the gauge is shared,
+  obelix_potion). Test aids: S_ENDFIGHT -- ENDFIGHT (gated squads put away, spent, 0D16), ENDFIGHTKEEP(hero) (members
+  away from the hero taken off with FUN_00530300, spent; the end left to the game / mod); S_PULLLEVER a < 0 = the
+  lever nearest (x, y, z) (PULLLEVERAT); env XXL_OBELIXPOTION. Autotests: nolock34 (-Level 3, XXL_NOLOCK=1
+  XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0): 5-6 Romans of mixed pools at the library marker, Obelix hurt 15 -> 0, the
+  fight ended for Asterix with them out, the lever lifts the wait, they stay round downed Obelix, the second 0D16
+  dropped; freeromans23 (2-4 Romans, the keg lifts the wait); nolockmark36 now sends none (the fight's squad #4 has no
+  free Roman, all at its at-once number -- before, one was queued).
