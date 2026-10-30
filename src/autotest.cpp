@@ -1413,6 +1413,26 @@ const Step kBoat49A[] = {
 	SHOT(11800, "boat49_3"),
 	END(14000),
 };
+// iconsboat49 (-Level 4, XXL_ICONP2KB=1 XXL_ICONLOG=1): the LV4-9 boat's "Use"
+// prompt with player 2's Obelix on its deck (the user's spot -165.2 5.4 -651.7,
+// dropped from 7.5; placed at 5.4 he sticks in the hull): Asterix 12 units off on
+// the jetty (player 2's key), 7 off (the same); then Asterix alone on the deck
+// (player 1's button), Obelix walking back on beside him (both players'). The
+// deck is small: 1.6 units past the spot is water.
+const Step kIconsBoat49[] = {
+	BOAT49_SETUP,
+	PLACEAT(3000, HERO_OBELIX, -165.213f, 7.5f, -651.691f), PLACEAT(3000, HERO_ASTERIX, -164.66f, 6.6f, -640.0f),
+	SHOT(5500, "iconsboat_far"),
+	PLACEAT(6000, HERO_ASTERIX, -164.66f, 6.6f, -645.0f),
+	SHOT(7500, "iconsboat_near"),
+	PLACEAT(8000, HERO_OBELIX, -164.66f, 6.6f, -640.0f),
+	PLACEAT(8100, HERO_ASTERIX, -165.213f, 7.5f, -651.691f),
+	SHOT(9500, "iconsboat_p1"),
+	PLACEAT(10000, HERO_OBELIX, -165.3f, 6.6f, -646.0f),
+	GLIDEAT(10200, HERO_OBELIX, -165.3f, 6.3f, -650.6f, 1500),
+	SHOT(13000, "iconsboat_both"),
+	END(13500),
+};
 
 // hintjoin: the level-start hint (player 2 joins with Start), on screen.
 const Step kHintJoin[] = {
@@ -6713,6 +6733,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("mgun33d", kMgun33D),
 	SCENARIO("boat49o", kBoat49O),
 	SCENARIO("boat49a", kBoat49A),
+	SCENARIO("iconsboat49", kIconsBoat49),
 	SCENARIO("hintjoin", kHintJoin),
 	SCENARIO("spy3n", kSpy3N),
 	SCENARIO("hudvanish", kHudVanish),

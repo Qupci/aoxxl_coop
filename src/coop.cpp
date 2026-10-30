@@ -104,6 +104,8 @@ struct CoopState {
 	uint32_t offerValue = 0;          // the last trio+0x4C a trio event put there...
 	int      offerHero = -1;          // ... for this hero (the leader byte then: an object ticked as its)
 	uint32_t leaderHidOffer = 0;      // trio+0x4C hidden from the leader's tick (the other hero's)
+	void*    machineOffer = nullptr;  // the last machine a trio event offered (trio+0x48)...
+	int      machineOfferHero = -1;   // ... to this hero (the leader byte then)
 
 	bool    suspended = false;
 	bool    shopping = false;            // a merchant's menu is open
@@ -2558,6 +2560,19 @@ void CoopNoteOffer(uint32_t offer, int hero) {
 void CoopNoteTrioEvent(void* trio, int event, void* param) {
 	extern void* g_trioEventCaller;
 	if ((event & 0xFFFF) == 0x4804 && (uintptr_t)g_trioEventCaller == 0x49C699) g.launcherAt = GetTickCount();
+	if (((event & 0xFFFF) == 0x4901 || (event & 0xFFFF) == 0x4A01) && param) {
+		// A machine offering itself (boat / gun, trio +0x48 = the parameter) to
+		// the leader its tick saw: the boat ticks as its nearest hero's, and offers
+		// itself to the one standing on its deck, leading or not.
+		Trio tl = GetTrio();
+		int to = tl ? tl.Leader() : -1;
+		if (g.p2Joined && (param != g.machineOffer || to != g.machineOfferHero)) {
+			static int s_told = 0;
+			if (s_told++ < 20) Log("coop: %s %p offered to %s", (event & 0xFFFF) == 0x4901 ? "boat" : "machine gun", param, HeroName(to));
+		}
+		g.machineOffer = param;
+		g.machineOfferHero = to;
+	}
 	if (g.p2Joined && ((event & 0xFFFF) == 0x4800 || (event & 0xFFFF) == 0x4801) &&
 	    (uintptr_t)g_trioEventCaller >= 0x49AC80 && (uintptr_t)g_trioEventCaller < 0x49AD00) {
 		Trio tl = GetTrio();
@@ -3449,6 +3464,32 @@ const unsigned  kPromptNone = 0xE;
 PromptFn g_origPrompt = nullptr;
 struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; int hero = -1; bool both = false; } g_prompt;
 
+// A machine's "Use" (kind 9) is written by Asterix's call alone (hero vtable
+// +0x3C == 0) whenever trio +0x48 holds a machine, whoever it was offered to --
+// player 2's Obelix on the boat's deck got player 1's button. The prompt is the
+// hero's it was offered to (CoopNoteTrioEvent). Either player's X takes it
+// (Obelix's is a request, ServeMachineRequest); with both heroes on the boat's
+// deck (hero +0x280 = boat +0x120, on its feet: the boat's own test through
+// trio 0xB00) the prompt is both players'.
+const unsigned  kPromptMachine = 9;
+const uintptr_t kBoatVtbl = 0x627EB8;   // CKHkBoat (2,39)
+static int MachinePromptHero(Trio t, bool* both) {
+	char* m = *(char**)(t.raw() + 0x48);
+	*both = false;
+	if (!m || m != g.machineOffer || (g.machineOfferHero != g.p1Hero && g.machineOfferHero != g.p2Hero)) return -1;
+	if (*(uintptr_t*)m == kBoatVtbl) {
+		int on = 0;
+		const int players[2] = { g.p1Hero, g.p2Hero };
+		for (int i : players) {
+			Hero h = t.GetHero(i);
+			uint32_t gr = h ? *(uint32_t*)(h.raw() + 0x384) : 1;
+			if (h && *(char**)(h.raw() + 0x280) == *(char**)(m + 0x120) && !(gr & 7) && !(gr & 0x20000000)) on++;
+		}
+		*both = on == 2;
+	}
+	return g.machineOfferHero;
+}
+
 static void __fastcall PromptHook(char* hero, void* edx) {
 	g_origPrompt(hero, edx);
 	// Individual heroes: a launcher (hero +0x3F0 bit 0x4000, set in the hero's own
@@ -3469,9 +3510,14 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	if (g_prompt.frame != g.frameNo) { g_prompt.frame = g.frameNo; g_prompt.kind = kPromptNone; g_prompt.leader = false; g_prompt.hero = -1; g_prompt.both = false; }
 	uint32_t& cc = *(uint32_t*)(gm + 0xCC);
 	unsigned kind = (cc >> 4) & 0xF;
+	bool machineBoth = false;
+	if (kind == kPromptMachine && idx == HERO_ASTERIX) {
+		int to = MachinePromptHero(t, &machineBoth);
+		if (to >= 0) idx = to;
+	}
 	bool leads = idx == t.Leader();
 	if (kind != kPromptNone) {
-		if (g_prompt.kind == kind && g_prompt.hero != idx) g_prompt.both = true;   // offered to both heroes
+		if ((g_prompt.kind == kind && g_prompt.hero != idx) || machineBoth) g_prompt.both = true;   // offered to both heroes
 		if (g_prompt.kind == kPromptNone || (leads && !g_prompt.leader)) { g_prompt.kind = kind; g_prompt.leader = leads; g_prompt.hero = idx; }
 		else cc = (cc & ~0xF0u) | (g_prompt.kind << 4);
 	} else if (g_prompt.kind != kPromptNone) {

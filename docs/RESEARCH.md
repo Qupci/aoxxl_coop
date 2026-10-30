@@ -2946,3 +2946,20 @@ both halves).
   S_OBJEV 0x0903 -- its turnstile is up on the beam's pole, S_NEAROBJ put Obelix in the water). As before: beam42f
   (now let go at the drop, the landing's 4800 in the same frame, same landing spot), beam42l (leads again), beam28.
   XXL_LIFTLOG's car line is 1024 chars (the beams were cut off) and logs each beam's angles and Asterix's distance.
+- Round 162 (user: LV4-9, player 2's Obelix on the boat at -165.213 5.424 -651.691 with player 2 on the keyboard --
+  the boat's "Use" prompt showed the pad's button). The hero prompt FUN_0049A1A0 writes kind 9 ("Use", gm +0xCC bits
+  4-7) only for a hero whose vtable +0x3C returns 0 -- Asterix -- whenever trio +0x48 holds a machine, so PromptHook
+  always credited it to Asterix's player. The boat (CKHkBoat 0x627EB8; its offer, FUN_004FB1D0 from CKHkBoatLife::vf17: trio
+  0xB00 = the leader's ground, hero +0x280 if hero +0x384 & 7 == 0 and not bit 0x20000000 (FUN_0049D560), compared
+  with boat +0x120, the deck) ticks as its nearest hero's (proximity slicing), so it is offered to whoever stands on
+  its deck, leading or not: trio 0x4901 (boat) / 0x4A01 (gun) with the machine as parameter -> trio +0x48, +0x3F4 bit
+  10 / 11 (FUN_004823D0 / FUN_00482300 case 1; ignored while +0x3F4 bit 2). Now CoopNoteTrioEvent notes the machine
+  and the leader byte at that event (g.machineOffer / machineOfferHero, log "coop: boat ... offered to X"), and
+  PromptHook credits kind 9 to that hero; both heroes on the boat's deck -> both players' buttons ("X/F"). Either
+  player's X still takes the machine (Obelix's through ServeMachineRequest), unchanged. The LV3-3 machine gun had
+  the same misattribution (Obelix at the seat: "for player 1"; now player 2). Autotest iconsboat49 (-Level 4,
+  XXL_ICONP2KB=1 XXL_ICONLOG=1): Obelix on the deck with Asterix 12 / 7 units off on the jetty -> "Use F", Asterix
+  alone on it -> "Use X", both on it -> "Use X/F". Placing a hero at the user's y 5.4 sticks it in the hull: drop it
+  from 7.5; the deck is small (1.6 units past the spot is water; z -649.5 is still the jetty). Regressions: iconsgun
+  -L3 (now "Use F" for Obelix at the gun), boat49o (Obelix's X still boards: 4807). A one-frame "both" right after a
+  teleport next to a machine is old (seen before the fix too).
