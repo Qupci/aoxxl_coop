@@ -27,8 +27,8 @@ struct CoopConfig {
 	bool  safeSequence  = true;   // the non-leading player can't set off levers meant for the leader's switch
 	int   sectorCatchUpMs = 1000; // a hero left in an unloaded sector this long is brought to the other
 	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with
-	bool  freedom       = true;   // the level never takes a player's hero (waits, walks to markers); cable cars still do
-	bool  freedomCorkscrews = true;   // freedom mode: a corkscrew's circle (light pillar launching its hero) still locks it
+	bool  noLock        = true;   // the level never takes a player's hero (waits, walks to markers); cable cars still do
+	bool  noLockExceptCorkscrews = true;   // no-lock mode: a corkscrew's circle (light pillar launching its hero) still locks it
 	bool  carRiderLeads = false;      // a hero boarding a cable car while the other leads takes the lead at once
 	float deadzone      = 0.24f;
 
@@ -43,7 +43,7 @@ struct CoopConfig {
 	float comboFactor      = 0.5f;  // combo bar hits counted per Roman hit
 	float comboDrainFactor = 1.5f;  // the combo bar losing its hits (before it is full)
 	float comboFullDrainFactor = 1.5f; // a full combo bar running out
-	bool  freedomRomans    = false; // freedom mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
+	bool  noLockRomans    = false; // no-lock mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

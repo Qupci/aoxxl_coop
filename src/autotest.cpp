@@ -958,7 +958,7 @@ const Step kBoss210f[] = {
 const Step kBoss210u[] = { BOSS210_USER(CINE_ENTER(7500)) };
 const Step kBoss210v[] = { BOSS210_USER(MARK(7500, "no skip")) };
 
-// boss210t (-Level 2, XXL_FREEDOM=1): the user's -- Asterix crosses the boss gate
+// boss210t (-Level 2, XXL_NOLOCK=1): the user's -- Asterix crosses the boss gate
 // (#34 loads it, its cutscene; #4 sets it moving), both heroes wait out of its
 // way, then Asterix takes the automatic cable car, whose end jumps him onto the
 // boss's button: the boss's "Obelix leads, Asterix waits" must lock him there.
@@ -1902,9 +1902,9 @@ const Step kPauseDown[] = {
 	END(12500),
 };
 
-// cork53 (-Level 5, sector 3; freedom on): LV5-3's corkscrew (circle -259.71 10.49
+// cork53 (-Level 5, sector 3; nolock on): LV5-3's corkscrew (circle -259.71 10.49
 // 353.69, turnstile -255.87 9.54 358.30) -- Asterix onto its circle (event 0110:
-// Obelix leads, Asterix waits; freedom_corkscrews locks him), player 2's Obelix
+// Obelix leads, Asterix waits; nolock_except_corkscrews locks him), player 2's Obelix
 // turns the turnstile, the launch (0x0C09 -> 4805, AI order 2) jumps Asterix up:
 // he must be his player's again once landed (nothing in LV5-3 frees him after).
 const Step kCork53[] = {
@@ -4499,10 +4499,10 @@ const Step kLifterLock[] = {
 	END(44000),
 };
 
-// pull28 (level 2, sector 8; freedom on): the user's LV2-8 -- Asterix crosses the
+// pull28 (level 2, sector 8; nolock on): the user's LV2-8 -- Asterix crosses the
 // detector that lights the pillar (16.9 50.9 -133 -> -128), stands on the pillar
 // on the platform (42.06 57.0 -120.10; "Obelix leads, Asterix waits", free in
-// freedom mode), player 2's Obelix holds X at the platform (37.92 51.0 -120.16)
+// no-lock mode), player 2's Obelix holds X at the platform (37.92 51.0 -120.16)
 // and pulls right, then down: the "Pull" prompt and the platform moving.
 const Step kPull28[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 8),
@@ -4519,7 +4519,7 @@ const Step kPull28[] = {
 	END(14000),
 };
 
-// camfall28 (level 2, sector 8; freedom on): the user's LV2-8 -- the platform's
+// camfall28 (level 2, sector 8; nolock on): the user's LV2-8 -- the platform's
 // pillar (Obelix leads), Obelix pulls the platform with Asterix on it, Asterix
 // jumps off it (29.4 57.7 -117.4: the platform's camera, zone 02E9) and falls to
 // the ground (31.1 51.0 -106.4: the reset, 03B8 -- the lead back to Asterix):
@@ -4604,9 +4604,9 @@ const Step kTele28[] = {
 };
 
 // beam28 (level 2, sector 8): the natural LV2-8 order -- the platform's pillar
-// (Obelix leads, Asterix waits: AI order 3, free in freedom mode), Asterix into
+// (Obelix leads, Asterix waits: AI order 3, free in no-lock mode), Asterix into
 // the beam's cutscene zone, Obelix put by the turnstile hitting it (X), Asterix
-// jumping now and then: the rotary beam must take him (freedom: his jump).
+// jumping now and then: the rotary beam must take him (nolock: his jump).
 const Step kBeam28[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 8),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -5168,10 +5168,10 @@ const Step kBeamUndo[] = {
 	END(21000),
 };
 
-// beam42 (-Level 4, XXL_LIFTLOG=1, XXL_FREEDOM=0/1): LV4-2's rotary beam -- Asterix lights
+// beam42 (-Level 4, XXL_LIFTLOG=1, XXL_NOLOCK=0/1): LV4-2's rotary beam -- Asterix lights
 // the hearth, stands on the blue circle; player 2's Obelix turns the turnstile
 // (the user's spot) again and again: the beam swings over Asterix (locked: the AI
-// jumps up and hangs on it; freedom: player 1 must jump to it).
+// jumps up and hangs on it; nolock: player 1 must jump to it).
 const Step kBeam42[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -5239,7 +5239,7 @@ const Step kBeam42[] = {
 	END(32000),
 };
 
-// beam42f (-Level 4, XXL_P2HERO=asterix XXL_FREEDOM=1 XXL_LIFTLOG=1): beam42 in freedom
+// beam42f (-Level 4, XXL_P2HERO=asterix XXL_NOLOCK=1 XXL_LIFTLOG=1): beam42 in no-lock
 // mode with the roles swapped -- player 2's Asterix (not locked) jumps again and
 // again under the beam, player 1's Obelix turns the turnstile.
 const Step kBeam42f[] = {
@@ -5447,7 +5447,7 @@ const Step kBeam42f[] = {
 	END(34000),
 };
 
-// beam42l (-Level 4, XXL_P2HERO=asterix XXL_FREEDOM=1): beam42f with the lead back
+// beam42l (-Level 4, XXL_P2HERO=asterix XXL_NOLOCK=1): beam42f with the lead back
 // to Asterix after the circle (4800, 4801, 4800: his wait order cleared too) -- the beam
 // must take him while he leads, and drop him leading at the far end.
 const Step kBeam42L[] = {
@@ -5658,7 +5658,7 @@ const Step kBeam42L[] = {
 	END(34000),
 };
 
-// beam32 (-Level 3, XXL_P2HERO=asterix XXL_FREEDOM=1 XXL_LIFTLOG=1): the user's LV3-2 --
+// beam32 (-Level 3, XXL_P2HERO=asterix XXL_NOLOCK=1 XXL_LIFTLOG=1): the user's LV3-2 --
 // Asterix lights the hearth (252.7 9.1 -90.5) and stands on the light pillar
 // (266.18 11.07 -97.09); player 1's Obelix hits the turnstile (251.3 6.1 -97.8)
 // until the rotary beam has carried Asterix across and let him go. He must be
@@ -5789,9 +5789,9 @@ const Step kKeg23S[] = {
 	END(30000),
 };
 
-// freeromans23 (level 2 sector 3, XXL_FREEDOM=1 XXL_FREEDOMROMANS=1 XXL_LIFTLOG=1): the
+// freeromans23 (level 2 sector 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_LIFTLOG=1): the
 // user's -- Asterix lights the hearth by the doors (#423: the doors shut, Obelix
-// walks to a marker and waits -- in freedom mode not followed: Romans come for
+// walks to a marker and waits -- in no-lock mode not followed: Romans come for
 // him), then lights the powder keg (#327: the crumbly wall opens, Obelix's wait
 // lifted -- no more Romans).
 const Step kFreeRomans23[] = {
@@ -5814,7 +5814,7 @@ const Step kFreeRomans23[] = {
 	END(40000),
 };
 
-// pillar36 (-Level 3, sector 6; the user's with XXL_FREEDOM=1): the light
+// pillar36 (-Level 3, sector 6; the user's with XXL_NOLOCK=1): the light
 // pillar's circle (-175.3 3.8 -219.2, live only once the fight is won) hands
 // Obelix the lead (4801) -- sent here directly; then Asterix rides the automatic
 // cable car (CKHkTelepher) -- at its end it must jump off by itself (0C09).
@@ -5963,8 +5963,8 @@ const Step kCrates1CC[] = {
 };
 
 // pillar36l: the same circle's lock (4801, 4802 sent as its group does) with
-// Asterix on it: freedom mode keeps it (a corkscrew's circle; off with
-// XXL_FREEDOMCORK=0); R3 + B still frees him.
+// Asterix on it: no-lock mode keeps it (a corkscrew's circle; off with
+// XXL_NOLOCKCORK=0); R3 + B still frees him.
 const Step kPillar36l[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),

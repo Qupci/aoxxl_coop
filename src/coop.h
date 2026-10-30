@@ -78,7 +78,7 @@ void CoopAfterTrioEvent(int event, int cookie);
 // (cable_car_rider_leads off): run with the rider as the leader. End with what
 // Begin returned.
 bool CoopRideSliceBegin(int event, void* caller);
-// Freedom mode: the rotary beam's catch (0x0C02) for a companion that jumped
+// No-lock mode: the rotary beam's catch (0x0C02) for a companion that jumped
 // for it, its wait order lost to a lead switch. End with what Begin returned.
 bool CoopBeamCatchBegin(int event, void* caller);
 void CoopBeamCatchEnd(bool began);
@@ -100,8 +100,8 @@ bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 int CoopUndoLockFor(int fallen);
 // What R3 + B does for `hero` (autotests): unlocks it from a level lock.
 void CoopUnlockHero(int hero);
-// Freedom mode: `hero` has a scripted order the mode leaves unfollowed (it would be waiting).
-bool CoopFreedomWaiting(int hero);
+// No-lock mode: `hero` has a scripted order the mode leaves unfollowed (it would be waiting).
+bool CoopNoLockWaiting(int hero);
 // An event that commands the trio was just flagged (before its group runs): the
 // level's state is noted, should it lock a hero and need undoing.
 void CoopNoteTrioEventFlagged(unsigned eventId);

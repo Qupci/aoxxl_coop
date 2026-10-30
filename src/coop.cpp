@@ -32,7 +32,7 @@
 #include "pads.h"
 #include "hints.h"
 #include "individual.h"
-#include "freedom.h"
+#include "nolock.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -473,28 +473,28 @@ static void RestoreLockPicture(const LockPicture& p) {
 	    changed, shown, flags, cams);
 }
 
-// Freedom mode ([coop] freedom): the level never takes a player's hero -- no
+// No-lock mode ([coop] nolock): the level never takes a player's hero -- no
 // "wait here" (light pillars, the rotary beam's circle), no walks to markers; the
 // player does it by hand. Cable cars still do: the rope-pulled one (order 9) and
 // the automatic CKHkTelepher (12, external control). Not the mod's own holds (the
 // machine gun Obelix's player asked to join).
-static bool FreedomLetsHold(int order) {
-	return !g_config.freedom || order == AI_USE_CABLECAR || order == AI_EXTERNAL_CTRL;
+static bool NoLockLetsHold(int order) {
+	return !g_config.noLock || order == AI_USE_CABLECAR || order == AI_EXTERNAL_CTRL;
 }
 
-// Waits freedom mode still lets lock the hero (CoopNoteTrioEvent, at the 0x4802):
+// Waits no-lock mode still lets lock the hero (CoopNoteTrioEvent, at the 0x4802):
 // - the boss (LV2-10, LV3-6; its code at 0x4F3165/0x4F317E: "Obelix leads,
 //   Asterix waits") once Asterix is on its button (the automatic cable car's end
 //   jumps him there) -- left free he walked off and the boss fight was cheesed;
 // - a corkscrew's circle (CKHkCorkscrew 2,44 -- LV3-6's light pillar, LV2-1's
-//   spinning platform; [coop] freedom_corkscrews): it launches the waiting hero
+//   spinning platform; [coop] nolock_except_corkscrews): it launches the waiting hero
 //   (0x0C09, AI order 2), aimed where the level wants it -- by hand it was a blind
 //   jump (LV3-6 boss: onto the cable car).
-struct FreedomLock { int hero = -1; DWORD at = 0; const char* what = ""; } g_freedomLock;
-static bool FreedomKeepsLock(int idx) {
-	return g_freedomLock.hero == idx && GetTickCount() - g_freedomLock.at < 500;
+struct KeptLock { int hero = -1; DWORD at = 0; const char* what = ""; } g_keptLock;
+static bool NoLockKeepsLock(int idx) {
+	return g_keptLock.hero == idx && GetTickCount() - g_keptLock.at < 500;
 }
-// The hero a corkscrew's circle locked in freedom mode, until the ride gives it
+// The hero a corkscrew's circle locked in no-lock mode, until the ride gives it
 // the lead (LV2-1: the top's box 0058) or lets it go. Its whole ride is the
 // level's, as in single player: on its way to the turnstile Obelix crosses zone
 // 03C8, whose 4803 freed Asterix -- the ride's walk onto the platform (0528:
@@ -507,7 +507,7 @@ static bool FreedomKeepsLock(int idx) {
 // that frees him -- in the user's run it never went off, and he stayed the game's.
 struct CorkRide { int hero = -1; char* cork = nullptr; DWORD launched = 0; bool jumping = false; } g_corkRide;
 // The player's hero handed to the game for the rotary beam's ride (its jump,
-// WatchFreedomBeam), until the beam lets it go (its order leaves 8). The drop
+// WatchNoLockBeam), until the beam lets it go (its order leaves 8). The drop
 // leaves it "wait here" (0x0C03: order 8 -> 3), which only a level's event ends:
 // LV4-2's landing gives Asterix the lead, LV3-2's (247.7 7.1 -118.5) nothing,
 // and he stayed the game's.
@@ -517,12 +517,12 @@ void Hold(Trio t, int idx, const char* why, bool modOwn = false) {
 	Hero h = t.GetHero(idx);
 	if (!h || g.held[idx]) return;
 	if (g_beamRider == idx) g_beamRider = -1;
-	if (!modOwn && !FreedomLetsHold((int)h.Order()) && FreedomKeepsLock(idx))
-		Log("coop: freedom: %s locked all the same (%s)", HeroName(idx), g_freedomLock.what);
-	else if (!modOwn && !FreedomLetsHold((int)h.Order())) {
+	if (!modOwn && !NoLockLetsHold((int)h.Order()) && NoLockKeepsLock(idx))
+		Log("coop: nolock: %s locked all the same (%s)", HeroName(idx), g_keptLock.what);
+	else if (!modOwn && !NoLockLetsHold((int)h.Order())) {
 		static int s_told = 0;
 		if (s_told++ < 40)
-			Log("coop: freedom: %s stays its player's (%s, AI order %d not followed)", HeroName(idx), why, (int)h.Order());
+			Log("coop: nolock: %s stays its player's (%s, AI order %d not followed)", HeroName(idx), why, (int)h.Order());
 		return;
 	}
 	g.held[idx] = true;
@@ -1801,11 +1801,11 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 			return true;
 		}
 	}
-	// Freedom mode: the level's 4803 (zone 03C8) does not free the hero a
+	// No-lock mode: the level's 4803 (zone 03C8) does not free the hero a
 	// corkscrew's circle holds (g_corkRide) -- it stays the level's until its ride
 	// ends. The lock's own bookkeeping runs as for any 4803 (the sequence goes on:
 	// Obelix off before turning it is still set back).
-	if ((ev & 0xFFFF) == 0x4803 && g_config.freedom && g_config.freedomCorkscrews && g_corkRide.hero >= 0 && g.p2Joined &&
+	if ((ev & 0xFFFF) == 0x4803 && g_config.noLock && g_config.noLockExceptCorkscrews && g_corkRide.hero >= 0 && g.p2Joined &&
 	    !g.suspended) {
 		extern void* g_trioEventCaller;
 		uintptr_t from = (uintptr_t)g_trioEventCaller;
@@ -1820,7 +1820,7 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 				if (g_lock.hero == g_corkRide.hero) EndLock(true);
 				static int s_told = 0;
 				if (s_told++ < 20)
-					Log("coop: freedom: trio event 4803 from %p held back -- %s stays on the corkscrew's circle for its ride",
+					Log("coop: nolock: trio event 4803 from %p held back -- %s stays on the corkscrew's circle for its ride",
 					    (void*)from, HeroName(g_corkRide.hero));
 				return true;
 			}
@@ -2020,7 +2020,7 @@ static bool LockedByLevel(int idx, Hero h) {
 	if (!h) return false;
 	uint8_t order = *(uint8_t*)(h.raw() + 0x564);
 	bool waits = order == AI_WAIT || order == AI_HANG_ON_BEAM || order == AI_USE_CABLECAR;
-	if (g_config.freedom) return waits && g.held[idx];   // only a cable car holds a hero
+	if (g_config.noLock) return waits && g.held[idx];   // only a cable car holds a hero
 	return waits && (g.held[idx] || g_lock.hero == idx);
 }
 
@@ -2079,7 +2079,7 @@ int CoopUndoLockFor(int fallen) {
 	}
 	Log("coop: %s went down while %s waited on it -- the sequence undone", HeroName(fallen), HeroName(up));
 	int before = g_lock.hero == up ? g_lock.pic.leader
-	           : g_seqHero == up && SequenceUnderWay() ? g_seqPic.leader : -1;   // (a corkscrew's ride kept, freedom)
+	           : g_seqHero == up && SequenceUnderWay() ? g_seqPic.leader : -1;   // (a corkscrew's ride kept, no-lock)
 	UndoLock(t, up, true);
 	return before;
 }
@@ -2109,7 +2109,7 @@ static void WatchPendingLead(Trio t) {
 // companion's walk to its end (0x481C, AI order 1), the jump off at the end
 // (0x0C09: the leader's own; the companion's AI order 2) and the helmets on the
 // way. LV3-6: the light pillar's circle had handed Obelix the lead (4801); in
-// freedom mode Asterix rode on to the end and stayed on the car, his jump off an
+// no-lock mode Asterix rode on to the end and stayed on the car, his jump off an
 // AI order not followed, the helmets not his. The rider takes the lead the next
 // frame -- before the walk order (0.3 s later), as in a ride boarded leading.
 int g_telepherRider = -1;
@@ -2158,7 +2158,7 @@ static void WatchTelepherRider(Trio t) {
 	GiveLead(t, who);
 }
 
-// Freedom mode, the rotary beam's catch: trio 0x0C02 from the beam (0x53F348;
+// No-lock mode, the rotary beam's catch: trio 0x0C02 from the beam (0x53F348;
 // FUN_00481d50 case 2) hangs the companion on it (AI order 8) only while its order
 // is 3, "wait here", and it is within the trio's +0x50 of the beam. The circle's
 // wait gives Asterix that 3 (LV2-8: the platform's pillar), but a lead switch since
@@ -2180,10 +2180,10 @@ static void WatchCorkLaunch(Trio t) {
 	if (!g_corkRide.jumping && GetTickCount() - g_corkRide.launched < 3000) return;   // (the jump not begun yet)
 	g.held[idx] = false;
 	g_corkRide = {};
-	Log("coop: freedom: %s landed from the corkscrew's launch -- back to its player (AI order %d)", HeroName(idx), (int)h.Order());
+	Log("coop: nolock: %s landed from the corkscrew's launch -- back to its player (AI order %d)", HeroName(idx), (int)h.Order());
 }
 
-DWORD g_beamJumpAt[2] = {};   // a player's hero's last jump (body 0x0E), set by WatchFreedomBeam
+DWORD g_beamJumpAt[2] = {};   // a player's hero's last jump (body 0x0E), set by WatchNoLockBeam
 struct BeamCatch { int hero = -1; uint8_t order = 0; bool sliced = false; uint8_t leader = 0, companion = 0; bool drop = false; } g_beamCatch;
 
 bool CoopBeamCatchBegin(int ev, void* caller) {
@@ -2199,7 +2199,7 @@ bool CoopBeamCatchBegin(int ev, void* caller) {
 		Log("coop: the rotary beam drops Asterix (leading) -- the companion for it");
 		return true;
 	}
-	if ((ev & 0xFFFF) != 0x0C02 || (uintptr_t)caller != 0x53F348 || !g_config.freedom || !g.p2Joined || g.suspended) return false;
+	if ((ev & 0xFFFF) != 0x0C02 || (uintptr_t)caller != 0x53F348 || !g_config.noLock || !g.p2Joined || g.suspended) return false;
 	if (!h || (a != g.p1Hero && a != g.p2Hero) || g.held[a] || GetTickCount() - g_beamJumpAt[a] > 1000) return false;
 	uint8_t* tr = (uint8_t*)t.raw();
 	uint8_t* order = (uint8_t*)(h.raw() + 0x564);
@@ -2211,7 +2211,7 @@ bool CoopBeamCatchBegin(int ev, void* caller) {
 		tr[0x2D] = (uint8_t)a;
 	}
 	*order = AI_WAIT;
-	Log("coop: freedom: Asterix jumped as the rotary beam came (AI order %d%s) -- taken as waiting for its catch",
+	Log("coop: nolock: Asterix jumped as the rotary beam came (AI order %d%s) -- taken as waiting for its catch",
 	    g_beamCatch.order, leads ? ", leading: the companion for it" : "");
 	return true;
 }
@@ -2262,7 +2262,7 @@ void CoopRideSliceEnd(bool began) {
 	}
 }
 
-// Freedom mode and the rotary beam (CKHkRotaryBeam 2,57; LV4-2): the level asks
+// No-lock mode and the rotary beam (CKHkRotaryBeam 2,57; LV4-2): the level asks
 // the hero on its circle to hang on it (beam event 0x0C02 -> AI order 8) when the
 // beam is over him (+8 bit 2). A player's jump never catches it -- only the AI's
 // order 8 does. So the player's jump (body 0x0E) hands the hero to the game for
@@ -2271,8 +2271,8 @@ void CoopRideSliceEnd(bool began) {
 // swinging (+0x2C speed < 0.2, +0x28 angle within 0.02 of +0x3C), and only then
 // sends 0x0C02 (state 2) -- the order came long after the beam was there. A jump
 // under it cuts the delay; a jump up to 1 s before the order still counts.
-static void WatchFreedomBeam(Trio t) {
-	if (!g_config.freedom || !t || !g.p2Joined || g.suspended) return;
+static void WatchNoLockBeam(Trio t) {
+	if (!g_config.noLock || !t || !g.p2Joined || g.suspended) return;
 	DWORD* s_jumpAt = g_beamJumpAt;
 	const int players[2] = { g.p1Hero, g.p2Hero };
 	for (int idx : players) {
@@ -2284,14 +2284,14 @@ static void WatchFreedomBeam(Trio t) {
 		if (!b || (*(uint32_t*)(b + 8) & 7) != 4 || *(float*)(b + 0x20) <= 0.0f) continue;
 		for (int idx : players)
 			if (GetTickCount() - s_jumpAt[idx] < 300 && !g.held[idx]) {
-				Log("coop: freedom: %s jumped under the rotary beam -- its wait (%.2f s) cut", HeroName(idx), *(float*)(b + 0x20));
+				Log("coop: nolock: %s jumped under the rotary beam -- its wait (%.2f s) cut", HeroName(idx), *(float*)(b + 0x20));
 				*(float*)(b + 0x20) = 0.0f;
 			}
 	}
 	for (int idx : players) {
 		Hero h = t.GetHero(idx);
 		if (!h || g.held[idx] || h.Order() != AI_HANG_ON_BEAM || GetTickCount() - s_jumpAt[idx] > 1000) continue;
-		Log("coop: freedom: %s jumped for the rotary beam -- the game's for the ride", HeroName(idx));
+		Log("coop: nolock: %s jumped for the rotary beam -- the game's for the ride", HeroName(idx));
 		Hold(t, idx, "jumped for the rotary beam", true);
 		if (g.held[idx]) g_beamRider = idx;
 	}
@@ -2322,7 +2322,7 @@ static void UndoLock(Trio t, int up, bool lead) {
 	int before = g_lock.hero == up ? g_lock.pic.leader : -1;
 	if (g_lock.hero == up) RestoreLockPicture(g_lock.pic);
 	else if (g_seqHero == up && SequenceUnderWay()) {
-		// (a corkscrew's ride in freedom mode: its lock ended at 03C8, the hero kept)
+		// (a corkscrew's ride in no-lock mode: its lock ended at 03C8, the hero kept)
 		before = g_seqPic.leader;
 		UndoSequence();
 	}
@@ -2365,14 +2365,14 @@ static void UnlockByPlayer(Trio t, int me, const char* player) {
 	}
 }
 
-// Freedom mode: the level has given `hero` a scripted order the mode leaves
+// No-lock mode: the level has given `hero` a scripted order the mode leaves
 // unfollowed (a wait, a walk to a marker) -- it would be waiting now.
-bool CoopFreedomWaiting(int hero) {
+bool CoopNoLockWaiting(int hero) {
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(hero) : Hero();
-	if (!g_config.freedom || !h || g.held[hero] || t.Leader() == hero) return false;
+	if (!g_config.noLock || !h || g.held[hero] || t.Leader() == hero) return false;
 	int o = (int)h.Order();
-	return IsScriptedOrder(o) && !FreedomLetsHold(o);
+	return IsScriptedOrder(o) && !NoLockLetsHold(o);
 }
 
 void CoopUnlockHero(int hero) {
@@ -2479,18 +2479,18 @@ static void WatchStrandedCar() {
 // The hero kept off cable cars now: the lifter waits for it, or its car was just sent back. Else -1.
 static int KeptOffCars() { return g.lifterWaitsFor >= 0 ? g.lifterWaitsFor : g_carWatch.keptOff; }
 
-// A 0x4802 freedom mode keeps (g_freedomLock): the boss's own, or the waiter on a
+// A 0x4802 no-lock mode keeps (g_keptLock): the boss's own, or the waiter on a
 // corkscrew's circle -- its node within 4 units (LV3-6's pillar: 0.4).
-static void NoteFreedomLock(Trio t, int waiter) {
+static void NoteKeptLock(Trio t, int waiter) {
 	extern void* g_trioEventCaller;
-	if (!g_config.freedom) return;
+	if (!g_config.noLock) return;
 	Hero h = t.GetHero(waiter);
 	if (!h) return;
 	if ((uintptr_t)g_trioEventCaller == 0x4F317E) {
-		g_freedomLock = { waiter, GetTickCount(), "on the boss's button" };
+		g_keptLock = { waiter, GetTickCount(), "on the boss's button" };
 		return;
 	}
-	if (!g_config.freedomCorkscrews) return;
+	if (!g_config.noLockExceptCorkscrews) return;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 44); i < n; i++) {
 		char* c = (char*)GetLvlObject(2, 44, i);
 		char* node = c ? *(char**)(c + 0x10) : nullptr;
@@ -2499,9 +2499,9 @@ static void NoteFreedomLock(Trio t, int waiter) {
 		const float* p = (const float*)(fr + 0x80);
 		float dx = h.Pos().x - p[0], dz = h.Pos().z - p[2];
 		if (dx * dx + dz * dz < 4.0f * 4.0f && fabsf(h.Pos().y - p[1]) < 4.0f) {
-			g_freedomLock = { waiter, GetTickCount(), "a corkscrew's circle" };
+			g_keptLock = { waiter, GetTickCount(), "a corkscrew's circle" };
 			g_corkRide = { waiter, c };
-			Log("coop: freedom: %s waits on corkscrew %p (%.1f units off)", HeroName(waiter), c, sqrtf(dx * dx + dz * dz));
+			Log("coop: nolock: %s waits on corkscrew %p (%.1f units off)", HeroName(waiter), c, sqrtf(dx * dx + dz * dz));
 			return;
 		}
 	}
@@ -2563,7 +2563,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 			int waiter = tl.Leader() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
 			NoteLock(waiter, "the companion told to wait");
 			if (g_lock.hero == waiter) g_lock.wait = true;
-			NoteFreedomLock(tl, waiter);
+			NoteKeptLock(tl, waiter);
 		}
 	}
 	SpyWalk& w = g_spyWalk;
@@ -3121,9 +3121,9 @@ void CoopFrame() {
 	WatchLifterHint(t);
 	WatchPendingLead(t);
 	WatchTelepherRider(t);
-	WatchFreedomBeam(t);
+	WatchNoLockBeam(t);
 	WatchCorkLaunch(t);
-	FreedomFrame();
+	NoLockRomansFrame();
 	WatchUnfinishedSequence(t);
 	WatchStrandedCar();
 	WatchSpyWalk(t, now);

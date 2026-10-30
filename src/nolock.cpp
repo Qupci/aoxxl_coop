@@ -1,4 +1,4 @@
-#include "freedom.h"
+#include "nolock.h"
 #include "coop.h"
 #include "config.h"
 #include "kal.h"
@@ -11,9 +11,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-// Freedom mode's Romans ([coop_difficulty.experimental] freedom_romans): while
-// the level would have kept a player's hero waiting -- a scripted order freedom
-// mode leaves unfollowed (CoopFreedomWaiting) -- Romans come for it now and
+// No-lock mode's Romans ([coop_difficulty.experimental] nolock_romans): while
+// the level would have kept a player's hero waiting -- a scripted order no-lock
+// mode leaves unfollowed (CoopNoLockWaiting) -- Romans come for it now and
 // then, so the free player has something to do until the other lifts the wait.
 //
 // Romans come from a squad's pools: vf55 (CKGrpSquadEnemy, the squad script's
@@ -120,7 +120,7 @@ bool SpawnPoint(Trio t, Hero h, Vector3* at, const char** how) {
 	}
 	static int s_told = 0;
 	if (s_told++ < 5)
-		Log("freedom: spawn markers within %.0f units of %s: %d -- %d by a hero, %d in view, %d not walkable to; its walk-to "
+		Log("nolock: spawn markers within %.0f units of %s: %d -- %d by a hero, %d in view, %d not walkable to; its walk-to "
 		    "marker %.0f units off%s%s", kReach, HeroName(t.GetHero(HERO_ASTERIX).raw() == h.raw() ? HERO_ASTERIX : HERO_OBELIX),
 		    total, nearHero, seen, unreachable, sqrtf(dt), byHero ? ", by a hero" : "", InAView(tg) ? ", in view" : "");
 	return false;
@@ -131,13 +131,13 @@ void SpawnFor(int hero, Trio t, Hero h) {
 	int pool = -1;
 	char* sq = SquadFor(h.Pos(), &pool);
 	if (!sq) {
-		if (w.noneTold++ < 3) Log("freedom: no active squad with Romans to send for %s", HeroName(hero));
+		if (w.noneTold++ < 3) Log("nolock: no active squad with Romans to send for %s", HeroName(hero));
 		return;
 	}
 	Vector3 at;
 	const char* how = "";
 	if (!SpawnPoint(t, h, &at, &how)) {
-		if (w.noneTold++ < 3) Log("freedom: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
+		if (w.noneTold++ < 3) Log("nolock: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
 		return;
 	}
 	uint32_t args[3] = { 1, (uint32_t)(uintptr_t)&at, (uint32_t)pool };
@@ -150,7 +150,7 @@ void SpawnFor(int hero, Trio t, Hero h) {
 	((CmdFn)(*(void***)sq)[55])(sq, nullptr, args);
 	char alive1 = *(char*)(rec + 0x11);
 	w.sent++;
-	Log("freedom: a Roman of squad %p (pool %d) sent at %s from %s (%.1f %.1f %.1f): alive %d -> %d [%d/%d]", sq, pool,
+	Log("nolock: a Roman of squad %p (pool %d) sent at %s from %s (%.1f %.1f %.1f): alive %d -> %d [%d/%d]", sq, pool,
 	    HeroName(hero), how, at.x, at.y, at.z, alive0, alive1, w.sent, kMaxPerWait);
 }
 
@@ -159,7 +159,7 @@ void SpawnFor(int hero, Trio t, Hero h) {
 // pools: alive / sent / to defeat, spawn markers).
 void DumpAround(int hero, Hero h) {
 	const Vector3& tg = h.AiTargetPos();
-	Log("freedom: %s at (%.1f %.1f %.1f), order %d to (%.1f %.1f %.1f)", HeroName(hero), h.Pos().x, h.Pos().y, h.Pos().z,
+	Log("nolock: %s at (%.1f %.1f %.1f), order %d to (%.1f %.1f %.1f)", HeroName(hero), h.Pos().x, h.Pos().y, h.Pos().z,
 	    (int)h.Order(), tg.x, tg.y, tg.z);
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 		char* sq = (char*)GetLvlObject(4, 26, i);
@@ -168,7 +168,7 @@ void DumpAround(int hero, Hero h) {
 		Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
 		if ((c - h.Pos()).len2() > 60.0f * 60.0f) continue;
 		char buf[400];
-		int k = sprintf(buf, "freedom:   squad #%u %p box centre (%.1f %.1f %.1f) size %.0fx%.0f active %d markers %u pools:", i, sq,
+		int k = sprintf(buf, "nolock:   squad #%u %p box centre (%.1f %.1f %.1f) size %.0fx%.0f active %d markers %u pools:", i, sq,
 		                c.x, c.y, c.z, f[0x47] - f[0x4A], f[0x49] - f[0x4C], (*(uint8_t*)(sq + 0x152) >> 1) & 1,
 		                *(char**)(sq + 0x5C) ? *(unsigned*)(sq + 0x64) : 0);
 		char* recs = *(char**)(sq + 0x144);
@@ -182,17 +182,17 @@ void DumpAround(int hero, Hero h) {
 
 } // namespace
 
-void FreedomFrame() {
-	if (!g_config.freedom || !g_config.freedomRomans || !CoopP2Joined() || CoopSuspended()) return;
+void NoLockRomansFrame() {
+	if (!g_config.noLock || !g_config.noLockRomans || !CoopP2Joined() || CoopSuspended()) return;
 	Trio t = GetTrio();
 	if (!t) return;
 	DWORD now = GetTickCount();
 	for (int hero = HERO_ASTERIX; hero <= HERO_OBELIX; hero++) {
 		Hero h = t.GetHero(hero);
 		Waiting& w = g_wait[hero];
-		bool waiting = h && CoopFreedomWaiting(hero);
+		bool waiting = h && CoopNoLockWaiting(hero);
 		if (waiting != w.on) {
-			Log("freedom: %s %s", HeroName(hero),
+			Log("nolock: %s %s", HeroName(hero),
 			    waiting ? "would be kept waiting by the level -- Romans will come for it"
 			            : "is no longer kept waiting -- no more Romans for it");
 			w = Waiting();

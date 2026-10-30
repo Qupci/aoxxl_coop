@@ -118,9 +118,9 @@ static int CatapultHitter(char* cat, Trio t) {
 // The one hero a block is for (+0x14 bit 6 Asterix, bit 7 Obelix; it offers its
 // push or pull, 0x900 to trio vf25, only while that hero leads), else -1. LV2-8's
 // platform under a light pillar is Obelix's to pull with Asterix on the pillar:
-// in freedom mode Asterix stands there as a player's hero, the nearest, and the
+// in no-lock mode Asterix stands there as a player's hero, the nearest, and the
 // platform ticked with him as the leader never offered Obelix its "Pull" (with
-// freedom off he is the game's, and nothing is sliced).
+// nolock off he is the game's, and nothing is sliced).
 static int BlockHero(char* block) {
 	uint8_t f = *(uint8_t*)(block + 0x14) & 0xC0;
 	return f == 0x40 ? HERO_ASTERIX : f == 0x80 ? HERO_OBELIX : -1;
@@ -259,7 +259,7 @@ void TickPlate(int* life, void* dt, char* plate, Trio t) {
 // check: the companion's ground, trio 0xB01, is the corkscrew's; then 0x0C09 ->
 // 4805, the companion's AI order 2). With Obelix leading, Asterix on the circle
 // set nothing off, and Obelix on it set it off for Asterix wherever he stood
-// (locked there by freedom_corkscrews when near). Its landing is now checked
+// (locked there by nolock_except_corkscrews when near). Its landing is now checked
 // with that hero posing as the leader; after the event the trio has him as the
 // companion anyway, as in single player.
 int CorkscrewHero(char* cork) {
