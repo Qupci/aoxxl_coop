@@ -1137,17 +1137,52 @@ bool PatchBeaconCheck() {
 	return true;
 }
 
-// Placed bonuses (helmets on beacons) per frame: pool +0x2C, 25 for level 3's
-// helmets out of 50 bonus objects (the rest serve dropped ones). Two views see
-// about twice as many beacons; with the split screen up the pool may place
-// three quarters as many again (still leaving some for drops), so that player 1's view does not take player 2's share.
+// Placed bonuses (helmets on beacons) per frame: pool +0x2C, 20-25 out of 50
+// bonus objects (the rest serve dropped ones). Two views see about twice as many
+// beacons: three quarters more (35 of 50) still left LV1-2's far helmets on
+// player 1's half to come and go as either camera turned (46 in the two views).
+// With the split screen up the pool places as many as it has free, and a drop
+// that finds none takes back the beacon's bonus placed last (PoolSpawnHook).
+bool PoolSplit() { return CoopP2Joined() && !CoopSuspended() && KlusterSplitUp(); }
 struct PoolCap {
 	char* pool; unsigned saved;
 	explicit PoolCap(void* p) : pool((char*)p), saved(*(unsigned*)((char*)p + 0x2C)) {
-		if (CoopP2Joined() && !CoopSuspended() && KlusterSplitUp()) *(unsigned*)(pool + 0x2C) = saved + saved * 3 / 4;
+		if (PoolSplit()) *(unsigned*)(pool + 0x2C) = 0xFFFF;
 	}
 	~PoolCap() { *(unsigned*)(pool + 0x2C) = saved; }
 };
+
+// Shared vf29 of both pools (0x54C790, thiscall(pool, arg), ret 4): a dropped
+// bonus (a beaten Roman's helmets) moves from the free list +0x38 to the active
+// list +0x30; with none free, nothing drops. Under PoolCap the beacons may have
+// taken them all: the head of +0x34 (placed last, so ranked last) that is not
+// flying to a hero (vf19) is freed the way vf27 frees them each frame (vf22).
+const size_t    kPoolSpawnSlot = 29;
+const uintptr_t kPoolSpawn     = 0x54C790;
+typedef void*(__fastcall* SpawnFn)(void* self, void* edx, void* arg);
+SpawnFn g_origPoolSpawn = nullptr;
+
+void* __fastcall PoolSpawnHook(void* self, void* edx, void* arg) {
+	char* pool = (char*)self;
+	if (!*(char**)(pool + 0x38) && PoolSplit()) {
+		typedef char(__fastcall* BoolFn)(void* self, void* edx);
+		typedef void(__fastcall* VoidFn)(void* self, void* edx);
+		char** link = (char**)(pool + 0x34);
+		for (char* b = *link; b; link = (char**)(b + 0x14), b = *link) {
+			if (((BoolFn)(*(void***)b)[19])(b, nullptr)) continue;
+			*link = *(char**)(b + 0x14);
+			((VoidFn)(*(void***)b)[22])(b, nullptr);
+			*(char**)(b + 0x14) = nullptr;
+			*(char**)(pool + 0x38) = b;
+			static long n = 0;
+			if (++n <= 8 || n % 100 == 0)
+				Log("proximity: bonus pool %p (handler %u): no free bonus for a drop, the beacon's %p taken back (%ld)", pool,
+				    *(uint8_t*)(pool + 0x28), b, n);
+			break;
+		}
+	}
+	return g_origPoolSpawn(self, edx, arg);
+}
 void LogPoolOnce(void* self) {
 	static void* logged[32];
 	static int nLogged = 0;
@@ -2023,6 +2058,10 @@ bool ProximityInstallHooks() {
 	ok &= PatchVtableSlot(kAsterixBonusPoolVtbl, kPoolUpdateSlot, kAsterixBonusPoolUpdate,
 	                      (void*)AsterixPoolUpdateHook, (void**)&g_origAsterixPoolUpdate,
 	                      "CKGrpAsterixBonusPool::update");
+	ok &= PatchVtableSlot(kBonusPoolVtbl, kPoolSpawnSlot, kPoolSpawn, (void*)PoolSpawnHook, (void**)&g_origPoolSpawn,
+	                      "CKGrpBonusPool::spawn");
+	ok &= PatchVtableSlot(kAsterixBonusPoolVtbl, kPoolSpawnSlot, kPoolSpawn, (void*)PoolSpawnHook, (void**)&g_origPoolSpawn,
+	                      "CKGrpAsterixBonusPool::spawn");
 	ok &= PatchCallSite(kPairCallSite, kPairCallBytes, sizeof(kPairCallBytes),
 	                    (void*)PairContactDispatch, "collision contacts (0x300)");
 	ok &= PatchCallSite(kTargetCallSite, kTargetCallBytes, sizeof(kTargetCallBytes),

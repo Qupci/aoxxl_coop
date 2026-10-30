@@ -2843,3 +2843,37 @@ both halves).
   2) and catapultcomboa (-Level 3, XXL_P2HERO=asterix, Obelix leads via 4801: A 2 a blow, O 0). Same direct-add
   pattern, not looked at in co-op yet: CKHkJetPackRoman::vf28 (0x4E25A0) and CKHkMobileTower::vf28 (0x4EB170),
   Roman state code that runs in the squads' tick (the leader's stats, or the posing hero's slice).
+- Round 158 (user, screenshots\attachments\Pasted image 20261026204437/38.png: LV1-2, P1's Asterix at 2.6 -7.4
+  117.2, P2's Obelix at 24.4 -2.4 122.1 -- the helmets at -45.8 -14.4 140.0 came and went on P1's half as either
+  camera turned; and Caesar's Challenge level 1: crates on Asterix's way to -257.7 29.8 609.2 came in only as he
+  walked up, some as Obelix's camera turned). Two capacities.
+  (1) Helmets. CKGrpBonusPool vf27 (0x54C380) frees every beacon bonus (+0x34) each frame and places them again
+  from the free list +0x38 in the kluster query's order until the cap +0x2C (20 here) or the free list runs out;
+  drops take from the same free list (shared vf29 0x54C790, thiscall(pool, arg), ret 4: +0x38 head -> +0x30,
+  vf17 0x44 places it). Round 22's split cap (x 7/4 = 35 of 50) was too small: the two views saw up to 46 beacons
+  and the far group (9 beacons, 7th in the list, 31 before it) got 4-8 (45 of 188 log samples). Now the split cap
+  is 0xFFFF (the free list is the limit) and vf29 is hooked on both pool vtables (slot 29): in split, with the
+  free list empty, it takes back the head of +0x34 (placed last = ranked last) that is not flying to a hero
+  (vf19), freed the way vf27 does (vf22, onto +0x38), then spawns. Autotests helmets12 (-Level 1; XXL_KLOG=
+  -45.8,140.0; new step P1R = player 1's right stick through the camera service's input view +0x580 remap, as
+  CoopP2CameraValues): after, 188 of 188 samples 9 of 9; helmets12d (new S_POOLHOLD holds a pool's free bonuses
+  as if in flight; P1's Asterix beats a beach Roman): "taken back" twice, the drop spawned, far group still 9.
+  (2) Crates. CKCrateCpnt::vf13 (0x542AB0, thiscall(cpnt, handler, ?), ret 8; slot 13 of vt 0x6291E0) queries
+  flags 7: loop 1 frees the objects of the outside klusters' beacons (live bit cleared, FUN_00544BC0/CE0 +
+  FUN_00544B00), loop 2 gives free objects (CKHkCrate, list (cpnt +4)->vf12, next +4, beacon +0x58, -1 free) to
+  the inside beacons nearest first and stops at the first it cannot serve. An object stays with its kluster while
+  it is in any view: far crates in P2's view held objects that nearer ones in P1's waited for. Beacon bits: the
+  beacon service (yp +0x78) +0x18 records (0x40 each; entry +0x13 the sector) have a bit array at +0x28; beacon
+  i's bits at entry +0x11 * i + entry +0x16: three of pieces left (FUN_00542E40), +6 live (FUN_00542E90);
+  FUN_00505260 resolves a descriptor (entry +0x13..+0x15, index). CC level 1: handler 3 has 26 objects, handler 4
+  10; before, 0 of 26 free and 4-10 crates in view without an object for the whole run. Now (klusters.cpp, split
+  query only) a crate query's sorted list is cut where the beacons holding or wanting an object reach the object
+  count, the rest passed as outside (loop 1 frees theirs). Without hysteresis two klusters at the cut traded
+  objects every frame while P2's camera swung after the warp (76 hand-overs that second, 4 without the cut), so:
+  klusters with crates standing rank a quarter nearer (kCrateLiveRank 0.75), one handed objects is not cut for
+  1.5 s (kCrateHoldMs), and the fair merge counts the crates' needy beacons instead of +0xC -> 24 (handler 4,
+  untouched, 11-16 the same second). Bounded logs: "N in view without an object", "objects handed to another crate
+  in the last second", "klusters past the N objects passed as outside". Autotest crates1cc (-Level 1 -GameDir
+  "SPQR\Caesars Challenge" -NoDeploy after deploying to Game Files: the CC asi is the user's hardlink; P2's R3 + A
+  warp, Asterix placed a step ahead, glide; S_CRATE b = -3 lists every crate object): a near crate by the river
+  missing during the walk before, there after; the same at the target. crates44 (45 objects, no cut) unchanged.

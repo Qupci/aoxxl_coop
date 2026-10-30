@@ -99,6 +99,126 @@ void Insert(Entry*& head, Entry* e, uint32_t key, bool sorted) {
 	else head = e;
 }
 
+// Crates. CKCrateCpnt::vf13 (0x542AB0, thiscall(cpnt, handler, ?), ret 8) asks
+// for its klusters with flags 7: the beacons of those outside every view lose
+// their crate objects (CKHkCrate: list (cpnt +4)->vf12, next +4, beacon +0x58,
+// -1 free), then those inside get free objects, nearest first, until none is
+// left. An object stays with its crate while the kluster is in a view, however
+// far: with two views the far crates held them while nearer ones on the other
+// half waited (Caesar's Challenge level 1: they came in as Asterix walked up, or
+// as player 2's camera turned away). The klusters past the objects there are
+// are now passed as outside, so the game's own pass frees theirs.
+const uintptr_t kCrateVtbl       = 0x6291E0;
+const size_t    kCrateUpdateSlot = 13;
+const uintptr_t kCrateUpdate     = 0x542AB0;
+typedef void(__fastcall* CrateUpdateFn)(void* self, void* edx, int handler, int arg);
+CrateUpdateFn g_origCrateUpdate = nullptr;
+char*  g_crateCpnt = nullptr;     // during its vf13
+Entry* g_crateInside = nullptr;   // the crate query's answer, for the log after vf13
+// Two klusters at the cut traded objects every frame while a camera swung (76
+// hand-overs in the second after a warp, 4 without the cut): a kluster with
+// crates standing ranks as if a quarter nearer, and one handed objects keeps
+// them for kCrateHoldMs.
+const float kCrateLiveRank = 0.75f;
+const DWORD kCrateHoldMs   = 1500;
+struct CrateGiven { Entry* e; DWORD at; };
+CrateGiven g_crateGiven[256];
+DWORD* CrateGivenAt(Entry* e, bool add) {
+	CrateGiven* oldest = &g_crateGiven[0];
+	for (CrateGiven& g : g_crateGiven) {
+		if (g.e == e) return &g.at;
+		if (!g.e || g.at < oldest->at) oldest = &g;
+	}
+	if (!add) return nullptr;
+	oldest->e = e;
+	oldest->at = 0;
+	return &oldest->at;
+}
+
+// A beacon's bits: the beacon service's sector record (svc +0x18, 0x40 bytes,
+// the entry's sector at +0x13) has a bit array at +0x28; beacon i's bits start
+// at entry +0x11 (bits per beacon) * i + entry +0x16: three of pieces left, and
+// +6 set while a crate object stands for it.
+bool Bit(const uint8_t* a, unsigned i) { return (a[i >> 3] >> (i & 7)) & 1; }
+// Beacons of `e` holding or wanting a crate object; *waiting counts the wanting.
+unsigned CrateNeeds(char* svc, Entry* e, unsigned* waiting) {
+	char* recs = *(char**)(svc + 0x18);
+	char* rec = recs ? recs + *((uint8_t*)e + 0x13) * 0x40 : nullptr;
+	const uint8_t* a = rec && *(void**)rec ? *(const uint8_t**)(rec + 0x28) : nullptr;
+	if (!a) return 0;
+	unsigned n = *(unsigned*)((char*)e + 0xC), per = *((uint8_t*)e + 0x11), base = *(uint16_t*)((char*)e + 0x16);
+	unsigned need = 0;
+	for (unsigned i = 0; i < n; i++) {
+		unsigned b = (per * i + base) & 0xFFFF;
+		bool live = Bit(a, b + 6);
+		bool pieces = Bit(a, b) || Bit(a, b + 1) || Bit(a, b + 2);
+		if (live || pieces) need++;
+		if (!live && pieces && waiting) ++*waiting;
+	}
+	return need;
+}
+
+unsigned CrateObjects(char* cpnt, unsigned* freeN) {
+	typedef char**(__fastcall* ListFn)(void* self, void* edx);
+	char* owner = *(char**)(cpnt + 4);
+	char** head = owner ? ((ListFn)(*(void***)owner)[12])(owner, nullptr) : nullptr;
+	unsigned n = 0;
+	for (char* o = head ? *head : nullptr; o && n < 4096; o = *(char**)(o + 4)) {
+		n++;
+		if (*(int*)(o + 0x58) == -1) ++*freeN;
+	}
+	return n;
+}
+
+void __fastcall CrateUpdateHook(char* self, void* edx, int handler, int arg) {
+	// Objects handed to another crate this update (a crate gone here, one come there).
+	typedef char**(__fastcall* ListFn)(void* self, void* edx);
+	const int kMaxObj = 128;
+	int before[kMaxObj];
+	char* owner = *(char**)(self + 4);
+	char** head = owner ? ((ListFn)(*(void***)owner)[12])(owner, nullptr) : nullptr;
+	int nObj = 0;
+	for (char* o = head ? *head : nullptr; o && nObj < kMaxObj; o = *(char**)(o + 4)) before[nObj++] = *(int*)(o + 0x58);
+	g_crateCpnt = self;
+	g_crateInside = nullptr;
+	g_origCrateUpdate(self, edx, handler, arg);
+	g_crateCpnt = nullptr;
+	if (!g_crateInside) return;
+	static unsigned moves[256];
+	static DWORD since[256];
+	static long movesLogged = 0;
+	int i = 0;
+	for (char* o = head ? *head : nullptr; o && i < nObj; o = *(char**)(o + 4), i++)
+		if (*(int*)(o + 0x58) != before[i] && *(int*)(o + 0x58) != -1) moves[handler & 0xFF]++;
+	DWORD now = GetTickCount();
+	if (now - since[handler & 0xFF] >= 1000) {
+		if (moves[handler & 0xFF] && movesLogged < 60) {
+			movesLogged++;
+			Log("klusters: crates (handler %d): %u objects handed to another crate in the last second", handler & 0xFF,
+			    moves[handler & 0xFF]);
+		}
+		moves[handler & 0xFF] = 0;
+		since[handler & 0xFF] = now;
+	}
+	// Crates in view still without an object after the update: they show late.
+	CKYellowPages* yp = YellowPages();
+	char* bsvc = yp ? *(char**)((char*)yp + 0x78) : nullptr;
+	unsigned waiting = 0, freeN = 0, n = 0;
+	for (Entry* e = g_crateInside; bsvc && e && n < 1024; e = e->next, n++) CrateNeeds(bsvc, e, &waiting);
+	unsigned objects = CrateObjects(self, &freeN);
+	static int lastWaiting[256];
+	static bool primed = false;
+	static long logged = 0;
+	if (!primed) { primed = true; memset(lastWaiting, 0xFF, sizeof(lastWaiting)); }
+	int& last = lastWaiting[handler & 0xFF];
+	if ((int)(waiting > 0) != last && logged < 40) {
+		logged++;
+		Log("klusters: crates (handler %d): %u in view without an object, %u of %u objects free", handler & 0xFF, waiting,
+		    freeN, objects);
+	}
+	last = waiting > 0;
+}
+
 // FUN_0046DED0, with the union frustum (see the top of the file).
 Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, Entry** outside,
                             const float* ref) {
@@ -133,6 +253,7 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 	static Entry* fe[kMaxFair];
 	static float fd[kMaxFair][kViews + 1];
 	static uint32_t fr[kMaxFair];
+	static unsigned fn[kMaxFair];   // objects a kluster counts for in the merge
 	int nf = 0;
 	bool fair = !ref && (flags & 2);
 	for (char* sector = next(mgr, nullptr, nullptr); sector; sector = next(mgr, nullptr, sector)) {
@@ -168,8 +289,15 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 				if (!in1) InterlockedIncrement(&g_p2Only);
 				if (fair && nf < kMaxFair) {
 					fe[nf] = e;
-					fd[nf][0] = in1 ? Manhattan(c, ref1) : 1e30f;
-					for (int v = 0; v < kViews; v++) fd[nf][v + 1] = inV[v] ? Manhattan(c, g_viewPos[v]) : 1e30f;
+					float rank = 1.0f;
+					unsigned waiting = 0;
+					fn[nf] = *(unsigned*)((char*)e + 0xC);
+					if (g_crateCpnt && flags == 7) {   // crates: the ones holding or wanting an object
+						fn[nf] = CrateNeeds(self, e, &waiting);
+						if (fn[nf] > waiting) rank = kCrateLiveRank;
+					}
+					fd[nf][0] = in1 ? Manhattan(c, ref1) * rank : 1e30f;
+					for (int v = 0; v < kViews; v++) fd[nf][v + 1] = inV[v] ? Manhattan(c, g_viewPos[v]) * rank : 1e30f;
 					nf++;
 				} else {
 					Insert(inside, e, key, (flags & 2) != 0);
@@ -181,8 +309,9 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 	}
 	if (nf) {
 		// Rank per camera, then merge the rankings so every camera gets the same
-		// number of objects (a kluster entry counts its beacons at +0xC): the next
-		// place goes to the camera that has had the fewest so far.
+		// number of objects (a kluster entry counts its beacons at +0xC, crates the
+		// ones holding or wanting an object): the next place goes to the camera that
+		// has had the fewest so far.
 		const int cams = kViews + 1;
 		for (int i = 0; i < nf; i++) fr[i] = 0xFFFFFFFFu;
 		static int order[kViews + 1][kMaxFair];
@@ -201,13 +330,47 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 			if (best < 0) break;
 			int i = order[best][at[best]++];
 			fr[i] = pos;
-			unsigned beacons = *(unsigned*)((char*)fe[i] + 0xC);
-			given[best] += beacons ? beacons : 1;
+			given[best] += fn[i] ? fn[i] : 1;
 		}
 		for (int i = 0; i < nf; i++) Insert(inside, fe[i], 0xFFFFFFFFu - fr[i], true);
 	}
+	if (g_crateCpnt && flags == 7) {
+		// Crates: the klusters past the objects there are go outside (CrateUpdateHook),
+		// but not one handed its objects less than kCrateHoldMs ago.
+		DWORD now = GetTickCount();
+		unsigned freeN = 0, cap = CrateObjects(g_crateCpnt, &freeN), sum = 0, moved = 0;
+		Entry** link = &inside;
+		while (*link && sum < cap) {
+			unsigned waiting = 0;
+			sum += CrateNeeds(self, *link, &waiting);
+			if (waiting) *CrateGivenAt(*link, true) = now;
+			link = &(*link)->next;
+		}
+		while (Entry* e = *link) {
+			unsigned waiting = 0;
+			DWORD* at = CrateNeeds(self, e, &waiting) > waiting ? CrateGivenAt(e, false) : nullptr;
+			if (at && now - *at < kCrateHoldMs) {
+				link = &e->next;
+				continue;
+			}
+			*link = e->next;
+			Insert(out, e, 0, false);
+			moved++;
+		}
+		g_crateInside = inside;
+		static int lastMoved[256];
+		static bool primed = false;
+		static long logged = 0;
+		if (!primed) { primed = true; memset(lastMoved, 0xFF, sizeof(lastMoved)); }
+		int& last = lastMoved[handler & 0xFF];
+		if ((int)(moved > 0) != last && logged < 40) {
+			logged++;
+			Log("klusters: crates (handler %d): %u klusters past the %u objects passed as outside", handler & 0xFF, moved, cap);
+		}
+		last = moved > 0;
+	}
 	static const char* klog = getenv("XXL_KLOG");   // diagnostics: "x,z" of a point to follow
-	if (klog && flags == 3) {
+	if (klog && (flags & 3) == 3) {
 		static float wx = 0, wz = 0;
 		static bool parsed = false;
 		if (!parsed) { parsed = true; sscanf(klog, "%f,%f", &wx, &wz); }
@@ -324,6 +487,9 @@ long KlusterQueries() { return g_queries; }
 long KlusterP2Only() { return g_p2Only; }
 
 bool KlusterInstallHooks() {
-	return InstallDetour(kKlusterQuery, (void*)QueryHook, (void**)&g_origQuery, kKlusterQueryPrologue,
-	                     sizeof(kKlusterQueryPrologue), "beacon kluster query");
+	bool ok = InstallDetour(kKlusterQuery, (void*)QueryHook, (void**)&g_origQuery, kKlusterQueryPrologue,
+	                        sizeof(kKlusterQueryPrologue), "beacon kluster query");
+	ok &= PatchVtableSlot(kCrateVtbl, kCrateUpdateSlot, kCrateUpdate, (void*)CrateUpdateHook, (void**)&g_origCrateUpdate,
+	                      "CKCrateCpnt::update");
+	return ok;
 }

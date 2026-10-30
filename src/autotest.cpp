@@ -38,7 +38,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -107,6 +107,8 @@ struct Step {
 #define PROBE(t, on)                { t, S_PROBE, on, 0, 0, 0, 0, "probe" }
 // Right stick of virtual pad `slot` (camera look).
 #define VPADR(t, slot, x, y, n)     { t, S_VPADR, slot, 0, 0, x, y, n }
+// Player 1's right stick: the game camera's input (bindings 46-49).
+#define P1R(t, x, y, n)             { t, S_P1R, 0, 0, 0, x, y, n }
 // Puts hero `hero` next to lifter `lifter` (offset dx/dz, 1.5 units up).
 #define TELEPORT(t, hero, lifter, dx, dz) { t, S_TELEPORT, hero, lifter, 0, dx, dz, "teleport" }
 // Hero `hero` put at / moved frame by frame to a point given by its coordinates.
@@ -2989,6 +2991,63 @@ const Step kHelmets3[] = {
 	END(13500),
 };
 
+// helmets12 (-Level 1): the user's LV1-2 spot. Obelix found (both cutscenes
+// skipped as Enter does), player 1's Asterix (leading) at 2.6 -7.4 117.2,
+// player 2's Obelix at 24.4 -2.4 122.1; both turn their cameras. The placed
+// helmets at -45.8 -14.4 140.0 (53 units from Asterix) came and went on player
+// 1's half. XXL_KLOG=-45.8,140.0 follows their kluster.
+const Step kHelmets12[] = {
+	MARK(0, "baseline"), CINE_ENTER(200), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	{ 7000, S_PLACE, HERO_ASTERIX, 19, 0, 0, 0, "asterix to sector 2's zone" },
+	{ 9000, S_PLACE, HERO_ASTERIX, 20, 0, 0, 0, "asterix before the rectangle" },
+	GLIDE(9500, HERO_ASTERIX, 21, 1500),
+	CINE_ENTER(12000),
+	VPAD(17000, 1, PAD_START, 0, 0, "p2 start"), VPAD(17200, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(19000, HERO_ASTERIX, 2.614f, -7.371f, 117.215f), PLACEAT(19000, HERO_OBELIX, 24.378f, -2.403f, 122.115f),
+	{ 19000, S_WATCHBEACONS, 0, 0, 0, -45.809f, -14.426f, "watch the helmets", 139.981f },
+	SHOT(21000, "helmets12_0"),
+	P1R(21500, 0.35f, 0.0f, "p1 camera right"),
+	SHOT(22500, "helmets12_p1a"), SHOT(23500, "helmets12_p1b"), SHOT(24500, "helmets12_p1c"), SHOT(25500, "helmets12_p1d"),
+	SHOT(26500, "helmets12_p1e"), SHOT(27500, "helmets12_p1f"), SHOT(28500, "helmets12_p1g"), SHOT(29500, "helmets12_p1h"),
+	P1R(30000, 0.0f, 0.0f, "p1 camera still"),
+	VPADR(30500, 1, 0.35f, 0.0f, "p2 camera right"),
+	SHOT(31500, "helmets12_p2a"), SHOT(32500, "helmets12_p2b"), SHOT(33500, "helmets12_p2c"), SHOT(34500, "helmets12_p2d"),
+	SHOT(35500, "helmets12_p2e"), SHOT(36500, "helmets12_p2f"), SHOT(37500, "helmets12_p2g"), SHOT(38500, "helmets12_p2h"),
+	VPADR(39000, 1, 0.0f, 0.0f, "p2 camera still"),
+	END(40000),
+};
+
+// helmets12d (-Level 1): helmets12's spot with the helmet pool's (handler 6)
+// free bonuses held, as if in flight, so the beacons take every bonus left;
+// player 1's Asterix then beats the nearest Roman: its drops must take back
+// the bonuses of the beacons placed last.
+const Step kHelmets12D[] = {
+	MARK(0, "baseline"), CINE_ENTER(200),
+	{ 7000, S_PLACE, HERO_ASTERIX, 19, 0, 0, 0, "asterix to sector 2's zone" },
+	{ 9000, S_PLACE, HERO_ASTERIX, 20, 0, 0, 0, "asterix before the rectangle" },
+	GLIDE(9500, HERO_ASTERIX, 21, 1500),
+	CINE_ENTER(12000),
+	VPAD(17000, 1, PAD_START, 0, 0, "p2 start"), VPAD(17200, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(19000, HERO_ASTERIX, 2.614f, -7.371f, 117.215f), PLACEAT(19000, HERO_OBELIX, 24.378f, -2.403f, 122.115f),
+	{ 19000, S_WATCHBEACONS, 0, 0, 0, -45.809f, -14.426f, "watch the helmets", 139.981f },
+	{ 21000, S_POOLHOLD, 6, 1, 0, 0, 0, "hold the free helmets" },
+	{ 21500, S_POOLHOLD, 6, 1, 0, 0, 0, "hold the free helmets" },
+	NEAR_ENEMY(22000, HERO_ASTERIX), SHOT(22300, "helmets12d_0"),
+	P1(22500, PAD_X, 0, 0, "p1 X"), P1(22650, 0, 0, 0, "p1 r"), P1(23100, PAD_X, 0, 0, "p1 X"), P1(23250, 0, 0, 0, "p1 r"),
+	P1(23700, PAD_X, 0, 0, "p1 X"), P1(23850, 0, 0, 0, "p1 r"), { 24000, S_POOLHOLD, 6, 2, 0, 0, 0, "helmet pool" },
+	SHOT(24100, "helmets12d_1"),
+	P1(24300, PAD_X, 0, 0, "p1 X"), P1(24450, 0, 0, 0, "p1 r"), P1(24900, PAD_X, 0, 0, "p1 X"), P1(25050, 0, 0, 0, "p1 r"),
+	P1(25500, PAD_X, 0, 0, "p1 X"), P1(25650, 0, 0, 0, "p1 r"), { 25800, S_POOLHOLD, 6, 2, 0, 0, 0, "helmet pool" },
+	SHOT(25900, "helmets12d_2"),
+	NEAR_ENEMY(26500, HERO_ASTERIX),
+	P1(26800, PAD_X, 0, 0, "p1 X"), P1(26950, 0, 0, 0, "p1 r"), P1(27400, PAD_X, 0, 0, "p1 X"), P1(27550, 0, 0, 0, "p1 r"),
+	P1(28000, PAD_X, 0, 0, "p1 X"), P1(28150, 0, 0, 0, "p1 r"), { 28500, S_POOLHOLD, 6, 2, 0, 0, 0, "helmet pool" },
+	SHOT(28600, "helmets12d_3"), SHOT(30000, "helmets12d_4"),
+	{ 31000, S_POOLHOLD, 6, 0, 0, 0, 0, "give the helmets back" },
+	SHOT(32000, "helmets12d_5"),
+	END(33000),
+};
+
 // music5a / music5o (-Level 5): the fight at the start of level 5 (340.98
 // 11.13 246.87). a: the leader Asterix walks into it; o: player 2's Obelix
 // (not leading), Asterix stays back. Music events and streams are logged.
@@ -5705,6 +5764,28 @@ const Step kCam14[] = {
 	END(9000),
 };
 
+// crates1cc (-Level 1 -GameDir "SPQR\Caesars Challenge"): the user's Caesar's
+// Challenge level 1 -- its opening scene skipped, player 2 joins and warps
+// Obelix to Asterix (R3 + A; Obelix's camera turns to a door, away from the
+// crates), then Asterix walks past the crates to -257.7 29.8 609.2: crates there
+// came in only as he got near, some as Obelix turned his camera.
+#define CRATES1CC(t, n) { t, S_CRATE, 0, -3, 0, 0, 0, n }, SHOT(t, n)
+const Step kCrates1CC[] = {
+	MARK(0, "baseline"), CINE_ENTER(1500), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
+	VPAD(5000, 1, PAD_START, 0, 0, "p2 start"), VPAD(5200, 1, 0, 0, 0, "p2 release"),
+	VPAD(7000, 1, PAD_RTHUMB, 0, 0, "p2 R3"), VPAD(7100, 1, PAD_RTHUMB | PAD_A, 0, 0, "p2 R3 + A"), VPAD(7300, 1, 0, 0, 0, "p2 release"),
+	CRATES1CC(9500, "crates1cc_0"),
+	PLACEAT(9800, HERO_ASTERIX, -268.43f, 30.2f, 583.74f),   // a step ahead: the warp left them on one spot
+	GLIDEAT(10000, HERO_ASTERIX, -257.661f, 29.799f, 609.162f, 5000),
+	CRATES1CC(11000, "crates1cc_1"), CRATES1CC(12500, "crates1cc_2"), CRATES1CC(14000, "crates1cc_3"),
+	CRATES1CC(15500, "crates1cc_4"), CRATES1CC(17500, "crates1cc_5"),
+	VPADR(18000, 1, 0.35f, 0.0f, "p2 camera right"),
+	CRATES1CC(19000, "crates1cc_6"), CRATES1CC(20000, "crates1cc_7"), CRATES1CC(21000, "crates1cc_8"), CRATES1CC(22000, "crates1cc_9"),
+	VPADR(22500, 1, 0.0f, 0.0f, "p2 camera still"),
+	CRATES1CC(24000, "crates1cc_10"),
+	END(25000),
+};
+
 // pillar36l: the same circle's lock (4801, 4802 sent as its group does) with
 // Asterix on it: freedom mode keeps it (a corkscrew's circle; off with
 // XXL_FREEDOMCORK=0); R3 + B still frees him.
@@ -6477,6 +6558,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spitter44l", kSpitter44l),
 	SCENARIO("pillar36l", kPillar36l),
 	SCENARIO("cam14", kCam14),
+	SCENARIO("crates1cc", kCrates1CC),
 	SCENARIO("turnstile21b", kTurnstile21b),
 	SCENARIO("liftercar", kLifterCar),
 	SCENARIO("carpause", kCarPause),
@@ -6527,6 +6609,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("combop2", kComboP2),
 	SCENARIO("combop1", kComboP1),
 	SCENARIO("helmets3", kHelmets3),
+	SCENARIO("helmets12", kHelmets12),
+	SCENARIO("helmets12d", kHelmets12D),
 	SCENARIO("music5a", kMusic5A),
 	SCENARIO("music5o", kMusic5O),
 	SCENARIO("group38", kGroup38),
@@ -7306,6 +7390,13 @@ void RunStep(const Step& s) {
 		at.p1.lx = s.x;
 		at.p1.ly = s.y;
 		CoopLogState(s.name);
+		break;
+	case S_P1R:
+		Log("autotest: %s", s.name);
+		at.p1Active = true;
+		at.p1.connected = true;
+		at.p1.rx = s.x;
+		at.p1.ry = s.y;
 		break;
 	case S_KEY: {
 		Log("autotest: %s", s.name);
@@ -8140,6 +8231,37 @@ void RunStep(const Step& s) {
 		    best ? *(void**)(best + 0x20) : nullptr);
 		break;
 	}
+	case S_POOLHOLD: {   // pool of handler a: b 1 takes its free bonuses away (as if in flight), 0 gives them back, 2 logs
+		static char* held[128];
+		static int nHeld = 0;
+		static char* heldPool = nullptr;
+		char* pool = nullptr;
+		const int kPoolIds[2] = { 61, 63 };
+		for (int k = 0; k < 2 && !pool; k++)
+			for (unsigned i = 0, n = GetNumLvlClassInstances(4, kPoolIds[k]); i < n && !pool; i++) {
+				char* p = (char*)GetLvlObject(4, kPoolIds[k], i);
+				if (p && *(uint8_t*)(p + 0x28) == (uint8_t)s.a) pool = p;
+			}
+		auto count = [](char* b) { int c = 0; for (; b && c < 999; b = *(char**)(b + 0x14)) c++; return c; };
+		if (!pool) { Log("autotest: no bonus pool with handler %d", s.a); break; }
+		if (s.b == 1) {
+			for (char* b; (b = *(char**)(pool + 0x38)) != nullptr && nHeld < 128;) {
+				*(char**)(pool + 0x38) = *(char**)(b + 0x14);
+				*(char**)(b + 0x14) = nullptr;
+				held[nHeld++] = b;
+			}
+			heldPool = pool;
+		} else if (s.b == 0 && heldPool == pool) {
+			while (nHeld > 0) {
+				char* b = held[--nHeld];
+				*(char**)(b + 0x14) = *(char**)(pool + 0x38);
+				*(char**)(pool + 0x38) = b;
+			}
+		}
+		Log("autotest: bonus pool %p (handler %d): %d held; active %d, beacons %d, free %d", pool, s.a, nHeld,
+		    count(*(char**)(pool + 0x30)), count(*(char**)(pool + 0x34)), count(*(char**)(pool + 0x38)));
+		break;
+	}
 	case S_AREAHIT: {   // the trio's area hit (event 0x4C14, a mobile tower's shockwave) on hero a, from a stand-in tower
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
@@ -8548,6 +8670,22 @@ void RunStep(const Step& s) {
 			Log("autotest: %s: %u crate objects, %u live, %u of them within 30 units (%u intact)", s.name, n, live, nearby, intact);
 			break;
 		}
+		if (s.b == -3) {   // every crate object: where its live crate is, or free
+			unsigned n = GetNumLvlClassInstances(2, 112);
+			char buf[1500];
+			LineBuf d(buf);
+			d.Add("autotest: %s: %u crate objects:", s.name, n);
+			for (unsigned i = 0; i < n && i < 40; i++) {
+				char* c = (char*)GetLvlObject(2, 112, i);
+				char* node = c ? *(char**)(c + 0x10) : nullptr;
+				char* frame = node ? *(char**)(node + 4) : nullptr;
+				if (!c || *(int*)(c + 0x58) == -1 || !frame) { d.Add(" free"); continue; }
+				d.Add(" (%.0f %.0f %.0f)%u", ((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2],
+				      *(uint32_t*)(c + 8) & 7);
+			}
+			Log("%s", d.c_str());
+			break;
+		}
 		if (s.b < 0) {
 			if (at.watchCrate)
 				Log("autotest: crate %p has %u pieces left", at.watchCrate, *(uint32_t*)(at.watchCrate + 8) & 7);
@@ -8850,6 +8988,17 @@ void InjectP1() {
 	BuildActionsFromPad(at.p1, tmp, n);
 	for (int i = 0; i < n; i++)
 		if (tmp[i]) values[i] = tmp[i];
+	// The right stick: the game camera's input view (service +0x580) maps its
+	// actions 0-3 (up, down, right, left) to bindings, as CoopP2CameraValues does.
+	CKYellowPages* yp = YellowPages();
+	char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+	char* view = cs ? *(char**)(cs + 0x580) : nullptr;
+	const uint8_t* remap = view ? *(const uint8_t**)(view + 8) : nullptr;
+	auto put = [&](int action, float v) {
+		if (remap && v > 0.0f && remap[action] < n) values[remap[action]] = (uint8_t)(fminf(v, 1.0f) * 255.0f + 0.5f);
+	};
+	put(0, at.p1.ry); put(1, -at.p1.ry);
+	put(2, at.p1.rx); put(3, -at.p1.rx);
 	if (at.p1Combo >= 0) {   // a combo's action (value numActions + k) for one frame
 		values[im.NumActions() + at.p1Combo] = 0xFF;
 		at.p1Combo = -1;
