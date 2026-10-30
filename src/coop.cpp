@@ -33,6 +33,7 @@
 #include "hints.h"
 #include "individual.h"
 #include "nolock.h"
+#include "guard.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -3175,6 +3176,7 @@ void CoopFrame() {
 	WatchNoLockBeam(t);
 	WatchCorkLaunch(t);
 	NoLockRomansFrame();
+	GuardFrame();
 	WatchUnfinishedSequence(t);
 	WatchStrandedCar();
 	WatchSpyWalk(t, now);

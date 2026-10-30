@@ -3079,3 +3079,20 @@ both halves).
   fight ended for Asterix with them out, the lever lifts the wait, they stay round downed Obelix, the second 0D16
   dropped; freeromans23 (2-4 Romans, the keg lifts the wait); nolockmark36 now sends none (the fight's squad #4 has no
   free Roman, all at its at-once number -- before, one was queued).
+- Round 168 (user, seeing round 167's no-lock Romans stay by downed Obelix: wanted in all play -- the Romans after a
+  hero in a fight stay near it once it is down). guard.cpp: as a hero goes down (individual heroes, IndivFallen;
+  GuardFrame from CoopFrame) the members of active squads within 10 units of it become its guards (16 max; each
+  checked as no-lock's: in its pool record's list, hook +8 bit 0 clear, the squad still GetLvlObject's) until it is
+  revived, they are beaten or put away. With a hero down the lead goes to the standing one and EnemyTickHook takes its
+  plain path (the non-leader HeroOut: the game's CKGrpEnemyLife tick) -- every squad runs for the leader and its
+  slots took everyone over to it. GuardSteer after each squad's tick (both EnemyTickHook paths; NoLockSteer now in
+  the plain path too): a guard's slot (cpnt 0x46) on a 3-unit ring round the downed hero. They leave the downed hero
+  alone (out of the objects' slicing) and go for the one who comes to revive it. Squads put away out of view (vf35,
+  0x52F6D0, thiscall() ret: vf34 once the box is out of the game camera's frustum) are kept while guards or no-lock
+  Romans of theirs are out: CKGrpSquadEnemy vtable 0x6266B0 slot 35 hook (replaces round 167's branch in
+  EnemyTickHook, which missed the plain path); SquadFreeHook (vf36) keeps them too. Test lesson: a hero walked out of
+  LV3-6's fight zone (z < -234.8) had squad 4 put 9 of its 13 Romans away (flags 06B7 -> 0602, target 0) -- glide
+  inside the zone. Autotest guard36 (-Level 3, XXL_DOWNAT=1:20000 XXL_OBELIXPOTION=0; sq36c, Obelix down, Asterix to
+  the zone's far corner -192 -211): 7 guards stay 3-4 units round Obelix to the end, the other 6 go with Asterix;
+  with GuardFrame off (a local build): all 13 at Asterix's formation, none by Obelix. rules4d (XXL_DOWNAT=1:1000
+  XXL_UPAT=20000): 1 guard; the gate scaled at the revive (85 -> 170) as before.

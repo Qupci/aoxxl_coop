@@ -5,6 +5,7 @@
 #include "detour.h"
 #include "klusters.h"
 #include "log.h"
+#include "guard.h"
 #include "nolock.h"
 #include "p2cam.h"
 #include "trio.h"
@@ -974,7 +975,7 @@ void __fastcall SquadFreeHook(char* squad, void* edx) {
 	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
 		void** vt = *(void***)sq;
 		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604) || !(*(uint8_t*)(sq + 0x152) & 2)) continue;
-		if (InSquadBox(sq, lp) || NoLockKeepsSquad(sq)) continue;   // (its Romans out for a waiting hero stay)
+		if (InSquadBox(sq, lp) || NoLockKeepsSquad(sq) || GuardKeepsSquad(sq)) continue;   // (Romans by a waiting / downed hero stay)
 		if (InSquadBox(sq, pa) || InSquadBox(sq, po)) {
 			if (InterlockedIncrement(&g_squadsSpared) % 300 == 1)
 				Log("proximity: out of Romans; squad %p kept for the player in it", sq);
@@ -991,7 +992,11 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 	Hero lead = t ? t.GetHero(t.Leader()) : Hero(), other = t && nl >= 0 ? t.GetHero(nl) : Hero();
 	if (!grp || !lead || !other || !CoopP2Joined() || CoopSuspended() || HeroOut(nl)) {
 		g_origEnemyTick(life, edx, dt);
-		for (char* sq = grp ? *(char**)(grp + 0x0C) : nullptr; sq; sq = *(char**)(sq + 4)) EndSpentSquad(sq);
+		for (char* sq = grp ? *(char**)(grp + 0x0C) : nullptr; sq; sq = *(char**)(sq + 4)) {
+			EndSpentSquad(sq);
+			NoLockSteer(sq);
+			GuardSteer(sq);   // (a hero down: the non-leader is out)
+		}
 		return;
 	}
 	typedef char(__fastcall* IsSubFn)(void* self, void* edx, int id);
@@ -1057,9 +1062,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 			const float* f = (const float*)sq;
 			float c[3] = { (f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f };
 			float hx = (f[0x47] - f[0x4A]) * 0.5f, hy = (f[0x48] - f[0x4B]) * 0.5f, hz = (f[0x49] - f[0x4C]) * 0.5f;
-			if (NoLockKeepsSquad(sq)) {
-				// its Romans out for a waiting hero (nolock.cpp) go after that hero
-			} else if (KlusterSphereInOtherViews(c, sqrtf(hx * hx + hy * hy + hz * hz))) {
+			if (KlusterSphereInOtherViews(c, sqrtf(hx * hx + hy * hy + hz * hz))) {
 				if (InterlockedIncrement(&g_keptSquads) % 600 == 1)
 					Log("proximity: squad %p kept: out of the game camera's view, in the other player's", sq);
 			} else {
@@ -1070,6 +1073,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 		}
 		EndSpentSquad(sq);
 		NoLockSteer(sq);
+		GuardSteer(sq);
 	}
 }
 

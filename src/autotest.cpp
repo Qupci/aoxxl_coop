@@ -3494,6 +3494,26 @@ const Step kSq36c[] = {
 	SHOT(20000, "sq36_3"), SHOT(25000, "sq36_4"),
 	END(26000),
 };
+// guard36 (-Level 3, XXL_DOWNAT=1:20000 XXL_OBELIXPOTION=0): sq36c with the
+// potion for Asterix only -- player 2's Obelix walks off with half the Romans,
+// goes down at 20 s, then Asterix goes to the fight zone's far corner (walked
+// out of it the squad puts most of its Romans away): the Romans by Obelix stay
+// round him (guards) instead of going over to Asterix (the squads run for the
+// leader).
+const Step kGuard36[] = {
+	MARK(0, "baseline"),
+	LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_WATCHENEMIES, 0, 0, 0, -187.225f, 2.583f, "watch romans", -233.172f },
+	PLACEAT(2000, HERO_ASTERIX, -187.225f, 3.0f, -233.172f),
+	PLACEAT(2100, HERO_OBELIX, -178.0f, 3.0f, -222.0f), POTION(2500),
+	SHOT(8000, "guard36_1"), SHOT(15000, "guard36_2"),
+	VPAD(16000, 1, 0, 0, -1.0f, "p2 walks"), VPAD(18000, 1, 0, 0, 0, "p2 stops"),
+	SHOT(19500, "guard36_3"),
+	GLIDEAT(22000, HERO_ASTERIX, -192.0f, 2.6f, -211.0f, 1500),   // the fight zone's far corner, 17 units from Obelix
+	SHOT(26000, "guard36_4"), SHOT(32000, "guard36_5"),
+	END(33000),
+};
 const Step kSq36b[] = { SQ36(HERO_OBELIX, HERO_ASTERIX, VPAD(16000, 1, 0, 0, -1.0f, "p2 walks"), VPAD(17500, 1, 0, 0, 0, "p2 stops")) };
 
 // over56 (-Level 5, XXL_DOWNAT=1:6000 XXL_DOWNAT2=0:9000): both heroes go down
@@ -7015,6 +7035,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),
 	SCENARIO("sq36c", kSq36c),
+	SCENARIO("guard36", kGuard36),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("twistend", kTwistEnd),
