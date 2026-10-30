@@ -915,7 +915,7 @@ with the Sas boxes (as the engine does for the leader); a completed switch is cr
 leader's Sas or to the hero whose zone fired (`ZoneEventHero`: the enabled detection entry carrying
 the event -> its node -> hero); unknown switches (e.g. a forced load) move everyone along. A hero
 whose sector isn't the streamed one for 2 s (outside Sas boxes) is brought to the other player
-(autotests `sas`, `sectorzone`).
+(autotests `sas`, `sectorzone`). Since round 159 either hero's Sas box streams (vf17's position patched).
 
 ### Roman agent dialogue walk
 Trio 0x5120 (FUN_00482610 case 0x20): leader +0x3F0 |= 2, param (0x34 bytes: +0 four bytes, +4
@@ -2877,3 +2877,26 @@ both halves).
   "SPQR\Caesars Challenge" -NoDeploy after deploying to Game Files: the CC asi is the user's hardlink; P2's R3 + A
   warp, Asterix placed a step ahead, glide; S_CRATE b = -3 lists every crate object): a near crate by the river
   missing during the walk before, there after; the same at the target. crates44 (45 objects, no cut) unchanged.
+- Round 159 (user, LV2-1: Asterix leading in sector 1's Sas half at -802.5 526.9 -970.3, player 2's Obelix through
+  sector 2's half at -811.8 528.6 -970.5 and over the rectangles at -810.6 531.2 -985 -> -989: Obelix was brought
+  back to Asterix; LV2-5: Obelix in the half that streams sector 5 at 97.6 2.5 -524.2, Asterix at 138.0 2.6 -564.7,
+  R3 + A unloaded sector 5 and left both stuck). (1) CKLevel::vf17 (0x40FD10, ret 4) takes its Sas position from
+  game manager vf28 -> CKGrpTrio::vf27 (leader's node frame +0x80) at 0x40FD9A (17 bytes: mov edx,[0x6621F4];
+  mov ecx,[edx+8C]; mov eax,[ecx]; call [eax+70]), checks the current sector's Sas list (FUN_00410DA0, ECX =
+  sector), then the loading one's, and requests a different answer (FUN_0040FE60: +0x34 = n, unload, load ->
+  +0x2C; the loader's callback 0x40F9A0 sets +0x24, +0x34 = -2). Obelix's half did nothing, his zone 0839 asked for
+  2, and the next frame Asterix's half asked for 1 (S_WATCHRW x = 8: writes to +0x34 with stacks; 40FE00 = vf17).
+  Now that call site goes to SasPosition: in co-op the hero whose own tracked sector moved by a Sas box into a
+  sector not streamed becomes g_sec.streamHero and vf17 takes its node frame; a zone switch makes its hero the one,
+  an unknown switch the leader again (-1), as does P2 leaving. A left-behind hero is brought over in a Sas box too
+  (before: never while inside one), and the "heroes within 8 units share a sector" rule skips heroes in Sas boxes
+  (the halves are ~2 units apart: it gave Asterix sector 2 in his sector-1 half, his half then took the streaming
+  back). (2) The detection service tests the node's world frame (node +4 -> +0x80, copied to its last positions
+  +0x1C at the end of its tick); the mod's teleports wrote only Pos and frame +0x40, so the world frame showed the
+  old spot for a tick and the jump crossed planes (LV2-5: 084B, which requests sector 4). SetHeroPosition now
+  writes +0x80 too and forgets the move (ProximityForgetMove); R3 + A (WarpToPartner) goes through it, so do the
+  sector catch-up, cutscene regroups and spy walk. Autotests sasnl21 (glided: a glided hero is held in the air,
+  and when the old sector went out the game put Obelix back on his last ground in sector 1's half for ~17 frames,
+  which asked for sector 1 once -- test artifact), sasnl21w (walked: one switch 1 -> 2 by Obelix's Sas, Asterix
+  brought 1 s later), warp25 (before: 0908 + 084B, sector 4; after: no zone, sector 5 stays); sas, sectorzone,
+  shopsas0 as before (shopsas0's switch now by Obelix's Sas instead of the rectangles).

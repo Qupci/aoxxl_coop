@@ -508,6 +508,63 @@ const Step kSectorZone[] = {
 	END(10000),
 };
 
+// sasnl21 (the user's LV2-1 spots): Asterix, leading, stands in the Sas half
+// that streams sector 1; player 2's Obelix walks through the half that streams
+// sector 2, then over the rectangles (-810.6 531.2 -985 -> -989) that switch to
+// it. Sector 2 should come with the Sas, and Asterix go to Obelix.
+const Step kSasNl21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_WATCHRW, HERO_ASTERIX, 0, 0, 8, 0, "requested sector writes" },
+	PLACEAT(1500, HERO_ASTERIX, -802.514f, 526.927f, -970.293f),
+	PLACEAT(1500, HERO_OBELIX, -803.5f, 527.5f, -972.0f),
+	SECTORS(2500),
+	GLIDEAT(3000, HERO_OBELIX, -811.770f, 528.636f, -970.530f, 1200),
+	SECTORS(5500), SHOT(5500, "sasnl21_1"),
+	GLIDEAT(6500, HERO_OBELIX, -810.617f, 531.231f, -985.0f, 1500),
+	GLIDEAT(8200, HERO_OBELIX, -810.617f, 531.231f, -989.0f, 800),
+	SECTORS(11000), SHOT(11000, "sasnl21_2"),
+	SHOT(14000, "sasnl21_3"),
+	END(15000),
+};
+
+// sasnl21w: sasnl21 walked with player 2's stick instead of glided (a glided
+// hero is held in the air, and the game's physics put it back on its last
+// ground -- in sector 1's half -- while the old sector was out).
+const Step kSasNl21w[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, -802.514f, 526.927f, -970.293f),
+	PLACEAT(1500, HERO_OBELIX, -803.5f, 527.5f, -972.0f),
+	SECTORS(2500),
+	{ 3000, S_P2LOOK, 0, 0, 0, -811.77f, 528.6f, "p2 camera at sector 2's half", -970.53f },
+	VPAD(3500, 1, 0, 0, 0.6f, "p2 forward"), VPAD(4600, 1, 0, 0, 0, "p2 stop"),
+	SECTORS(6000), SHOT(6000, "sasnl21w_1"),
+	{ 7000, S_P2LOOK, 0, 0, 0, -810.617f, 531.231f, "p2 camera at the rectangles", -990.0f },
+	VPAD(7500, 1, 0, 0, 0.6f, "p2 forward"), VPAD(9500, 1, 0, 0, 0, "p2 stop"),
+	SECTORS(11000), SHOT(11000, "sasnl21w_2"),
+	SHOT(14000, "sasnl21w_3"),
+	END(15000),
+};
+
+// warp25 (the user's LV2-5 spots): player 2's Obelix in the Sas half that
+// streams sector 5, Asterix, leading, on the ground in sector 5; Obelix joins
+// Asterix with R3 + A -- sector 5 has to stay.
+const Step kWarp25[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 138.042f, 2.584f, -564.668f),
+	PLACEAT(2500, HERO_OBELIX, 97.622f, 2.465f, -524.185f),
+	SECTORS(4000), SHOT(4500, "warp25_1"),
+	{ 5000, S_WATCHRW, HERO_ASTERIX, 0, 0, 8, 0, "requested sector writes" },
+	VPAD(7000, 1, PAD_RTHUMB, 0, 0, "p2 R3"), VPAD(7100, 1, PAD_RTHUMB | PAD_A, 0, 0, "p2 R3 + A"),
+	VPAD(7300, 1, 0, 0, 0, "p2 release"),
+	SECTORS(8500), SHOT(8500, "warp25_2"),
+	SHOT(12000, "warp25_3"),
+	SECTORS(13000),
+	END(14000),
+};
+
 // boot0 (XXL_LEVEL=-1): the game's start untouched -- level 0's intro, the logo,
 // the title screen: every scene's flags as they change, screenshots.
 const Step kBoot0[] = {
@@ -6372,6 +6429,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("spywalk", kSpyWalk),
 	SCENARIO("sas", kSas),
 	SCENARIO("sectorzone", kSectorZone),
+	SCENARIO("sasnl21", kSasNl21),
+	SCENARIO("sasnl21w", kSasNl21w),
+	SCENARIO("warp25", kWarp25),
 	SCENARIO("cine1", kCine1),
 	SCENARIO("boot0", kBoot0),
 	SCENARIO("boot1", kBoot1),
@@ -7852,6 +7912,15 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		if (s.x == 8) {   // writes to the level's requested sector (yellow pages +0x90, +0x34), with stacks
+			CKYellowPages* yp = YellowPages();
+			char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+			if (!lvl) break;
+			const void* w[1] = { lvl + 0x34 };
+			WatchBytes(w, 1, 0, 0);
+			Log("autotest: watching writes to the requested sector (now %d)", *(int*)(lvl + 0x34));
+			break;
+		}
 		if (s.x == 7) {   // the hero's vertical speed (+0xA8) rising: a jump's impulse, with stacks
 			WatchFloatRise((const float*)(h.raw() + 0xA8));
 			Log("autotest: watching %s's vertical speed rise", HeroName(s.a));

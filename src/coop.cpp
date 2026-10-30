@@ -1196,16 +1196,18 @@ static bool FusionOn(Hero h1, Hero h2);
 // too (CKLevel 0x1222: level 2's rectangles #75/#76), for either hero. Sector
 // boxes overlap too much to tell where a hero is, so each player's hero gets
 // the leader's treatment: its own sector, moved by the Sas boxes it walks
-// through. A switch goes to the hero that made it -- the leader by a Sas, or
-// the hero whose zone fired -- and a player's hero whose sector is not the
-// streamed one (outside any Sas box) for a second (ini sector_catch_up_ms) is
-// brought to the other.
+// through. Either player's hero streams sectors in by its Sas boxes: one that
+// walks into the box for a sector not streamed becomes the hero whose position
+// the level's Sas check takes (streamHero, SasPosition), so the other hero's
+// Sas box no longer asks back for the sector it stands in (LV2-1: Asterix in
+// sector 1's half took sector 1 back from player 2's Obelix every frame). A
+// switch goes to the hero that made it -- that hero by a Sas, or the hero whose
+// zone fired -- and a player's hero whose sector is not the streamed one for a
+// second (ini sector_catch_up_ms) is brought to the other.
 // Only a hero the streaming *left behind* (the sector switched away from it) is
-// brought over at once. A hero that walks through a Sas box towards a sector
-// that is not streamed (player 2's Obelix heading for the rectangle that
-// switches the streaming over to him) is left alone -- the level between
-// sectors is always there -- unless it falls (the floor it walked onto is not
-// loaded).
+// brought over, in a Sas box too. A hero that walks through a Sas box towards a
+// sector that is not streamed (yet) is left alone -- the level between sectors
+// is always there -- unless it falls (the floor it walked onto is not loaded).
 struct SectorTrack {
 	int   level = -99;
 	int   lastCur = -2;
@@ -1214,8 +1216,30 @@ struct SectorTrack {
 	float outsideY[HERO_COUNT] = {};
 	int   zoneHero = -1;
 	DWORD zoneAt = 0;
+	int   streamHero = -1;   // whose position the level's Sas check takes; -1 the leader's (as in single player)
 } g_sec;
 const float kFallBelow = 8.0f;   // units below where it left the streamed sector
+
+// CKLevel::vf17 takes the position for its Sas check from the game manager
+// (vf28 -> CKGrpTrio::vf27: the leader's node frame +0x80). Patched to take
+// the hero whose Sas box asked for the streamed sector in co-op.
+const uintptr_t kSasPositionCall = 0x40FD9A;
+const uint8_t   kSasPositionCallBytes[17] = { 0x8B, 0x15, 0xF4, 0x21, 0x66, 0x00,    // mov edx, [yellow pages]
+                                              0x8B, 0x8A, 0x8C, 0x00, 0x00, 0x00,    // mov ecx, [edx+8C]
+                                              0x8B, 0x01, 0xFF, 0x50, 0x70 };        // call [game manager vf28]
+
+static const float* __cdecl SasPosition() {
+	Trio t = GetTrio();
+	int s = g_sec.streamHero;
+	if (g.p2Joined && t && s >= 0 && s != t.Leader()) {
+		Hero h = t.GetHero(s);
+		char* fr = h && h.hook->node ? (char*)h.hook->node->matrix : nullptr;
+		if (fr) return (const float*)(fr + 0x80);
+	}
+	void* gm = *(void**)((char*)YellowPages() + 0x8C);
+	typedef const float*(__fastcall* PositionFn)(void* self, void* edx);
+	return ((PositionFn)(*(void***)gm)[28])(gm, nullptr);
+}
 
 void CoopNoteStoryZone(int heroIndex) {
 	g.storyZoneHero = heroIndex;
@@ -1245,9 +1269,13 @@ static void WatchSectors(Trio t, DWORD now) {
 		g_sec.level = g.lastLevel;
 		g_sec.lastCur = cur;
 		for (int i = 0; i < HERO_COUNT; i++) { g_sec.sector[i] = cur; g_sec.leftBehind[i] = false; }
+		g_sec.streamHero = -1;
 		memset(g.outsideSince, 0, sizeof(g.outsideSince));
 		return;
 	}
+	if (!g.p2Joined) g_sec.streamHero = -1;
+	int L = t.Leader();
+	if (L < 0 || L >= HERO_COUNT) L = idx[0];
 	// Sas boxes, as CKLevel::vf17 checks them, for each player's own sector.
 	bool inSas[HERO_COUNT] = {};
 	for (int i : idx) {
@@ -1269,19 +1297,37 @@ static void WatchSectors(Trio t, DWORD now) {
 				}
 			}
 		}
+		// Into the box for a sector not streamed: the level's Sas check follows
+		// this hero from now on, as it follows the leader in single player.
+		if (g.p2Joined && g_sec.sector[i] != s && g_sec.sector[i] != cur) {
+			int before = g_sec.streamHero >= 0 ? g_sec.streamHero : L;
+			g_sec.streamHero = i;
+			if (before != i)
+				Log("coop: %s in the Sas box for sector %d (sector %d streamed): the level's Sas check follows %s",
+				    HeroName(i), g_sec.sector[i], cur, HeroName(i));
+		}
 	}
 	// A completed switch: whose was it?
 	if (cur != g_sec.lastCur) {
-		int L = t.Leader();
-		if (L < 0 || L >= HERO_COUNT) L = idx[0];
+		int S = g_sec.streamHero >= 0 ? g_sec.streamHero : L;
 		bool zoneRecent = g_sec.zoneHero >= 0 && (int)(now - g_sec.zoneAt) < 5000;
 		const char* why;
-		if (g_sec.sector[L] == cur) why = "the leader's Sas";
-		else if (zoneRecent) { g_sec.sector[g_sec.zoneHero] = cur; why = "a zone"; }
-		else { for (int i : idx) g_sec.sector[i] = cur; why = "unknown, everyone moved along"; }
+		int by = -1;
+		if (g_sec.sector[S] == cur) { why = S == L ? "the leader's Sas" : "the Sas"; by = S == L ? -1 : S; }
+		else if (zoneRecent) {
+			// The zone's hero is the one the Sas check follows now (the other one's
+			// Sas box would ask for the sector it stands in again).
+			by = g_sec.zoneHero;
+			g_sec.sector[by] = cur;
+			g_sec.streamHero = by;
+			why = "a zone";
+		} else {
+			for (int i : idx) g_sec.sector[i] = cur;
+			g_sec.streamHero = -1;
+			why = "unknown, everyone moved along";
+		}
 		Log("coop: sector %d -> %d (%s%s%s); Asterix's sector %d, Obelix's %d", g_sec.lastCur, cur, why,
-		    zoneRecent && g_sec.sector[L] != cur ? " of " : "", zoneRecent && g_sec.sector[L] != cur ? HeroName(g_sec.zoneHero) : "",
-		    g_sec.sector[HERO_ASTERIX], g_sec.sector[HERO_OBELIX]);
+		    by >= 0 ? " of " : "", by >= 0 ? HeroName(by) : "", g_sec.sector[HERO_ASTERIX], g_sec.sector[HERO_OBELIX]);
 		for (int i : idx) g_sec.leftBehind[i] = g_sec.sector[i] != cur;
 		g_sec.lastCur = cur;
 		// The streaming moved on from a player at the merchant (the other walked
@@ -1292,9 +1338,10 @@ static void WatchSectors(Trio t, DWORD now) {
 		g_sec.zoneHero = -1;
 	}
 	// Heroes together are in the same place: whatever the game did to put them
-	// there (warp, respawn, its own teleports).
+	// there (warp, respawn, its own teleports). Not in a Sas box: the two halves
+	// are a few units apart, and each hero's own half says where it is.
 	Hero h1 = t.GetHero(idx[0]), h2 = t.GetHero(idx[1]);
-	if (h1 && h2 && (h1.Pos() - h2.Pos()).len2() < 8.0f * 8.0f &&
+	if (h1 && h2 && !inSas[idx[0]] && !inSas[idx[1]] && (h1.Pos() - h2.Pos()).len2() < 8.0f * 8.0f &&
 	    (g_sec.sector[idx[0]] == cur || g_sec.sector[idx[1]] == cur))
 		g_sec.sector[idx[0]] = g_sec.sector[idx[1]] = cur;
 	for (int i : idx) if (g_sec.sector[i] == cur) g_sec.leftBehind[i] = false;
@@ -1307,7 +1354,7 @@ static void WatchSectors(Trio t, DWORD now) {
 	for (int k = 0; k < 2; k++) {
 		int i = idx[k], o = idx[1 - k];
 		Hero h = t.GetHero(i), other = t.GetHero(o);
-		if (!h || !other || g_sec.sector[i] == cur || inSas[i]) { g.outsideSince[i] = 0; continue; }
+		if (!h || !other || g_sec.sector[i] == cur || (inSas[i] && !g_sec.leftBehind[i])) { g.outsideSince[i] = 0; continue; }
 		if (!g.outsideSince[i]) { g.outsideSince[i] = now; g_sec.outsideY[i] = h.Pos().y; continue; }
 		bool falling = h.Pos().y < g_sec.outsideY[i] - kFallBelow;
 		if ((!g_sec.leftBehind[i] && !falling) || (int)(now - g.outsideSince[i]) < g_config.sectorCatchUpMs ||
@@ -2564,7 +2611,6 @@ static void BringAlongForBossRun(Trio t) {
 	Vector3 to = h.Pos();
 	to.y += 1.0f;
 	SetHeroPosition(o, to);
-	ProximityForgetMove(o.hook->node, &to.x);
 	Log("coop: %s woke the boss %.0f units away from %s: %s brought along to (%.1f %.1f %.1f)", HeroName(by), apart,
 	    HeroName(other), HeroName(other), to.x, to.y, to.z);
 }
@@ -2588,7 +2634,6 @@ static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 			Vector3 to = o.Pos();
 			to.y += 1.0f;
 			SetHeroPosition(s, to);
-			ProximityForgetMove(s.hook->node, &to.x);
 			Log("coop: cutscene while %s was at the merchant: brought to %s at (%.1f %.1f %.1f)", HeroName(shopper),
 			    HeroName(other), to.x, to.y, to.z);
 			g.storyZoneHero = -1;
@@ -2638,11 +2683,7 @@ static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 static void WarpToPartner(int whoIdx, Hero who, int toIdx, Hero to) {
 	Vector3 dst = to.Pos();
 	dst.y += 1.0f;
-	who.Pos() = dst;
-	if (who.hook->node && who.hook->node->matrix) {
-		float* hp = (float*)((char*)who.hook->node->matrix + 0x40);
-		hp[0] = dst.x; hp[1] = dst.y; hp[2] = dst.z;
-	}
+	SetHeroPosition(who, dst);
 	Log("coop: %s warped to %s (Back + A) at (%.1f %.1f %.1f)", HeroName(whoIdx), HeroName(toIdx), dst.x, dst.y,
 	    dst.z);
 }
@@ -4311,12 +4352,19 @@ int CoopBeforeTrioEvent(int ev, void* caller) {
 	return g_eventDepth;
 }
 
+// A jump, not a walk: the node's world frame (+0x80, what the detection service
+// tests; it follows +0x40 only later in the frame) and the detection service's
+// last position for the hero move along, so the jump crosses no zone (LV2-5:
+// R3 + A from the Sas box to the partner crossed a plane that streams sector 4).
 static void SetHeroPosition(Hero h, const Vector3& to) {
 	h.Pos() = to;
 	if (h.hook->node && h.hook->node->matrix) {
 		float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
 		hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+		hp = (float*)((char*)h.hook->node->matrix + 0x80);
+		hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
 	}
+	ProximityForgetMove(h.hook->node, &to.x);
 }
 
 // Two ticks in the AI variant: the Life's state change runs the player
@@ -4404,6 +4452,8 @@ void CoopInit() {
 	              sizeof(kSkipScenePrologue), "cutscene skip (its later events still flagged)");
 	PatchCallSite(kShopMenuInputOff, kShopMenuInputOffBytes, sizeof(kShopMenuInputOffBytes), (void*)ShopMenuInputOff,
 	              "merchant's menu input (player 1's controls on while player 2 shops)");
+	PatchCallSite(kSasPositionCall, kSasPositionCallBytes, sizeof(kSasPositionCallBytes), (void*)SasPosition,
+	              "level's Sas check (the hero whose Sas box asked for the sector)");
 	InstallDetour(kSetPreset, (void*)SetPresetHook, (void**)&g_origSetPreset, kSetPresetPrologue,
 	              sizeof(kSetPresetPrologue), "controller preset (picked without a pad)");
 	PatchVtableSlot(0x625A8C, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent,
