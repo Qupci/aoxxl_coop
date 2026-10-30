@@ -149,12 +149,18 @@ void Commit(int idx) {
 int Other(int idx) { return idx == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX; }
 int PlayerOf(int hero) { return hero == CoopP1Hero() ? 0 : 1; }
 
+// A put-back is a jump, not a walk: the node's world frame (+0x80, what the
+// detection service tests) and the detection service's last position move
+// along, so it crosses no zone (as coop.cpp's SetHeroPosition).
 void PlaceHero(Hero h, const Vector3& p) {
 	h.Pos() = p;
 	if (h.hook->node && h.hook->node->matrix) {
 		float* m = (float*)((char*)h.hook->node->matrix + 0x40);
 		m[0] = p.x; m[1] = p.y; m[2] = p.z;
+		m = (float*)((char*)h.hook->node->matrix + 0x80);
+		m[0] = p.x; m[1] = p.y; m[2] = p.z;
 	}
+	if (h.hook->node) ProximityForgetMove(h.hook->node, &p.x);
 }
 
 // Out of the death (situation 0x0E), which the situation chooser never leaves
@@ -327,10 +333,6 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	PlaceHero(h, spot);
 	g.placedAt[up] = GetTickCount();
 	g.noSafeUntil[up] = GetTickCount() + 1000;
-	if (h.hook->node) {
-		float at[3] = { spot.x, spot.y, spot.z };
-		ProximityForgetMove(h.hook->node, at);
-	}
 	PutBackLog(up, down, what, spot);
 	return true;
 }
@@ -343,10 +345,6 @@ void IndivPutOnSafeGround(int hero) {
 	spot.y += 0.5f;
 	PlaceHero(h, spot);
 	g.placedAt[hero] = GetTickCount();
-	if (h.hook->node) {
-		float at[3] = { spot.x, spot.y, spot.z };
-		ProximityForgetMove(h.hook->node, at);
-	}
 	Log("indiv: %s put on its last solid ground (%.1f %.1f %.1f)", HeroName(hero), spot.x, spot.y, spot.z);
 }
 
@@ -385,10 +383,6 @@ bool IndivBlockPartnerSpot(const char* what) {
 	PlaceHero(h, spot);
 	g.placedAt[up] = GetTickCount();
 	g.noSafeUntil[up] = GetTickCount() + 1000;
-	if (h.hook->node) {
-		float at[3] = { spot.x, spot.y, spot.z };
-		ProximityForgetMove(h.hook->node, at);
-	}
 	static DWORD s_told = 0;
 	DWORD now = GetTickCount();
 	if (now - s_told > 2000) {
@@ -566,6 +560,42 @@ Vector3 SpotBesideFallen(int down, const Vector3& at) {
 	return best ? *best : at;
 }
 
+} // namespace
+
+bool IndivJoinSpot(int to, Vector3* out) {
+	if (!g.active || (to != HERO_ASTERIX && to != HERO_OBELIX)) return false;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(to) : Hero();
+	if (!h) return false;
+	Vector3 at = h.Pos();
+	char* ground = *(char**)(h.raw() + 0x280);
+	bool onFeet = (*(uint8_t*)(h.raw() + 0x384) & 7) == 0 && ground && !IsBadReadPtr(ground, 0x2C) &&
+	              !(*(uint8_t*)(ground + 0x2A) & 4);
+	if (onFeet) {
+		if (*(uintptr_t*)ground != 0x624258) return false;   // a lifter's or a platform's ground: on it, with `to`
+		Vector3 p = SpotBesideFallen(to, at);
+		if ((p - at).len2() < 0.01f) return false;   // none 1 to 3 units away
+		*out = p;
+		out->y += 0.5f;
+		return true;
+	}
+	// Off its feet: where it stood last, if that is near.
+	const SafeSpot* best = nullptr;
+	for (int i = 0; i < kSafeSpots; i++) {
+		const SafeSpot& s = g.safe[to][i];
+		if (!s.at) continue;
+		Vector3 d = s.pos - at;
+		if (d.x * d.x + d.z * d.z > 12.0f * 12.0f || fabsf(d.y) > 12.0f) continue;
+		if (!best || (int)(s.at - best->at) > 0) best = &s;
+	}
+	if (!best) return false;
+	*out = best->pos;
+	out->y += 0.5f;
+	return true;
+}
+
+namespace {
+
 // A fallen hero the other can't walk to (the level's pathfinding graph,
 // pathfind.cpp: LV2-6's pit before its bridge is out, LV2-3's hearth room once
 // its door has shut): if it led when it fell, the other hero is brought to it,
@@ -600,10 +630,6 @@ void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	g.broughtTo[up] = spot;
 	PlaceHero(o, spot);
 	g.placedAt[up] = now;
-	if (o.hook->node) {
-		float at[3] = { spot.x, spot.y, spot.z };
-		ProximityForgetMove(o.hook->node, at);
-	}
 	Log("indiv: %s can't walk to %s, who led when it fell -- brought beside it (%.1f %.1f %.1f)", HeroName(up),
 	    HeroName(down), spot.x, spot.y, spot.z);
 }
@@ -1115,10 +1141,6 @@ void IndivFrame() {
 			back.y += 0.5f;
 			PlaceHero(b, back);
 			g.placedAt[who] = now;
-			if (b.hook->node) {
-				float at[3] = { back.x, back.y, back.z };
-				ProximityForgetMove(b.hook->node, at);
-			}
 			Log("indiv: %s revived its leader -- back where it was brought from (%.1f %.1f %.1f)", HeroName(who), back.x,
 			    back.y, back.z);
 		}
@@ -1161,8 +1183,7 @@ void IndivFrame() {
 		Hero o = t.GetHero(up);
 		if (!o || g.fallen[up]) continue;
 		if (sectorChanged) {
-			Vector3 p = o.Pos();
-			p.y += 1.0f;
+			Vector3 p = CoopJoinSpot(up);
 			PlaceHero(h, p);
 			Revive(i, h, "the other hero went on into another area");
 			continue;

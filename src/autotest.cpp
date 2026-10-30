@@ -237,6 +237,21 @@ const Step kLifter[] = {
 	END(29500),
 };
 
+// warplift58 (-Level 5): Asterix waits on sector 8's lifter (-375.5 0.8 -39.2;
+// in co-op it waits for both heroes), player 2's Obelix at the sector's
+// entrance joins him with R3 + A: on a lifter's ground he lands on the lifter
+// with Asterix (not on solid ground near it), and the lifter goes.
+const Step kWarpLift58[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 8),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, -376.82f, 17.2f, 20.05f), PLACEAT(3000, HERO_ASTERIX, -375.46f, 0.8f, -39.19f),
+	SHOT(5000, "warplift58_0"),
+	VPAD(6000, 1, PAD_RTHUMB, 0, 0, "p2 R3"), VPAD(6200, 1, PAD_RTHUMB | PAD_A, 0, 0, "p2 R3 + A"),
+	VPAD(6400, 1, 0, 0, 0, "p2 release"),
+	SHOT(7000, "warplift58_1"), SHOT(11000, "warplift58_2"), SHOT(16000, "warplift58_3"),
+	END(18000),
+};
+
 // potion: the magic potion while player 2 is in -- what each hero gets -- then
 // a second potion while the first runs (the user saw Obelix running on for good
 // after that), and the end of it.
@@ -2835,6 +2850,24 @@ const Step kReach26P[] = {
 	GLIDEAT(4500, HERO_ASTERIX, 97.0f, 2.2f, -391.1f, 300),
 	SHOT(9000, "reach26p_0"), SHOT(11000, "reach26p_1"), REACH(11200),
 	END(12000),
+};
+
+// warppit26 (-Level 2): Asterix stands up to LV2-6's pit edge (93.2 2.6 -391.1),
+// then is over the pit falling, and player 2's Obelix (across the pit) joins
+// him with R3 + A: Obelix has to land on the edge, not fall in after him.
+const Step kWarpPit26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, 117.82f, 3.0f, -389.01f),
+	PLACEAT(2500, HERO_ASTERIX, 88.2f, 3.5f, -391.1f), PLACEAT(3300, HERO_ASTERIX, 90.7f, 3.5f, -391.1f),
+	PLACEAT(4100, HERO_ASTERIX, 93.2f, 3.0f, -391.1f),
+	SHOT(5000, "warppit26_0"),
+	VPAD(5400, 1, PAD_RTHUMB, 0, 0, "p2 R3"),
+	PLACEAT(5500, HERO_ASTERIX, 97.0f, 7.0f, -391.1f),
+	VPAD(5600, 1, PAD_RTHUMB | PAD_A, 0, 0, "p2 R3 + A"),
+	VPAD(5800, 1, 0, 0, 0, "p2 release"),
+	SHOT(6200, "warppit26_1"), SHOT(9000, "warppit26_2"),
+	END(11000),
 };
 
 // reach23g (-Level 2, XXL_DOWNAT=0:8000): reach23, then player 2's Obelix
@@ -6647,6 +6680,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("relight23n", kRelight23N),
 	SCENARIO("pausedown", kPauseDown),
 	SCENARIO("reach26p", kReach26P),
+	SCENARIO("warppit26", kWarpPit26),
+	SCENARIO("warplift58", kWarpLift58),
 	SCENARIO("sq36a", kSq36a),
 	SCENARIO("over56", kOver56),
 	SCENARIO("sq36b", kSq36b),

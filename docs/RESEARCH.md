@@ -2900,3 +2900,21 @@ both halves).
   which asked for sector 1 once -- test artifact), sasnl21w (walked: one switch 1 -> 2 by Obelix's Sas, Asterix
   brought 1 s later), warp25 (before: 0908 + 084B, sector 4; after: no zone, sector 5 stays); sas, sectorzone,
   shopsas0 as before (shopsas0's switch now by Obelix's Sas instead of the rectangles).
+- Round 160 (user: round 159's open item -- the put-backs -- and "does R3 + A / the sector catch-up check for solid
+  ground, as the revive beside a fallen hero does?"). (1) individual.cpp PlaceHero (every put-back: zone and
+  partner-spot put-backs, R3 + B's last solid ground, brought beside a fallen leader and back, a pit fall laid on
+  its last ground, the revives at a launcher / a sector change) now writes node frame +0x80 as well as +0x40 and
+  calls ProximityForgetMove itself (three callers never did; the five that did dropped their copies). Called from
+  inside the detection tick (IndivBlockPartnerSpotFrom), the tick's later tests now see the put-back spot too.
+  (2) No: R3 + A, the catch-up and the sector-change revive put the hero 1 unit above the partner -- over the pit
+  when the partner was jumping it, and onto it at a ledge (the two push apart). New CoopJoinSpot (coop.cpp) ->
+  IndivJoinSpot (individual.cpp): the partner on its feet (+0x384 & 7 == 0) on static ground (CGround 0x624258, not
+  a death pit), one of its own safe spots / trail points 1-3 units away (SpotBesideFallen's choice); off its feet
+  (no ground, jumping, swimming), its newest safe spot within 12 units; on a CDynamicGround (0x6241BC: lifters,
+  platforms) or with no spot (individual heroes off: none are noted), 1 unit above it as before. A spot in a Sas
+  half of the streamed sector that streams another sector is refused (the hero would take the streaming,
+  round 159). Autotests warppit26 (-Level 2: Asterix over LV2-6's pit, Obelix R3 + A; before: put at 97.0 7.8,
+  fell in, game over; after: on Asterix's edge spot 93.2 2.7 -391.1, revives him), warplift58 (-Level 5: Asterix on
+  sector 8's lifter floor, CDynamicGround; Obelix lands on it with him, as before). As before: slidecross3
+  (XXL_DOWNAT=1:1000, all put back short of z -903.82), reach26 (XXL_DOWNAT=0:5000), unlockpillar, warp25;
+  sasnl21w's catch-up now lands 1.7 units beside Obelix on his own ground.

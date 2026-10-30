@@ -69,6 +69,13 @@ bool IndivBlockTalk(const char* what);
 void IndivNoteLevelLead(int hero);
 // Hero `hero` onto its last solid ground (a sequence undone).
 void IndivPutOnSafeGround(int hero);
+// Where a hero joining hero `to` lands: `to` on its feet on static ground, one
+// of `to`'s own last solid grounds 1 to 3 units away (not on top of it:
+// overlapping heroes push apart, off a ledge too); `to` off its feet (mid-jump
+// over a pit, swimming), where it stood last within 12 units. False: no such
+// spot, or `to` on a lifter's or a platform's ground -- land on `to`.
+struct Vector3;
+bool IndivJoinSpot(int to, Vector3* out);
 // Hero `hero` about to board a cable car (situation 2): out of it and onto its
 // last solid ground. True: it was.
 bool IndivLeaveCableCar(int hero);

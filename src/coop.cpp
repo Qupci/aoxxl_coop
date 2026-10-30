@@ -1241,6 +1241,44 @@ static const float* __cdecl SasPosition() {
 	return ((PositionFn)(*(void***)gm)[28])(gm, nullptr);
 }
 
+// `p` is in a half of the streamed sector's Sas boxes that streams another
+// sector: a hero put there would take the streaming over (WatchSectors).
+static bool InSasForAnotherSector(const Vector3& p) {
+	CKYellowPages* yp = YellowPages();
+	char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+	int cur = lvl ? *(int*)(lvl + 0x24) : -2;
+	char** secs = lvl ? *(char***)(lvl + 4) : nullptr;
+	if (!secs || cur <= 0 || !secs[cur]) return false;
+	char** sas = *(char***)(secs[cur] + 0x10);
+	unsigned ns = *(unsigned*)(secs[cur] + 0x14);
+	for (unsigned k = 0; sas && k < ns && k < 64; k++) {
+		const float* b = (const float*)(sas[k] + 0xC);
+		for (int half = 0; half < 2; half++, b += 6)
+			if (p.x <= b[0] && p.x > b[3] && p.y <= b[1] && p.y > b[4] && p.z <= b[2] && p.z > b[5])
+				return *(int*)(sas[k] + (half ? 8 : 4)) != cur;
+	}
+	return false;
+}
+
+// Joining a partner by a jump: beside it on its own solid ground -- not on top
+// of it (the two push apart, off a ledge too), not over the pit it is jumping
+// (IndivJoinSpot) -- else just above it.
+Vector3 CoopJoinSpot(int to) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(to) : Hero();
+	Vector3 p;
+	if (h && IndivJoinSpot(to, &p) && !InSasForAnotherSector(p)) {
+		static int s_told = 0;
+		if (s_told++ < 40)
+			Log("coop: joining %s: on its own solid ground at (%.1f %.1f %.1f), %.1f units from it", HeroName(to), p.x, p.y,
+			    p.z, sqrtf((p - h.Pos()).len2()));
+		return p;
+	}
+	p = h ? h.Pos() : Vector3();
+	p.y += 1.0f;
+	return p;
+}
+
 void CoopNoteStoryZone(int heroIndex) {
 	g.storyZoneHero = heroIndex;
 	g.storyZoneAt = GetTickCount();
@@ -1361,8 +1399,7 @@ static void WatchSectors(Trio t, DWORD now) {
 		    g_sec.sector[o] != cur || !HeroModePlayable(other.Flags18()))
 			continue;
 		g.outsideSince[i] = 0;
-		Vector3 from = h.Pos(), to = other.Pos();
-		to.y += 1.0f;
+		Vector3 from = h.Pos(), to = CoopJoinSpot(o);
 		SetHeroPosition(h, to);
 		Log("coop: %s %s sector %d (at %.0f %.0f %.0f), sector %d is streamed: brought to %s at (%.1f %.1f %.1f)",
 		    HeroName(i), falling && !g_sec.leftBehind[i] ? "fell out of the streamed level into" : "left in",
@@ -2677,12 +2714,10 @@ static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 	    HeroName(farIdx), HeroName(nearIdx), to.x, to.y, to.z);
 }
 
-// Puts `who` just above `to`'s position (it lands next to it; overlapping heroes
-// push apart). Hero position +kHero_pos and the node's matrix (+0x40) both
-// carry the position.
+// Puts `who` beside `to` on `to`'s own solid ground, else just above it
+// (CoopJoinSpot).
 static void WarpToPartner(int whoIdx, Hero who, int toIdx, Hero to) {
-	Vector3 dst = to.Pos();
-	dst.y += 1.0f;
+	Vector3 dst = CoopJoinSpot(toIdx);
 	SetHeroPosition(who, dst);
 	Log("coop: %s warped to %s (Back + A) at (%.1f %.1f %.1f)", HeroName(whoIdx), HeroName(toIdx), dst.x, dst.y,
 	    dst.z);

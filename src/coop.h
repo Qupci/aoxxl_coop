@@ -48,6 +48,10 @@ int  CoopShopHero();
 // Gives hero `idx` the trio's lead the game's way (switch event), as a player's
 // hero (individual heroes: a leader that went down).
 void CoopGiveLead(int idx, const char* why);
+// Where a hero joining hero `to` is put (R3 + A, the sector catch-up, a revive
+// at a sector change): beside `to` on its own solid ground, else just above it.
+struct Vector3;
+Vector3 CoopJoinSpot(int to);
 // How long player `player` (0 = player 1) has held action `action` (seconds; 0 = not held).
 float CoopHoldTime(int player, int action);
 // Player 2 holds Back (not for a combo): their HUD shows.
