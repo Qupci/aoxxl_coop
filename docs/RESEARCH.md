@@ -3110,3 +3110,44 @@ both halves).
   the Roman sent did not change it (sent +1, alive +1). Autotests nolock34 (-Level 3, XXL_NOLOCK=1
   XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0, any markers 0 and 1): "squad #5 is a gated fight's" at the gate, no Roman
   for Obelix; freeromans23: a group of 4 at the walk-to marker, the keg lifts the wait (unchanged).
+- Round 170 (user, after round 168: guards closer (2-3 units), at most 5, a shield for guards without one, a hit
+  that lands makes a guard "mad" (it breaks off), the last guard goes for the standing hero, never lions, pirates,
+  leaders, archers, jumping / jetpack Romans or turtles; an ini option, on by default). guard.cpp:
+  - Kinds: only CKBasicEnemyCpnt (pool record +4 vtable 0x627BD0: leaders 0x627C30, archers 0x627CF0, jumping
+    0x627CC0, jetpack 0x627C90, rocket 0x627C60, tower 0x627D20, turtles 0x627D50.. are other classes) and no model
+    texture with "lion", "pirate" or "normand". Lions and pirates are CKBasicEnemyCpnt like Romans (LV5's pirates
+    have the regular Roman's component values, flags 03007EA9 health 3): the model's textures tell them apart.
+    Path: hook +0x10 node (CAnimatedClone 0x6230D4), node +0x54 its team player (RpTeam, 0xF8 each, the clone
+    manager +4 team's +0x58 array; CCloneManager::deserialize 0x422AA0 sets CClone +0x24 bounding sphere / +0x28
+    player and CAnimatedClone +0x50 / +0x54, +0x28 the skeleton = FUN_00574000(player +0xD8 frame), its +4 bone
+    count); player +0xD0 the team dictionary (+0xC slots, +0x50 -> +4 elements 0x24 each, +0 the atomic, +0x1C
+    flags; +0x54 per-element visible counts), +0xD4 an element index per slot (-1 none); atomic +0x18 geometry (+0x20
+    materials, +0x24 count); material +0 texture, name +0x10. Names seen (the level files' strings): Romans romnl01 /
+    rmnar01 (archer, romar_arc) / rmspe* / rompo01 / romaq01 / romjp01 (jetpack), lions lion01 + spec1_t_lion (31
+    bones; Romans 28, archers 29), the tamer dompt01 (a CKBasicEnemyLeaderCpnt), pirates pirate01 (26 bones), their
+    leader barberousse, centurion cntnl_01, Norman villagers villageois_normand01 (LV2), tower marteau*. The user's
+    "LV2-1 squad 7, 15 lions" is the game's level 3 (LVL003): squad #7 pool 1, the only lion textures besides LVL006.
+    The level files also hold the sounds' source paths (...\ennemis\lion\lion_attaque1.wav; pirates use "base").
+  - Shield: the component is shared by the pool's Romans (one per squad pool record), so a guard's hook +0x54 is
+    swapped for a copy of its own (0x180 bytes, CKBasicEnemyCpnt deserialized to +0x174; copy +0x60 = copy +0x10,
+    the move parameters' pointer the deserialize sets) with +4 |= 0x10 (Has shield) and shield points (+0x110) 2 if
+    0; put back as it stops guarding (FUN_00530380 sets +0x54 from the record as a Roman is sent, FUN_00530460 clears
+    it as it goes back to its pool; records are found by list membership, never by +0x54). The hit code (Class_2_84,
+    0x4CF990's switch on hook +8 bits 1-4, the hit kind: 0 front, 1 behind, set by sendEvent 3,0 from the hitter's
+    side): kind 0 with +4 & 0x10 and the reaction (+0x1A4) not 1..5 counts hits in a row (+0x148); up to +0x110
+    blocks (+0x24 |= 0x10000: state 6, cover, reaction 0x1B then 0x1C-0x20), beyond +0x110 + +0x111 only with +4 &
+    0x40 (infinite); the count drops back as cover ends (~0.5 s). Hit landed: state (+0x21) 2 (or 1: stunned,
+    seized, flying +0x24 0x402) with a hurt reaction below 0x1B (0x02, 0x03, 0x05; 0x07 flying) -> "mad": dropped,
+    its own component back. From behind (kind 1) a hit lands at once.
+  - 5 guards per hero (nearest first; fewer than 2 near: none -- a lone one goes for the standing hero), ring 0.8
+    (they stand 1.5-2.8 off in the open; LV3-6's walled corner kept them at 2-3.3), the last guard of a hero dropped.
+    [coop] romans_guard_downed (default on). Test aid XXL_GUARDMAX (guards per hero). Diagnostics (bounded): guards'
+    distances every 2 s, their hit state as it changes. Autotest steps: S_POOLKINDS (every squad pool: component,
+    flags, shield points, a Roman's bones and textures, may it guard), S_NEAROBJ buttons = nearest to hero
+    buttons - 1 (pooled hidden Romans skipped, quiet). Autotests guard41 (-Level 4, XXL_DOWNAT=1:13000
+    XXL_OBELIXPOTION=0: both heroes out where LV4-1's lock fight Romans come in, Obelix down there, Asterix faces the
+    Roman nearest Obelix and hits, single hits then 4-hit combos): 5 guards 1.5-3.4 off, single front hits blocked,
+    three broke off on hits landing from behind, one blocked 2 of a combo and broke off on the 3rd, the last went for
+    Asterix; with XXL_GUARDMAX=2 the first hit landed and the other went for Asterix at once. poolkinds -Level 3 / 5
+    / 2: lions, the tamer, archers, turtles; pirates, jetpack, tower, leaders; Norman villagers, archers, leaders,
+    turtles -- no; the Roman pools -- yes. rules4d: 1 Roman near (none guard), the gate 85 -> 170 as before.

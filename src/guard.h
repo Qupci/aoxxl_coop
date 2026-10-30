@@ -11,3 +11,7 @@ void GuardFrame();
 void GuardSteer(char* sq);
 // Has squad `sq` Romans guarding a downed hero (not to be put away meanwhile)?
 bool GuardKeepsSquad(char* sq);
+// May Roman `roman` of pool record `rec` guard (a basic Roman serving the empire)?
+bool GuardEligible(const char* rec, char* roman);
+// The names of the Roman's model's textures, " name" each, in `out` (diagnostics).
+void GuardModelTextures(char* roman, char* out, int room);

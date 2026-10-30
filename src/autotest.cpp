@@ -14,6 +14,7 @@
 #include "individual.h"
 #include "pathfind.h"
 #include "detour.h"
+#include "guard.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -38,7 +39,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -3515,6 +3516,40 @@ const Step kGuard36[] = {
 	END(33000),
 };
 const Step kSq36b[] = { SQ36(HERO_OBELIX, HERO_ASTERIX, VPAD(16000, 1, 0, 0, -1.0f, "p2 walks"), VPAD(17500, 1, 0, 0, 0, "p2 stops")) };
+
+// guard41 (-Level 4, XXL_DOWNAT=1:13000 XXL_OBELIXPOTION=0): LV4-1's fight lock
+// (an open field), both heroes taken out where its Romans come in at 8 s; Obelix
+// down there at 13 s among the Romans;
+// Asterix (no potion, healed every 2.5 s) faces the Roman nearest Obelix and
+// hits it every 0.5 s from 15 s: the guards' ring, their shields, a guard
+// breaking off, the last guard.
+#define HEALA(t) { t, S_GIVE, HERO_ASTERIX, 0, 0, 10.0f, 0, "heal asterix" }
+#define HIT(t) P1(t, PAD_X, 0, 0, "p1 X"), P1(t + 150, 0, 0, 0, "p1 release")
+#define FACEHIT(t) { t, S_NEAROBJ, HERO_ASTERIX, 93, HERO_OBELIX + 1, 1.3f, 0, "face the roman nearest obelix" }, HIT(t + 50)
+#define FH5(t) FACEHIT(t), FACEHIT(t + 500), FACEHIT(t + 1000), FACEHIT(t + 1500), FACEHIT(t + 2000), HEALA(t + 2200)
+// a 4-hit combo at the Roman nearest Obelix (a quick one breaks a shield of 2 or 3 hits)
+#define FC4(t) FACEHIT(t), HIT(t + 300), HIT(t + 550), HIT(t + 800), HEALA(t + 1100)
+const Step kGuard41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_WATCHENEMIES, 0, 0, 0, -288.15f, 0.5f, "watch romans", 117.27f },
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	PLACEAT(8000, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), PLACEAT(8100, HERO_OBELIX, -294.0f, 0.5f, 90.0f),   // out where the Romans come in
+	HEALA(4500), HEALA(7000), HEALA(9500), HEALA(12000), HEALA(14500),
+	SHOT(11500, "guard41_0"), SHOT(14500, "guard41_1"),
+	FH5(15000), FH5(17500), SHOT(19900, "guard41_2"), FC4(20000), FC4(21500), FC4(23000), FC4(24500), FC4(26000), FC4(27500), FC4(29000),
+	FC4(30500),
+	SHOT(32400, "guard41_3"), FH5(32500), FH5(35000), FH5(37500), FH5(40000),
+	SHOT(42600, "guard41_4"),
+	END(44000),
+};
+
+// poolkinds (any level): every squad's pools -- the enemy kind (component class,
+// flags, shield points), a Roman of each pool (its bones, its model's textures) and
+// whether it may guard a downed hero (guard.cpp).
+#define POOLKINDS(t) { t, S_POOLKINDS, 0, 0, 0, 0, 0, "pool kinds" }
+const Step kPoolKinds[] = { MARK(0, "baseline"), POOLKINDS(2500), END(4000) };
 
 // over56 (-Level 5, XXL_DOWNAT=1:6000 XXL_DOWNAT2=0:9000): both heroes go down
 // at LV5-6's squad 4 fight lock: the game over and the respawn after it.
@@ -7036,6 +7071,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("sq36b", kSq36b),
 	SCENARIO("sq36c", kSq36c),
 	SCENARIO("guard36", kGuard36),
+	SCENARIO("guard41", kGuard41),
+	SCENARIO("poolkinds", kPoolKinds),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("twistend", kTwistEnd),
@@ -7227,6 +7264,27 @@ void Finish(const char* why) {
 		g_hookCounters.enforced, g_hookCounters.trioEvents, at.forceReverts);
 	LogClose();
 	TerminateProcess(GetCurrentProcess(), 0);
+}
+
+// Pool kinds (S_POOLKINDS): an enemy component's class by its vtable.
+const char* CpntClass(uintptr_t vt) {
+	switch (vt) {
+	case 0x627B10: return "CKSquadEnemyCpnt";
+	case 0x627B40: return "CKSeizableEnemyCpnt";
+	case 0x627BA0: return "CKSquadSeizableEnemyCpnt";
+	case 0x627BD0: return "CKBasicEnemyCpnt";
+	case 0x627C00: return "CKEnemyCpnt";
+	case 0x627C30: return "CKBasicEnemyLeaderCpnt";
+	case 0x627C90: return "CKJetPackRomanCpnt";
+	case 0x627CC0: return "CKJumpingRomanCpnt";
+	case 0x627CF0: return "CKRomanArcherCpnt";
+	case 0x627D20: return "CKMobileTowerCpnt";
+	case 0x627D50: return "CKTriangularTurtleCpnt";
+	case 0x627DB8: return "CKSquareTurtleCpnt";
+	case 0x627DEC: return "CKDonutTurtleCpnt";
+	case 0x627E20: return "CKPyramidalTurtleCpnt";
+	}
+	return "?";
 }
 
 // HUD diagnostics (S_HUDDIFF): the in-game interface (2,132) and every object
@@ -8121,6 +8179,42 @@ void RunStep(const Step& s) {
 		Log("autotest: %d active squad(s) put away", n);
 		break;
 	}
+	case S_POOLKINDS: {   // every squad's pools: the component (class, flags, health, shield points), a Roman of it (bones, textures), may it guard
+		const int classes[2] = { 26, 64 };
+		for (int c : classes)
+			for (unsigned i = 0, k = GetNumLvlClassInstances(4, c); i < k; i++) {
+				char* sq = (char*)GetLvlObject(4, c, i);
+				char* recs = sq ? *(char**)(sq + 0x144) : nullptr;
+				for (unsigned r = 0, nr = recs ? *(unsigned*)(sq + 0x14C) : 0; r < nr && r < 8; r++) {
+					char* rec = recs + 0x1C * r;
+					char* pool = *(char**)rec;
+					char* cp = *(char**)(rec + 4);
+					if (!cp || IsBadReadPtr(cp, 0x130)) continue;
+					uintptr_t vt = *(uintptr_t*)cp;
+					bool seiz = vt != 0x627B10 && vt != 0x627C00 && vt != 0x627C90 && vt != 0x627D20 && vt < 0x627D50;
+					char* e = nullptr;   // a Roman: one out, else the pool's first free one
+					if (*(char**)(rec + 8)) e = *(char**)(rec + 8);
+					else if (pool) {
+						__try {
+							typedef char** (__fastcall* ListFn)(char* self, void* edx);
+							char** head = ((ListFn)(*(void***)pool)[12])(pool, nullptr);
+							e = head ? *head : nullptr;
+						} __except (EXCEPTION_EXECUTE_HANDLER) { e = nullptr; }
+					}
+					char* node = e && !IsBadReadPtr(e, 0x60) ? *(char**)(e + 0x10) : nullptr;
+					char* hier = node && !IsBadReadPtr(node, 0x60) ? *(char**)(node + 0x28) : nullptr;   // its skeleton
+					char tex[160] = {};
+					if (e) GuardModelTextures(e, tex, sizeof(tex));
+					Log("autotest: squad (4,%d) #%u %p pool %u (%p): %d to defeat, cpnt %p %s flags %08X health %u damage %u"
+					    " shield points %d stun %.2f cover %.2f | Roman %p vt %X, bones %d, textures%s | guards %s",
+					    c, i, sq, r, pool, *(int16_t*)(rec + 0x18), cp, CpntClass(vt), *(uint32_t*)(cp + 4),
+					    *(uint8_t*)(cp + 8), *(uint8_t*)(cp + 9), seiz ? *(uint8_t*)(cp + 0x110) : -1,
+					    seiz ? *(float*)(cp + 0x120) : 0.0f, seiz ? *(float*)(cp + 0x114) : 0.0f, e, e ? *(unsigned*)e : 0,
+					    hier && !IsBadReadPtr(hier, 8) ? *(uint8_t*)(hier + 4) : -1, tex, e && GuardEligible(rec, e) ? "yes" : "no");
+				}
+			}
+		break;
+	}
 	case S_SQUADS: {   // squads (4,26 / 4,64) whose box is within s.x units of hero a
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
@@ -8202,7 +8296,7 @@ void RunStep(const Step& s) {
 		    HeroName(s.b), f.Pos().x, f.Pos().y, f.Pos().z);
 		break;
 	}
-	case S_NEAROBJ: {   // hero a put s.x units from the nearest object of class (2, b), facing it
+	case S_NEAROBJ: {   // hero a put s.x units from the object of class (2, b) nearest it (buttons: nearest hero buttons - 1), facing it
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
@@ -8214,10 +8308,11 @@ void RunStep(const Step& s) {
 			char* o = (char*)GetLvlObject(2, s.b, i);
 			char* node = o ? *(char**)(o + 0x10) : nullptr;
 			char* fr = node ? *(char**)(node + 4) : nullptr;
-			if (!fr) continue;
+			if (!fr || (s.buttons && (*(uint8_t*)(node + 0x10) & 2))) continue;   // (in a pool: hidden)
 			Vector3 p(((float*)(fr + 0x80))[0], ((float*)(fr + 0x80))[1], ((float*)(fr + 0x80))[2]);
-			Log("autotest:   class (2,%d) #%u %p at (%.1f %.1f %.1f)", s.b, i, o, p.x, p.y, p.z);
-			float d = (p - h.Pos()).len2();
+			if (!s.buttons) Log("autotest:   class (2,%d) #%u %p at (%.1f %.1f %.1f)", s.b, i, o, p.x, p.y, p.z);
+			Hero from = s.buttons ? t.GetHero(s.buttons - 1) : h;
+			float d = (p - (from ? from.Pos() : h.Pos())).len2();
 			if (d < bd) { bd = d; best = o; bp = p; }
 		}
 		if (!best) { Log("autotest: no (2,%d) object with a node", s.b); break; }
