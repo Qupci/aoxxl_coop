@@ -3281,6 +3281,26 @@ const Step kFight36[] = {
 	SHOT(45000, "fight36_end"),
 	END(46000),
 };
+// fight36v (-Level 3): the same fight at the user's spot (Asterix -179.3 2.6
+// -232.8, Obelix -185.5 2.6 -228.2), both fighting. With every spawn marker of
+// the squad in a player's view its Romans wait for one out of view (log "wait
+// for one out of view"); XXL_ROMANSINVIEW=1: they come at once on the farthest,
+// in plain view (the user saw a batch pop up there in player 1's half).
+const Step kFight36V[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	{ 4500, S_WATCHENEMIES, 0, 0, 0, -185.14f, 2.64f, "watch romans", -225.10f },
+	POTION(4600),
+	TAPS1(5000), TAPS2(5000), SHOT(9000, "fight36v_1"), TAPS1(10000), TAPS2(10000), SHOT(14000, "fight36v_2"),
+	TAPS1(15000), TAPS2(15000), SHOT(19000, "fight36v_3"), TAPS1(20000), TAPS2(20000), SHOT(24000, "fight36v_4"),
+	TAPS1(25000), TAPS2(25000), POTION(29000), SHOT(29500, "fight36v_5"), TAPS1(30000), TAPS2(30000),
+	SHOT(34000, "fight36v_6"), TAPS1(35000), TAPS2(35000), SHOT(39000, "fight36v_7"), TAPS1(40000), TAPS2(40000),
+	SHOT(44000, "fight36v_8"), TAPS1(45000), TAPS2(45000), SHOT(49000, "fight36v_9"), TAPS1(50000), TAPS2(50000),
+	SHOT(55000, "fight36v_end"),
+	END(56000),
+};
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3340,6 +3360,28 @@ const Step kGateDone[] = {
 	TWIST1(231500), TWIST1(238000), TWIST1(244500), TWIST1(251000), TWIST1(257500), TWIST1(264000), TWIST1(270500),
 	TWIST1(277000), TWIST1(283500), TWIST1(290000), TWIST1(296500),
 	END(305000),
+};
+// gatedonew (-Level 5): the same fight, the squad's records logged; at 35 s both
+// cameras turn away from the arena's three spawn markers (around -128.5 9.9 54.7).
+// With every marker in view the Romans wait, and the Twister beats the rest of
+// the squad's Romans without them (vf41): the squad's end comes from the mod
+// (log "the squad's end (0D16)") and the gate goes. S_WATCHRW x = 9 shows who
+// writes the squad's "sent" counts.
+const Step kGateDoneW[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	LOADSECTOR(600, 6),
+	{ 1000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 2500, S_WATCHENEMIES, 0, 0, 0, -116.16f, 9.84f, "watch romans", 33.90f },
+	PLACEAT(2600, HERO_ASTERIX, -116.16f, 10.3f, 33.90f), PLACEAT(2600, HERO_OBELIX, -114.16f, 10.3f, 33.90f),
+	SHOT(4000, "gatedonew_start"),
+	TWIST1(4000), TWIST1(10500), SQUADS(15000, HERO_ASTERIX, 20), TWIST1(17000), SQUADS(22000, HERO_ASTERIX, 20),
+	TWIST1(23500), SQUADS(28000, HERO_ASTERIX, 20), SHOT(34000, "gatedonew_before"),
+	{ 35000, S_P2LOOK, 0, 0, 0, -110.0f, 10.0f, "p2 camera away from the markers", 0.0f },
+	P1R(35000, 1.0f, 0, "p1 camera turns"), P1R(36500, 0, 0, "p1 camera stops"),
+	SHOT(37000, "gatedonew_away"), SQUADS(38000, HERO_ASTERIX, 20), SQUADS(45000, HERO_ASTERIX, 20),
+	TWIST1(46000), SQUADS(55000, HERO_ASTERIX, 20), TWIST1(56000), SQUADS(65000, HERO_ASTERIX, 20),
+	END(70000),
 };
 
 // sq36a / sq36b (-Level 3): LV3-6's Romans in the open by the bars. a: Asterix
@@ -6863,6 +6905,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight64", kFight64),
 	SCENARIO("fight56", kFight56),
 	SCENARIO("gatedone", kGateDone),
+	SCENARIO("gatedonew", kGateDoneW),
 	SCENARIO("pf26", kPf26),
 	SCENARIO("pf23", kPf23),
 	SCENARIO("reach26", kReach26),
@@ -6938,6 +6981,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("camfight", kCamFight),
 	SCENARIO("fight4a", kFight4A),
 	SCENARIO("fight36", kFight36),
+	SCENARIO("fight36v", kFight36V),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -7926,8 +7970,10 @@ void RunStep(const Step& s) {
 				                    (*(uint8_t*)(sq + 0x152) >> 1) & 1, *(int8_t*)(sq + 0x154));
 				char* recs = *(char**)(sq + 0x144);
 				for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); recs && r < nr && r < 4 && len > 0 && len < (int)sizeof(buf); r++)
-					len += _snprintf(buf + len, sizeof(buf) - len, " [%u: %d to defeat, sent %u]", r,
-					                 *(int16_t*)(recs + 0x1C * r + 0x18), *(uint16_t*)(recs + 0x1C * r + 0x16));
+					len += _snprintf(buf + len, sizeof(buf) - len, " [%u: %d to defeat, sent %u, alive %u, asked %u/%u]", r,
+					                 *(int16_t*)(recs + 0x1C * r + 0x18), *(uint16_t*)(recs + 0x1C * r + 0x16),
+					                 *(uint8_t*)(recs + 0x1C * r + 0x11), *(uint8_t*)(recs + 0x1C * r + 0x14),
+					                 *(uint8_t*)(recs + 0x1C * r + 0x15));
 				buf[sizeof(buf) - 1] = 0;
 				Log("%s", buf);
 			}
@@ -8147,6 +8193,22 @@ void RunStep(const Step& s) {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
 		if (!h) break;
+		if (s.x == 9) {   // writes to "sent" (+0x16) of the member groups of the squad with spawn markers holding the hero, with stacks
+			for (unsigned i = 0, k = GetNumLvlClassInstances(4, 26); i < k; i++) {
+				char* sq = (char*)GetLvlObject(4, 26, i);
+				char* recs = sq ? *(char**)(sq + 0x144) : nullptr;
+				const float* f = (const float*)sq;   // box: max +0x11C, min +0x128
+				const Vector3& p = h.Pos();
+				if (!recs || !*(unsigned*)(sq + 0x64) || p.x < f[0x4A] || p.x > f[0x47] || p.z < f[0x4C] || p.z > f[0x49]) continue;
+				const void* w[4];
+				int nw = 0;
+				for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); r < nr && nw < 4; r++) w[nw++] = recs + 0x1C * r + 0x16;
+				WatchBytes(w, nw, 0, 0);
+				Log("autotest: watching writes to 'sent' of squad %p's %d member groups", sq, nw);
+				break;
+			}
+			break;
+		}
 		if (s.x == 8) {   // writes to the level's requested sector (yellow pages +0x90, +0x34), with stacks
 			CKYellowPages* yp = YellowPages();
 			char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;

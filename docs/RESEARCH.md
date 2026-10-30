@@ -2963,3 +2963,33 @@ both halves).
   from 7.5; the deck is small (1.6 units past the spot is water; z -649.5 is still the jetty). Regressions: iconsgun
   -L3 (now "Use F" for Obelix at the gun), boat49o (Obelix's X still boards: 4807). A one-frame "both" right after a
   teleport next to a machine is old (seen before the fix too).
+- Round 163 (user, LV3-6's fight at -185.14 2.64 -225.10, userlogs xxl_coop.lv3-6_roman_spawns.log: a batch of Romans
+  popped up at once in player 1's view, though round 22 keeps spawn markers in a player's view out). Cause: round 82's
+  fallback -- with every marker of squad 4 (03BA4A04 in the log; markers -177.4 2.6 -238.3, -195.2 2.6 -219.3 and a
+  third) in a view within 40 units (KlusterSphereInAnyView) vf38 got the marker farthest from both heroes anyway; the
+  user's log has "3 of 3 spawn markers in a player's view" for 188-209 s. Now (user: keep the fallback as an option)
+  [coop] romans_spawn_in_view, default off (env XXL_ROMANSINVIEW): off = the call is skipped and its Romans wait --
+  member group +0x14 (asked) only goes down as vf38 places one, and vf37 calls vf38 every frame while it is > 0 (the
+  game's own vf38 places nobody either when no marker suits its camera), so they come at the first call with a marker
+  out of view; on = round 82's farthest marker. Vanilla's vf38 (0x52FB80) first picks a marker INSIDE its camera's cone
+  (1.5 x FOV, > 2.5 units) whose facing (FUN_004622F0: chars +0xC yaw / +0xD pitch, 2 pi / 254, axes 0x662180 /
+  0x6621E8 / 0x662138 filled at runtime) points at the camera (< -0.7), then any marker outside the cone -- single
+  player does bring Romans in on screen at such markers; the co-op rule is stricter.
+  Why round 82 needed the fallback (the wait alone stalled LV5-6's gate): the Twister counts Romans still to come as
+  beaten -- CKGrpSquadEnemy slot 41 (0x4C8CB0, (count, group or -1, bonus)): +0x16 += n up to +0x18, event 0x4D09
+  (one beaten, the gate counter) and a helmet each (write watch: 0x4C8D94 from 0x4984CE in the Twister handler); +0x16
+  is "taken" (FUN_00530380 +1 per Roman placed, slot 41 per one beaten unseen), +0x11 alive, +0x14 asked, +0x15 to
+  place at the reinforcement point, +0x18 to defeat (< 0 endless). vf37 drops +0x14/+0x15 once +0x16 >= +0x18. The
+  squad's end (FUN_00530570 from vf31: event 0xD16 via vt+0x14 (thiscall, ret 8), byte +0x154 = 0xFE) runs only while
+  the squad has members (vt slot 12 list) and all of them are dead -- beaten unseen with nobody there, it never ran.
+  proximity.cpp EndSpentSquad (from EnemyTickHook, both paths): a squad whose Romans waited (NoteWaitedSquad, 8
+  slots) that has nothing left to send / beat and no member -- and did not just lose its last one while spent (the
+  game's own end, same tick: hadMembers) -- gets 0xD16 and +0x154 = 0xFE. Tried and dropped: a point behind the camera
+  (FUN_00530060 via SpawnPointHook, as a one-off marker) when all markers are seen -- in a fight it lies by the other
+  hero, in that player's view (always refused in fight36v). Autotests (-Level 3) fight36v (the user's spot, both
+  fighting): XXL_ROMANSINVIEW=1 -> 6 Romans at -195.2 2.6 -219.3 in view at the fight's start; default -> none in view,
+  waits up to ~22 s while both views keep the three markers, then the asked ones (up to 10) come together at a marker
+  out of view; (-Level 5) gatedone / gatedonew (XXL_GATESHOTS=1; gatedonew logs the squad records and has
+  S_WATCHRW x = 9, writes to "sent"): stalled before EndSpentSquad, now ended at 15.1 s by "the squad's end (0D16)"
+  (fallback on: 18.9 s). Regressions lock34g (same counts as Oct 29), rules4n with XXL_DOWNAT=1:1600 (100, apart).
+  Open: a fight can stand still while both cameras keep all of its markers in sight (the option's trade-off).

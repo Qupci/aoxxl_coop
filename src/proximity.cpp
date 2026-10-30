@@ -622,10 +622,66 @@ char __fastcall SpawnPointHook(char* squad, void* edx, float* out) {
 // behind player 1's camera (level 3 sector 6). For a squad run for the
 // non-leading player that player's camera is used, and for every squad the
 // markers a player can see within 40 units are left out of the list for the call.
+// With all of them left out the call is skipped: its Romans stay asked for (the
+// member group's +0x14, which only a spawn takes down; the game's own call skips
+// too when no marker suits its camera) and come at the next call that finds a
+// marker out of view -- or, with romans_spawn_in_view, at once from the farthest.
 typedef void(__fastcall* MarkerSpawnFn)(char* squad, void* edx, int count, unsigned group);
 const uintptr_t kMarkerSpawn = 0x52FB80;
 MarkerSpawnFn g_origMarkerSpawn = nullptr;
 volatile long g_markersHidden = 0;
+char* g_markersWaitSquad = nullptr;   // the squad whose Romans last waited for a marker out of view
+volatile long g_markersWaited = 0, g_markersInView = 0;
+struct WaitedSquad { char* sq; bool hadMembers; };
+WaitedSquad g_waitedSquads[8] = {};   // squads whose Romans waited, until their end (EndSpentSquad)
+
+void NoteWaitedSquad(char* sq) {
+	for (WaitedSquad& w : g_waitedSquads) if (w.sq == sq) return;
+	WaitedSquad* slot = &g_waitedSquads[0];
+	for (WaitedSquad& w : g_waitedSquads) if (!w.sq) { slot = &w; break; }
+	slot->sq = sq;
+	slot->hadMembers = true;
+}
+
+// While its Romans wait the rest of a squad's Romans can be beaten without
+// them: the Twister counts Romans still to come as beaten (CKGrpSquadEnemy
+// vf41 0x4C8CB0: +0x16 up to +0x18, event 0x4D09 and a helmet each), and the
+// asked ones are dropped then (vf37: nothing left to send). The squad's end
+// (FUN_00530570: event 0xD16, +0x154 = -2, the fight's gate opens) is looked at
+// only as one of its Romans goes -- with none left, LV5-6's fight (squad 4)
+// never ended. Ended here as the game would, once nothing is left to send or
+// to beat and no Roman of it is there; one that ran out of Romans with nothing
+// left (in its tick, just before this) has had the game's own end.
+void EndSpentSquad(char* sq) {
+	WaitedSquad* slot = nullptr;
+	for (WaitedSquad& w : g_waitedSquads) if (w.sq == sq) slot = &w;
+	if (!slot) return;
+	void** vt = *(void***)sq;
+	char* recs = *(char**)(sq + 0x144);
+	unsigned n = *(unsigned*)(sq + 0x14C);
+	if (!recs || n == 0 || n > 16) return;
+	bool spent = true;
+	for (unsigned r = 0; r < n && spent; r++) {
+		const char* rec = recs + r * 0x1C;
+		int16_t toDefeat = *(const int16_t*)(rec + 0x18);
+		spent = toDefeat < 0 ? !rec[0x14] && !rec[0x15] : *(const uint16_t*)(rec + 0x16) >= (uint16_t)toDefeat;
+	}
+	typedef int* (__fastcall* ListFn)(char* self, void* edx);
+	int* members = ((ListFn)vt[12])(sq, nullptr);
+	bool had = slot->hadMembers;
+	slot->hadMembers = members && *members;
+	if (!spent) return;
+	if (slot->hadMembers || had) {   // the game's own end: as its last Roman goes
+		if (!slot->hadMembers) slot->sq = nullptr;
+		return;
+	}
+	slot->sq = nullptr;
+	Log("proximity: squad %p: its last Romans were beaten while they waited for a marker out of view -- the squad's "
+	    "end (0D16)", sq);
+	typedef void(__fastcall* SendFn)(char* self, void* edx, int ev, int arg);
+	((SendFn)vt[5])(sq, nullptr, 0xD16, 0);
+	*(uint8_t*)(sq + 0x154) = 0xFE;
+}
 
 void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned group) {
 	CKYellowPages* yp = YellowPages();
@@ -638,9 +694,10 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 	}
 	uint32_t keep[64 * 2];
 	unsigned m = 0;
-	// The game keeps to markers outside a cone of 1.5 x the camera's field of
-	// view (camera +0x38 -> +0x44, degrees) for its own camera; the other view
-	// gets the same cone (within 40 units), and no marker within 8 units of a hero.
+	// The game measures from its own camera with a cone of 1.5 x the camera's
+	// field of view (camera +0x38 -> +0x44, degrees): first a marker inside it
+	// that faces the camera, else one outside it. Here the other view gets the
+	// same cone (within 40 units), and no marker within 8 units of a hero.
 	char* camObj = *(char**)(svc + 0x38);
 	float fov = camObj ? *(float*)(camObj + 0x44) : 60.0f;
 	if (!(fov > 10.0f && fov < 170.0f)) fov = 60.0f;
@@ -680,10 +737,33 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 			    p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), have, d, dot);
 		}
 	}
-	// All in sight: the call's Romans still come (its caller has counted them as
-	// sent in; skipped, a fight lock's Romans ran out with none of them there --
-	// LV5-6 squad 4, both heroes in the arena, the counter at 0 for good): from
-	// the marker farthest from both heroes.
+	// All in sight: the Romans wait -- the member group's +0x14 keeps them asked
+	// for, and the next call that finds a marker out of view brings them. LV3-6's
+	// fight has its three markers in the two views for 20 s and more at a time;
+	// with the farthest taken anyway, a batch popped up there in plain view. With
+	// romans_spawn_in_view they still come at once, from the marker farthest from
+	// both heroes (round 82: LV5-6 squad 4 with both heroes standing in the arena).
+	// (A point behind the camera, as squads without markers take, was no way out:
+	// in a fight it lies by the other hero, in that player's view.)
+	if (m == 0 && !g_config.romansInView) {
+		const char* rec = group < *(unsigned*)(squad + 0x14C) ? *(char**)(squad + 0x144) + group * 0x1C : nullptr;
+		if (squad != g_markersWaitSquad && InterlockedIncrement(&g_markersWaited) <= 40) {
+			const float* p = *(const float**)list;
+			Log("proximity: squad %p: all %u spawn markers in a player's view (the first at %.1f %.1f %.1f) -- %d Romans of "
+			    "group %u wait for one out of view (asked %u, alive %u, sent %d of %d)", squad, n, p ? p[0] : 0, p ? p[1] : 0,
+			    p ? p[2] : 0, count, group, rec ? rec[0x14] : 0, rec ? rec[0x11] : 0, rec ? *(short*)(rec + 0x16) : 0,
+			    rec ? *(short*)(rec + 0x18) : 0);
+		}
+		g_markersWaitSquad = squad;
+		NoteWaitedSquad(squad);
+		return;
+	}
+	if (m > 0 && squad == g_markersWaitSquad) {
+		g_markersWaitSquad = nullptr;
+		if (InterlockedIncrement(&g_markersWaited) <= 40)
+			Log("proximity: squad %p: %u of %u spawn markers out of view again -- %d Romans of group %u come", squad, m, n,
+			    count, group);
+	}
 	if (m == 0) {
 		float best = -1.0f;
 		for (unsigned i = 0; i < n; i++) {
@@ -695,6 +775,10 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 			if (d > best) { best = d; memcpy(keep, list + i * 8, 8); m = 1; }
 		}
 		if (m == 0) { g_origMarkerSpawn(squad, edx, count, group); return; }
+		const float* p = *(const float**)keep;
+		if (InterlockedIncrement(&g_markersInView) % 60 == 1)
+			Log("proximity: squad %p: all %u spawn markers in a player's view -- %d Romans of group %u at the farthest "
+			    "(%.1f %.1f %.1f) anyway (romans_spawn_in_view)", squad, n, count, group, p[0], p[1], p[2]);
 	}
 	float saved[6], mtx[16];
 	bool swapped = g_squadForNonLeader && OtherViewMatrix(mtx);
@@ -840,6 +924,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 	Hero lead = t ? t.GetHero(t.Leader()) : Hero(), other = t && nl >= 0 ? t.GetHero(nl) : Hero();
 	if (!grp || !lead || !other || !CoopP2Joined() || CoopSuspended() || HeroOut(nl)) {
 		g_origEnemyTick(life, edx, dt);
+		for (char* sq = grp ? *(char**)(grp + 0x0C) : nullptr; sq; sq = *(char**)(sq + 4)) EndSpentSquad(sq);
 		return;
 	}
 	typedef char(__fastcall* IsSubFn)(void* self, void* edx, int id);
@@ -914,6 +999,7 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 		} else {
 			*(float*)(sq + 0x138) += *(float*)(dt + 0xC);
 		}
+		EndSpentSquad(sq);
 	}
 }
 

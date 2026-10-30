@@ -31,6 +31,7 @@ struct CoopConfig {
 	bool  noLockExceptCorkscrews = true;   // no-lock mode: a corkscrew's circle (light pillar launching its hero) still locks it
 	bool  noLockExceptBeams = false;   // no-lock mode: a rotary beam's circle still locks its hero, through the ride and after
 	bool  carRiderLeads = false;      // a hero boarding a cable car while the other leads takes the lead at once
+	bool  romansInView  = false;      // every spawn marker of a squad in a player's view: its Romans come anyway (farthest marker)
 	float deadzone      = 0.24f;
 
 	// Co-op difficulty ([coop_difficulty]; read at startup)
