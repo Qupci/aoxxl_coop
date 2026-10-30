@@ -2993,3 +2993,21 @@ both halves).
   S_WATCHRW x = 9, writes to "sent"): stalled before EndSpentSquad, now ended at 15.1 s by "the squad's end (0D16)"
   (fallback on: 18.9 s). Regressions lock34g (same counts as Oct 29), rules4n with XXL_DOWNAT=1:1600 (100, apart).
   Open: a fight can stand still while both cameras keep all of its markers in sight (the option's trade-off).
+- Round 164 (user, after round 163, userlogs xxl_coop.lv5-6_marker28.log: LV5-6's fight, both players looking the same
+  way at -119.4 9.6 35.9 -- no Romans in co-op from 29 s ("all 3 spawn markers in a player's view") until player 2
+  left at 67 s; then single player brought them at marker 28 (-128.537 9.891 54.691), behind the rock plateau: in
+  front of the camera but hidden). The levels hide markers behind rocks and walls and the game's vf38 prefers one in
+  front of its camera facing it, so frustum + 40 units was too strict. Now a marker counts as seen by a view only with
+  no collision wall in between: the game's wall sweep FUN_00449C90 (CKSrvCollision = yellow pages +0x50; thiscall
+  (segment float[6] {start, delta}, height, result float[14], 0, gather 1), ret 0x14; returns 1 on a hit, result +0x24
+  = hit fraction, 2 = none; with gather it runs FUN_00449730, which collects the walls (CGround vf19, slot +0x4C) whose
+  boxes meet the segment's box in the current sector and sector 0 -- at most 40 a call, records 0x3C bytes at
+  collector +0x14, count +0x18; walls with +0x38 set have a top, the others reach up for ever). The camera uses it
+  (FUN_00457600 from CKSrvCamera::vf17), so do bombs and bonuses. proximity.cpp WallBetween (pieces of 8 units),
+  SeesMarker (feet y+0.5 or head y+1.8; cached per marker and eye), MarkerSeen (klusters.cpp KlusterViewsSeeing: the
+  eyes of the views with the sphere in their frustum within 40 units); the other view's cone check asks SeesMarker
+  too. Log "spawn marker (...) in a player's view behind a wall". Autotest marker56 (-Level 5, the user's spot; before:
+  Romans waited 24-39 s with all three "in view"; after: marker 28 behind a wall, no wait, 6-7 alive throughout,
+  61 fps). fight36v: LV3-6's grass marker -195.2 2.6 -219.3 still counts as seen (no wall), a batch of 12 there came
+  out of both views (shot 0.5 s later); gatedone ends at 22.3 s by the game's own end (Romans from marker 28).
+  Limit: an infinite wall the camera looks over (a low ledge built as one) would count as hiding what is behind it.

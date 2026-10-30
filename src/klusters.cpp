@@ -469,18 +469,27 @@ bool KlusterSphereInOtherViews(const float* c, float r) {
 bool KlusterSplitUp() { return g_p2Planes && SplitActive(); }
 
 bool KlusterSphereInAnyView(const float* c, float r, float maxDist) {
+	const float* eyes[4];
+	return KlusterViewsSeeing(c, r, maxDist, eyes) > 0;
+}
+
+int KlusterViewsSeeing(const float* c, float r, float maxDist, const float* eyes[4]) {
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
 	auto closeTo = [&](const float* cam) {
 		float dx = c[0] - cam[0], dy = c[1] - cam[1], dz = c[2] - cam[2];
 		return dx * dx + dy * dy + dz * dz < maxDist * maxDist;
 	};
-	if (svc && closeTo((const float*)(svc + 0x5B0)) && InFrustum(svc + 0x500, c, r)) return true;
-	if (!g_p2Planes || !SplitActive()) return false;
-	if (svc && g_gameHalfOn && closeTo((const float*)(svc + 0x5B0)) && InFrustum(g_gameHalfSvc + 0x500, c, r)) return true;
+	int n = 0;
+	const float* gameEye = svc ? (const float*)(svc + 0x5B0) : nullptr;
+	bool game = svc && closeTo(gameEye) && InFrustum(svc + 0x500, c, r);
+	if (!game && svc && g_p2Planes && SplitActive() && g_gameHalfOn && closeTo(gameEye))
+		game = InFrustum(g_gameHalfSvc + 0x500, c, r);
+	if (game) eyes[n++] = gameEye;
+	if (!g_p2Planes || !SplitActive()) return n;
 	for (int v = 0; v < kViews; v++)
-		if (g_viewOn[v] && closeTo(g_viewPos[v]) && InFrustum(g_fakeSvc[v] + 0x500, c, r)) return true;
-	return false;
+		if (g_viewOn[v] && closeTo(g_viewPos[v]) && InFrustum(g_fakeSvc[v] + 0x500, c, r)) eyes[n++] = g_viewPos[v];
+	return n;
 }
 
 long KlusterQueries() { return g_queries; }

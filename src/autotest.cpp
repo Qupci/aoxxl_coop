@@ -3361,6 +3361,27 @@ const Step kGateDone[] = {
 	TWIST1(277000), TWIST1(283500), TWIST1(290000), TWIST1(296500),
 	END(305000),
 };
+// marker56 (-Level 5): LV5-6's fight at the user's spot (Asterix -119.4 9.6
+// 35.9, Obelix -121.8 9.6 37.1), both cameras on marker 28 (-128.5 9.9 54.7,
+// behind the rock plateau); Asterix fights with the potion (no Twister, so
+// Romans keep being asked for). Squad 4's markers count as seen only if no
+// collision wall stands between a camera and them -- the Romans come from behind
+// the rock, as in single player (before: all three "in view", nobody came).
+const Step kMarker56[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	LOADSECTOR(600, 6),
+	{ 2500, S_WATCHENEMIES, 0, 0, 0, -120.0f, 9.6f, "watch romans", 36.5f },
+	PLACEAT(2600, HERO_ASTERIX, -119.355f, 10.1f, 35.882f), PLACEAT(2600, HERO_OBELIX, -121.844f, 10.1f, 37.134f),
+	POTION(3000),
+	{ 3500, S_P2LOOK, 0, 0, 0, -128.537f, 9.891f, "p2 camera at marker 28", 54.691f },
+	SHOT(4500, "marker56_start"),
+	TAPS1(5000), { 9800, S_P2LOOK, 0, 0, 0, -128.537f, 9.891f, "p2 camera at marker 28", 54.691f }, SHOT(10000, "marker56_1"),
+	TAPS1(10500), SHOT(15000, "marker56_2"), TAPS1(15500), { 19800, S_P2LOOK, 0, 0, 0, -128.537f, 9.891f, "p2 camera at marker 28", 54.691f },
+	SHOT(20000, "marker56_3"), TAPS1(20500), SHOT(25000, "marker56_4"), POTION(25200), TAPS1(25500),
+	SHOT(30000, "marker56_5"), TAPS1(30500), SHOT(35000, "marker56_end"),
+	END(36000),
+};
 // gatedonew (-Level 5): the same fight, the squad's records logged; at 35 s both
 // cameras turn away from the arena's three spawn markers (around -128.5 9.9 54.7).
 // With every marker in view the Romans wait, and the Twister beats the rest of
@@ -6906,6 +6927,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight56", kFight56),
 	SCENARIO("gatedone", kGateDone),
 	SCENARIO("gatedonew", kGateDoneW),
+	SCENARIO("marker56", kMarker56),
 	SCENARIO("pf26", kPf26),
 	SCENARIO("pf23", kPf23),
 	SCENARIO("reach26", kReach26),

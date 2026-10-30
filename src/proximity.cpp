@@ -621,7 +621,11 @@ char __fastcall SpawnPointHook(char* squad, void* edx, float* out) {
 // (camera service +0x5B0 / +0x5BC). Player 2 watched them pop up on a marker
 // behind player 1's camera (level 3 sector 6). For a squad run for the
 // non-leading player that player's camera is used, and for every squad the
-// markers a player can see within 40 units are left out of the list for the call.
+// markers a player can see within 40 units are left out of the list for the call
+// -- in a view with no collision wall in between: the levels hide their markers
+// behind rocks and walls (LV5-6's marker 28 behind the plateau, in front of both
+// cameras: nobody came while it counted as seen; single player brings Romans in
+// there, the game's vf38 prefers a marker in front of its camera facing it).
 // With all of them left out the call is skipped: its Romans stay asked for (the
 // member group's +0x14, which only a spawn takes down; the game's own call skips
 // too when no marker suits its camera) and come at the next call that finds a
@@ -683,6 +687,66 @@ void EndSpentSquad(char* sq) {
 	*(uint8_t*)(sq + 0x154) = 0xFE;
 }
 
+// A collision wall between two points (the levels' walls, the invisible ones
+// too): the game's own wall sweep, which keeps the camera out of walls --
+// FUN_00449C90 on CKSrvCollision (yellow pages +0x50), thiscall(segment {start,
+// delta}, height, result (14 dwords, +0x24 = how far along the hit is, 2 = none),
+// 0, gather 1), ret 0x14. It gathers at most 40 walls a call, so the line goes
+// in pieces of 8 units.
+typedef uint32_t(__fastcall* WallSweepFn)(void* coll, void* edx, float* seg, float height, float* result, int unused,
+                                          int gather);
+const uintptr_t kWallSweep = 0x449C90;
+
+bool WallBetween(const float* a, const float* b) {
+	CKYellowPages* yp = YellowPages();
+	void* coll = yp ? *(void**)((char*)yp + 0x50) : nullptr;
+	if (!coll) return false;
+	float d[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] };
+	int pieces = (int)(sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) / 8.0f) + 1;
+	if (pieces > 8) pieces = 8;
+	for (int i = 0; i < pieces; i++) {
+		float seg[6], res[16] = {};
+		for (int k = 0; k < 3; k++) {
+			seg[k] = a[k] + d[k] * i / pieces;
+			seg[3 + k] = d[k] / pieces;
+		}
+		res[9] = 2.0f;
+		if ((((WallSweepFn)kWallSweep)(coll, nullptr, seg, 0.0f, res, 0, 1) & 0xFF) && res[9] <= 1.0f) return true;
+	}
+	return false;
+}
+
+// Can a camera at eye see a Roman standing on the marker at p (its feet or its
+// head, no wall in between)? Asked every frame while Romans are asked for:
+// answers kept per marker and eye.
+bool SeesMarker(const float* eye, const float* p) {
+	struct Seen { const float* p; float eye[3]; bool seen; };
+	static Seen s_seen[16] = {};
+	static int s_next = 0;
+	for (const Seen& s : s_seen)
+		if (s.p == p && s.eye[0] == eye[0] && s.eye[1] == eye[1] && s.eye[2] == eye[2]) return s.seen;
+	float feet[3] = { p[0], p[1] + 0.5f, p[2] }, head[3] = { p[0], p[1] + 1.8f, p[2] };
+	Seen& s = s_seen[s_next++ & 15];
+	s.p = p;
+	memcpy(s.eye, eye, 12);
+	s.seen = !WallBetween(eye, head) || !WallBetween(eye, feet);
+	return s.seen;
+}
+
+volatile long g_markersBehindWalls = 0;
+
+// In a player's view within 40 units, with no wall in between.
+bool MarkerSeen(const float* p) {
+	const float* eyes[4];
+	int n = KlusterViewsSeeing(p, 1.5f, 40.0f, eyes);
+	for (int i = 0; i < n; i++)
+		if (SeesMarker(eyes[i], p)) return true;
+	if (n && InterlockedIncrement(&g_markersBehindWalls) % 300 == 1)
+		Log("proximity: spawn marker (%.1f %.1f %.1f) in a player's view behind a wall -- Romans may come there", p[0],
+		    p[1], p[2]);
+	return false;
+}
+
 void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned group) {
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
@@ -710,12 +774,14 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 		const float* p = *(const float**)(list + i * 8);
 		if (p) {
 			Vector3 pv(p[0], p[1], p[2]);
-			if (KlusterSphereInAnyView(p, 1.5f, 40.0f)) continue;
+			if (MarkerSeen(p)) continue;
 			if ((ha && (ha.Pos() - pv).len2() < 64.0f) || (ho && (ho.Pos() - pv).len2() < 64.0f)) continue;
 			if (other) {
 				float dx = p[0] - om[12], dy = p[1] - om[13], dz = p[2] - om[14];
 				float d = sqrtf(dx * dx + dy * dy + dz * dz);
-				if (d < 40.0f && d > 0.01f && (dx * om[8] + dy * om[9] + dz * om[10]) / d >= cosLimit) continue;
+				if (d < 40.0f && d > 0.01f && (dx * om[8] + dy * om[9] + dz * om[10]) / d >= cosLimit &&
+				    SeesMarker(om + 12, p))
+					continue;
 			}
 		}
 		memcpy(keep + m * 2, list + i * 8, 8);
@@ -733,8 +799,8 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 			float dx = p[0] - m2[12], dy = p[1] - m2[13], dz = p[2] - m2[14];
 			float d = sqrtf(dx * dx + dy * dy + dz * dz);
 			float dot = d > 0 ? (dx * m2[8] + dy * m2[9] + dz * m2[10]) / d : 0;
-			Log("proximity: marker %u (%.1f %.1f %.1f): seen %d; other view %d at %.1f, cos to its axis %.2f", i, p[0], p[1],
-			    p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), have, d, dot);
+			Log("proximity: marker %u (%.1f %.1f %.1f): in a view %d, seen %d; other view %d at %.1f, cos to its axis %.2f",
+			    i, p[0], p[1], p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), MarkerSeen(p), have, d, dot);
 		}
 	}
 	// All in sight: the Romans wait -- the member group's +0x14 keeps them asked
