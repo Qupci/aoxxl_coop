@@ -3096,3 +3096,17 @@ both halves).
   the zone's far corner -192 -211): 7 guards stay 3-4 units round Obelix to the end, the other 6 go with Asterix;
   with GuardFrame off (a local build): all 13 at Asterix's formation, none by Obelix. rules4d (XXL_DOWNAT=1:1000
   XXL_UPAT=20000): 1 guard; the gate scaled at the revive (85 -> 170) as before.
+- Round 169 (user, userlogs 20261031-lv34-xxl_coop*.log: LV3-4 with the heroes apart -- Obelix got a Roman of
+  Asterix's fight; "who knows where those Romans can spawn from"). nolock.cpp: the courtyard squad (#5, pools 1, 1,
+  2, 6, 40, 10) was gated by sphere 0x578 (0D17, +0x154 -1) as Obelix's wait (4821) began, and SquadFor's nearest
+  squad that can send was that same squad: 1 Roman of pool 4 at the library marker. Now squads a gate has taken
+  this level are never used (NoteGatedSquads each frame: +0x154 >= -1 seen once -> remembered by squad index until
+  the level number changes; -2 is both "never gated" and "its fight over", so the past has to be kept); SquadFor
+  and SquadAtOwnMarker skip them. LV3-4 has no other squad awake by the library -> no Romans there for Obelix
+  ("no active squad with Romans to send"); EndFightsLeftToOurs stays (a squad gated after it sent Romans). The
+  user's "Asterix alone should have had 30, not 60": two fights -- the library's own (2 squads 03BE1D7C 16+9,
+  03BE1EE0 4+1 = 30, the user's earlier session teleported into the library) and the courtyard's via 0x578 (one
+  squad, 60 in the level file: kept at 60 with the heroes apart, 118 together) -- the 60 was the level's number,
+  the Roman sent did not change it (sent +1, alive +1). Autotests nolock34 (-Level 3, XXL_NOLOCK=1
+  XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0, any markers 0 and 1): "squad #5 is a gated fight's" at the gate, no Roman
+  for Obelix; freeromans23: a group of 4 at the walk-to marker, the keg lifts the wait (unchanged).

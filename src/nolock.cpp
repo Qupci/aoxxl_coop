@@ -247,6 +247,34 @@ int PickPool(char* sq) {
 	return -1;
 }
 
+// Squads a fight's gate has taken this level (+0x154 >= -1 at some time; -2
+// again once its fight is over, as for squads never gated), by squad index. A
+// gated fight is the other hero's (the waiting one is never in it): none of its
+// Romans come for the waiting hero, even after it -- the user's LV3-4, Obelix
+// got one of the courtyard fight's Romans at the library's marker.
+const unsigned kMaxSquads = 256;
+char* g_gated[kMaxSquads];
+int   g_gatedLevel = -1;
+
+void NoteGatedSquads() {
+	CKYellowPages* yp = YellowPages();
+	int level = yp && yp->gameManager ? *(int*)((char*)yp->gameManager + ax::kGM_currentLevel) : -1;
+	if (level != g_gatedLevel) {   // a level loaded (again): its squads anew
+		for (char*& g : g_gated) g = nullptr;
+		g_gatedLevel = level;
+	}
+	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n && i < kMaxSquads; i++) {
+		char* sq = (char*)GetLvlObject(4, 26, i);
+		if (g_gated[i] && g_gated[i] != sq) g_gated[i] = nullptr;   // another level's
+		if (!sq || g_gated[i] || *(int8_t*)(sq + 0x154) < -1) continue;
+		g_gated[i] = sq;
+		static int s_told = 0;
+		if (s_told++ < 40) Log("nolock: squad #%u %p is a gated fight's -- no Romans of it for a waiting hero this level", i, sq);
+	}
+}
+
+bool GatedFight(char* sq, unsigned i) { return i < kMaxSquads && g_gated[i] == sq; }
+
 // A squad that can send a Roman: its AI running (+0x152 bit 1, not 0x2000), a
 // pool to send it from; `left`: Romans left to send in.
 bool SquadCanSend(char* sq, bool* left) {
@@ -269,7 +297,7 @@ char* SquadFor(const Vector3& at, unsigned* idx) {
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 		char* sq = (char*)GetLvlObject(4, 26, i);
 		bool left;
-		if (!SquadCanSend(sq, &left)) continue;
+		if (GatedFight(sq, i) || !SquadCanSend(sq, &left)) continue;
 		float penalty = left ? 0.0f : 1e6f;   // spent squads only when no other can send
 		const float* f = (const float*)sq;
 		Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
@@ -360,7 +388,7 @@ char* SquadAtOwnMarker(Trio t, Hero h, unsigned* idx, Vector3* at) {
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 		char* sq = (char*)GetLvlObject(4, 26, i);
 		bool left;
-		if (!SquadCanSend(sq, &left) || !left) continue;
+		if (GatedFight(sq, i) || !SquadCanSend(sq, &left) || !left) continue;
 		char* list = *(char**)(sq + 0x5C);
 		unsigned nm = list ? *(unsigned*)(sq + 0x64) : 0;
 		for (unsigned k = 0; k < nm && k < 64; k++) {
@@ -477,9 +505,11 @@ void NoLockRomansFrame() {
 	if (!KalLevelIsLoaded()) {
 		g_nOut = 0;
 		for (Ended& e : g_ended) e = Ended();
+		for (char*& g : g_gated) g = nullptr;
 		return;
 	}
 	Prune(now);
+	NoteGatedSquads();
 	if (!g_config.noLock || !g_config.noLockRomans || !CoopP2Joined() || CoopSuspended()) return;
 	Trio t = GetTrio();
 	if (!t) return;
