@@ -75,19 +75,21 @@ bool InAView(const Vector3& p) {
 	return MarkerSeen(c);
 }
 
-// Where a Roman comes in for `h`, as squads bring theirs: a spawn marker the
-// level placed (any squad's: +0x5C, 8 bytes each, +0 -> position; count +0x64)
-// within 40 units, at least 6 from both heroes, in no player's view (the co-op
-// rule for squad markers) and one the hero can walk to (the level's pathfinding
-// graph: not behind a shut door) -- the nearest; else the hero's walk-to marker
+// Where a Roman of squad `sender` comes in for `h`, as squads bring theirs: a
+// spawn marker the level placed (+0x5C, 8 bytes each, +0 -> position; count
+// +0x64) -- the sender's own; any squad's with nolock_romans_any_markers (the
+// user saw Romans stuck in the air: a marker placed for other Romans) -- within
+// 40 units, at least 6 from both heroes, in no player's view (the co-op rule for
+// squad markers) and one the hero can walk to (the level's pathfinding graph:
+// not behind a shut door) -- the nearest; else the hero's walk-to marker
 // (below). None, no Roman: places picked off the graph's cells were unreliable
 // (its walkable cells take in shallow water -- LV2-3's Romans there drowned).
-bool SpawnPoint(Trio t, Hero h, Vector3* at, const char** how) {
+bool SpawnPoint(Trio t, Hero h, char* sender, Vector3* at, const char** how) {
 	Hero ha = t.GetHero(HERO_ASTERIX), ho = t.GetHero(HERO_OBELIX);
 	const float kReach = 40.0f;
 	float bestD = kReach * kReach;
 	bool have = false;
-	int total = 0, nearHero = 0, seen = 0, unreachable = 0;
+	int total = 0, others = 0, nearHero = 0, seen = 0, unreachable = 0;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 		char* sq = (char*)GetLvlObject(4, 26, i);
 		char* list = sq ? *(char**)(sq + 0x5C) : nullptr;
@@ -99,16 +101,18 @@ bool SpawnPoint(Trio t, Hero h, Vector3* at, const char** how) {
 			float d = (pv - h.Pos()).len2();
 			if (d >= kReach * kReach) continue;
 			total++;
+			if (sq != sender && !g_config.noLockRomansAnyMarkers) { others++; continue; }
 			if ((ha && (ha.Pos() - pv).len2() < 36.0f) || (ho && (ho.Pos() - pv).len2() < 36.0f)) { nearHero++; continue; }
 			if (InAView(pv)) { seen++; continue; }
 			if (PfReachable(h.Pos(), pv) != PF_YES) { unreachable++; continue; }
 			if (d >= bestD) continue;
 			bestD = d;
 			*at = pv;
+			*how = sq == sender ? "its squad's spawn marker" : "another squad's spawn marker";
 			have = true;
 		}
 	}
-	if (have) { *how = "a squad's spawn marker"; return true; }
+	if (have) return true;
 	// Else the marker the level would have walked the hero to (its AI target,
 	// +0x568 -- LV2-3's hearth: no squad marker within 40 units, Obelix's marker by
 	// the doors): placed by the level and on the hero's side by design. Only out of
@@ -123,25 +127,66 @@ bool SpawnPoint(Trio t, Hero h, Vector3* at, const char** how) {
 	}
 	static int s_told = 0;
 	if (s_told++ < 5)
-		Log("nolock: spawn markers within %.0f units of %s: %d -- %d by a hero, %d in view, %d not walkable to; its walk-to "
-		    "marker %.0f units off%s%s", kReach, HeroName(t.GetHero(HERO_ASTERIX).raw() == h.raw() ? HERO_ASTERIX : HERO_OBELIX),
-		    total, nearHero, seen, unreachable, sqrtf(dt), byHero ? ", by a hero" : "", InAView(tg) ? ", in view" : "");
+		Log("nolock: spawn markers within %.0f units of %s: %d -- %d other squads', %d by a hero, %d in view, %d not walkable "
+		    "to; its walk-to marker %.0f units off%s%s", kReach,
+		    HeroName(t.GetHero(HERO_ASTERIX).raw() == h.raw() ? HERO_ASTERIX : HERO_OBELIX), total, others, nearHero, seen,
+		    unreachable, sqrtf(dt), byHero ? ", by a hero" : "", InAView(tg) ? ", in view" : "");
 	return false;
+}
+
+// Without nolock_romans_any_markers: a Roman of an active squad with Romans
+// left to send at one of that squad's own spawn markers (as SpawnPoint takes
+// them) -- the nearest to `h` of all squads'. LV3-6: the nearest squad's own
+// markers are up on the walls (not walkable to), the fight's squad's three on
+// the ground.
+char* SquadAtOwnMarker(Trio t, Hero h, int* pool, Vector3* at) {
+	Hero ha = t.GetHero(HERO_ASTERIX), ho = t.GetHero(HERO_OBELIX);
+	float bestD = 40.0f * 40.0f;
+	char* best = nullptr;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
+		char* sq = (char*)GetLvlObject(4, 26, i);
+		if (!sq || !(*(uint8_t*)(sq + 0x152) & 2) || (*(uint16_t*)(sq + 0x152) & 0x2000)) continue;
+		char* recs = *(char**)(sq + 0x144);
+		unsigned nr = *(unsigned*)(sq + 0x14C);
+		char* list = *(char**)(sq + 0x5C);
+		unsigned nm = list ? *(unsigned*)(sq + 0x64) : 0;
+		if (!recs || !nr || !nm) continue;
+		int p = -1;
+		for (unsigned k = 0; k < nr && k < 8 && p < 0; k++)
+			if (PoolHasRomans(recs + 0x1C * k)) p = (int)k;
+		if (p < 0) continue;
+		for (unsigned k = 0; k < nm && k < 64; k++) {
+			const float* m = *(const float**)(list + k * 8);
+			if (!m) continue;
+			Vector3 pv(m[0], m[1], m[2]);
+			float d = (pv - h.Pos()).len2();
+			if (d >= bestD || (ha && (ha.Pos() - pv).len2() < 36.0f) || (ho && (ho.Pos() - pv).len2() < 36.0f)) continue;
+			if (InAView(pv) || PfReachable(h.Pos(), pv) != PF_YES) continue;
+			bestD = d;
+			best = sq;
+			*pool = p;
+			*at = pv;
+		}
+	}
+	return best;
 }
 
 void SpawnFor(int hero, Trio t, Hero h) {
 	Waiting& w = g_wait[hero];
 	int pool = -1;
-	char* sq = SquadFor(h.Pos(), &pool);
-	if (!sq) {
-		if (w.noneTold++ < 3) Log("nolock: no active squad with Romans to send for %s", HeroName(hero));
-		return;
-	}
 	Vector3 at;
-	const char* how = "";
-	if (!SpawnPoint(t, h, &at, &how)) {
-		if (w.noneTold++ < 3) Log("nolock: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
-		return;
+	const char* how = "its squad's spawn marker";
+	char* sq = g_config.noLockRomansAnyMarkers ? nullptr : SquadAtOwnMarker(t, h, &pool, &at);
+	if (!sq) {
+		sq = SquadFor(h.Pos(), &pool);
+		if (!sq) {
+			if (w.noneTold++ < 3) Log("nolock: no active squad with Romans to send for %s", HeroName(hero));
+			return;
+		}
+		if (!SpawnPoint(t, h, sq, &at, &how)) {
+			if (w.noneTold++ < 3) Log("nolock: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
+			return;
+		}
 	}
 	uint32_t args[3] = { 1, (uint32_t)(uintptr_t)&at, (uint32_t)pool };
 	char* rec = *(char**)(sq + 0x144) + 0x1C * pool;

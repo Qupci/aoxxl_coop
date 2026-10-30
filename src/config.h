@@ -46,6 +46,7 @@ struct CoopConfig {
 	float comboDrainFactor = 1.5f;  // the combo bar losing its hits (before it is full)
 	float comboFullDrainFactor = 1.5f; // a full combo bar running out
 	bool  noLockRomans     = false; // no-lock mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
+	bool  noLockRomansAnyMarkers = false; // ... at any squad's spawn markers near it, not only its own squad's
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

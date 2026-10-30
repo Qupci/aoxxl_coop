@@ -3321,6 +3321,22 @@ const Step kJoin36[] = {
 	TAPS1(17000), TAPS1(22000), SQUADS(26800, HERO_ASTERIX, 5.0f), SHOT(27000, "join36_end"),
 	END(27500),
 };
+// nolockmark36 (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1): LV3-6's fight with
+// both heroes in it; the level's "wait here" for Obelix (4802, sent directly) is
+// not followed in no-lock mode, so Romans come for him -- at the sending squad's
+// own spawn markers only (XXL_NOLOCKROMANSANY=1: any squad's markers near him).
+const Step kNoLockMark36[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600),
+	{ 6000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	SHOT(9000, "nolockmark36_1"), TAPS1(10000), SHOT(15000, "nolockmark36_2"), TAPS1(16000), SHOT(21000, "nolockmark36_3"),
+	TAPS1(22000), SHOT(27000, "nolockmark36_4"), TAPS1(28000), SHOT(33000, "nolockmark36_5"), TAPS1(34000),
+	SHOT(39000, "nolockmark36_end"),
+	END(40000),
+};
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -7025,6 +7041,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("fight36", kFight36),
 	SCENARIO("fight36v", kFight36V),
 	SCENARIO("join36", kJoin36),
+	SCENARIO("nolockmark36", kNoLockMark36),
 };
 
 // Fixed spots (level 2), from players' logs.

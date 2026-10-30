@@ -3032,3 +3032,16 @@ both halves).
   (200), rules4l (leave: 194 -> 95), rules4d (XXL_DOWNAT=1:1000 XXL_UPAT=20000: 100 apart, scaled at the revive),
   freeromans23 (XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_LIFTLOG=1: four Romans from Obelix's walk-to marker).
   Test lesson (user): with the potion Asterix knocks Romans out in one punch -- no stun, so no grab; grab tests without it.
+- Round 166 (user: no-lock Romans seen stuck in the air -- wants other squads' spawn markers behind an option, default
+  off). [coop_difficulty.experimental] nolock_romans_any_markers (default off; env XXL_NOLOCKROMANSANY; in the user's
+  ini and dist). Off: nolock.cpp SquadAtOwnMarker -- a Roman of an active squad with Romans left to send (not +0x152
+  0x2000) at one of that squad's own markers (within 40 units of the waiting hero, 6+ from both heroes, not seen --
+  MarkerSeen --, PfReachable), the nearest of all squads'; none -> as before: the nearest active squad (SquadFor) at
+  its own markers (SpawnPoint now takes the sender), else the hero's walk-to marker (AI target +0x568; unchanged,
+  user's choice). On: the nearest squad at any squad's marker, as before. Log "from its squad's / another squad's
+  spawn marker"; the spawn-marker tally counts "other squads'". Autotest nolockmark36 (-Level 3, XXL_NOLOCK=1
+  XXL_NOLOCKROMANS=1; LV3-6's fight, the level's 4802 for Obelix sent by S_TRIOEV): the nearest squad #3 (box up to y
+  35) has its three markers on the walls (not walkable to) and the fight's squad #4 its three on the ground -- off,
+  before SquadAtOwnMarker: no Roman at all; any markers on: #3's Romans sent at #4's marker -195.2 2.6 -219.3 and vf55
+  placed none (alive 0 -> 0: #3 has none free); off now: #4's at its own marker (queued, +0x14, as #4 is at its at-once
+  number; they come at its markers out of view). freeromans23 unchanged (walk-to marker, no squad markers near).
