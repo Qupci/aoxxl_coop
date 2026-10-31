@@ -952,11 +952,62 @@ void SplitSquad(char* sq, int target, Hero targetHero, int other, Hero otherHero
 // squads around player 2's Obelix freed each other every frame: their Romans
 // were spawned over and over at their starting spots, hanging in the air above
 // the lifters (level 5 sector 8) until Asterix came along. Squads around either
-// player's hero are kept as well.
+// player's hero are kept as well -- but for a squad coming alive round the
+// leader (vf33 asks; in single player the leader's squads come first), one with
+// only the other hero in its box, not fighting (ProximityHeroFighting), is not:
+// the user's LV3-6, Obelix left at the level's start (squad #19's box) held the
+// Romans of the pool squad #4 shares with it -- none of the fight's came. Never
+// the other way round (two squads freeing each other as each comes alive). Such
+// a squad is not woken for the other hero (EnemyTickHook: a hero in an asleep
+// squad's box wakes it -- it took them straight back before the fight's next
+// Romans were sent in) while the one it was sent back for is awake with Romans
+// left to send in (a pool endless, or sent +0x16 short of its count +0x18, or
+// some asked +0x14) and that hero is not fighting.
 typedef void(__fastcall* SquadFreeFn)(char* squad, void* edx);
 const uintptr_t kSquadFree = 0x52F850;
 SquadFreeFn g_origSquadFree = nullptr;
-volatile long g_squadsSpared = 0;
+volatile long g_squadsSpared = 0, g_squadsTaken = 0;
+struct HeldBack { char* sq; char* taker; };
+HeldBack g_heldBack[8];
+
+bool MoreToSend(const char* sq) {
+	const char* recs = *(char* const*)(sq + 0x144);
+	unsigned nr = *(const unsigned*)(sq + 0x14C);
+	for (unsigned r = 0; recs && r < nr && r < 16; r++) {
+		const char* rec = recs + r * 0x1C;
+		int16_t count = *(const int16_t*)(rec + 0x18);
+		if (count < 0 || *(const uint16_t*)(rec + 0x16) < (uint16_t)count || rec[0x14]) return true;
+	}
+	return false;
+}
+
+void HoldBack(char* sq, char* taker) {
+	HeldBack* slot = &g_heldBack[0];
+	for (HeldBack& h : g_heldBack) {
+		if (h.sq == sq) { slot = &h; break; }
+		if (!h.sq) slot = &h;
+	}
+	*slot = { sq, taker };
+}
+
+// Is asleep `sq` (in `grp`) kept from waking for the other hero `hero`?
+bool HeldBackFor(char* grp, char* sq, int hero) {
+	for (HeldBack& h : g_heldBack) {
+		if (h.sq != sq) continue;
+		bool taker = false;
+		for (char* s = *(char**)(grp + 0x0C); s && !taker; s = *(char**)(s + 4)) taker = s == h.taker;
+		if (taker && (*(uint8_t*)(h.taker + 0x152) & 2) && MoreToSend(h.taker) && !ProximityHeroFighting(hero))
+			return true;
+		static int s_told = 0;
+		if (s_told++ < 20)
+			Log("proximity: squad %p may come alive for %s again (squad %p %s)", sq, HeroName(hero), h.taker,
+			    !taker ? "gone" : !(*(uint8_t*)(h.taker + 0x152) & 2) ? "asleep" : MoreToSend(h.taker) ? "still sending, the hero fights"
+			                                                                                : "has sent all its Romans");
+		h = HeldBack();
+		return false;
+	}
+	return false;
+}
 
 void __fastcall SquadFreeHook(char* squad, void* edx) {
 	CKYellowPages* yp = YellowPages();
@@ -972,14 +1023,24 @@ void __fastcall SquadFreeHook(char* squad, void* edx) {
 	typedef void(__fastcall* VoidFn)(void* self, void* edx);
 	const float* look = (const float*)(svc + 0x5BC);
 	Vector3 lp(look[0], look[1], look[2]), pa = ha.Pos(), po = ho.Pos();
+	int lead = t.Leader(), other = 1 - lead;   // (the real leader: a squad run for the other has them swapped meanwhile)
+	Vector3 pl = lead == HERO_ASTERIX ? pa : po, pn = lead == HERO_ASTERIX ? po : pa;
+	bool forLeader = !g_squadForNonLeader && lead <= HERO_OBELIX && InSquadBox(squad, pl) && !InSquadBox(squad, pn);
 	for (char* sq = *(char**)(grp + 0x0C); sq; sq = *(char**)(sq + 4)) {
 		void** vt = *(void***)sq;
 		if (!((IsSubFn)vt[1])(sq, nullptr, 0x604) || !(*(uint8_t*)(sq + 0x152) & 2)) continue;
 		if (InSquadBox(sq, lp) || NoLockKeepsSquad(sq) || GuardKeepsSquad(sq)) continue;   // (Romans by a waiting / downed hero stay)
-		if (InSquadBox(sq, pa) || InSquadBox(sq, po)) {
+		bool inL = InSquadBox(sq, pl), inN = InSquadBox(sq, pn);
+		if (inL || (inN && (!forLeader || ProximityHeroFighting(other)))) {
 			if (InterlockedIncrement(&g_squadsSpared) % 300 == 1)
 				Log("proximity: out of Romans; squad %p kept for the player in it", sq);
 			continue;
+		}
+		if (inN) {
+			HoldBack(sq, squad);
+			if (InterlockedIncrement(&g_squadsTaken) <= 20)
+				Log("proximity: out of Romans; squad %p, with only %s in its box (not fighting), sends its Romans back for squad "
+				    "%p coming alive round %s", sq, HeroName(other), squad, HeroName(lead));
 		}
 		((VoidFn)vt[34])(sq, nullptr);
 	}
@@ -1039,6 +1100,8 @@ void __fastcall EnemyTickHook(char* life, void* edx, char* dt) {
 		if (inL) {
 			((DtFn)vt[31])(sq, nullptr, dt);
 			if (shared) SplitSquad(sq, t.Leader(), lead, nl, other);
+		} else if (inO && !(*(uint8_t*)(sq + 0x152) & 2) && HeldBackFor(grp, sq, nl)) {
+			*(float*)(sq + 0x138) += *(float*)(dt + 0xC);   // asleep, as below
 		} else if (inO) {
 			uint8_t leader = tr[0x2C], companion = tr[0x2D];
 			tr[0x2C] = (uint8_t)nl;

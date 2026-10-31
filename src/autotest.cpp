@@ -3688,6 +3688,21 @@ const Step kGuard41A[] = {
 	HEALO(37000), SHOT(37500, "guard41a_4"), HEALO(39500), SHOT(41500, "guard41a_5"), END(42000),
 };
 
+// pool36 (-Level 3): the user's "strange" LV3-6 run -- sector 6 loaded with
+// Obelix left at the level's start (squad #19's box, its Romans out for him),
+// Asterix taken into the fight below the walls (squad #4, sharing a pool with
+// #19): its Romans come (they did not till Obelix came over).
+const Step kPool36[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	SQUADS(2500, HERO_OBELIX, 5.0f),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(4000, HERO_ASTERIX, -185.5f, 3.2f, -228.2f),
+	{ 4200, S_WATCHENEMIES, 0, 0, 0, -185.5f, 3.2f, "watch romans", -228.2f },
+	HEALA(6000), SQUADS(7000, HERO_ASTERIX, 5.0f), SHOT(8000, "pool36_1"), HEALA(9000), SQUADS(12000, HERO_ASTERIX, 5.0f),
+	HEALA(12000), SQUADS(12100, HERO_OBELIX, 5.0f), SHOT(14000, "pool36_2"), HEALA(15000), SQUADS(18000, HERO_ASTERIX, 5.0f),
+	SHOT(18500, "pool36_3"), END(19000),
+};
+
 // poolkinds (any level): every squad's pools -- the enemy kind (component class,
 // flags, shield points), a Roman of each pool (its bones, its model's textures) and
 // whether it may guard a downed hero (guard.cpp).
@@ -7230,6 +7245,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("guard41", kGuard41),
 	SCENARIO("guard41m", kGuard41M),
 	SCENARIO("guard41a", kGuard41A),
+	SCENARIO("pool36", kPool36),
 	SCENARIO("poolkinds", kPoolKinds),
 	SCENARIO("spots26", kSpots26),
 	SCENARIO("twistroman", kTwistRoman),

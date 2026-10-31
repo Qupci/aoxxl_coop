@@ -3279,3 +3279,21 @@ both halves).
   XXL_OBELIXPOTION=0 XXL_NOLOCKPAUSE=4000 XXL_NOLOCKCORK=0): before, 4 of #3's at #4's marker; now "#3's fight has
   not begun", 3 of #29's (the pool of the 3 spear Romans the level places on the ledge: begun) at #4's marker,
   round Obelix. nolock34m as in round 174. ini text for nolock_romans.
+- Round 177 (user's "strange" LV3-6 run, userlogs 20261031-xxl_coop.lv3-6_nolock_off_strange.log: a sector jump at
+  9 s left Obelix at the level's start with sector 1 unloaded -- "everyone moved along" -- and Asterix by the keg;
+  squad #4's fight began but its Romans did not come until Obelix was brought over at 51 s). Squads #18 / #19 (the
+  level's start; #19 shares a pool with #4) were awake for Obelix in their boxes, their Romans out. Squad #4 coming
+  alive (vf33 0x52EF70; with the pool's free list empty it calls vf36 0x52F850, which puts away -- vf34 -- every
+  awake squad of its group whose box does not hold the camera's look-at) found the pool dry, and proximity.cpp
+  SquadFreeHook kept every squad with a hero in its box (LV5-8's squads round Obelix freed each other every frame):
+  #4 placed 3 of its starting Romans, and the 11 it sent in next waited (+0x14 asked 8 / 3) for good. Now, for a
+  squad coming alive round the leader only (not g_squadForNonLeader -- EnemyTickHook's non-leader pass swaps the
+  trio's leader, so t.Leader() is the other hero there: the first try had the two sides freeing each other for 4
+  frames), a squad with only the other hero in its box, not fighting (ProximityHeroFighting), is put away (log, cap
+  20) and held back (HoldBack): EnemyTickHook's non-leader pass does not run its vf31 while it is asleep -- a hero in
+  an asleep squad's box wakes it the next frame, and it took the pool's Romans straight back before the fight's next
+  ones were sent in (second try: 4 + 1 out, 6 + 3 asked for good) -- until the squad it was put away for is asleep,
+  gone or has nothing left to send (MoreToSend: a pool endless, sent short of its count, or some asked), or that
+  hero fights (log "may come alive ... again", cap 20). Never the other way round. Autotest pool36 (-Level 3):
+  sector 6 loaded, Obelix left at the start (#18 / #19 awake for him), Asterix taken into #4's fight: before, #4 2 +
+  1 out and asked 8 / 3 to the end; now #18 / #19 put away and asleep, #4 10 + 3 out, 1 asked (a marker in view).
