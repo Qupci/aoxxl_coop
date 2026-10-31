@@ -3297,3 +3297,15 @@ both halves).
   hero fights (log "may come alive ... again", cap 20). Never the other way round. Autotest pool36 (-Level 3):
   sector 6 loaded, Obelix left at the start (#18 / #19 awake for him), Asterix taken into #4's fight: before, #4 2 +
   1 out and asked 8 / 3 to the end; now #18 / #19 put away and asleep, #4 10 + 3 out, 1 asked (a marker in view).
+- Round 178 (user's pad test of rounds 175-177: guards good, LV3-6's squad #3 no longer early, Romans keep coming
+  while a hero stands idle; userlogs 20261031-xxl_coop.lv3-6_wierd_squad.log: LV3-6's fight won, then Romans of
+  "an unknown squad" -- the ledge squad #29, never fought, at 2 s into Obelix's wait, while #4's 21 s pause after
+  its win ran -- walked backwards. Asked: revenge first, a nearby squad not yet beaten only as a fallback; the first
+  group 5-25 s after the wait begins). nolock.cpp SendGroup: Revenge (brought over if need be) first; with none
+  cooled down, RevengeSoon (a won squad still in its pause that could send then, as Revenge takes them) -> w.next
+  at the end of the shortest pause (log "Romans for X from squad #N's won fight in S s", 3 a wait); only with no
+  won fight's Romans to come: SquadAtOwnMarker, SquadFor(left), SquadFor(spent). FirstMs: the first try 5000 +
+  Random(20001) ms after the wait begins (kFirstMs 2 s before; logged with "would be kept waiting"); test aid
+  XXL_NOLOCKFIRST (ms). Autotest nolock36w (XXL_NOLOCKPAUSE=20000 XXL_NOLOCKFIRST=4000): #4 won at 13.3 s -> at
+  18.4 "from squad #4's won fight in 15 s", 4 of #4's Romans at 33.3 s (before: #29's at 16.4). freeromans23 (no
+  aids): "the first in 24 s" (the test's wait ends at 35.8: none came). ini text for nolock_romans.

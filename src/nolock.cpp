@@ -21,12 +21,14 @@
 // (LV3-4: Obelix shut in the library while Asterix fights in the courtyard) or
 // held by a sequence -- Romans come for it in groups of 1 to 6, the next group
 // 20 to 90 s (mostly about 30) after the last of a group is gone, so the free
-// player has something to do until the other lifts the wait. They go after
-// that hero wherever it goes and start no fight music. Never for the leader:
-// the one in the locked fight (the level's scripts follow it). A squad whose
-// fight was won sends its Romans back ("revenge") 20 to 90 s after the win, from
-// anywhere in the level: its box is moved over the waiting hero meanwhile. None
-// from a squad whose fight has not begun (NotBegun) or is under way at a gate.
+// player has something to do until the other lifts the wait; the first 5 to 25
+// s after the wait begins. They go after that hero wherever it goes and start
+// no fight music. Never for the leader: the one in the locked fight (the level's
+// scripts follow it). They come from a squad whose fight was won ("revenge",
+// the user's choice), 20 to 90 s after the win, from anywhere in the level: its
+// box is moved over the waiting hero meanwhile. Only while no fight has been won
+// yet, from a squad whose box holds the hero -- never one whose fight has not
+// begun (NotBegun) or is under way at a gate.
 //
 // Romans come from a squad's pools: vf55 (CKGrpSquadEnemy, the squad script's
 // "send in at a point", thiscall(args) -- args { count, Vector3* point, pool or
@@ -43,7 +45,6 @@
 namespace {
 
 const int   kMaxGroup = 6;
-const DWORD kFirstMs  = 2000;   // the first group, after the wait begins
 const DWORD kRetryMs  = 6000;   // no Roman could come: the next try
 
 // The game's rand() is its own; this one is seeded from the clock.
@@ -61,11 +62,19 @@ DWORD PauseMs() {
 	return 20000 + (DWORD)(70000.0f * u * u * u);
 }
 
+// The first group, 5 to 25 s after the wait begins (the user: not behind the
+// hero the moment the heroes part).
+DWORD FirstMs() {
+	static const char* s_test = getenv("XXL_NOLOCKFIRST");   // autotests: a fixed delay (ms)
+	return s_test ? (DWORD)atoi(s_test) : 5000 + Random(20001);
+}
+
 struct Waiting {
 	bool  on = false;
 	DWORD next = 0;      // the next group, once none of the last is left
 	int   groups = 0;
 	int   noneTold = 0;
+	int   soonTold = 0;
 } g_wait[2];
 
 // A Roman sent for a hero, until beaten or put away: in its pool record's list
@@ -538,6 +547,26 @@ char* Revenge(int hero, DWORD now, unsigned* idx) {
 	return (char*)GetLvlObject(4, 26, cand[k]);
 }
 
+// A squad whose fight was won, still in its pause after the win, that could
+// send Romans then (as Revenge takes them): the time till the first such pause
+// is over (`ms`, its squad `idx`).
+bool RevengeSoon(int hero, DWORD now, DWORD* ms, unsigned* idx) {
+	bool any = false;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n && i < kMaxSquads; i++) {
+		char* sq = (char*)GetLvlObject(4, 26, i);
+		bool left;
+		if (!sq || g_wonSq[i] != sq || !g_won[i] || CooledDown(i, now) || !Completed(sq) || g_moved[1 - hero].sq == sq ||
+		    WakeStartsOver(sq) || !SquadCanSend(sq, &left))
+			continue;
+		DWORD rest = g_wonPause[i] - (now - g_wonAt[i]);
+		if (any && rest >= *ms) continue;
+		*ms = rest;
+		*idx = i;
+		any = true;
+	}
+	return any;
+}
+
 // Seen by a player as the squads' markers are (proximity.cpp): a wall between
 // counts as out of view.
 bool InAView(const Vector3& p) {
@@ -643,22 +672,34 @@ char* SquadAtOwnMarker(Trio t, Hero h, unsigned* idx, Vector3* at) {
 
 // A group of 1 to 6 Romans, all from one squad at one point, each from a pool
 // picked at random (PickPool) -- fewer if the squad runs out of free Romans. The
-// squad: one whose box holds the hero with Romans left (at its own marker, else
-// SpawnPoint's); else one whose fight was won a while ago (Revenge, brought over
-// if need be); else a spent one whose box holds the hero.
+// squad: one whose fight was won a while ago (Revenge, brought over if need be:
+// the user's choice -- LV3-6's ledge squad, not fought yet, sent its spear
+// Romans while the fight below was in its pause); one still in its pause after
+// the win is waited for. With no won fight's Romans to come: one whose box holds
+// the hero with Romans left (at its own marker, else SpawnPoint's); else a spent
+// one whose box holds the hero.
 void SendGroup(int hero, Trio t, Hero h, DWORD now) {
 	Waiting& w = g_wait[hero];
 	unsigned idx = 0;
 	Vector3 at;
 	const char* how = "its squad's spawn marker";
-	char* sq = g_config.noLockRomansAnyMarkers ? nullptr : SquadAtOwnMarker(t, h, &idx, &at);
-	bool placed = sq != nullptr, revenge = false, brought = false;
-	if (!sq) sq = SquadFor(h.Pos(), &idx, true);
-	if (!sq && (sq = Revenge(hero, now, &idx)) != nullptr) {
+	bool placed = false, revenge = false, brought = false;
+	char* sq = Revenge(hero, now, &idx);
+	if (sq) {
 		revenge = true;
 		if (!InBox(sq, h.Pos()) && !(brought = MoveBox(hero, sq, idx, h.Pos()))) sq = nullptr;   // (no graph here)
 	}
-	if (!sq) { sq = SquadFor(h.Pos(), &idx, false); revenge = false; }
+	DWORD soon;
+	if (!sq && RevengeSoon(hero, now, &soon, &idx)) {
+		w.next = now + soon;
+		if (w.soonTold++ < 3)
+			Log("nolock: Romans for %s from squad #%u's won fight in %.0f s (its pause after the win)", HeroName(hero), idx,
+			    soon / 1000.0f);
+		return;
+	}
+	if (!sq && !g_config.noLockRomansAnyMarkers) placed = (sq = SquadAtOwnMarker(t, h, &idx, &at)) != nullptr;
+	if (!sq) { sq = SquadFor(h.Pos(), &idx, true); revenge = false; }
+	if (!sq) sq = SquadFor(h.Pos(), &idx, false);
 	if (!sq) {
 		if (w.noneTold++ < 3) Log("nolock: no squad with Romans to send for %s (awake, or its fight won a while ago)", HeroName(hero));
 		return;
@@ -795,12 +836,13 @@ void NoLockRomansFrame() {
 		Waiting& w = g_wait[hero];
 		bool waiting = h && CoopNoLockWaiting(hero);
 		if (waiting == w.on) continue;
-		Log("nolock: %s %s", HeroName(hero),
-		    waiting ? "would be kept waiting by the level -- Romans will come for it"
-		            : "is no longer kept waiting -- no more Romans for it");
 		w = Waiting();
 		w.on = waiting;
-		w.next = now + kFirstMs;
+		DWORD first = FirstMs();
+		w.next = now + first;
+		if (waiting) Log("nolock: %s would be kept waiting by the level -- Romans will come for it (the first in %.0f s)",
+		                 HeroName(hero), first / 1000.0f);
+		else Log("nolock: %s is no longer kept waiting -- no more Romans for it", HeroName(hero));
 		if (waiting) DumpAround(hero, h);
 		else RestoreBox(hero, "the wait is over");
 	}
