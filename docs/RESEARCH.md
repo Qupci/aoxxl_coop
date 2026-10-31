@@ -3359,3 +3359,19 @@ both halves).
 - Round 182 (user: no-lock Romans on by default). config.h noLockRomans true; dist ini nolock_romans = on. The
   user's ini had lost [coop] romans_spawn_in_view (an older copy saved over it from Notepad): put back as in dist
   (off -- the default when the key is missing too, so the Romans the user saw come in in view were not from it).
+- Round 183 (user's pad test of round 181: the LV3-6 pier Roman still ran on the spot; userlogs
+  20261031-160145-xxl_coop.lv3-6_roman_stuck_running2.log + screenshots/Snipaste_2026-10-31_16-01-35.png). The log:
+  squad #4's first Roman (of 2; its spot clamped to x -132.5, 4.5 north of it on the pier's wall cells -- PFDUMP:
+  2x2 cells, the row z -233.7 walkable, the one north of it walls) held back at (-132.0 -1.9 -233.2), the box's x
+  max, given up at 147.5 s ("it stands where it is") and held back still (+0x24 bit 14 on, no change logged) to
+  the level's end at 169 s, Obelix standing at (-124.7 -4.0 -231.1). nolock36s with XXL_NOLOCKNOCLAMP=1 (trace now
+  with the frame +0x80, +0x38 and the slot): one given up at x -131.99, its slot its own place, stayed held in
+  0x27 (turning) for 2.7 s, to Obelix's next move; ones given up at -132.01 / -132.04 stood (0x22). Turning to
+  face the hero -- out of the box -- a Roman on the edge steps out, is put back (0x4CEE00: out of the box with
+  +0x38 inside -> +0x2C = +0x38, bit 14, return), and never turns round. The tick read: bit 14 also comes without
+  a put-back (FUN_0045c560 false, or FUN_0045d7e0 true). nolock.cpp NoLockSteer: the stand spot of a given-up
+  Roman is its place kept 0.5 units in from the box's x / z edges (KeepInBox, the slots' clamp). nolock36s +
+  XXL_NOLOCKNOCLAMP: 12 trace samples held and given up before, 0 after (all 3 step 0.3-0.75 in, 0x22 / 0x23).
+  Autotest nolock36v (nolock36s's env, XXL_NOLOCKGROUP=2): the user's walk timed from the group's coming (log
+  offset 10.5-17 s here, not 5.9): both Romans stop at the edge on their own (0x22, x -132.5..-132.8), no give-up,
+  follow Obelix back -- the user's x -132.0 not reached in 3 runs.

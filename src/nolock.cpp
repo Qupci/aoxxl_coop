@@ -145,7 +145,7 @@ void WatchOut() {
 	Trio t = GetTrio();
 	if (!t) return;
 	typedef char*(__fastcall* CpntFn)(char* self, void* edx, int id);
-	char line[600];
+	char line[1200];
 	int len = _snprintf(line, sizeof(line), "nolock: trace (pos, hero / slot off, [reaction], bits):");
 	for (int i = 0; i < g_nOut && len > 0 && len < (int)sizeof(line); i++) {
 		const Out& o = g_out[i];
@@ -155,9 +155,12 @@ void WatchOut() {
 		if (!h || !slot) continue;
 		Vector3 hp = h.Pos();
 		float hx = hp.x - p[0], hz = hp.z - p[2], sx = slot[0] - p[0], sz = slot[2] - p[2];
-		len += _snprintf(line + len, sizeof(line) - len, " (%.1f %.1f %.1f) %.1f/%.1f [%02X] %X%s", p[0], p[1], p[2],
-		                 sqrtf(hx * hx + hz * hz), sqrtf(sx * sx + sz * sz), *(uint8_t*)(o.roman + 0x1A4),
-		                 *(uint32_t*)(o.roman + 0x24) & 0x4002, o.stuck ? " stuck" : "");
+		char* node = *(char**)(o.roman + 0x10);
+		const float* fp = node && *(char**)(node + 4) ? (const float*)(*(char**)(node + 4) + 0x80) : p;
+		const float* in = (const float*)(o.roman + 0x38);
+		len += _snprintf(line + len, sizeof(line) - len, " (%.2f %.1f %.2f) %.1f/%.1f [%02X] %X%s fr %.2f %.2f in %.2f %.2f slot %.2f %.2f",
+		                 p[0], p[1], p[2], sqrtf(hx * hx + hz * hz), sqrtf(sx * sx + sz * sz), *(uint8_t*)(o.roman + 0x1A4),
+		                 *(uint32_t*)(o.roman + 0x24) & 0x4002, o.stuck ? " stuck" : "", fp[0], fp[2], in[0], in[2], slot[0], slot[2]);
 	}
 	line[sizeof(line) - 1] = 0;
 	Log("%s", line);
@@ -984,10 +987,20 @@ bool GivenUp(Out& o, const float* rp, const Vector3& hp, const Vector3* other, f
 // too, and stay on its side -- within their squad's box (x / z, 0.5 units in):
 // the hero out of it, they wait at its edge (the Roman's tick holds one stepping
 // out at its last place inside every frame: it walked on the spot there); one
-// that can't get to its spot stands where it is (GivenUp). Each faces the hero
-// (slot +0xC, the formation's facing: a squad run for the other hero faces that
-// one -- LV3-6's ledge squad, run for Asterix up there, had its spear Romans
-// walk after Obelix backwards).
+// that can't get to its spot stands where it is (GivenUp), 0.5 units in from the
+// box's edge too: one standing on the edge turned on the spot for good, held
+// back, the hero facing out of the box (the user's LV3-6 Roman at x -132.0, given
+// up 1 s after, ran on the spot to the level's end; nolock36s with
+// XXL_NOLOCKNOCLAMP: one given up at x -131.99, 0x27 and held, to the hero's
+// next move -- ones at -132.01 and -132.04 stood). Each faces the hero (slot
+// +0xC, the formation's facing: a squad run for the other hero faces that one --
+// LV3-6's ledge squad, run for Asterix up there, had its spear Romans walk after
+// Obelix backwards).
+void KeepInBox(const float* b, float& x, float& z) {
+	x = x < b[0x4A] + 0.5f ? b[0x4A] + 0.5f : x > b[0x47] - 0.5f ? b[0x47] - 0.5f : x;
+	z = z < b[0x4C] + 0.5f ? b[0x4C] + 0.5f : z > b[0x49] - 0.5f ? b[0x49] - 0.5f : z;
+}
+
 void NoLockSteer(char* sq) {
 	if (!g_nOut) return;
 	Trio t = GetTrio();
@@ -1013,14 +1026,14 @@ void NoLockSteer(char* sq) {
 		float sx = hp.x + 2.5f * cosf(a), sz = hp.z + 2.5f * sinf(a);
 		const float* b = (const float*)sq;
 		static const bool s_noClamp = getenv("XXL_NOLOCKNOCLAMP") != nullptr;   // autotests: Romans held back at the box's edge
-		if (!s_noClamp) {
-			sx = sx < b[0x4A] + 0.5f ? b[0x4A] + 0.5f : sx > b[0x47] - 0.5f ? b[0x47] - 0.5f : sx;
-			sz = sz < b[0x4C] + 0.5f ? b[0x4C] + 0.5f : sz > b[0x49] - 0.5f ? b[0x49] - 0.5f : sz;
-		}
+		if (!s_noClamp) KeepInBox(b, sx, sz);
 		float sy = hp.y;
 		Hero oh = t.GetHero(1 - o.hero);
 		Vector3 op = oh ? oh.Pos() : Vector3();
-		if (GivenUp(o, rp, hp, oh ? &op : nullptr, sx, sz, now)) { sx = rp[0]; sy = rp[1]; sz = rp[2]; }
+		if (GivenUp(o, rp, hp, oh ? &op : nullptr, sx, sz, now)) {
+			sx = rp[0]; sy = rp[1]; sz = rp[2];
+			KeepInBox(b, sx, sz);
+		}
 		slot[0] = sx; slot[1] = sy; slot[2] = sz;
 		float dx = sx - rp[0], dz = sz - rp[2], len = sqrtf(dx * dx + dz * dz);
 		float f = len <= 0.01f ? 0.0f : 1.0f / (len > minStep ? len : minStep);
