@@ -3262,3 +3262,20 @@ both halves).
   (they fight him), 7.5 off (the first run, without kBusy: four stopped 3.0-4.7 from Asterix facing Obelix; with it
   none, back at their spots 1.1-2.8 from him, standing), 14 off. guard41m with XXL_GUARDRING=0.8: five stop 1 s
   after the fall (round 173: 2 s), then stand.
+- Round 176 (user: LV3-6's squad #3 -- its Romans come once the keg at (-183.8 5.5 -207.5) blows, in single player
+  (userlogs 20261031-xxl_coop.lv3-6_sp.log) and with nolock_romans off (_nolock_off_squad3.log) -- was there
+  before it with nolock_romans on (_nolock_squad3.log), one Roman "dying out of nowhere"; no jumping / jetpack
+  Romans, mobile towers or turtles for no-lock). Squad #3 before the keg: awake (Obelix in its box), gate -2, one
+  pool [alive 0, sent 0 of 60], at once 0/0 (none placed by the level): its script sends its Romans in at its
+  markers up on the walls once the keg blows, and its gate takes it then. nolock.cpp NotBegun(sq): +0x154 -2 and
+  every pool's sent +0x16 and alive +0x11 0 -> SquadCanSend false (log once per squad, cap 20; DumpAround tags
+  "(not begun)"). The user's log: 6 of #3's sent at #4's marker (-177.5 2.6 -227.1) at 84.8 s, beaten by Obelix
+  (+0x24 bit 1); one was put back by #3's script at its own marker (-183.3 5.7 -204.9) 0.1 s later, still taken
+  for ours (in its pool record's list, hook +8 bit 0 clear) and steered, knocked out up there 10 s on. StillOut:
+  +0x24 bit 1 counts as gone (WatchOut now runs before Prune so it still logs it; the line says "beaten, out of its
+  squad's box or on a deadly floor": the tick's last branch -- hook +0xB8 the floor, its +0x2A bit 2 -- sets bit 1
+  too). FreeRomans: no CKJumpingRomanCpnt (0x627CC0) pools either (jetpack, mobile tower and the four turtles were
+  out already: KeptAsIs). Autotest nolock36w (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_NOLOCKROMANSANY=1
+  XXL_OBELIXPOTION=0 XXL_NOLOCKPAUSE=4000 XXL_NOLOCKCORK=0): before, 4 of #3's at #4's marker; now "#3's fight has
+  not begun", 3 of #29's (the pool of the 3 spear Romans the level places on the ledge: begun) at #4's marker,
+  round Obelix. nolock34m as in round 174. ini text for nolock_romans.

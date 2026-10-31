@@ -25,7 +25,8 @@
 // that hero wherever it goes and start no fight music. Never for the leader:
 // the one in the locked fight (the level's scripts follow it). A squad whose
 // fight was won sends its Romans back ("revenge") 20 to 90 s after the win, from
-// anywhere in the level: its box is moved over the waiting hero meanwhile.
+// anywhere in the level: its box is moved over the waiting hero meanwhile. None
+// from a squad whose fight has not begun (NotBegun) or is under way at a gate.
 //
 // Romans come from a squad's pools: vf55 (CKGrpSquadEnemy, the squad script's
 // "send in at a point", thiscall(args) -- args { count, Vector3* point, pool or
@@ -79,13 +80,16 @@ bool SquadValid(char* sq, unsigned idx) {
 	return KalLevelIsLoaded() && idx < GetNumLvlClassInstances(4, 26) && (char*)GetLvlObject(4, 26, idx) == sq;
 }
 
+// Knocked out (+0x24 bit 1) is gone too: a squad's script may send the same
+// Roman in again at once (LV3-6's squad #3 put one beaten by Obelix back up on
+// its wall marker, still taken for ours).
 bool StillOut(const Out& o) {
 	if (!SquadValid(o.sq, o.sqIdx)) return false;
 	char* recs = *(char**)(o.sq + 0x144);
 	if (!recs || o.pool >= (int)*(unsigned*)(o.sq + 0x14C)) return false;
 	int guard = 0;
 	for (char* m = *(char**)(recs + 0x1C * o.pool + 8); m && guard++ < 256; m = *(char**)(m + 0x50))
-		if (m == o.roman) return !(*(uint8_t*)(m + 8) & 1);
+		if (m == o.roman) return !(*(uint8_t*)(m + 8) & 1) && !(*(uint32_t*)(m + 0x24) & 2);
 	return false;
 }
 
@@ -117,7 +121,7 @@ void WatchOut() {
 		s_told++;
 		Log("nolock: Roman %p of squad #%u at (%.1f %.1f %.1f)%s%s -- its squad's box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f",
 		    o.roman, o.sqIdx, p[0], p[1], p[2], bits & 0x4000 ? " held back (out of its squad's box or off the pathfinding)" : "",
-		    bits & 2 ? " knocked out: out of its squad's box" : bits ? "" : " free to go again", f[0x4A], f[0x47],
+		    bits & 2 ? " knocked out (beaten, out of its squad's box or on a deadly floor)" : bits ? "" : " free to go again", f[0x4A], f[0x47],
 		    f[0x4B], f[0x48], f[0x4C], f[0x49]);
 	}
 }
@@ -306,10 +310,14 @@ bool PoolHasRomans(const char* rec) {
 }
 
 // Free Romans of a pool record's kind; none of the enemies left as the level
-// has them (turtles, the mobile tower, jetpack Romans).
+// has them (turtles, the mobile tower, jetpack Romans) nor jumping Romans (the
+// user: such kinds make no sense coming for a hero).
+const uintptr_t kJumpingRomanCpnt = 0x627CC0;
+
 int FreeRomans(const char* rec) {
 	char* pool = *(char* const*)rec;
-	if (!pool || EnemyKindKeptAsIs(*(char* const*)(rec + 4))) return 0;
+	char* cpnt = *(char* const*)(rec + 4);
+	if (!pool || EnemyKindKeptAsIs(cpnt) || (cpnt && *(uintptr_t*)cpnt == kJumpingRomanCpnt)) return 0;
 	typedef char** (__fastcall* ListFn)(char* self, void* edx);
 	char** head = ((ListFn)(*(void***)pool)[12])(pool, nullptr);
 	int n = 0;
@@ -427,12 +435,39 @@ void NoteWonSquads(DWORD now) {
 
 bool CooledDown(unsigned i, DWORD now) { return i < kMaxSquads && g_won[i] && now - g_wonAt[i] >= g_wonPause[i]; }
 
+// A squad whose fight is yet to begin: none of its Romans sent in or placed
+// (every pool's sent +0x16 and alive +0x11 0), no gate on it (+0x154 -2). Its
+// script sends them in as the fight begins -- LV3-6's squad #3 once the keg
+// blows (at its markers up on the walls; awake before that, Obelix in its box):
+// Romans of it for a waiting hero came early (the user saw them before the
+// keg), and its script put the beaten ones back up on its markers.
+bool NotBegun(const char* sq) {
+	if (*(const int8_t*)(sq + 0x154) >= -1) return false;
+	const char* recs = *(char* const*)(sq + 0x144);
+	unsigned nr = *(const unsigned*)(sq + 0x14C);
+	for (unsigned r = 0; recs && r < nr && r < 16; r++)
+		if (*(const uint16_t*)(recs + r * 0x1C + 0x16) || recs[r * 0x1C + 0x11]) return false;
+	return true;
+}
+
 // A squad that can send a Roman: its AI running (+0x152 bit 1, not 0x2000) or
-// its fight over (revenge: woken for them, SendGroup), a pool to send it from;
-// `left`: Romans left to send in.
+// its fight over (revenge: woken for them, SendGroup), its fight begun, a pool
+// to send it from; `left`: Romans left to send in.
 bool SquadCanSend(char* sq, bool* left) {
 	if (!sq || (*(uint16_t*)(sq + 0x152) & 0x2000)) return false;
 	if (!(*(uint8_t*)(sq + 0x152) & 2) && !Completed(sq)) return false;
+	if (NotBegun(sq)) {
+		static const char* s_told[8];
+		static int s_nTold = 0;
+		bool told = false;
+		for (int i = 0; i < 8; i++) told |= s_told[i] == sq;
+		if (!told && s_nTold < 20) {
+			s_told[s_nTold++ % 8] = sq;
+			Log("nolock: squad %p's fight has not begun (nothing sent in or placed) -- no Romans of it for a waiting hero "
+			    "till then", sq);
+		}
+		return false;
+	}
 	int w[8];
 	if (!PoolWeights(sq, w)) return false;
 	char* recs = *(char**)(sq + 0x144);
@@ -708,9 +743,9 @@ void DumpAround(int hero, Hero h) {
 		Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
 		if ((c - h.Pos()).len2() > 60.0f * 60.0f) continue;
 		char buf[400];
-		int k = sprintf(buf, "nolock:   squad #%u %p box centre (%.1f %.1f %.1f) size %.0fx%.0f, y %.1f..%.1f, active %d gate %d markers %u pools:",
+		int k = sprintf(buf, "nolock:   squad #%u %p box centre (%.1f %.1f %.1f) size %.0fx%.0f, y %.1f..%.1f, active %d gate %d%s markers %u pools:",
 		                i, sq, c.x, c.y, c.z, f[0x47] - f[0x4A], f[0x49] - f[0x4C], f[0x4B], f[0x48], (*(uint8_t*)(sq + 0x152) >> 1) & 1,
-		                *(int8_t*)(sq + 0x154), *(char**)(sq + 0x5C) ? *(unsigned*)(sq + 0x64) : 0);
+		                *(int8_t*)(sq + 0x154), NotBegun(sq) ? " (not begun)" : "", *(char**)(sq + 0x5C) ? *(unsigned*)(sq + 0x64) : 0);
 		char* recs = *(char**)(sq + 0x144);
 		for (unsigned p = 0, np = *(unsigned*)(sq + 0x14C); recs && p < np && p < 4; p++) {
 			const char* r = recs + 0x1C * p;
@@ -745,8 +780,8 @@ void NoLockRomansFrame() {
 		for (Moved& m : g_moved) m = Moved();
 		return;
 	}
+	WatchOut();   // (before Prune drops one knocked out)
 	Prune(now);
-	WatchOut();
 	NoteGatedSquads();
 	NoteWonSquads(now);
 	if (!g_config.noLock || !g_config.noLockRomans || !CoopP2Joined() || CoopSuspended()) {
