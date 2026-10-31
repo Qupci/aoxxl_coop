@@ -3247,3 +3247,18 @@ both halves).
     from the courtyard (no move: its box holds the library); those taken off -> 2 from #19 brought over; Asterix
     pulls the lever -> the wait over, #19's box back, its 2 Romans knocked out at once. nolock34r (no pause aid): the
     courtyard won -> "in 23 s", none came to the run's end (round 172: at once). freeromans23: 1 from squad #36.
+- Round 175 (user's pad test of rounds 173-174: the guards are fun, no backing off; asked for the stuck rule at 1 s;
+  userlogs 20261031-xxl_coop.lv4-1_inf_walk.log, LV4-1: at the end a guard walked on the spot for good against
+  downed Asterix's body, its spot behind it). guard.cpp Unstick: a guard walking (+0x1A4 0x24 on) that has not got
+  0.2 units nearer its spot in 1 s takes the place it stands on as its spot. Reset by: progress, at its spot (0.1),
+  engaged, reacting (below 0x22), more than 6.5 units from the downed hero, the standing hero within 4 units of it
+  (kBusy: a Roman goes for a hero near it on its own, facing it, 0x2A). Standing a moment between (0x22 / 0x23)
+  does not reset it. Round 173's rule reset on every frame a guard was 0.4 off its spot or less: the one pressed on
+  the body slid in and out of that (15 re-spots in the log, none at the end). The same log had guards re-spotted
+  at 6.1, 7.9 and 8.4 units from Asterix -- after Obelix (a hit landed on one there). Test aid XXL_GUARDTRACE: the
+  distances line every 15 frames (cap 400). Autotest guard41a (-Level 4, XXL_DOWNAT=0:13000 XXL_OBELIXPOTION=0
+  XXL_GUARDTRACE=1): Asterix down among LV4-1's lock fight Romans -- three guards walking against his body (0x2A,
+  0.5-1.5 off their spots, 1.3-2.8 from him) stop 1 s after the fall and stand (0x22); Obelix 3 off and round him
+  (they fight him), 7.5 off (the first run, without kBusy: four stopped 3.0-4.7 from Asterix facing Obelix; with it
+  none, back at their spots 1.1-2.8 from him, standing), 14 off. guard41m with XXL_GUARDRING=0.8: five stop 1 s
+  after the fall (round 173: 2 s), then stand.

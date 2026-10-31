@@ -28,11 +28,13 @@
 // Roman 2.8 off a guard's spot would) -- their slots 1.5 units off it, on each
 // one's side, kept within those 5 units of the downed hero (the squads' own slots
 // keep their distance from the hero they run for: they backed off as it came,
-// away from the downed hero); 6.5 off, back to their spots. A guard that has not
-// got 0.2 units nearer its spot for 2 s, 0.4 units or more off it (a wall,
-// another guard, the downed hero's body, a fight lock's dome: a Roman walks on
-// the spot even for a small step, or slides along what it presses on; once one
-// did for good), takes the place it stands on as its spot: it stops.
+// away from the downed hero); 6.5 off, back to their spots. A guard walking that
+// has not got 0.2 units nearer its spot for 1 s (a wall, another guard, the
+// downed hero's body, a fight lock's dome: a Roman walks on the spot even for a
+// small step, or slides back and forth along what it presses on; once one did
+// for good) takes the place it stands on as its spot: it stops -- not one with
+// the standing hero within 4 units or more than 6.5 units from the downed hero
+// (after the standing hero on its own).
 // A guard blocks hits with a shield: its hook's component (+0x54, the pool
 // record's +4, shared by the pool's Romans) swapped for a copy of its own with
 // the shield flag (+4 bit 0x10) and shield points (+0x110) -- the hit code
@@ -51,9 +53,10 @@ const float  kRing         = 1.8f;
 const float  kEngage       = 5.0f;    // the standing hero this near the downed one: the guards fight it
 const float  kDisengage    = 6.5f;    // ... this far again: back to their spots
 const float  kClose        = 1.5f;    // the guards going for the standing hero: their slots this far off it
-const float  kStuckGain    = 0.2f;    // a guard not this much nearer its spot in kStuckMs,
-const DWORD  kStuckMs      = 2000;
-const float  kStuckOff     = 0.4f;    // ... this far off its spot or more: its spot is where it stands
+const float  kStuckGain    = 0.2f;    // a guard walking, not this much nearer its spot in kStuckMs,
+const DWORD  kStuckMs      = 1000;
+const float  kStuckOff     = 0.1f;    // ... more than this off it: its spot is where it stands
+const float  kBusy         = 4.0f;    // ... not with the standing hero this near it (a Roman's range 2.8 and some)
 const int    kShieldPoints = 2;       // a guard's shield, for a Roman without one: a 3-hit combo gets through
 const size_t kCpntSize     = 0x180;   // CKBasicEnemyCpnt (deserialized up to +0x174)
 const uintptr_t kBasicEnemyCpnt = 0x627BD0;
@@ -215,8 +218,9 @@ int g_watchLogs = 0;
 
 void WatchHits() {
 	static int s_frames = 0, s_rings = 0;
+	static const bool s_trace = getenv("XXL_GUARDTRACE") != nullptr;   // autotests: the line every 15 frames
 	Trio t = GetTrio();
-	if (g_n && t && ++s_frames % 120 == 0 && s_rings < 40) {   // how far the guards are from their hero / spot, [reaction]
+	if (g_n && t && ++s_frames % (s_trace ? 15 : 120) == 0 && s_rings < (s_trace ? 400 : 40)) {   // how far the guards are from their hero / spot, [reaction]
 		char line[500];
 		int len = _snprintf(line, sizeof(line), "guard: distances to the downed hero / spot:");
 		for (int i = 0; i < g_n && len > 0 && len < (int)sizeof(line); i++) {
@@ -347,30 +351,36 @@ void Engage(Trio t, int hero) {
 		    on ? "fight it" : "go back to their spots");
 }
 
-// A guard at its spot, getting nearer it, going for the standing hero or
-// reacting to a hit (+0x1A4 below 0x22: hurt, blocking, covering) is where it
-// should be; one that has not got 0.2 units nearer in 2 s, 0.4 units or more
-// off it, takes the place it stands on as its spot.
+// A guard at its spot (0.1 units off), getting nearer it, going for the standing
+// hero or reacting to a hit (+0x1A4 below 0x22: hurt, blocking, covering) is
+// where it should be; one walking (0x24 on) that has not got 0.2 units nearer
+// in 1 s takes the place it stands on as its spot. Standing a moment between
+// does not count: the user's LV4-1 guard pressed on downed Asterix's body walked
+// back and forth for good (round 173's rule took one 0.4 off or less as at its
+// spot). Not one with the standing hero within 4 units or more than 6.5 units
+// from the downed hero: it is after the standing hero (a Roman goes for a hero
+// near it on its own; walking on the spot facing it) -- one had its spot moved
+// after it, 8 units off; guard41a's stopped 4.3 off, the standing hero 7.5 off.
 void Unstick(Trio t, DWORD now) {
 	static int s_told = 0;
 	for (int i = 0; i < g_n; i++) {
 		Guard& g = g_guards[i];
-		Hero h = t.GetHero(g.hero);
+		Hero h = t.GetHero(g.hero), o = t.GetHero(1 - g.hero);
 		Vector3 p;
 		if (!h || !RomanPos(g.roman, &p)) continue;
 		Vector3 hp = h.Pos();
 		float ox = hp.x + g.dx - p.x, oz = hp.z + g.dz - p.z, off = sqrtf(ox * ox + oz * oz);
-		bool reacting = *(uint8_t*)(g.roman + 0x1A4) < 0x22;
-		if (g_engaged[g.hero] || reacting || off < kStuckOff || off < g.nearest - kStuckGain) {
+		uint8_t react = *(uint8_t*)(g.roman + 0x1A4);
+		if (g_engaged[g.hero] || react < 0x22 || off < kStuckOff || off < g.nearest - kStuckGain ||
+		    (p - hp).len2() > kDisengage * kDisengage || (o && (p - o.Pos()).len2() < kBusy * kBusy)) {
 			g.nearest = off;
 			g.since = now;
 			continue;
 		}
-		if (now - g.since < kStuckMs) continue;
+		if (react < 0x24 || now - g.since < kStuckMs) continue;
 		if (s_told++ < 30)
-			Log("guard: %p has not got nearer its spot for %.0f s, %.1f units off it (%.1f from %s, reaction %02X) -- its spot "
-			    "is where it stands", g.roman, kStuckMs / 1000.0f, off, sqrtf((p - hp).len2()), HeroName(g.hero),
-			    *(uint8_t*)(g.roman + 0x1A4));
+			Log("guard: %p walking, not nearer its spot for %.0f s, %.1f units off it (%.1f from %s, reaction %02X) -- its spot "
+			    "is where it stands", g.roman, (now - g.since) / 1000.0f, off, sqrtf((p - hp).len2()), HeroName(g.hero), react);
 		g.dx = p.x - hp.x; g.dz = p.z - hp.z;
 		g.nearest = 0.0f;
 		g.since = now;

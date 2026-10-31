@@ -3664,6 +3664,30 @@ const Step kGuard41M[] = {
 	HEALA(37000), SHOT(37500, "guard41m_4"), END(39000),
 };
 
+// guard41a (-Level 4, XXL_DOWNAT=0:13000 XXL_OBELIXPOTION=0 XXL_GUARDTRACE=1): the
+// user's LV4-1 the other way round -- Asterix down among the lock fight's Romans
+// at 13 s, Obelix (no potion, healed every 2.5 s) 12 units off, then 3 off (the
+// guards go for him), round Asterix 3.5 off, 7.5 off for 5 s (past the range: a
+// guard after him on its own keeps its spot), 14 off (back to their spots; one
+// pressed on Asterix's body walking on the spot stops within about 1 s).
+#define HEALO(t) { t, S_GIVE, HERO_OBELIX, 0, 0, 10.0f, 0, "heal obelix" }
+const Step kGuard41A[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_WATCHENEMIES, 0, 0, 0, -288.15f, 0.5f, "watch romans", 117.27f },
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	PLACEAT(8000, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), PLACEAT(8100, HERO_OBELIX, -294.0f, 0.5f, 90.0f),
+	HEALO(4500), HEALO(7000), HEALO(9500), HEALO(12000), PLACEAT(13300, HERO_OBELIX, -306.0f, 0.5f, 92.0f),
+	HEALO(14500), HEALO(17000), SHOT(17500, "guard41a_0"),
+	GLIDEBY(18000, HERO_OBELIX, -3.0f, 0.0f, 1500), HEALO(19500), SHOT(21000, "guard41a_1"),
+	GLIDEBY(21500, HERO_OBELIX, 0.0f, 3.5f, 1200), HEALO(22000), GLIDEBY(23000, HERO_OBELIX, 3.5f, 0.0f, 1200),
+	GLIDEBY(24500, HERO_OBELIX, 0.0f, -3.5f, 1200), HEALO(24600), GLIDEBY(26000, HERO_OBELIX, -3.5f, 0.0f, 1200),
+	HEALO(27000), SHOT(27500, "guard41a_2"), GLIDEBY(28000, HERO_OBELIX, -7.5f, 0.0f, 800), HEALO(29500),
+	HEALO(32000), SHOT(32500, "guard41a_3"), GLIDEBY(33000, HERO_OBELIX, -14.0f, 0.0f, 1500), HEALO(34500),
+	HEALO(37000), SHOT(37500, "guard41a_4"), HEALO(39500), SHOT(41500, "guard41a_5"), END(42000),
+};
+
 // poolkinds (any level): every squad's pools -- the enemy kind (component class,
 // flags, shield points), a Roman of each pool (its bones, its model's textures) and
 // whether it may guard a downed hero (guard.cpp).
@@ -7205,6 +7229,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("guard36", kGuard36),
 	SCENARIO("guard41", kGuard41),
 	SCENARIO("guard41m", kGuard41M),
+	SCENARIO("guard41a", kGuard41A),
 	SCENARIO("poolkinds", kPoolKinds),
 	SCENARIO("spots26", kSpots26),
 	SCENARIO("twistroman", kTwistRoman),
