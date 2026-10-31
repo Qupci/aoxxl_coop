@@ -3430,3 +3430,14 @@ both halves).
   12 s + 8 s), fuse2 (fusion hint on both, then each player's roles while fused), rage2 (player 2's RB: Rage done).
   Test aids S_HINTTEST / S_HINTSPARK / S_COMBOHINT (100 + k: first in line; -2: the Twister learned quietly).
   Autotests in a remote desktop session: the window minimised and restored at 1.5 s and 5 s (else white shots).
+- Round 186 (user's pad test of round 185: all worked; asked for): (1) every box's lines left-aligned (hints.cpp;
+  the left box's right-aligned lines read oddly). (2) combohints.cpp: a combo whose first button is A (Club, Power
+  Hammer, Twister, Mole) is pressed in the air -- with some of it lit, the hero off its feet (+0x384 bits 0-2) and
+  then on them again resets it (log "landed with n of the X's buttons"; autotest combohint2l: A, then A A). (3)
+  coop.cpp: the LB pass hint's count (3 a level) and "passed once" are per hero. (4) hud2.cpp LayoutFlask: the
+  flask at the game's own place again (0.08, 0.10 at 16:9), anchored to the corner by screen heights (0.142 from
+  the edge: the HUD's models are placed by shares of the width, so wider screens took it in from the corner) --
+  mirrored for player 2 side by side, at the bottom of his half right of the combo column (3/4 size) stacked; it
+  rises over a hint box under it (HintBoxRect: the plate as drawn, sliding included) to 0.01 above its top, at
+  interface +0x278 a second (the game's flask slide speed), and comes down after. hudhints shows it above both a
+  two-line (player 1) and a three-line (player 2, XXL_P2HERO=asterix) box.
