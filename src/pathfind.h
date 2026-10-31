@@ -15,6 +15,11 @@ int PfReachable(const Vector3& from, const Vector3& to);
 // One read of the graph for both ways.
 int PfConnected(const Vector3& a, const Vector3& b);
 
+// Does the straight line from `from` to `to` stay within the graph's node boxes
+// (x / z, y within 1 unit)? An enemy stepping out of them is put back where it
+// was (its tick, 0x4CEE00). PF_UNKNOWN when the level has no graph.
+int PfLineInNodes(const Vector3& from, const Vector3& to);
+
 // The box round the cells a hero at `from` can walk to (as PfReachable) within
 // `radius` units of it (x / z), from the lowest of their nodes' boxes to the
 // highest; false when `from` is in no node of the graph.

@@ -304,6 +304,22 @@ int PfReachable(const Vector3& from, const Vector3& to) {
 	return PF_NO;
 }
 
+int PfLineInNodes(const Vector3& from, const Vector3& to) {
+	Graph g;
+	if (!Load(&g)) return PF_UNKNOWN;
+	float dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+	int steps = (int)(sqrtf(dx * dx + dz * dz) / 0.25f) + 1;
+	for (int i = 0; i <= steps; i++) {
+		float k = (float)i / steps;
+		Vector3 p(from.x + dx * k, from.y + dy * k, from.z + dz * k);
+		bool in = false;
+		for (const Node& n : g.nodes)
+			if (Inside(n, p, 1.0f)) { in = true; break; }
+		if (!in) return PF_NO;
+	}
+	return PF_YES;
+}
+
 int PfConnected(const Vector3& a, const Vector3& b) {
 	Graph g;
 	if (!Load(&g)) return PF_UNKNOWN;

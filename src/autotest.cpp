@@ -3526,6 +3526,36 @@ const Step kNoLock36V[] = {
 	GLIDEAT(50000, HERO_OBELIX, -140.0f, 0.0f, -234.2f, 2000), SHOT(53000, "nolock36v_6"),
 	SQUADS(54000, HERO_OBELIX, 5.0f), END(56000),
 };
+// nolock36y (nolock36s's env, XXL_NOLOCKGROUP=4): the user's walk of userlogs
+// 20261101-012914-xxl_coop.lv3-6_roman_stuck_running_again.log, timed from the
+// group's coming (93.2 s there, ~16.5 s here) -- Obelix by #4's marker, then east
+// along the pier's row (z -233.7) out of #4's box to (-122.4 -1.8 -233.7), standing
+// there, Asterix far off; player 2's camera turned round to the Romans (the
+// user's idea). The user's second Roman was held back at (-132.0 -1.9 -233.6),
+// 0.8 units off its spot, gave up 1 s after and ran on the spot to the level's
+// end (14 s) -- here too (the squad's attacker slid along the crates onto #4's
+// box edge) before #4's box grew over Obelix's reach. Then back into the box.
+// (XXL_NOLOCKCORK=0: the user's ini locks Obelix at a corkscrew here.)
+const Step kNoLock36Y[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), ENDFIGHTWON(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -177.7f, 3.1f, -216.4f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -150.0f, 2.6f, "watch romans", -230.0f },
+	GLIDEAT(11000, HERO_OBELIX, -178.8f, 2.6f, -228.2f, 2000), SHOT(16000, "nolock36y_1"),   // the Romans come at ~16.5 s
+	GLIDEAT(17000, HERO_OBELIX, -176.9f, 2.6f, -230.3f, 3800), GLIDEAT(20900, HERO_OBELIX, -176.3f, 2.8f, -233.5f, 1300),
+	GLIDEAT(22300, HERO_OBELIX, -172.7f, 2.6f, -235.2f, 500), GLIDEAT(22900, HERO_OBELIX, -159.4f, 2.6f, -235.1f, 1900),
+	GLIDEAT(24900, HERO_OBELIX, -145.3f, 0.0f, -235.0f, 1900),
+	PLACEAT(26000, HERO_ASTERIX, -159.67f, 1.3f, -133.62f),   // the corkscrew took the user's Asterix out of #4's box
+	GLIDEAT(26900, HERO_OBELIX, -131.5f, -1.9f, -233.7f, 1900), GLIDEAT(28900, HERO_OBELIX, -122.4f, -1.8f, -233.7f, 1900),
+	VPADR(31000, 1, 1.0f, 0.0f, "p2 camera round to the Romans"), VPADR(32600, 1, 0.0f, 0.0f, "p2 camera still"),
+	SHOT(33000, "nolock36y_2"), SHOT(35000, "nolock36y_3"), SHOT(38000, "nolock36y_4"), SHOT(44000, "nolock36y_5"),
+	GLIDEAT(46000, HERO_OBELIX, -140.0f, 0.0f, -234.2f, 2000), SHOT(49000, "nolock36y_6"),
+	SQUADS(50000, HERO_OBELIX, 5.0f), END(52000),
+};
 // nolock36u (nolock36s's env): nolock36s's Romans by Obelix at #4's marker, then
 // Asterix far off and Obelix put at the ledge spot (-159.6 12.3 -209.0, in #4's
 // box) -- he drops into the water below (-159.5 -5.5 -208.9) -- for 10 s, then
@@ -7572,6 +7602,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("nolock36s", kNoLock36S),
 	SCENARIO("nolock36u", kNoLock36U),
 	SCENARIO("nolock36v", kNoLock36V),
+	SCENARIO("nolock36y", kNoLock36Y),
 };
 
 // Fixed spots (level 2), from players' logs.

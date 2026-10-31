@@ -82,10 +82,12 @@ struct Waiting {
 // level's still (a level change frees it) before anything is read. `nearest` /
 // `since` / (ax, az): how near its spot it has got, since when, and where it
 // was then (GivenUp); `stuck`: it stands where it is, given up on the spot at
-// (gx, gz) -- the walk to it checked again at `checked`.
+// (gx, gz) -- the walk to it checked again at `checked` -- since `stuckAt`
+// (`heldTold`: still held back a second on, logged).
 struct Out {
 	char* roman; char* sq; unsigned sqIdx; int pool; int hero; uint32_t boxBits; bool faced;
 	float nearest; DWORD since; float ax, az; bool stuck; float gx, gz; DWORD checked;
+	DWORD stuckAt; bool heldTold;
 };
 Out g_out[2 * kMaxGroup];
 int g_nOut = 0;
@@ -158,9 +160,11 @@ void WatchOut() {
 		char* node = *(char**)(o.roman + 0x10);
 		const float* fp = node && *(char**)(node + 4) ? (const float*)(*(char**)(node + 4) + 0x80) : p;
 		const float* in = (const float*)(o.roman + 0x38);
-		len += _snprintf(line + len, sizeof(line) - len, " (%.2f %.1f %.2f) %.1f/%.1f [%02X] %X%s fr %.2f %.2f in %.2f %.2f slot %.2f %.2f",
+		const float* fw = fp != p ? fp - 4 : p;   // (frame +0x70: forward)
+		len += _snprintf(line + len, sizeof(line) - len, " (%.2f %.1f %.2f) %.1f/%.1f [%02X] %X%s fr %.2f %.2f in %.2f %.2f slot %.2f %.2f node %d fw %.2f %.2f",
 		                 p[0], p[1], p[2], sqrtf(hx * hx + hz * hz), sqrtf(sx * sx + sz * sz), *(uint8_t*)(o.roman + 0x1A4),
-		                 *(uint32_t*)(o.roman + 0x24) & 0x4002, o.stuck ? " stuck" : "", fp[0], fp[2], in[0], in[2], slot[0], slot[2]);
+		                 *(uint32_t*)(o.roman + 0x24) & 0x4002, o.stuck ? " stuck" : "", fp[0], fp[2], in[0], in[2], slot[0], slot[2],
+		                 (int)*(int16_t*)(o.roman + 0xA8), fw[0], fw[2]);
 	}
 	line[sizeof(line) - 1] = 0;
 	Log("%s", line);
@@ -244,7 +248,8 @@ void EndFightsLeftToOurs() {
 // A squad whose fight was won, brought over to a waiting hero out of its box
 // (the user's idea: revenge from any won fight): its box (+0x11C.., max then
 // min -- its Romans out of it are sent off) round what the hero can walk to
-// within 60 units (PfReachBox; LV3-4's library: the library), grown as the hero
+// within 60 units (PfReachBox; LV3-4's library: the library) -- one holding the
+// hero keeps its own and has that added (MoveBox `keep`) -- grown as the hero
 // goes (every 1 s); its own box back once none of its Romans are out for the
 // hero (the next group may come from another squad) or the wait is over (any
 // still out are sent off then: bonus Romans). One per waiting hero.
@@ -262,7 +267,14 @@ bool ReachBox(const Vector3& at, float box[6]) {
 	return true;
 }
 
-bool MoveBox(int hero, char* sq, unsigned idx, const Vector3& at) {
+// `keep`: a squad whose box holds the hero keeps it, grown over what the hero can
+// walk to (the user: no-lock Romans go after the waiting hero anywhere; LV3-6's
+// squad #4, its box's east edge x -132.0 at the pier: the Roman going for Obelix
+// past it -- the squad's attacker walks straight at the hero, not to its slot --
+// slid along the pier's crates onto the edge, held back there, running on the
+// spot, in three of the user's runs and nolock36y; given up it stood, then went
+// for him again; LV2-1's squad #29's two by its west edge).
+bool MoveBox(int hero, char* sq, unsigned idx, const Vector3& at, bool keep) {
 	float box[6];
 	if (!ReachBox(at, box)) return false;
 	Moved& m = g_moved[hero];
@@ -271,11 +283,16 @@ bool MoveBox(int hero, char* sq, unsigned idx, const Vector3& at) {
 	m.idx = idx;
 	m.grown = GetTickCount();
 	memcpy(m.box, f, sizeof(m.box));
+	for (int k = 0; k < 3 && keep; k++) {
+		if (f[k] > box[k]) box[k] = f[k];
+		if (f[k + 3] < box[k + 3]) box[k + 3] = f[k + 3];
+	}
 	memcpy(f, box, sizeof(box));
 	if (g_groupLogs++ < 200)
-		Log("nolock: squad #%u %p brought over to %s -- its box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f -> x %.1f..%.1f y "
-		    "%.1f..%.1f z %.1f..%.1f (what %s can walk to within %.0f units)", idx, sq, HeroName(hero), m.box[3], m.box[0],
-		    m.box[4], m.box[1], m.box[5], m.box[2], f[3], f[0], f[4], f[1], f[5], f[2], HeroName(hero), kZoneReach);
+		Log("nolock: squad #%u %p %s %s -- its box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f -> x %.1f..%.1f y "
+		    "%.1f..%.1f z %.1f..%.1f (what %s can walk to within %.0f units)", idx, sq, keep ? "grown round" : "brought over to",
+		    HeroName(hero), m.box[3], m.box[0], m.box[4], m.box[1], m.box[5], m.box[2], f[3], f[0], f[4], f[1], f[5], f[2],
+		    HeroName(hero), kZoneReach);
 	return true;
 }
 
@@ -720,7 +737,7 @@ void SendGroup(int hero, Trio t, Hero h, DWORD now) {
 	char* sq = Revenge(hero, now, &idx);
 	if (sq) {
 		revenge = true;
-		if (!InBox(sq, h.Pos()) && !(brought = MoveBox(hero, sq, idx, h.Pos()))) sq = nullptr;   // (no graph here)
+		if (!InBox(sq, h.Pos()) && !(brought = MoveBox(hero, sq, idx, h.Pos(), false))) sq = nullptr;   // (no graph here)
 	}
 	DWORD soon;
 	if (!sq && RevengeSoon(hero, now, &soon, &idx)) {
@@ -742,6 +759,7 @@ void SendGroup(int hero, Trio t, Hero h, DWORD now) {
 		if (w.noneTold++ < 3) Log("nolock: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
 		return;
 	}
+	bool grown = revenge && !brought && MoveBox(hero, sq, idx, h.Pos(), true);
 	// A squad whose end has come already (spent, none of its Romans left) would
 	// send it again as these go.
 	bool ended = SquadSpent(sq) && !OthersAlive(sq);
@@ -788,7 +806,7 @@ void SendGroup(int hero, Trio t, Hero h, DWORD now) {
 		pk += sprintf(pools + pk, " %d", pool);
 	}
 	if (!sent) {
-		if (brought) RestoreBox(hero, "no Roman of it free");
+		if (brought || grown) RestoreBox(hero, "no Roman of it free");
 		if (asleep) {   // asleep again
 			typedef void(__fastcall* AwayFn)(char* self, void* edx);
 			((AwayFn)(*(void***)sq)[34])(sq, nullptr);
@@ -918,12 +936,22 @@ void NoLockHideFromFight(bool hide) {
 // A Roman out for a hero held back for 1 s on end (+0x24 bit 14: its every step
 // out of its squad's box or off the enemies' cells put back -- it runs on the
 // spot), getting neither 0.2 units nearer its spot nor 1 unit from where it was,
-// gives up on it and stands where it is, facing the hero (the user: Romans that
-// kept running for a place they could not get to -- LV3-6, one held at squad
-// #4's box edge for 9 s, Obelix on the pier past it; single player has it too),
-// until the spot it gave up on has moved 1.5 units and the level's pathfinding
-// has it walkable to from where the Roman stands (checked every 0.5 s at most),
-// or a hero comes within 4 units. Not one with a hero within 4 units (it goes
+// gives up on it (the user: Romans that kept running for a place they could not
+// get to -- LV3-6, one held at squad #4's box edge for 9 s, Obelix on the pier
+// past it; single player has it too) and stands where it is, facing as it does
+// (its slot its place, frame +0x80, its facing the frame's forward, +0x70, no
+// step -- each frame): neither a step nor a turn to make, however small -- one
+// held back finishes neither (each frame's move put back, or a cell its tick
+// flags; the user's LV3-6 Roman, given up at x -132.0 with a stand spot 0.5 in,
+// then one facing the hero, ran on the spot to the level's end three times;
+// nolock36s + XXL_NOLOCKNOCLAMP: one given up 0.01 in from the edge, its slot
+// where it stood and facing as it did then, turned 0.04 rad / stepped 0.05 out
+// onto a flagged cell, 0x27 / 0x25 and held for good; LV2-1's two held where they
+// came in), until the spot it gave up on has moved 1.5 units and
+// the level's pathfinding has it walkable to from where the Roman stands, the
+// straight line there within the graph's nodes as the Roman walks it (checked
+// every 0.5 s at most -- LV2-1's walk-to marker: walkable to, yet held again 1 s
+// on each time), or a hero comes within 4 units. Not one with a hero within 4 units (it goes
 // for that hero on its own) or reacting to a hit (+0x1A4 below 0x22), as for
 // guards (guard.cpp Unstick). Only held back: a Roman a wall stops stands on its
 // own (nolock36s / nolock36u: 4.8 to 26 units off its spot, 0x22), and one that
@@ -941,17 +969,25 @@ void Unstuck(Out& o, float off, const float* rp, DWORD now) {
 }
 
 bool GivenUp(Out& o, const float* rp, const Vector3& hp, const Vector3* other, float sx, float sz, DWORD now) {
-	static int s_told = 0;
+	static int s_told = 0, s_heldTold = 0;
 	float ox = sx - rp[0], oz = sz - rp[2], off = sqrtf(ox * ox + oz * oz);
 	float hx = hp.x - rp[0], hz = hp.z - rp[2];
 	float px = other ? other->x - rp[0] : kBusy, pz = other ? other->z - rp[2] : kBusy;
 	bool byHero = hx * hx + hz * hz < kBusy * kBusy || px * px + pz * pz < kBusy * kBusy;
 	if (o.stuck) {
+		// Diagnostics, once a give-up: held back still a second after it.
+		if (!o.heldTold && now - o.stuckAt >= kStuckMs && (*(uint32_t*)(o.roman + 0x24) & 0x4000)) {
+			o.heldTold = true;
+			if (s_heldTold++ < 20)
+				Log("nolock: Roman %p of squad #%u given up, held back still at (%.2f %.2f %.2f), reaction %02X", o.roman,
+				    o.sqIdx, rp[0], rp[1], rp[2], *(uint8_t*)(o.roman + 0x1A4));
+		}
 		float mx = sx - o.gx, mz = sz - o.gz;
 		if (!byHero) {
 			if (mx * mx + mz * mz < kRetryMove * kRetryMove || now - o.checked < kReachCheckMs) return true;
 			o.checked = now;
-			if (PfReachable(Vector3(rp[0], rp[1], rp[2]), Vector3(sx, hp.y, sz)) == PF_NO) return true;
+			Vector3 from(rp[0], rp[1], rp[2]), to(sx, hp.y, sz);
+			if (PfReachable(from, to) == PF_NO || PfLineInNodes(from, to) == PF_NO) return true;
 		}
 		o.stuck = false;
 		Unstuck(o, off, rp, now);
@@ -970,13 +1006,14 @@ bool GivenUp(Out& o, const float* rp, const Vector3& hp, const Vector3* other, f
 	}
 	if (now - o.since < kStuckMs) return false;
 	if (s_told++ < 40)
-		Log("nolock: Roman %p of squad #%u held back for %.1f s, %.1f units off its spot (%.1f from %s, reaction %02X) -- "
-		    "it stands where it is", o.roman, o.sqIdx, (now - o.since) / 1000.0f, off, sqrtf(hx * hx + hz * hz),
-		    HeroName(o.hero), react);
+		Log("nolock: Roman %p of squad #%u at (%.2f %.2f %.2f) held back for %.1f s, %.1f units off its spot (%.1f from %s, "
+		    "reaction %02X) -- it stands where it is", o.roman, o.sqIdx, rp[0], rp[1], rp[2], (now - o.since) / 1000.0f, off,
+		    sqrtf(hx * hx + hz * hz), HeroName(o.hero), react);
 	o.stuck = true;
 	o.gx = sx;
 	o.gz = sz;
-	o.checked = now;
+	o.checked = o.stuckAt = now;
+	o.heldTold = false;
 	return true;
 }
 
@@ -986,13 +1023,10 @@ bool GivenUp(Out& o, const float* rp, const Vector3& hp, const Vector3* other, f
 // 2.5 units off, spread out: they go after it out of their squad's fight zone
 // too, and stay on its side -- within their squad's box (x / z, 0.5 units in):
 // the hero out of it, they wait at its edge (the Roman's tick holds one stepping
-// out at its last place inside every frame: it walked on the spot there); one
-// that can't get to its spot stands where it is (GivenUp), 0.5 units in from the
-// box's edge too: one standing on the edge turned on the spot for good, held
-// back, the hero facing out of the box (the user's LV3-6 Roman at x -132.0, given
-// up 1 s after, ran on the spot to the level's end; nolock36s with
-// XXL_NOLOCKNOCLAMP: one given up at x -131.99, 0x27 and held, to the hero's
-// next move -- ones at -132.01 and -132.04 stood). Each faces the hero (slot
+// out at its last place inside every frame: it walked on the spot there) -- a
+// won fight's squad has its box grown over the hero's reach (MoveBox); one
+// that can't get to its spot stands where it is, facing as it does (GivenUp).
+// Each other one faces the hero (slot
 // +0xC, the formation's facing: a squad run for the other hero faces that one --
 // LV3-6's ledge squad, run for Asterix up there, had its spear Romans walk after
 // Obelix backwards).
@@ -1021,7 +1055,8 @@ void NoLockSteer(char* sq) {
 		float* slot = (float*)((CpntFn)(*(void***)o.roman)[12])(o.roman, nullptr, 0x46);
 		if (!fr || !slot) continue;
 		const float* rp = (const float*)(fr + 0x80);
-		float a = 6.2831853f * place / n[o.hero] + 1.3f * o.hero;
+		static const char* s_angle = getenv("XXL_NOLOCKANGLE");   // autotests: one spot for all (crowding)
+		float a = s_angle ? (float)atof(s_angle) : 6.2831853f * place / n[o.hero] + 1.3f * o.hero;
 		Vector3 hp = h.Pos();
 		float sx = hp.x + 2.5f * cosf(a), sz = hp.z + 2.5f * sinf(a);
 		const float* b = (const float*)sq;
@@ -1031,8 +1066,12 @@ void NoLockSteer(char* sq) {
 		Hero oh = t.GetHero(1 - o.hero);
 		Vector3 op = oh ? oh.Pos() : Vector3();
 		if (GivenUp(o, rp, hp, oh ? &op : nullptr, sx, sz, now)) {
-			sx = rp[0]; sy = rp[1]; sz = rp[2];
-			KeepInBox(b, sx, sz);
+			const float* fw = (const float*)(fr + 0x70);
+			float fl = sqrtf(fw[0] * fw[0] + fw[2] * fw[2]);
+			slot[0] = rp[0]; slot[1] = rp[1]; slot[2] = rp[2];
+			slot[6] = slot[7] = slot[8] = 0.0f;
+			if (fl > 0.01f) { slot[3] = fw[0] / fl; slot[4] = 0.0f; slot[5] = fw[2] / fl; }
+			continue;
 		}
 		slot[0] = sx; slot[1] = sy; slot[2] = sz;
 		float dx = sx - rp[0], dz = sz - rp[2], len = sqrtf(dx * dx + dz * dz);

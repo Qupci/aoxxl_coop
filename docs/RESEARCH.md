@@ -3441,3 +3441,35 @@ both halves).
   rises over a hint box under it (HintBoxRect: the plate as drawn, sliding included) to 0.01 above its top, at
   interface +0x278 a second (the game's flask slide speed), and comes down after. hudhints shows it above both a
   two-line (player 1) and a three-line (player 2, XXL_P2HERO=asterix) box.
+- Round 187 (user's pad test of round 183: the LV3-6 pier Roman still ran on the spot; userlogs
+  20261101-012914-xxl_coop.lv3-6_roman_stuck_running_again.log + screenshots/Snipaste_2026-11-01_01-29-09.png --
+  squad #4's 4 revenge Romans, Obelix east along the pier to (-122.4 -1.8 -233.7); one held back at (-132.0 -1.9
+  -233.6), 0.8 off its spot, 9.6 from Obelix, given up 1 s on, held back still (no change logged) to the level's end;
+  and 20261031-234345-xxl_coop.lv2-1_roman_stuck_running.log -- squad #29's revenge Romans sent from Obelix's
+  walk-to marker by its box's west edge: two held back from the start, given up and gone again over and over).
+  Autotest nolock36y (nolock36s's env, XXL_NOLOCKGROUP=4, XXL_NOLOCKCORK=0 -- the user's ini has
+  nolock_except_corkscrews on, which locked Obelix at his test spot): the user's walk timed from the group's
+  coming, then player 2's camera turned round with the right stick (VPADR 1.6 s, the user's idea) -- that run
+  reproduced the user's line exactly (held at (-132.01 -233.64), 0.8 off, 9.6 from Obelix, 0x28). Trace (now with
+  the Roman's pathfinding node +0xA8 and its frame's forward +0x70, verified: (1, 0) walking east): Romans don't
+  push each other (XXL_NOLOCKANGLE, a test aid: one spot for all -- 4 stood on one point); the crates on the pier
+  stop a Roman 0.55 short of a spot at z -233.0 ([22]); about 0.5 s on it walks again ([28]), not to its spot (north)
+  but east-south-east at Obelix (the squad's attacker goes straight at the hero -- one Roman a group, as in all the
+  user's logs), slides along the crates onto the box's east edge (x max -132.0) and is held back there; given up,
+  its slot its own place, no step and its own facing, it stayed held ([25] / [28], facing turning) -- pushed out of
+  the box each frame by what it stands against and put back, not by its slot. Put back by hand onto its trail (0.56
+  in, a test) it was on the edge again 0.15 s on. Fixes, nolock.cpp:
+  - MoveBox(keep): a revenge squad whose box holds the waiting hero has its box grown over what the hero can walk to
+    within 60 units (ReachBox: x -200.9..-132.0 -> -222.8..-116.8, then GrowBox as he goes, to -94.9) and its own
+    box back as for one brought over (none of its Romans left / the wait over). nolock36y x2: no hold-back (0 of
+    143 trace lines), the Romans walk onto the pier past the crates to 1.6-4 units from Obelix and knock him back;
+    nolock36u (Obelix in the water): 0 held.
+  - GivenUp: a Roman given up has, every frame, its slot its place (frame +0x80), no step (slot +0x18 zero) and its
+    facing its frame's forward -- nothing to walk or turn to, however small (round 183's stand spot 0.5 in from the
+    edge, and a fixed place / facing taken at the give-up, had it turn 0.04 rad or step 0.05 onto a cell its tick
+    flags: [27] / [25], held for good). nolock36s + XXL_NOLOCKNOCLAMP: every give-up "free to go again" within 30 ms,
+    173 trace samples given up -- all [22] / [23], none held (one of 3 held for 1.8 s before). It goes on again only
+    with the straight line to its spot within the graph's node boxes too (pathfind.cpp PfLineInNodes: every 0.25
+    units, y within 1; the tick puts back a step off them -- LV2-1's walk-to marker: walkable to, yet held again
+    1 s on each time). Log: one given up held back still 1 s on (cap 20); the give-up line has the place.
+  ini nolock_romans: a won fight's Romans follow the hero anywhere it walks; only other squads' wait at their edge.
