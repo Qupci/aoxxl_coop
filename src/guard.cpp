@@ -24,9 +24,15 @@
 // a spot the level's pathfinding graph can't reach from the hero (a wall, a drop)
 // is left out, one guard fewer -- and their squads are not put away meanwhile
 // (vf35). They leave the downed hero alone (out of the objects' slicing: HeroOut).
-// The standing hero within 5 units of the downed one: the guards fight it (their
-// squads' own slots, as a Roman 2.8 off a guard's spot would); 6.5 off, back to
-// their spots.
+// The standing hero within 5 units of the downed one: the guards go for it (as a
+// Roman 2.8 off a guard's spot would) -- their slots 1.5 units off it, on each
+// one's side, kept within those 5 units of the downed hero (the squads' own slots
+// keep their distance from the hero they run for: they backed off as it came,
+// away from the downed hero); 6.5 off, back to their spots. A guard that has not
+// got 0.2 units nearer its spot for 2 s, 0.4 units or more off it (a wall,
+// another guard, the downed hero's body, a fight lock's dome: a Roman walks on
+// the spot even for a small step, or slides along what it presses on; once one
+// did for good), takes the place it stands on as its spot: it stops.
 // A guard blocks hits with a shield: its hook's component (+0x54, the pool
 // record's +4, shared by the pool's Romans) swapped for a copy of its own with
 // the shield flag (+4 bit 0x10) and shield points (+0x110) -- the hit code
@@ -44,6 +50,10 @@ const float  kGuardReach   = 10.0f;
 const float  kRing         = 1.8f;
 const float  kEngage       = 5.0f;    // the standing hero this near the downed one: the guards fight it
 const float  kDisengage    = 6.5f;    // ... this far again: back to their spots
+const float  kClose        = 1.5f;    // the guards going for the standing hero: their slots this far off it
+const float  kStuckGain    = 0.2f;    // a guard not this much nearer its spot in kStuckMs,
+const DWORD  kStuckMs      = 2000;
+const float  kStuckOff     = 0.4f;    // ... this far off its spot or more: its spot is where it stands
 const int    kShieldPoints = 2;       // a guard's shield, for a Roman without one: a 3-hit combo gets through
 const size_t kCpntSize     = 0x180;   // CKBasicEnemyCpnt (deserialized up to +0x174)
 const uintptr_t kBasicEnemyCpnt = 0x627BD0;
@@ -54,8 +64,12 @@ Shield g_shields[kMaxGuards];
 
 // A guard, in its pool record's list (+8, chained +0x50) and not finished
 // (hook +8 bit 0) while it lasts; the squad checked to be the level's still.
-// Its spot: (dx, dz) from its hero.
-struct Guard { char* roman; char* sq; unsigned sqIdx; int pool; int hero; char* cpnt; int shield; float dx, dz; };
+// Its spot: (dx, dz) from its hero; the nearest it has been to it (`nearest`)
+// since `since`.
+struct Guard {
+	char* roman; char* sq; unsigned sqIdx; int pool; int hero; char* cpnt; int shield; float dx, dz;
+	float nearest; DWORD since;
+};
 Guard g_guards[kMaxGuards];
 int   g_n = 0;
 bool  g_down[2] = {};
@@ -202,15 +216,23 @@ int g_watchLogs = 0;
 void WatchHits() {
 	static int s_frames = 0, s_rings = 0;
 	Trio t = GetTrio();
-	if (g_n && t && ++s_frames % 120 == 0 && s_rings < 40) {   // how far the guards are from their hero
-		char line[300];
-		int len = _snprintf(line, sizeof(line), "guard: distances to the downed hero:");
+	if (g_n && t && ++s_frames % 120 == 0 && s_rings < 40) {   // how far the guards are from their hero / spot, [reaction]
+		char line[500];
+		int len = _snprintf(line, sizeof(line), "guard: distances to the downed hero / spot:");
 		for (int i = 0; i < g_n && len > 0 && len < (int)sizeof(line); i++) {
-			Hero h = t.GetHero(g_guards[i].hero);
+			const Guard& g = g_guards[i];
+			Hero h = t.GetHero(g.hero), o = t.GetHero(1 - g.hero);
 			Vector3 p;
-			if (h && RomanPos(g_guards[i].roman, &p))
-				len += _snprintf(line + len, sizeof(line) - len, " %s %.1f%s", HeroName(g_guards[i].hero),
-				                 sqrtf((p - h.Pos()).len2()), g_engaged[g_guards[i].hero] ? " (fighting)" : "");
+			if (!h || !RomanPos(g.roman, &p)) continue;
+			Vector3 hp = h.Pos();
+			float ox = hp.x + g.dx - p.x, oz = hp.z + g.dz - p.z;
+			uint8_t react = *(uint8_t*)(g.roman + 0x1A4);
+			if (g_engaged[g.hero] && o)
+				len += _snprintf(line + len, sizeof(line) - len, " %s %.1f [%02X] (fighting, %.1f from %s)", HeroName(g.hero),
+				                 sqrtf((p - hp).len2()), react, sqrtf((p - o.Pos()).len2()), HeroName(1 - g.hero));
+			else
+				len += _snprintf(line + len, sizeof(line) - len, " %s %.1f/%.1f [%02X]", HeroName(g.hero), sqrtf((p - hp).len2()),
+				                 sqrtf(ox * ox + oz * oz), react);
 		}
 		line[sizeof(line) - 1] = 0;
 		Log("%s", line);
@@ -245,10 +267,11 @@ bool HitLanded(const Guard& g) {
 // the level's pathfinding graph reaches from it (no graph here: all). Their count.
 int Spots(const Vector3& at, float dx[kPerHero], float dz[kPerHero], bool* graph) {
 	int ns = 0;
+	static const float s_ring = getenv("XXL_GUARDRING") ? (float)atof(getenv("XXL_GUARDRING")) : kRing;   // autotests: round 170's 0.8
 	*graph = PfReachable(at, at) != PF_UNKNOWN;
 	for (int s = 0; s < kPerHero; s++) {
 		float a = 6.2831853f * s / kPerHero + 0.7f;
-		Vector3 p(at.x + kRing * cosf(a), at.y, at.z + kRing * sinf(a));
+		Vector3 p(at.x + s_ring * cosf(a), at.y, at.z + s_ring * sinf(a));
 		if (*graph && PfReachable(at, p) != PF_YES) continue;
 		dx[ns] = p.x - at.x;
 		dz[ns++] = p.z - at.z;
@@ -298,7 +321,7 @@ void Collect(int hero, const Vector3& at) {
 		}
 		open[best] = false;
 		Guard& g = g_guards[g_n++];
-		g = { c[k].m, c[k].sq, c[k].i, c[k].r, hero, nullptr, -1, sx[best], sz[best] };
+		g = { c[k].m, c[k].sq, c[k].i, c[k].r, hero, nullptr, -1, sx[best], sz[best], 1e30f, GetTickCount() };
 		GiveShield(g);
 	}
 	g_engaged[hero] = false;
@@ -322,6 +345,36 @@ void Engage(Trio t, int hero) {
 	if (s_told++ < 60)
 		Log("guard: %s %.1f units from downed %s -- its guards %s", HeroName(1 - hero), d, HeroName(hero),
 		    on ? "fight it" : "go back to their spots");
+}
+
+// A guard at its spot, getting nearer it, going for the standing hero or
+// reacting to a hit (+0x1A4 below 0x22: hurt, blocking, covering) is where it
+// should be; one that has not got 0.2 units nearer in 2 s, 0.4 units or more
+// off it, takes the place it stands on as its spot.
+void Unstick(Trio t, DWORD now) {
+	static int s_told = 0;
+	for (int i = 0; i < g_n; i++) {
+		Guard& g = g_guards[i];
+		Hero h = t.GetHero(g.hero);
+		Vector3 p;
+		if (!h || !RomanPos(g.roman, &p)) continue;
+		Vector3 hp = h.Pos();
+		float ox = hp.x + g.dx - p.x, oz = hp.z + g.dz - p.z, off = sqrtf(ox * ox + oz * oz);
+		bool reacting = *(uint8_t*)(g.roman + 0x1A4) < 0x22;
+		if (g_engaged[g.hero] || reacting || off < kStuckOff || off < g.nearest - kStuckGain) {
+			g.nearest = off;
+			g.since = now;
+			continue;
+		}
+		if (now - g.since < kStuckMs) continue;
+		if (s_told++ < 30)
+			Log("guard: %p has not got nearer its spot for %.0f s, %.1f units off it (%.1f from %s, reaction %02X) -- its spot "
+			    "is where it stands", g.roman, kStuckMs / 1000.0f, off, sqrtf((p - hp).len2()), HeroName(g.hero),
+			    *(uint8_t*)(g.roman + 0x1A4));
+		g.dx = p.x - hp.x; g.dz = p.z - hp.z;
+		g.nearest = 0.0f;
+		g.since = now;
+	}
 }
 
 void Release(int hero) {
@@ -391,6 +444,7 @@ void GuardFrame() {
 		}
 		if (on) Engage(t, hero);
 	}
+	if (on) Unstick(t, GetTickCount());
 }
 
 void GuardSteer(char* sq) {
@@ -401,16 +455,24 @@ void GuardSteer(char* sq) {
 	float minStep = *(float*)(sq + 0xC0);
 	for (int i = 0; i < g_n; i++) {
 		const Guard& g = g_guards[i];
-		if (g.sq != sq || g_engaged[g.hero] || !OnDuty(g)) continue;   // (engaged: its squad's own slot)
-		Hero h = t.GetHero(g.hero);
+		if (g.sq != sq || !OnDuty(g)) continue;
+		Hero h = t.GetHero(g.hero), o = t.GetHero(1 - g.hero);
 		char* node = *(char**)(g.roman + 0x10);
 		char* fr = node ? *(char**)(node + 4) : nullptr;
 		float* slot = (float*)((CpntFn)(*(void***)g.roman)[12])(g.roman, nullptr, 0x46);
 		if (!h || !fr || !slot) continue;
 		const float* rp = (const float*)(fr + 0x80);
 		Vector3 hp = h.Pos();
-		float sx = hp.x + g.dx, sz = hp.z + g.dz;
-		slot[0] = sx; slot[1] = hp.y; slot[2] = sz;
+		float sx = hp.x + g.dx, sy = hp.y, sz = hp.z + g.dz;
+		if (g_engaged[g.hero] && o) {   // by the standing hero on its side, within kEngage of the downed one
+			Vector3 op = o.Pos();
+			float ax = rp[0] - op.x, az = rp[2] - op.z, al = sqrtf(ax * ax + az * az);
+			if (al < 0.01f) { ax = g.dx; az = g.dz; al = sqrtf(ax * ax + az * az); }
+			sx = op.x + kClose * ax / al; sy = op.y; sz = op.z + kClose * az / al;
+			float cx = sx - hp.x, cz = sz - hp.z, cl = sqrtf(cx * cx + cz * cz);
+			if (cl > kEngage) { sx = hp.x + cx * kEngage / cl; sz = hp.z + cz * kEngage / cl; }
+		}
+		slot[0] = sx; slot[1] = sy; slot[2] = sz;
 		float dx = sx - rp[0], dz = sz - rp[2], len = sqrtf(dx * dx + dz * dz);
 		float f = len <= 0.01f ? 0.0f : 1.0f / (len > minStep ? len : minStep);
 		slot[6] = dx * f; slot[7] = 0.0f; slot[8] = dz * f;

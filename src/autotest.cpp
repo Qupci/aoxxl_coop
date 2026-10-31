@@ -115,6 +115,7 @@ struct Step {
 // Hero `hero` put at / moved frame by frame to a point given by its coordinates.
 #define PLACEAT(t, hero, X, Y, Z)       { t, S_PLACE, hero, -1, 0, X, Y, "place", Z }
 #define GLIDEAT(t, hero, X, Y, Z, ms)   { t, S_GLIDE, hero, -1, ms, X, Y, "glide", Z }
+#define GLIDEBY(t, hero, DX, DZ, ms)    { t, S_GLIDE, hero, -2, ms, DX, 0, "glide by the other hero", DZ }
 
 // exp1: does a hero held in the player control state answer input? Player 1's
 // synthetic input goes to the shared action array, so if the theory holds both
@@ -3560,6 +3561,28 @@ const Step kGuard41[] = {
 	FH5(20000), SHOT(22400, "guard41_2"), FH5(22500), FC4(25000), FC4(26500), FC4(28000), FC4(29500), FC4(31000),
 	PLACEAT(32300, HERO_ASTERIX, -308.0f, 0.5f, 98.0f), HEALA(33000), HEALA(35500), SHOT(37500, "guard41_3"),
 	HEALA(38000), END(40000),
+};
+// guard41m (-Level 4, XXL_DOWNAT=1:13000 XXL_OBELIXPOTION=0): guard41's start
+// (Obelix down at 13 s among LV4-1's lock fight Romans, Asterix 12 units off),
+// then Asterix comes 3 units from Obelix (the guards go for him), walks round
+// him 3.5 units off, stands 5.5 units off (they stay within 5 of Obelix), and
+// goes 14 units off (back to their spots). XXL_GUARDRING=0.8 (round 170's ring:
+// spots in Obelix's body) for guards that never get to their spots.
+const Step kGuard41M[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_WATCHENEMIES, 0, 0, 0, -288.15f, 0.5f, "watch romans", 117.27f },
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	PLACEAT(8000, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), PLACEAT(8100, HERO_OBELIX, -294.0f, 0.5f, 90.0f),
+	HEALA(4500), HEALA(7000), HEALA(9500), HEALA(12000), PLACEAT(13300, HERO_ASTERIX, -306.0f, 0.5f, 92.0f),
+	HEALA(14500), HEALA(17000), SHOT(17500, "guard41m_0"),
+	GLIDEBY(18000, HERO_ASTERIX, -3.0f, 0.0f, 1500), HEALA(19500), SHOT(21000, "guard41m_1"),
+	GLIDEBY(21500, HERO_ASTERIX, 0.0f, 3.5f, 1200), HEALA(22000), GLIDEBY(23000, HERO_ASTERIX, 3.5f, 0.0f, 1200),
+	GLIDEBY(24500, HERO_ASTERIX, 0.0f, -3.5f, 1200), HEALA(24600), GLIDEBY(26000, HERO_ASTERIX, -3.5f, 0.0f, 1200),
+	HEALA(27000), SHOT(27500, "guard41m_2"), GLIDEBY(28000, HERO_ASTERIX, -5.5f, 0.0f, 800), HEALA(29500),
+	SHOT(31000, "guard41m_3"), HEALA(32000), GLIDEBY(32500, HERO_ASTERIX, -14.0f, 0.0f, 1500), HEALA(34500),
+	HEALA(37000), SHOT(37500, "guard41m_4"), END(39000),
 };
 
 // poolkinds (any level): every squad's pools -- the enemy kind (component class,
@@ -7102,6 +7125,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("sq36c", kSq36c),
 	SCENARIO("guard36", kGuard36),
 	SCENARIO("guard41", kGuard41),
+	SCENARIO("guard41m", kGuard41M),
 	SCENARIO("poolkinds", kPoolKinds),
 	SCENARIO("spots26", kSpots26),
 	SCENARIO("twistroman", kTwistRoman),
@@ -9189,11 +9213,14 @@ void RunStep(const Step& s) {
 	case S_GLIDE: {
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
-		if (!h || s.a < 0 || s.a >= HERO_COUNT || s.b < -1 || s.b >= kNumSpots) break;
+		if (!h || s.a < 0 || s.a >= HERO_COUNT || s.b < -2 || s.b >= kNumSpots) break;
+		Hero o = s.b == -2 && s.a <= HERO_OBELIX ? t.GetHero(1 - s.a) : Hero();   // GLIDEBY: (x, z) off the other hero
+		if (s.b == -2 && !o) break;
 		auto& g = at.glide[s.a];
 		g.on = true;
 		g.from = h.Pos();
-		g.to = s.b < 0 ? Vector3(s.x, s.y, s.z) : Vector3(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
+		g.to = s.b == -2 ? Vector3(o.Pos().x + s.x, o.Pos().y + 0.3f, o.Pos().z + s.z)
+		     : s.b < 0 ? Vector3(s.x, s.y, s.z) : Vector3(kSpots[s.b][0], kSpots[s.b][1], kSpots[s.b][2]);
 		g.start = GetTickCount();
 		g.ms = s.b < 0 ? (DWORD)s.buttons : (DWORD)s.x;
 		Log("autotest: %s gliding to spot %d over %d ms", HeroName(s.a), s.b, (int)s.x);

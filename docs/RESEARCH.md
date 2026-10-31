@@ -3189,3 +3189,19 @@ both halves).
   while the courtyard fight lasts; won at 20 s and put away (SQUADRESET) -- the game wakes it again (Obelix in its
   box) and 3-4 of its Romans come at the library marker and stay by Obelix to the end. freeromans23: a group of 5
   (squad #36, its box holds Obelix).
+- Round 173 (user's pad test of rounds 171-172, userlogs 20261031-0525-xxl_coop.log, LV2-1: the range is right, but
+  guards fighting the standing hero kept their squads' distance from it as it moved -- 4.4-7.2 off downed Obelix --
+  so they drifted off the downed hero (LV4-1 too); once a guard walked to its spot for good (the same log: one 5.6
+  off Obelix, 3.8 off its spot, for 10 s). guard.cpp: engaged, GuardSteer puts a guard's slot 1.5 units off the
+  standing hero on the guard's side, kept within kEngage (5) of the downed hero (the squad's own slots ring the
+  hero it runs for at its formation's distance). Unstick: a guard 0.4 units or more off its spot that has not got
+  0.2 nearer it in 2 s (not engaged, not reacting: +0x1A4 below 0x22) takes the place it stands on as its spot
+  (log). +0x1A4 as seen: 0x22 / 0x23 standing, 0x24-0x2A walking and turning (walking on the spot against the
+  downed hero's body: 0x27-0x29; a Roman walks even for a small step, or slides along what it presses on, so "not
+  nearer" rather than "not moved"). Diagnostics: the distances line has each guard's distance to its spot and
+  [reaction], engaged its distance to the standing hero. Test aids: XXL_GUARDRING (the ring, 0.8 = round 170's:
+  spots in the downed hero's body), GLIDEBY (S_GLIDE b -2: a glide to (x, z) off the other hero). Autotests:
+  guard41m (-Level 4, XXL_DOWNAT=1:13000 XXL_OBELIXPOTION=0: Asterix 3 units from downed Obelix, round him at 3.5,
+  5.5 off, then 14): fighting guards 1.1-3.3 off Obelix and 0.3-4.9 from Asterix; at 14, back at their spots,
+  standing [22]. With XXL_GUARDRING=0.8: four walked into Obelix ([27]-[29]) and took their places 2 s after the
+  fall, then 0.1-0.4 off their spots, [22] / [23]. guard41: shields block, a hit landed (mad); the rest as before.
