@@ -353,6 +353,25 @@ void LayoutGate(char* itf, const float* cl, bool stacked) {
 	Xf2d(itf, 0x160, u);
 }
 
+// The magic potion's flask (model +0xAC, FUN_0051BA70: interface +0x24 bits
+// 15-16; it rises from below the screen to (0.08, 0.1), modelling +0x44 the
+// way it has come): Asterix's -- the potion is his. In co-op it sat at the
+// bottom left, under player 1's hint box (and on player 2's combo bar in the
+// stacked split). It goes under the health of Asterix's player's HUD, at 0.6 of
+// its size, right of the combo bar's column: (0.15, 0.80), mirrored (0.85) for
+// player 2's side by side, the bottom half's (0.30) stacked.
+void LayoutFlask(char* itf, const float* cl) {
+	char* n = NodeAt(itf, 0xAC);
+	float* fr = n ? FrameOf(n) : nullptr;
+	if (!fr) return;
+	int p = CoopP1Hero() == HERO_ASTERIX ? 0 : 1;
+	bool stacked = Stacked();
+	float tx = stacked || p == 0 ? 0.15f : 0.85f;
+	float ty = stacked && p == 1 ? 0.30f : 0.80f;
+	const float px = 0.08f, py = 0.1f;   // where the game shows it
+	Xf3d(n, cl, Xform{ px, py, 0.6f, tx - px, ty - py }, true);
+}
+
 // The gate counter's sparkle (particles +0x114) is placed once, at the
 // interface's start (frame modelling +0x40 = +0x3DC, 0.5): its particles leave
 // from there whatever the pass does with the node. Side by side it is put on
@@ -505,7 +524,7 @@ void Hud2BeforeInterfaceTick(char* itf) {
 }
 
 void Hud2AfterInterfaceTick(char* itf, void* time) {
-	if (itf) PlaceGateSparkle(itf, On() && SplitActive() && g_config.splitMode == SPLIT_VERTICAL);
+	if (itf) PlaceGateSparkle(itf, On() && SplitActive());
 	if (!On() || !itf) return;
 	char* gm = GM();
 	if (!gm) return;
@@ -572,8 +591,11 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 void Hud2BeginP1(RwCamera* hud) {
 	g.nSaved2d = 0;
 	g.nScaled = 0;
+	char* lvlItf = (char*)GetLvlObject(2, 132, 0);
+	if (hud && lvlItf && CoopP2Joined() && CoopShopper() < 0)   // co-op, split or one screen
+		LayoutFlask(lvlItf, (float*)((char*)*(void**)((char*)hud + 4) + 0x50));
 	char* itf = g.itf;
-	if (!On() || !hud || !itf || itf != (char*)GetLvlObject(2, 132, 0)) return;
+	if (!On() || !hud || !itf || itf != lvlItf) return;
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);   // right +0, up +4
 	bool stacked = Stacked();
 	// The helmet counter (plate +0x134 drawn leftwards from its place, text
@@ -662,7 +684,9 @@ void Hud2BeginP1(RwCamera* hud) {
 		tm.dy = tr.dy;
 		Xf3d(NodeAt(itf, 0x12C), cl, tm, true);
 	}
-	LayoutGate(itf, cl, stacked);
+	// The gate counter in the middle at 3/4 size in either split (stacked, at the
+	// right edge as in single player, it met player 1's prompt box there).
+	LayoutGate(itf, cl, false);
 	if (stacked) ComboToHalf(itf, cl, 0, true);
 	int hp = 0, shields = 3;
 	if (IndivStats(CoopP1Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, true);
