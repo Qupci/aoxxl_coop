@@ -2,6 +2,7 @@
 #include "autotest.h"
 #include "coop.h"
 #include "gamecam.h"
+#include "individual.h"
 #include "log.h"
 
 namespace {
@@ -12,6 +13,7 @@ LifeTickFn g_origAsterixLifeTick = nullptr;
 LifeTickFn g_origObelixLifeTick  = nullptr;
 
 volatile uint8_t g_lastState[HERO_COUNT] = { 0xFF, 0xFF, 0xFF };
+int g_ticking = -1;   // LifeTickingHero
 
 // Which trio slot does this Life's hero occupy? The Life class says which hero
 // it was built for, but asking the trio is what the rest of the mod keys on.
@@ -37,7 +39,10 @@ int LifeTickCommon(LifeTickFn orig, void* self, void* edx, int arg) {
 	AutotestBeforeLifeTick(idx, hero);
 	CoopBeforeLifeTick(idx, hero);
 	GameCamBeginHeroTick(idx);
+	int was = g_ticking;
+	g_ticking = idx;
 	int r = orig(self, edx, arg);
+	g_ticking = was;
 	GameCamEndHeroTick();
 	CoopAfterLifeTick(idx, hero);
 	AutotestAfterLifeTick(idx, hero);
@@ -61,12 +66,38 @@ const uintptr_t kIdefixLifeVtbl = 0x625DA0;
 const uintptr_t kIdefixLifeTick = 0x4AC560;
 LifeTickFn g_origIdefixLifeTick = nullptr;
 
+// His rage (RB with a full combo bar and the combo learned: his bite state's
+// entry, 0x49E4C0, spends the bar) reads the combo bar in the game's place --
+// individual heroes: the one whose RB called him (for a moment after it, as the
+// bite starts in a later tick too), and it is that hero's combo done.
+int g_rbHero = -1;
+DWORD g_rbAt = 0;
+
+int IdefixTick(void* self, void* edx, int arg) {
+	Trio t = GetTrio();
+	for (int i = 0; t && i < 2; i++) {
+		Hero p = t.GetHero(i);
+		if (p && (*(uint32_t*)(p.raw() + 0x3EC) & 0x100) && (i == CoopP1Hero() || i == CoopP2Hero()) && CoopP2Joined()) {
+			g_rbHero = i;
+			g_rbAt = GetTickCount();
+		}
+	}
+	if (g_rbHero < 0 || GetTickCount() - g_rbAt > 300 || !CoopP2Joined()) return g_origIdefixLifeTick(self, edx, arg);
+	int prev = IndivEnter(g_rbHero);
+	int was = g_ticking;
+	g_ticking = g_rbHero;
+	int r = g_origIdefixLifeTick(self, edx, arg);
+	g_ticking = was;
+	IndivLeave(prev);
+	return r;
+}
+
 int __fastcall IdefixLifeTickHook(void* self, void* edx, int arg) {
 	int nl = CoopNonLeaderPlayer();
 	Trio t = GetTrio();
 	Hero h = (t && nl >= 0 && !CoopSuspended()) ? t.GetHero(nl) : Hero();
 	if (!h || !(*(uint32_t*)(h.raw() + 0x3EC) & 0x100) || CoopHeroHeld(nl))
-		return g_origIdefixLifeTick(self, edx, arg);
+		return IdefixTick(self, edx, arg);
 	uint8_t* tr = (uint8_t*)t.raw();
 	uint8_t lead = tr[0x2C], comp = tr[0x2D];
 	tr[0x2C] = (uint8_t)nl;
@@ -79,7 +110,7 @@ int __fastcall IdefixLifeTickHook(void* self, void* edx, int arg) {
 	if (gate) *gate &= ~2u;
 	*(uint32_t*)(tr + 0x3F4) &= ~1u;   // the trio's enemy list (vf62..) is built around the leader
 	Log("life: %s pressed RB (not leading): Idefix's tick with %s as the leader", HeroName(nl), HeroName(nl));
-	int r = g_origIdefixLifeTick(self, edx, arg);
+	int r = IdefixTick(self, edx, arg);
 	if (gate) *gate |= gateBit;
 	if (tr[0x2C] == (uint8_t)nl) { tr[0x2C] = lead; tr[0x2D] = comp; }
 	*(uint32_t*)(tr + 0x3F4) &= ~1u;
@@ -91,6 +122,8 @@ int __fastcall ObelixLifeTickHook(void* self, void* edx, int arg) {
 }
 
 } // namespace
+
+int LifeTickingHero() { return g_ticking; }
 
 uint8_t LifeLastState(int heroIndex) {
 	if (heroIndex < 0 || heroIndex >= HERO_COUNT) return 0xFF;

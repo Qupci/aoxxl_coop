@@ -34,6 +34,7 @@
 #include "log.h"
 #include "shared.h"
 #include "hints.h"
+#include "combohints.h"
 #include "icons.h"
 
 namespace {
@@ -69,6 +70,7 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	AutotestFrame();
 	CoopFrame();
 	SharedFrame();
+	ComboHintsFrame();
 	HintsFrame();
 	IconsFrame();
 }

@@ -3464,7 +3464,9 @@ const uintptr_t kHeroPrompt = 0x49A1A0;
 const uint8_t   kHeroPromptPrologue[8] = { 0xA1, 0xF4, 0x21, 0x66, 0x00, 0x56, 0x8B, 0xF1 };
 const unsigned  kPromptNone = 0xE;
 PromptFn g_origPrompt = nullptr;
-struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; int hero = -1; bool both = false; } g_prompt;
+// heroKind: each hero's own prompt this frame (each player's prompt box, hints.cpp).
+struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; int hero = -1; bool both = false;
+         unsigned heroKind[2] = { kPromptNone, kPromptNone }; } g_prompt;
 
 // A machine's "Use" (kind 9) is written by Asterix's call alone (hero vtable
 // +0x3C == 0) whenever trio +0x48 holds a machine, whoever it was offered to --
@@ -3509,13 +3511,20 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	if (!gm || !t || !g.p2Joined || g.suspended) return;
 	int idx = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
 	if (idx < 0) return;
-	if (g_prompt.frame != g.frameNo) { g_prompt.frame = g.frameNo; g_prompt.kind = kPromptNone; g_prompt.leader = false; g_prompt.hero = -1; g_prompt.both = false; }
+	if (g_prompt.frame != g.frameNo) {
+		g_prompt.frame = g.frameNo; g_prompt.kind = kPromptNone; g_prompt.leader = false; g_prompt.hero = -1; g_prompt.both = false;
+		g_prompt.heroKind[0] = g_prompt.heroKind[1] = kPromptNone;
+	}
 	uint32_t& cc = *(uint32_t*)(gm + 0xCC);
 	unsigned kind = (cc >> 4) & 0xF;
 	bool machineBoth = false;
 	if (kind == kPromptMachine && idx == HERO_ASTERIX) {
 		int to = MachinePromptHero(t, &machineBoth);
 		if (to >= 0) idx = to;
+	}
+	if (kind != kPromptNone && idx < 2) {
+		g_prompt.heroKind[idx] = kind;
+		if (machineBoth) g_prompt.heroKind[idx ^ 1] = kind;
 	}
 	bool leads = idx == t.Leader();
 	if (kind != kPromptNone) {
@@ -3525,6 +3534,21 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	} else if (g_prompt.kind != kPromptNone) {
 		cc = (cc & ~0xF0u) | (g_prompt.kind << 4);
 	}
+}
+
+unsigned CoopPromptKindFor(int player) {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	unsigned kind = gm ? (*(uint32_t*)(gm + 0xCC) >> 4) & 0xF : kPromptNone;
+	if (!g.p2Joined) return player == 0 ? kind : kPromptNone;
+	if (kind == kPromptNone) return kPromptNone;
+	if (g.suspended || g.frameNo - g_prompt.frame > 2) {   // no hero's prompt seen (a ride): the leader's player's
+		Trio t = GetTrio();
+		int lead = t ? t.Leader() : -1;
+		return player == (lead == g.p2Hero ? 1 : 0) ? kind : kPromptNone;
+	}
+	int hero = player == 0 ? g.p1Hero : g.p2Hero;
+	return hero >= 0 && hero < 2 ? g_prompt.heroKind[hero] : kPromptNone;
 }
 
 int CoopPromptPlayer() {
@@ -3980,9 +4004,8 @@ static void WatchSpinHint(int idx, Hero h) {
 	g.spinHints++;
 	int player = idx == g.p1Hero ? 0 : 1;
 	wchar_t text[96];
-	swprintf(text, 96, L"%s %s passes\nthe Roman to %s", HintPlayer(player), HintButtonName(player, HB_LB),
-	         HintHeroName(other));
-	HintShow(HINT_PASS, text, 8000);
+	swprintf(text, 96, L"%s passes the Roman\nto %s", HintButtonName(player, HB_LB), HintHeroName(other));
+	HintShow(HINT_PASS, player, text, 8000);
 	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints, HeroName(idx));
 }
 
@@ -4223,7 +4246,7 @@ static void RefuseMachine(Trio t, int kind, int who) {
 	wchar_t text[96];
 	swprintf(text, 96, L"%s has to be\nat the %s too", OtherHero(who) == HERO_ASTERIX ? L"Asterix" : L"Obelix",
 	         kind == 2 ? L"machine gun" : L"boat");
-	HintShow(HINT_MACHINE, text, 4000);
+	HintShow(HINT_MACHINE, who == g.p1Hero ? 0 : 1, text, 4000);
 	Log("coop: %s's X at the %s refused: %s is not there", HeroName(who), kind == 2 ? "machine gun" : "boat",
 	    HeroName(OtherHero(who)));
 }
@@ -4345,11 +4368,11 @@ static void ShowJoinHint(Trio t) {
 	g.joinHintPending = false;
 	wchar_t text[96];
 	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
-		swprintf(text, 96, L"%s press %s to join co-op\n(keyboard: %s), again to leave", HintPlayer(1),
-		         HintButtonName(1, HB_START), HintKeyName(g_config.keys[CoopConfig::KEY_START]));
+		swprintf(text, 96, L"Second pad: %s joins co-op\n(keyboard: %s), again to leave", HintButtonName(1, HB_START),
+		         HintKeyName(g_config.keys[CoopConfig::KEY_START]));
 	else
-		swprintf(text, 96, L"%s press %s to join co-op\nand again to leave", HintPlayer(1), HintButtonName(1, HB_START));
-	HintShow(HINT_JOIN, text, 10000);
+		swprintf(text, 96, L"Second pad: %s joins co-op\nand again to leave", HintButtonName(1, HB_START));
+	HintShow(HINT_JOIN, 0, text, 10000);
 }
 
 // Hint: a lifter waiting at the bottom for the trio (CKHkLifter, 2/47: state
@@ -4392,7 +4415,7 @@ static void WatchLifterHint(Trio t) {
 		if (GetTickCount() - since < 4000) return;
 		wchar_t text[64];
 		swprintf(text, 64, L"The lifter waits for %s\nto go up", HintHeroName(on[0] ? HERO_OBELIX : HERO_ASTERIX));
-		HintShow(HINT_LIFTER, text, 300);
+		HintShow(HINT_LIFTER, (on[0] ? HERO_ASTERIX : HERO_OBELIX) == g.p1Hero ? 0 : 1, text, 300);
 		return;
 	}
 	waiting = nullptr;

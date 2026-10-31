@@ -20,13 +20,24 @@ void IconsFrame();
 
 // The glyph of icon `name` (a PNG's name: "pad_a", "p1", "asterix"), 0 if none.
 wchar_t IconGlyph(const char* name);
-// The glyph of a keyboard key (a keycap with its name), 0 if none.
-wchar_t IconKeyGlyph(int vk);
+// The glyph of a keyboard key (a keycap with its name), 0 if none. `unpressed`:
+// the dimmed keycap (key_unpressed.png / key_wide_unpressed.png, else the
+// pressed one darkened) -- a button of a combo hint not pressed yet.
+wchar_t IconKeyGlyph(int vk, bool unpressed = false);
 // The glyph for what player `player` (0 = player 1) presses for game action
 // `action` (CKInput action: 4 jump, 5 action, 6 grab, 7 targeted attack, 8 launch
 // Obelix, 10 Dogmatix, 12 pause, 15 start, 0-3 up/down/left/right, 20 confirm,
-// 21 cancel), 0 if none.
-wchar_t IconActionGlyph(int player, int action);
+// 21 cancel), 0 if none. `unpressed`: the dimmed variant (pad_a_unpressed.png...;
+// the pressed one when there is none).
+wchar_t IconActionGlyph(int player, int action, bool unpressed = false);
+// The merchant's icon of combo `kind` (0 Club, 1 Power Hammer, 2 Twister, 3
+// Twister Fusion, 4 Mole, 5 Rage), read from a level file's textures
+// (o_ico_massue_g01...), 0 if not found.
+wchar_t IconComboGlyph(int kind);
+// A sparkle and a glow for the combo hints' pressed buttons, `fade` 0 (bright)
+// to 3 (nearly gone); spark.png / glow.png in coop_icons replace the drawn ones.
+wchar_t IconSparkGlyph(int fade);
+wchar_t IconGlowGlyph(int fade);
 // The virtual key player 1's keyboard binding of `action` is on, 0 if none.
 int IconsP1Vk(int action);
 // A keyboard key's name ("Space", "K").

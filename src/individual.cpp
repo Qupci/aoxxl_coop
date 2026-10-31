@@ -527,9 +527,9 @@ void BlockPartnerGrounds() {
 void ShowDownHint(int down) {
 	int up = Other(down);
 	wchar_t text[160];
-	swprintf(text, 160, L"%s is down! %s:\nhold %s by him for %d s to revive", HintHero(down, PlayerOf(down)),
-	         HintHero(up, PlayerOf(up)), HintButtonName(PlayerOf(up), HB_B), (int)kReviveSeconds);
-	HintShow(HINT_REVIVE, text, 8000);
+	swprintf(text, 160, L"%s is down!\nHold %s by him for %d s to revive", HintHeroName(down),
+	         HintButtonName(PlayerOf(up), HB_B), (int)kReviveSeconds);
+	HintShow(HINT_REVIVE, PlayerOf(up), text, 8000);
 }
 
 // The HUD's health shows again and is read afresh (game manager +0x5C bit
@@ -1201,7 +1201,7 @@ void IndivFrame() {
 			for (int k = 0; k < 20; k++) bar[k] = k < n ? L'=' : L'-';
 			bar[20] = 0;
 			swprintf(text, 128, L"Reviving %s\n%s", HintHeroName(i), bar);
-			HintShow(HINT_REVIVE, text, 500);
+			HintShow(HINT_REVIVE, PlayerOf(up), text, 500);
 			if (g.revive[i] >= kReviveSeconds) Revive(i, h, "revived");
 		} else {
 			if (g.revive[i] > 0.0f) HintHide(HINT_REVIVE);
@@ -1209,9 +1209,8 @@ void IndivFrame() {
 			if (close && now - g.hintAt > 400) {
 				g.hintAt = now;
 				wchar_t text[128];
-				swprintf(text, 128, L"%s: hold %s to revive %s", HintHero(up, PlayerOf(up)),
-				         HintButtonName(PlayerOf(up), HB_B), HintHeroName(i));
-				HintShow(HINT_REVIVE, text, 600);
+				swprintf(text, 128, L"Hold %s to revive %s", HintButtonName(PlayerOf(up), HB_B), HintHeroName(i));
+				HintShow(HINT_REVIVE, PlayerOf(up), text, 600);
 			}
 		}
 	}

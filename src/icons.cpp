@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <objidl.h>
 #include <gdiplus.h>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
@@ -101,6 +102,25 @@ wchar_t AddBitmap(Gdiplus::Bitmap& bmp) {
 	return g.code;
 }
 
+// A bitmap of any size, scaled to kCell high (`alpha`: its opacity times this).
+wchar_t AddScaled(Gdiplus::Bitmap& src, float alpha = 1.0f) {
+	if (src.GetLastStatus() != Gdiplus::Ok || !src.GetHeight()) return 0;
+	int w = (int)((src.GetWidth() * kCell + src.GetHeight() / 2) / src.GetHeight());
+	if (w < 1 || w > 4 * kCell) return 0;
+	Gdiplus::Bitmap dst(w, kCell, PixelFormat32bppARGB);
+	{
+		Gdiplus::Graphics g(&dst);
+		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		Gdiplus::ImageAttributes at;
+		at.SetWrapMode(Gdiplus::WrapModeTileFlipXY);
+		Gdiplus::ColorMatrix cm = { { { 1, 0, 0, 0, 0 }, { 0, 1, 0, 0, 0 }, { 0, 0, 1, 0, 0 }, { 0, 0, 0, alpha, 0 }, { 0, 0, 0, 0, 1 } } };
+		if (alpha < 1.0f) at.SetColorMatrix(&cm);
+		g.DrawImage(&src, Gdiplus::Rect(0, 0, w, kCell), 0, 0, src.GetWidth(), src.GetHeight(), Gdiplus::UnitPixel, &at);
+	}
+	return AddBitmap(dst);
+}
+
 // A PNG of any size, scaled to kCell high.
 wchar_t AddPng(const wchar_t* path) {
 	Gdiplus::Bitmap src(path);
@@ -127,7 +147,167 @@ void IconsDir(wchar_t* out, size_t n, const char* file) {
 	MultiByteToWideChar(CP_ACP, 0, a, -1, out, (int)n);
 }
 
-// Every PNG of coop_icons but the keycap templates (key, key_wide).
+// The merchant's combo icons (CKHkAsterixShop's item pictures), read from a
+// level file's texture dictionary as kwn_textures.py does: an entry is its
+// name (32 bytes), filtering, u and v addressing (4 bytes each), then an RW
+// image chunk (0x18) whose struct chunk (1, 16 bytes) holds width, height,
+// bits per pixel and pitch; the pixels follow (RGBA, or indices into a palette
+// of 1 << bpp RGBA entries after them). Their opaque pinkish-grey backing (R:G:B
+// about 140:100:111, darker and lighter) is keyed out.
+const char* const kComboTex[6] = { "o_ico_massue_g01", "o_ico_marteaupilon_g01", "o_ico_twister_g01",
+                                   "o_ico_twisterfusion_g01", "o_ico_taupe_g01", "o_ico_idefix_g01" };
+
+bool ComboImage(const std::vector<uint8_t>& d, const char* name, std::vector<uint32_t>& argb, int* w, int* h) {
+	size_t len = strlen(name);
+	for (size_t at = 0; at + len + 1 < d.size(); at++) {
+		const uint8_t* p = (const uint8_t*)memchr(d.data() + at, name[0], d.size() - at);
+		if (!p) return false;
+		at = p - d.data();
+		if (at + 44 + 40 > d.size() || memcmp(p, name, len) != 0 || p[len] != 0) continue;
+		size_t i = at + 44;
+		uint32_t type, t1, s1, iw, ih, bpp, pitch;
+		memcpy(&type, &d[i], 4); memcpy(&t1, &d[i + 12], 4); memcpy(&s1, &d[i + 16], 4);
+		memcpy(&iw, &d[i + 24], 4); memcpy(&ih, &d[i + 28], 4); memcpy(&bpp, &d[i + 32], 4); memcpy(&pitch, &d[i + 36], 4);
+		if (type != 0x18 || t1 != 1 || s1 != 16 || !iw || !ih || iw > 256 || ih > 256 || (bpp != 8 && bpp != 32 && bpp != 4) ||
+		    pitch < iw * bpp / 8)
+			continue;
+		size_t px = i + 40, pal = px + (size_t)pitch * ih;
+		if (pal + (bpp <= 8 ? 4u << bpp : 0) > d.size()) continue;
+		argb.resize(iw * ih);
+		for (uint32_t y = 0; y < ih; y++)
+			for (uint32_t x = 0; x < iw; x++) {
+				const uint8_t* c;
+				if (bpp == 32) c = &d[px + y * pitch + x * 4];
+				else {
+					unsigned k = bpp == 8 ? d[px + y * pitch + x] : (d[px + y * pitch + x / 2] >> (x & 1 ? 4 : 0)) & 15;
+					c = &d[pal + k * 4];
+				}
+				unsigned a = c[3];
+				if (a && c[1] > 25) {   // the backing: R / G about 1.40, B / G about 1.11
+					float dist = fabsf(c[0] / (float)c[1] - 1.40f) + fabsf(c[2] / (float)c[1] - 1.11f);
+					if (dist < 0.16f) a = 0;
+					else if (dist < 0.30f) a = (unsigned)(a * (dist - 0.16f) / 0.14f);
+				}
+				argb[y * iw + x] = a << 24 | (uint32_t)c[0] << 16 | (uint32_t)c[1] << 8 | c[2];
+			}
+		*w = (int)iw;
+		*h = (int)ih;
+		return true;
+	}
+	return false;
+}
+
+void LoadComboIcons() {
+	int found = 0;
+	for (int lvl : { 2, 1, 3, 4, 5, 6 }) {
+		char rel[64], path[MAX_PATH];
+		snprintf(rel, sizeof(rel), "LVL%03d\\LVL%02d.KWN", lvl, lvl);
+		GameDirPath(path, sizeof(path), rel);
+		FILE* f = fopen(path, "rb");
+		if (!f) continue;
+		std::vector<uint8_t> d;
+		fseek(f, 0, SEEK_END);
+		long size = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		if (size > 0 && size < 256 * 1024 * 1024) {
+			d.resize(size);
+			if (fread(d.data(), 1, size, f) != (size_t)size) d.clear();
+		}
+		fclose(f);
+		for (int k = 0; k < 6; k++) {
+			char name[16];
+			snprintf(name, sizeof(name), "combo%d", k);
+			if (g_byName.count(name)) continue;
+			std::vector<uint32_t> argb;
+			int w = 0, h = 0;
+			if (!ComboImage(d, kComboTex[k], argb, &w, &h)) continue;
+			Gdiplus::Bitmap bmp(w, h, w * 4, PixelFormat32bppARGB, (BYTE*)argb.data());
+			wchar_t code = AddScaled(bmp);
+			if (code) { g_byName[name] = code; found++; }
+		}
+		if (found == 6) break;
+	}
+	Log("icons: %d of the merchant's 6 combo icons from the level files", found);
+}
+
+// A sparkle (a four-pointed star) and a glow, gold and white like the combo
+// bar's level sparkles, each in four strengths (spark0 .. spark3, glow0 ..):
+// spark.png / glow.png in coop_icons are drawn instead when there.
+void LoadSparkles() {
+	for (int kind = 0; kind < 2; kind++) {
+		const char* base = kind ? "glow" : "spark";
+		wchar_t path[MAX_PATH];
+		IconsDir(path, MAX_PATH, kind ? "glow.png" : "spark.png");
+		Gdiplus::Bitmap file(path);
+		Gdiplus::Bitmap drawn(kCell, kCell, PixelFormat32bppARGB);
+		Gdiplus::Bitmap* src = &file;
+		if (file.GetLastStatus() != Gdiplus::Ok || !file.GetHeight()) {
+			src = &drawn;
+			Gdiplus::Graphics g(&drawn);
+			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+			g.Clear(Gdiplus::Color(0, 0, 0, 0));
+			const float c = kCell / 2.0f;
+			if (kind) {
+				Gdiplus::GraphicsPath disc;
+				disc.AddEllipse(2.0f, 2.0f, kCell - 4.0f, kCell - 4.0f);
+				Gdiplus::PathGradientBrush b(&disc);
+				b.SetCenterColor(Gdiplus::Color(230, 255, 244, 190));
+				Gdiplus::Color edge(0, 255, 170, 40);
+				int n = 1;
+				b.SetSurroundColors(&edge, &n);
+				g.FillPath(&b, &disc);
+			} else {
+				Gdiplus::PointF pts[8];
+				for (int i = 0; i < 8; i++) {
+					float a = 3.14159265f * i / 4.0f, r = i & 1 ? 6.0f : c - 2.0f;
+					pts[i] = Gdiplus::PointF(c + r * cosf(a), c + r * sinf(a));
+				}
+				Gdiplus::GraphicsPath star;
+				star.AddPolygon(pts, 8);
+				Gdiplus::PathGradientBrush b(&star);
+				b.SetCenterPoint(Gdiplus::PointF(c, c));
+				b.SetCenterColor(Gdiplus::Color(255, 255, 255, 255));
+				Gdiplus::Color edge(160, 255, 200, 60);
+				int n = 1;
+				b.SetSurroundColors(&edge, &n);
+				g.FillPath(&b, &star);
+			}
+		}
+		static const float kFade[4] = { 1.0f, 0.7f, 0.45f, 0.2f };
+		for (int f = 0; f < 4; f++) {
+			wchar_t code = AddScaled(*src, kFade[f]);
+			char name[16];
+			snprintf(name, sizeof(name), "%s%d", base, f);
+			if (code) g_byName[name] = code;
+		}
+	}
+	// "Then" between a combo's buttons (the game's font has no '>'): a chevron,
+	// white with a dark edge like the text (next.png replaces it).
+	if (!g_byName.count("next")) {
+		Gdiplus::Bitmap chev(kCell / 2, kCell, PixelFormat32bppARGB);
+		{
+			Gdiplus::Graphics g(&chev);
+			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+			g.Clear(Gdiplus::Color(0, 0, 0, 0));
+			Gdiplus::PointF pts[3] = { Gdiplus::PointF(9.0f, 20.0f), Gdiplus::PointF(23.0f, 32.0f), Gdiplus::PointF(9.0f, 44.0f) };
+			Gdiplus::Pen edge(Gdiplus::Color(200, 0, 0, 0), 9.0f);
+			edge.SetLineJoin(Gdiplus::LineJoinRound);
+			edge.SetStartCap(Gdiplus::LineCapRound);
+			edge.SetEndCap(Gdiplus::LineCapRound);
+			g.DrawLines(&edge, pts, 3);
+			Gdiplus::Pen white(Gdiplus::Color(255, 244, 246, 244), 5.0f);
+			white.SetLineJoin(Gdiplus::LineJoinRound);
+			white.SetStartCap(Gdiplus::LineCapRound);
+			white.SetEndCap(Gdiplus::LineCapRound);
+			g.DrawLines(&white, pts, 3);
+		}
+		wchar_t code = AddBitmap(chev);
+		if (code) g_byName["next"] = code;
+	}
+}
+
+// Every PNG of coop_icons but the keycap templates (key, key_wide and their
+// unpressed variants) and the sparkles' images.
 void LoadIcons() {
 	g_loaded = true;
 	if (!g_gdiplus) {
@@ -147,7 +327,9 @@ void LoadIcons() {
 		char* dot = strrchr(name, '.');
 		if (dot) *dot = 0;
 		for (char* c = name; *c; c++) *c = (char)tolower(*c);
-		if (!strcmp(name, "key") || !strcmp(name, "key_wide")) continue;
+		if (!strcmp(name, "key") || !strcmp(name, "key_wide") || !strcmp(name, "key_unpressed") ||
+		    !strcmp(name, "key_wide_unpressed") || !strcmp(name, "spark") || !strcmp(name, "glow"))
+			continue;
 		wchar_t path[MAX_PATH];
 		IconsDir(path, MAX_PATH, (std::string(name) + ".png").c_str());
 		wchar_t code = AddPng(path);
@@ -156,6 +338,8 @@ void LoadIcons() {
 	} while (FindNextFileW(h, &fd));
 	FindClose(h);
 	Log("icons: %u icons from coop_icons", (unsigned)g_byName.size());
+	LoadComboIcons();
+	LoadSparkles();
 }
 
 void Upload() {
@@ -248,20 +432,33 @@ void KeyLabel(int vk, wchar_t* out, int n) {
 }
 
 // A keycap: key.png (one character) or key_wide.png with the key's name on it.
-wchar_t AddKeycap(int vk) {
+// Unpressed (a combo hint's button not pressed yet): key_unpressed.png /
+// key_wide_unpressed.png, else the pressed template darkened, and a grey name.
+wchar_t AddKeycap(int vk, bool unpressed) {
 	wchar_t label[32];
 	KeyLabel(vk, label, 32);
 	bool wide = wcslen(label) > 1 && !(label[0] >= 0x2190 && label[0] <= 0x2193);
 	wchar_t path[MAX_PATH];
-	IconsDir(path, MAX_PATH, wide ? "key_wide.png" : "key.png");
-	Gdiplus::Bitmap tpl(path);
+	IconsDir(path, MAX_PATH, unpressed ? (wide ? "key_wide_unpressed.png" : "key_unpressed.png") : wide ? "key_wide.png" : "key.png");
+	Gdiplus::Bitmap own(path);
+	bool darken = false;
+	Gdiplus::Bitmap* tplp = &own;
+	wchar_t tplPath[MAX_PATH];
+	IconsDir(tplPath, MAX_PATH, wide ? "key_wide.png" : "key.png");
+	Gdiplus::Bitmap pressedTpl(tplPath);
+	if (unpressed && (own.GetLastStatus() != Gdiplus::Ok || !own.GetHeight())) { tplp = &pressedTpl; darken = true; }
+	Gdiplus::Bitmap& tpl = *tplp;
 	if (tpl.GetLastStatus() != Gdiplus::Ok || !tpl.GetHeight()) return 0;
 	int w = (int)((tpl.GetWidth() * kCell + tpl.GetHeight() / 2) / tpl.GetHeight());
 	Gdiplus::Bitmap cap(w, kCell, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(&cap);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g.DrawImage(&tpl, Gdiplus::Rect(0, 0, w, kCell), 0, 0, tpl.GetWidth(), tpl.GetHeight(), Gdiplus::UnitPixel);
+	Gdiplus::ImageAttributes dim;
+	Gdiplus::ColorMatrix cm = { { { 0.45f, 0, 0, 0, 0 }, { 0, 0.45f, 0, 0, 0 }, { 0, 0, 0.45f, 0, 0 }, { 0, 0, 0, 1, 0 }, { 0, 0, 0, 0, 1 } } };
+	dim.SetColorMatrix(&cm);
+	g.DrawImage(&tpl, Gdiplus::Rect(0, 0, w, kCell), 0, 0, tpl.GetWidth(), tpl.GetHeight(), Gdiplus::UnitPixel,
+	            darken ? &dim : nullptr);
 	// The name, as big as fits on the cap's face.
 	Gdiplus::FontFamily fam(L"Arial");
 	Gdiplus::StringFormat sf;
@@ -280,7 +477,7 @@ wchar_t AddKeycap(int vk) {
 	Gdiplus::Pen outline(Gdiplus::Color(200, 0, 0, 0), 3.0f);
 	outline.SetLineJoin(Gdiplus::LineJoinRound);
 	g.DrawPath(&outline, &path2);
-	Gdiplus::SolidBrush white(Gdiplus::Color(255, 244, 246, 244));
+	Gdiplus::SolidBrush white(unpressed ? Gdiplus::Color(255, 150, 152, 150) : Gdiplus::Color(255, 244, 246, 244));
 	g.FillPath(&white, &path2);
 	return AddBitmap(cap);
 }
@@ -421,19 +618,49 @@ wchar_t IconGlyph(const char* name) {
 	return it == g_byName.end() || !g_texture ? 0 : it->second;
 }
 
-wchar_t IconKeyGlyph(int vk) {
+wchar_t IconKeyGlyph(int vk, bool unpressed) {
 	if (vk <= 0 || vk > 255 || !g_texture || !g_atlas) return 0;
-	auto it = g_byVk.find(vk);
+	int key = vk | (unpressed ? 0x100 : 0);
+	auto it = g_byVk.find(key);
 	if (it != g_byVk.end()) return it->second;
-	wchar_t g = AddKeycap(vk);
-	g_byVk[vk] = g;
+	wchar_t g = AddKeycap(vk, unpressed);
+	g_byVk[key] = g;
 	if (!g) return 0;
 	AddToFonts();
 	Upload();
 	return g;
 }
 
-wchar_t IconActionGlyph(int player, int action) {
+wchar_t IconComboGlyph(int kind) {
+	char name[16];
+	snprintf(name, sizeof(name), "combo%d", kind);
+	return kind >= 0 && kind < 6 ? IconGlyph(name) : 0;
+}
+
+wchar_t IconSparkGlyph(int fade) {
+	char name[16];
+	snprintf(name, sizeof(name), "spark%d", fade < 0 ? 0 : fade > 3 ? 3 : fade);
+	return IconGlyph(name);
+}
+
+wchar_t IconGlowGlyph(int fade) {
+	char name[16];
+	snprintf(name, sizeof(name), "glow%d", fade < 0 ? 0 : fade > 3 ? 3 : fade);
+	return IconGlyph(name);
+}
+
+namespace {
+// A pad icon's unpressed variant ("pad_a" -> "pad_a_unpressed"), else itself.
+wchar_t PadGlyph(const char* name, bool unpressed) {
+	if (unpressed) {
+		wchar_t g = IconGlyph((std::string(name) + "_unpressed").c_str());
+		if (g) return g;
+	}
+	return IconGlyph(name);
+}
+} // namespace
+
+wchar_t IconActionGlyph(int player, int action, bool unpressed) {
 	static bool kbTest = getenv("XXL_ICONP2KB") != nullptr;   // autotest: player 2's icons as on the keyboard
 	if (player == 1) {
 		if (CoopP2Pad() == kKeyboardPad || kbTest) {
@@ -448,7 +675,7 @@ wchar_t IconActionGlyph(int player, int action) {
 			case 10: key = CoopConfig::KEY_RB; break;     case 15: key = CoopConfig::KEY_START; break;
 			default: return 0;
 			}
-			return IconKeyGlyph(g_config.keys[key]);
+			return IconKeyGlyph(g_config.keys[key], unpressed);
 		}
 		const char* name;
 		switch (action) {
@@ -461,12 +688,12 @@ wchar_t IconActionGlyph(int player, int action) {
 		case 10: name = "pad_rb"; break;  case 15: name = "pad_start"; break;
 		default: return 0;
 		}
-		return IconGlyph(name);
+		return PadGlyph(name, unpressed);
 	}
 	int off;
 	switch (P1Source(action, &off)) {
-	case 1: { const char* n = PadByteName(off); return n ? IconGlyph(n) : 0; }
-	case 2: return IconKeyGlyph(IconsP1Vk(action));
+	case 1: { const char* n = PadByteName(off); return n ? PadGlyph(n, unpressed) : 0; }
+	case 2: return IconKeyGlyph(IconsP1Vk(action), unpressed);
 	}
 	return 0;
 }

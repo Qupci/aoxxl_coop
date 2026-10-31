@@ -137,6 +137,18 @@ function Keycap([int]$w, [string]$name) {
 }
 Keycap 64 "key"
 Keycap 128 "key_wide"
+# Unpressed keycaps (a combo hint's buttons not pressed yet; the mod writes the
+# name in grey): darker, like pad_*_unpressed.
+function KeycapUnpressed([int]$w, [string]$name) {
+	$c = New-Canvas $w $SZ; $g = $c[1]
+	$g.FillPath((New-Object System.Drawing.SolidBrush (C 0 0 0 120)), (RoundRect 3 6 ($w - 5) 56 10))
+	$g.FillPath((Grad (New-Object System.Drawing.RectangleF 0, 0, $w, 64) (C 78 82 80) (C 20 22 21)), (RoundRect 2 2 ($w - 5) 58 10))
+	$g.FillPath((Grad (New-Object System.Drawing.RectangleF 0, 6, $w, 44) (C 26 28 27) (C 40 43 41)), (RoundRect 8 6 ($w - 17) 44 7))
+	$g.DrawPath((New-Object System.Drawing.Pen (C 112 116 112), 2), (RoundRect 2 2 ($w - 5) 58 10))
+	Save $c $name
+}
+KeycapUnpressed 64 "key_unpressed"
+KeycapUnpressed 128 "key_wide_unpressed"
 
 # Players and heroes.
 foreach ($p in @(@('p1', (C 240 80 70)), @('p2', (C 70 130 250)))) {

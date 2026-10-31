@@ -13,6 +13,7 @@
 #include "log.h"
 #include "shared.h"
 #include "hints.h"
+#include "combohints.h"
 #include "icons.h"
 #include "individual.h"
 #include "hud2.h"
@@ -127,6 +128,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	SoundInstallHooks();
 	SharedInstallHooks();
 	HintsInstallHooks();
+	ComboHintsInstallHooks();
 	IconsInstallHooks();
 	IndivInstallHooks();
 	Hud2InstallHooks();

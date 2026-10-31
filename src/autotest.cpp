@@ -15,6 +15,9 @@
 #include "pathfind.h"
 #include "detour.h"
 #include "guard.h"
+#include "hints.h"
+#include "icons.h"
+#include "combohints.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -39,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7059,10 +7062,151 @@ const Step kP2Busy[] = {
 	END(10500),
 };
 
+// hudhints: the players' hint boxes and the HUD round them (the potion's flask,
+// both combo bars part full): player 1's box at the left (stacked split: the
+// top half's right), player 2's at the right; a combo hint's buttons lit one by
+// one with sparkles and the combo bar's level sound. XXL_HUDPOS=1 logs where the
+// HUD's pieces are.
+const Step kHudHints[] = {
+	MARK(0, "hudhints"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	POTION(1500),
+	{ 1600, S_GIVE, HERO_ASTERIX, 3, 0, 20.0f, 0, "asterix's combo bar: 20 hits" },
+	{ 1600, S_GIVE, HERO_OBELIX, 3, 0, 8.0f, 0, "obelix's combo bar: 8 hits" },
+	{ 2000, S_HINTTEST, 0, 0, 0, 0, 0, "p1: the revive hint (two lines)" },
+	{ 2000, S_HINTTEST, 1, 1, 0, 0, 0, "p2: one line" },
+	SHOT(3500, "boxes"),
+	{ 4000, S_HINTTEST, 0, 2, 0, 0.0f, 0, "p1: the Twister's buttons, none lit" },
+	{ 4000, S_HINTTEST, 1, 3, 0, 0, 0, "p2: three lines" },
+	SHOT(5000, "combo0"),
+	{ 5200, S_HINTTEST, 0, 2, 0, 1.0f, 0, "p1: one lit" }, { 5200, S_HINTSPARK, 0, 0, 0, 0, 0, "sparkle 1" },
+	SHOT(5280, "spark1a"), SHOT(5450, "spark1b"),
+	{ 6000, S_HINTTEST, 0, 2, 0, 2.0f, 0, "p1: two lit" }, { 6000, S_HINTSPARK, 0, 1, 0, 0, 0, "sparkle 2" },
+	SHOT(6080, "spark2a"), SHOT(6250, "spark2b"),
+	{ 6800, S_HINTTEST, 0, 2, 0, 4.0f, 0, "p1: all lit" }, { 6800, S_HINTSPARK, 0, 3, 0, 0, 0, "sparkle 4" },
+	SHOT(6880, "spark4a"), SHOT(7600, "lit"),
+	{ 7700, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "asterix hit: his shields show" },
+	{ 7700, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "obelix hit: his shields show" },
+	{ 8000, S_HINTTEST, 1, 2, 0, 1.0f, 0, "p2: the Twister's buttons, one lit" }, { 8000, S_HINTSPARK, 1, 0, 0, 0, 0, "p2 sparkle 1" },
+	SHOT(8060, "p2spark1a"), SHOT(8200, "p2spark1b"),
+	{ 8800, S_HINTTEST, 1, 2, 0, 2.0f, 0, "p2: two lit" }, { 8800, S_HINTSPARK, 1, 1, 0, 0, 0, "p2 sparkle 2" },
+	SHOT(8860, "p2spark2a"), SHOT(9000, "p2spark2b"),
+	VPAD(9000, 1, PAD_BACK, 0, 0, "p2 holds Back: player 2's HUD shows"),
+	SHOT(9500, "p2combo"), VPAD(9700, 1, 0, 0, 0, "p2 release"),
+	END(10500),
+};
+
+// combohint2: every combo learned (the cheat: the combos "bought" in this level
+// wait in line, the Club first); player 2's Obelix next to a Roman with a full
+// combo bar gets the Club's hint, and does it on player 2's pad (A A X B), each
+// button lit as pressed; the Club done, its hint goes (the Power Hammer's next
+// time the bar is full by a Roman).
+#define VTAP(t, b, what) VPAD(t, 1, b, 0, 0, what), VPAD(t + 90, 1, 0, 0, 0, "p2 release")
+const Step kComboHint2[] = {
+	MARK(0, "combohint2"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1500, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
+	{ 1800, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	SHOT(3000, "club_hint"),
+	VTAP(3500, PAD_A, "p2 A"), SHOT(3620, "pressed_a"),
+	VTAP(3750, PAD_A, "p2 A"), SHOT(3870, "pressed_aa"),
+	VTAP(4000, PAD_X, "p2 X"), SHOT(4120, "pressed_aax"),
+	VTAP(4250, PAD_B, "p2 B"), SHOT(4370, "pressed_aaxb"),
+	SHOT(5000, "club_done"), SHOT(7000, "after"),
+	{ 7500, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
+	{ 7600, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full again" },
+	SHOT(9000, "hammer_hint"),
+	END(10000),
+};
+#undef VTAP
+// combohint2b: every combo learned, the Mole first in line (test aid); player 1's
+// Asterix by a Roman with a full bar gets the Mole's hint; the Mole done (its
+// action injected), the hint lights all its buttons and goes; the Club's comes
+// with the next full bar by a Roman.
+const Step kComboHint2B[] = {
+	MARK(0, "combohint2b"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_COMBOHINT, 104, 0, 0, 0, 0, "the Mole first in line" },
+	{ 1500, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
+	{ 1800, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	SHOT(3000, "mole_hint"),
+	{ 3500, S_P1COMBO, 3, 0, 0, 0, 0, "player 1: the Mole" },
+	SHOT(3700, "mole_done"), SHOT(5200, "after"),
+	{ 9000, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
+	{ 9200, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full again" },
+	SHOT(10500, "club_hint"),
+	END(11500),
+};
+
+// crowd36 (-Level 3): LV3-6's fight (200 Romans to beat in co-op), the Twister
+// learned earlier (no hint line of its own): player 2's Obelix's combo bar
+// fills -- the crowd's Twister hint, 12 s; two of its buttons pressed in order
+// (A, X on player 2's pad): 8 s more (20 s in all).
+const Step kCrowd36[] = {
+	MARK(0, "crowd36"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_COMBOHINT, -2, 0, 0, 0, 0, "the Twister learned (no line)" },
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600),
+	{ 8000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	SHOT(9000, "crowd_hint"),
+	VPAD(10000, 1, PAD_A, 0, 0, "p2 A"), VPAD(10090, 1, 0, 0, 0, "p2 release"), SHOT(10150, "crowd_a"),
+	VPAD(10300, 1, PAD_X, 0, 0, "p2 X"), VPAD(10390, 1, 0, 0, 0, "p2 release"), SHOT(10450, "crowd_ax"),
+	SHOT(19000, "crowd_19s"), SHOT(26500, "crowd_26s"), SHOT(29500, "crowd_29s"),
+	END(30000),
+};
+
+// fuse2: every combo learned; the heroes side by side, both bars full; player
+// 1's Twister (injected) sets both spinning -- both players' boxes: X fuses
+// them; player 2's X: the fused tornado, its parts (who steers what) in each
+// player's box for as long as it lasts.
+const Step kFuse2[] = {
+	MARK(0, "fuse2"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix 1.5 units ahead of asterix (the trio's fusion range)" },
+	{ 1500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 1500, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1: the Twister" },
+	// Player 2's own (individual heroes: no Twister is copied), fast enough to
+	// be done before the jump (A) leaves the ground.
+	VPAD(2550, 1, PAD_A, 0, 0, "p2 A"), VPAD(2583, 1, 0, 0, 0, "p2 r"), VPAD(2600, 1, PAD_X, 0, 0, "p2 X"),
+	VPAD(2633, 1, 0, 0, 0, "p2 r"), VPAD(2650, 1, PAD_B, 0, 0, "p2 B"), VPAD(2683, 1, 0, 0, 0, "p2 r"),
+	VPAD(2700, 1, PAD_Y, 0, 0, "p2 Y"), VPAD(2733, 1, 0, 0, 0, "p2 r"),
+	SHOT(3300, "both_start"), SHOT(5300, "both_spin"),   // (the Twister's start step 0x22 lasts some 2 s)
+	VPAD(5800, 1, PAD_X, 0, 0, "p2 X"), VPAD(5900, 1, 0, 0, 0, "p2 release"),
+	SHOT(6050, "fuse_x"), SHOT(7500, "fused"), SHOT(10000, "fused_later"),
+	END(13000),
+};
+// rage2: every combo learned, the Rage first in line (test aid); player 2's
+// Obelix by a Roman with a full bar gets the Rage's hint; RB on player 2's pad:
+// Idefix's rage (his bite with that bar), the Rage done for player 2.
+const Step kRage2[] = {
+	MARK(0, "rage2"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_COMBOHINT, 105, 0, 0, 0, 0, "the Rage first in line" },
+	{ 1500, S_ENEMY, HERO_OBELIX, 2, 0, 0, 0, "obelix 6 from a roman" },
+	{ 1800, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	SHOT(3000, "rage_hint"),
+	VPAD(3500, 1, PAD_RB, 0, 0, "p2 RB"), VPAD(3600, 1, 0, 0, 0, "p2 release"),
+	SHOT(3700, "rage_rb"), SHOT(4500, "rage_done"), SHOT(6000, "rage_after"),
+	END(7000),
+};
+
 struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
+	SCENARIO("hudhints", kHudHints),
+	SCENARIO("combohint2", kComboHint2),
+	SCENARIO("combohint2b", kComboHint2B),
+	SCENARIO("crowd36", kCrowd36),
+	SCENARIO("fuse2", kFuse2),
+	SCENARIO("rage2", kRage2),
 	SCENARIO("towerscan", kTowerScan),
 	SCENARIO("towerhit", kTowerHit),
 	SCENARIO("shieldjump", kShieldJump),
@@ -9928,6 +10072,36 @@ void RunStep(const Step& s) {
 		IndivLeave(prev);
 		break;
 	}
+	case S_HINTTEST: {   // a hint on player a's box (-1 both): b 0 revive, 1 one line, 2 combo buttons (x lit), 3 three lines
+		wchar_t text[200];
+		int p = s.a < 0 ? 0 : s.a;
+		switch (s.b) {
+		case 0: swprintf(text, 200, L"%s is down!\nHold %s by him for 10 s to revive", HintHeroName(HERO_OBELIX), HintButtonName(p, HB_B)); break;
+		case 1: swprintf(text, 200, L"%s: jump with %s", HintHeroName(HERO_ASTERIX), HintButtonName(p, HB_A)); break;
+		case 2: {
+			const HintButton seq[4] = { HB_A, HB_X, HB_B, HB_Y };
+			wchar_t keys[120] = {};
+			for (int i = 0; i < 4; i++) {
+				if (i) wcscat(keys, HintNext());
+				wcscat(keys, HintButtonName(p, seq[i], i >= (int)s.x));
+			}
+			wchar_t ic = IconComboGlyph(2);
+			swprintf(text, 200, L"%c So many Romans: Twister!\n%s", ic ? ic : L' ', keys);
+			break;
+		}
+		default: swprintf(text, 200, L"Line one of three\nline two is a bit longer\nthree"); break;
+		}
+		HintShow(HINT_COMBO, s.a, text, (DWORD)(s.y > 0 ? s.y : 6000));
+		Log("autotest: hint %d on %s", s.b, s.a < 0 ? "both boxes" : s.a ? "player 2's box" : "player 1's box");
+		break;
+	}
+	case S_HINTSPARK:   // a sparkle on button b of player a's test hint, with the sound
+		HintSpark(HINT_COMBO, s.a, s.b, true);
+		Log("autotest: sparkle on button %d of player %d's hint", s.b, s.a + 1);
+		break;
+	case S_COMBOHINT:   // combo a as if just bought, for both players (-1: the crowd's Twister hint again)
+		ComboHintsQueue(s.a);
+		break;
 	case S_HUDDIFF:
 		HudDiffStart();
 		break;
@@ -10001,10 +10175,27 @@ void AutotestInit() {
 
 bool AutotestActive() { return at.phase != AutotestState::OFF; }
 
+// In a remote desktop session the game's window stays white (screenshots too)
+// until it is minimised and restored once (the user's finding): done 1.5 s and
+// 5 s after the window is known.
+void RemoteDesktopFlip(DWORD now) {
+	static DWORD first = 0;
+	static int done = 0;
+	if (!at.hwnd || done >= 2 || !GetSystemMetrics(SM_REMOTESESSION)) return;
+	if (!first) first = now;
+	if (now - first < (done == 0 ? 1500u : 5000u)) return;
+	done++;
+	ShowWindow(at.hwnd, SW_MINIMIZE);
+	ShowWindow(at.hwnd, SW_RESTORE);
+	SetForegroundWindow(at.hwnd);
+	Log("autotest: remote desktop session -- the window minimised and restored (%d)", done);
+}
+
 void AutotestFrame() {
 	if (at.phase == AutotestState::OFF || at.phase == AutotestState::DONE) return;
 	DWORD now = GetTickCount();
 	SubclassWindow();
+	RemoteDesktopFlip(now);
 
 	if (at.phase == AutotestState::WAIT && _strnicmp(at.sc->name, "boot", 4) == 0) {
 		// Boot scenarios (run with XXL_LEVEL=-1): the game's own start -- the run

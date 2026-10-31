@@ -1,13 +1,17 @@
-// Co-op hints in the HUD's action prompt box (where the game shows "Use",
-// "Activate", "Pull"...).
+// Co-op hints and the action prompt, one box per player.
 //
 // The in-game interface (CKHkInterfaceInGame, 2/132; tick = vtable 0x6285F0 slot
 // 18) shows the prompt of game manager +0xCC bits 4-7 (0xE = none) with the text
-// of string id [interface +0x1A4 + kind*4] (FUN_0042E590 on the text object
-// +0x15C; strings from the localisation manager, FUN_00411780) and a button icon
-// (+0x140). A hint borrows one prompt kind for the length of the interface's
-// tick, with a private string id answered by the mod; the game's own prompts
-// come first.
+// of string id [interface +0x1A4 + kind*4] in its text object +0x15C (strings
+// from the localisation manager, FUN_00411780) on its dark plate +0x140, at the
+// bottom right. With player 2 in, the game's prompt box is not drawn: each
+// player gets a box of the mod's -- player 1's at the bottom left (stacked split:
+// the right of the top half), player 2's at the bottom right -- showing that
+// player's hero's prompt ("Use", "Talk"...) or else that player's newest hint.
+// The boxes are copies of the game's text object (CText2d, 0x6DC bytes) laid out
+// with a private string id and drawn after the HUD's 2D layer (FUN_0042A470),
+// with the game's plate. Without player 2, hints use player 1's box at the
+// game's place while the game shows no prompt.
 
 #pragma once
 #include <windows.h>
@@ -16,11 +20,22 @@ bool HintsInstallHooks();
 // Once per frame (after the co-op frame).
 void HintsFrame();
 
-// Shows `text` for `ms` milliseconds. `key` identifies the hint: showing a key
-// again replaces its text and time. The newest hint is the one on screen.
-void HintShow(int key, const wchar_t* text, DWORD ms);
-void HintHide(int key);
-bool HintShown(int key);
+const int HINT_BOTH = -1;
+// Shows `text` on player `player`'s box (0 / 1, HINT_BOTH: each) for `ms`
+// milliseconds. (`key`, `player`) identifies the hint: showing it again replaces
+// its text and time. Each box shows its newest hint (by when it was first
+// shown), the player's prompt before any.
+void HintShow(int key, int player, const wchar_t* text, DWORD ms);
+void HintHide(int key);               // every player's
+void HintHide(int key, int player);
+bool HintShown(int key);              // any player's, still timed
+bool HintShown(int key, int player);
+// The hint the box shows right now (in place or sliding in).
+bool HintOnScreen(int key, int player);
+// A burst of sparkles over the `n`-th button (from 0: a word other than ">") of
+// the hint's last line, with the combo bar's level sound
+// (`sound`).
+void HintSpark(int key, int player, int n, bool sound);
 
 enum HintKey {
 	HINT_JOIN = 1,      // level start: how player 2 joins / leaves
@@ -29,16 +44,24 @@ enum HintKey {
 	HINT_MACHINE,       // a machine needs both heroes
 	HINT_LIFTER,        // a lifter waits for both heroes
 	HINT_REVIVE,        // a fallen hero: how to revive it, the revive under way
+	HINT_COMBO,         // a combo to try (combohints.cpp)
+	HINT_FUSE,          // both heroes spinning together: X fuses them
 };
 
-enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_COUNT };
+enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_Y, HB_RB, HB_COUNT };
 // The name of `b` on player `player`'s (0 = player 1, 1 = player 2) controller:
-// its icon (pad button, keycap), else the pad button's or the key's name.
-const wchar_t* HintButtonName(int player, HintButton b);
+// its icon (pad button, keycap; `unpressed`: the dimmed one), else the pad
+// button's or the key's name.
+const wchar_t* HintButtonName(int player, HintButton b, bool unpressed = false);
 // A keyboard key's name ("Space", "K"), or its keycap icon.
 const wchar_t* HintKeyName(int vk);
+// " > " between a combo's buttons: the mod's chevron icon (the game's font has
+// no '>').
+const wchar_t* HintNext();
 // With the co-op icons: the hero's icon and name ("Asterix"), the hero and its
 // player's icon ("Asterix (P1)" without), player's icon ("Player 2:" without).
+// (The hints name heroes only: each player's box is on its own side. The
+// player tags stay for later use.)
 const wchar_t* HintHeroName(int hero);
 const wchar_t* HintHero(int hero, int player);
 const wchar_t* HintPlayer(int player);

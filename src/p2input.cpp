@@ -172,7 +172,8 @@ int P2RecognizeCombos(uint8_t* values, int numActions, char* bindings) {
 
 // Cheat: every combo learned (the merchant's item bits the heroes' combo
 // actions ask for, game manager +0x40 -> +0x10: 1 Club, 2 Power Hammer, 4
-// Twister, 8 Twister Fusion, 0x10 Mole) and the combo bar full, as
+// Twister, 8 Twister Fusion, 0x10 Mole, 0x20 Rage -- Idefix's, read by his bite
+// state 0x49E4C0) and the combo bar full, as
 // FUN_0048C860 fills it (that object +0x10 bit 0x4000; +0xA4 = +0xA0, +0xC4 =
 // byte +0xBB).
 // The HUD's bar only turns "full" (FUN_00518190 state 2 -> 4, "Combo") when it
@@ -186,7 +187,7 @@ bool CombosCheat(bool viaHits) {
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	char* sg = gm ? *(char**)(gm + 0x40) : nullptr;
 	if (!sg) return false;
-	*(uint32_t*)(sg + 0x10) |= 0x1F;
+	*(uint32_t*)(sg + 0x10) |= 0x3F;
 	if (viaHits) {
 		if (*(uint32_t*)(sg + 0x10) & 0x4000) {   // already full: the gauge refilled
 			*(uint32_t*)(gm + 0xA4) = *(uint32_t*)(gm + 0xA0);

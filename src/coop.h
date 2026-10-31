@@ -39,6 +39,7 @@ void CoopTorchCheat(bool give);   // fire for Asterix from the nearest brazier, 
 int  CoopNonLeaderPlayer();   // the player hero that is not the trio leader (-1 if none)
 int  CoopP2Pad();
 int  CoopPromptPlayer();   // the player whose hero the HUD's action prompt is for (-1: unknown)
+unsigned CoopPromptKindFor(int player);   // the prompt kind (game manager +0xCC bits 4-7) of that player's hero, 0xE none
 bool CoopSuspended();   // co-op paused for a scripted mode (ride, cinematic...)
 bool CoopOneScreen();   // co-op running, but on one screen for now (Twister Fusion)
 int  CoopShopper();      // the hero at the merchant while co-op goes on around it (-1: none)

@@ -156,32 +156,35 @@ SharedMode DetectMode(Trio t) {
 	return SHARED_NONE;
 }
 
-// Hint: who does what, for 10 s (5 s for the short-lived fused tornado).
+// Hint: who does what -- each player's own part in its own box, for 10 s; the
+// fused tornado's for as long as it lasts (refreshed every frame).
 void ShowModeHint(SharedMode m) {
 	if (m == SHARED_NONE) { HintHide(HINT_MODE); return; }
 	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
-	wchar_t text[96];
+	wchar_t ta[96] = {}, to[96] = {};
 	switch (m) {
 	case SHARED_GUN:
-		swprintf(text, 96, L"%s: turn the gun\n%s: fire with %s", HintHero(HERO_OBELIX, o), HintHero(HERO_ASTERIX, a),
-		         HintButtonName(a, HB_X));
+		swprintf(to, 96, L"%s: turn the gun", HintHeroName(HERO_OBELIX));
+		swprintf(ta, 96, L"%s: fire with %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_X));
 		break;
 	case SHARED_GUN_SOLO:
-		swprintf(text, 96, L"%s: %s at the gun's handles\nto turn it for %s", HintHero(HERO_OBELIX, o),
+		swprintf(to, 96, L"%s: %s at the gun's handles\nto turn it for %s", HintHeroName(HERO_OBELIX),
 		         HintButtonName(o, HB_X), HintHeroName(HERO_ASTERIX));
-		HintShow(HINT_MODE, text, 6000);
+		HintShow(HINT_MODE, o, to, 6000);
 		return;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
-		swprintf(text, 96, L"%s: steer and camera\n%s: jump with %s", HintHero(HERO_OBELIX, o), HintHero(HERO_ASTERIX, a),
-		         HintButtonName(a, HB_A));
+		swprintf(to, 96, L"%s: steer and camera", HintHeroName(HERO_OBELIX));
+		swprintf(ta, 96, L"%s: jump with %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_A));
 		break;
 	default:
-		swprintf(text, 96, L"%s: forward and back\n%s: left, right and camera", HintHero(HERO_ASTERIX, a),
-		         HintHero(HERO_OBELIX, o));
+		swprintf(ta, 96, L"%s: forward and back", HintHeroName(HERO_ASTERIX));
+		swprintf(to, 96, L"%s: left, right and camera", HintHeroName(HERO_OBELIX));
 		break;
 	}
-	HintShow(HINT_MODE, text, m == SHARED_FUSION ? 5000 : 10000);
+	DWORD ms = m == SHARED_FUSION ? 500 : 10000;
+	HintShow(HINT_MODE, a, ta, ms);
+	HintShow(HINT_MODE, o, to, ms);
 }
 
 } // namespace
@@ -229,6 +232,8 @@ void SharedFrame() {
 		    g.owner[HERO_ASTERIX] + 1, g.owner[HERO_OBELIX] + 1);
 		g.mode = m;
 		ShowModeHint(m);
+	} else if (m == SHARED_FUSION) {
+		ShowModeHint(m);   // up as long as the fused tornado lasts
 	}
 }
 

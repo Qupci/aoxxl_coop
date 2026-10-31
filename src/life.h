@@ -51,6 +51,9 @@ inline bool HeroModePlayable(uint8_t f18) {
 
 // The Life state a hero was in at the end of its last tick (0xFF if unknown).
 uint8_t LifeLastState(int heroIndex);
+// The player hero whose Life is ticking right now (Idefix's tick: the hero
+// whose RB called him), -1 outside.
+int LifeTickingHero();
 
 // Installs the slot-17 hooks on both Life vtables. Reversible vtable swaps.
 bool LifeInstallHooks();
