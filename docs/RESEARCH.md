@@ -3356,3 +3356,6 @@ both halves).
   go on again as Obelix moves (held, standing again 1 s on), and with him back in the box go round him. nolock36u.
   ini nolock_romans: "one held back from where it is going for a second stands still until the hero moves
   somewhere it can walk to".
+- Round 182 (user: no-lock Romans on by default). config.h noLockRomans true; dist ini nolock_romans = on. The
+  user's ini had lost [coop] romans_spawn_in_view (an older copy saved over it from Notepad): put back as in dist
+  (off -- the default when the key is missing too, so the Romans the user saw come in in view were not from it).
