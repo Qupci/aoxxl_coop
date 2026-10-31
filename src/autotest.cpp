@@ -2792,6 +2792,8 @@ const Step kPit26A[] = {
 // ... the Romans within 15 units of hero `hero` left alive: the rest beaten (taken off their squads the game's
 // way), nothing left to send -- the fights' ends left to the game (and the mod)
 #define ENDFIGHTKEEP(t, hero) { t, S_ENDFIGHT, hero, 1, 0, 0, 0, "end fight, keep romans" }
+// ... every Roman of them beaten (taken off the game's way, counted), the end (0D16) given: a fight won
+#define ENDFIGHTWON(t)     { t, S_ENDFIGHT, 0, 2, 0, 0, 0, "fight won" }
 // the lever (CKHkActivator 2,52) nearest (X, Y, Z) worked as a punch on it does
 #define PULLLEVERAT(t, X, Y, Z) { t, S_PULLLEVER, -1, 0, 0, X, Y, "pull lever", Z }
 const Step kPf26[] = {
@@ -3370,6 +3372,22 @@ const Step kNoLock34[] = {
 	GLIDEAT(47000, HERO_ASTERIX, 121.0f, -0.8f, -327.0f, 1500), REACH(49000), DOORS(49100, HERO_OBELIX, 20.0f),
 	SHOT(50000, "nolock34_6"), SHOT(58000, "nolock34_7"), SQUADS(58100, HERO_OBELIX, 60.0f),
 	END(59000),
+};
+// nolock34r (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0):
+// nolock34 with the courtyard fight won at 20 s (ENDFIGHTWON: its Romans beaten, its end)
+// and the squad put away (asleep, as out of view) while Obelix still waits in the
+// library -- the courtyard squad (woken) sends its Romans
+// back for him ("revenge": its box holds the library).
+const Step kNoLock34R[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f), POTION(3200),
+	GLIDEAT(4000, HERO_ASTERIX, 120.5f, -0.8f, -327.5f, 800), GLIDEAT(5500, HERO_ASTERIX, 114.0f, -0.8f, -326.0f, 800),
+	GLIDEAT(7000, HERO_ASTERIX, 108.0f, -0.8f, -319.0f, 800), GLIDEAT(8000, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 800),
+	{ 9000, S_FLAGEV, 0x578, 0, 0, 0, 0, "lock34 sphere" }, SHOT(10800, "nolock34r_1"),
+	{ 11000, S_WATCHENEMIES, 0, 0, 0, 126.8f, -1.2f, "watch romans by obelix", -325.8f },
+	TAPS1(12000), ENDFIGHTWON(20000), SQUADRESET(20500), SHOT(21500, "nolock34r_2"), SHOT(27000, "nolock34r_3"), SHOT(33000, "nolock34r_4"),
+	SHOT(40000, "nolock34r_5"), END(46000),
 };
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
@@ -7147,6 +7165,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("join36", kJoin36),
 	SCENARIO("nolockmark36", kNoLockMark36),
 	SCENARIO("nolock34", kNoLock34),
+	SCENARIO("nolock34r", kNoLock34R),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -8138,9 +8157,9 @@ void RunStep(const Step& s) {
 			char* sq = (char*)GetLvlObject(4, 26, i);
 			if (!sq || *(int8_t*)(sq + 0x154) < -1) continue;
 			void** vt = *(void***)sq;
-			if (s.b == 1) {   // members (vf12, chained +4) away from hero a taken off as beaten ones are (FUN_00530300)
+			if (s.b == 1 || s.b == 2) {   // members (vf12, chained +4) away from hero a (2: all) taken off as beaten ones are (FUN_00530300)
 				Trio t = GetTrio();
-				Hero keep = t ? t.GetHero(s.a) : Hero();
+				Hero keep = t && s.b == 1 ? t.GetHero(s.a) : Hero();
 				char* off[64];
 				int nOff = 0, kept = 0;
 				char** head = ((char**(__fastcall*)(char*, void*))vt[12])(sq, nullptr);
@@ -8160,6 +8179,10 @@ void RunStep(const Step& s) {
 					*(int16_t*)(rec + 0x18) = (int16_t)*(uint16_t*)(rec + 0x16);
 				}
 				Log("autotest: squad %p: %d Romans taken off, %d by %s kept; nothing left to send", sq, nOff, kept, HeroName(s.a));
+				if (s.b == 2) {   // its end as the game gives it as its last Roman goes
+					((void(__fastcall*)(char*, void*, int, int))vt[5])(sq, nullptr, 0xD16, 0);
+					*(uint8_t*)(sq + 0x154) = 0xFE;
+				}
 				n++;
 				continue;
 			}

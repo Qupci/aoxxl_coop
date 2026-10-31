@@ -3167,3 +3167,25 @@ both halves).
   4, XXL_DOWNAT=1:13000 XXL_OBELIXPOTION=0) now in three parts: Asterix 12 units off (guards 1.4-2.6 off, standing:
   the same distances 6 s on), beside Obelix hitting (they fight him: "fighting", 1.6-4.3), 15 units off (back,
   1.5-2.3).
+- Round 172 (user, after round 169's LV3-4 gave Obelix no Romans: use squads whose fight was won earlier in the level
+  -- "revenge"). nolock.cpp: Completed(sq) = not gated now (+0x154 < -1), spent (SquadSpent), no member alive but
+  ours, a pool beaten to its count (count > 0, sent >= count). A gated squad is skipped only until it is Completed
+  (GatedFight). SquadCanSend takes an asleep squad (+0x152 bit 1 clear) if Completed; SendGroup wakes it with vf33
+  (0x52EF70, thiscall(): with nothing to place, its set-up, the flag, event 0D13 -- what a hero coming back into its
+  box does) -- the flag alone (no set-up) had the Romans sent off in its first tick; such a squad is put away again
+  (vf34 0x52F5A0: flag off, members back with sent -1 each, alive += queued + fallen, no events) 2 s after its last
+  one goes (Ended.woke). +0x154 is the squad's pool phase: 0..7 one pool, -1 all (0D17, "add all pools"), -2 none /
+  ended (0D16, FUN_00530570; vf32). Found on the way: a squad's Romans out of its box (x/z: max +0x11C, min +0x128)
+  are knocked out as they come in -- squad #19 (box at the level's start, z -1.7..58.6) woken for Obelix 380 units
+  off: its Romans got state 1 (+0x24 bit 1, the 4C02 path: Class_2_84 vf29 state 1 -> vf42 death sound, 0x4D09
+  "a Roman beaten" to the squad) and hook +8 bit 0 in their first tick, at their marker. So every sender must have
+  the waiting hero in its box (SquadFor, SquadAtOwnMarker) and the spawn point too (SpawnPoint: markers / walk-to
+  marker outside the sender's box left out, tallied); round 167's chase "anywhere" holds within the squad's box (the
+  courtyard's is 147 x 120). LV3-4: only the courtyard squad's box holds the library (SQUADS r 0.1); the user's
+  "library fight of 30" was by the level's start (the teleport's log line had x moved, z not yet). ini texts:
+  nolock_romans (revenge, the squad's area), romans_guard_downed (round 171's spots and range). Test step
+  ENDFIGHTWON (S_ENDFIGHT b 2: every member taken off as beaten -- FUN_00530300, sent kept --, count = sent, 0D16,
+  +0x154 -2). Autotest nolock34r (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0): none for Obelix
+  while the courtyard fight lasts; won at 20 s and put away (SQUADRESET) -- the game wakes it again (Obelix in its
+  box) and 3-4 of its Romans come at the library marker and stay by Obelix to the end. freeromans23: a group of 5
+  (squad #36, its box holds Obelix).
