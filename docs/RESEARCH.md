@@ -3151,3 +3151,19 @@ both halves).
     Asterix; with XXL_GUARDMAX=2 the first hit landed and the other went for Asterix at once. poolkinds -Level 3 / 5
     / 2: lions, the tamer, archers, turtles; pirates, jetpack, tower, leaders; Norman villagers, archers, leaders,
     turtles -- no; the Roman pools -- yes. rules4d: 1 Roman near (none guard), the gate 85 -> 170 as before.
+- Round 171 (user, userlogs 20261031-xxl_coop.guards_too_close.log: round 170's guards 1.1-1.7 off downed Obelix,
+  walking all the time -- the ring 0.8 put their places inside its body; shields, "mad" and the last guard confirmed on
+  the pad; asked: 1 unit farther, a spot a guard can't stand on lost rather than moved, and a range round the downed
+  hero in which the guards go for the standing hero, back to their spots once it is out). guard.cpp: 5 spots on a
+  1.8-unit ring fixed as the hero falls ((dx, dz) per guard, nearest free spot each), each one PfReachable from the
+  hero (PF_YES; no graph there: all) -- a lost spot is one guard fewer (Spots; spots26 -Level 2: 4.5 units along
+  LV2-6's pit edge from Obelix's spot 3 of 5, the two east ones lost). Engage: the standing hero within 5 units of the
+  downed one (1.8 + a basic Roman's range beRange +0x14C, 2.8) -> GuardSteer leaves the guards to their squads' own
+  slots (they fight it), out past 6.5 -> back to their spots (log "its guards fight it" / "go back"). Not causes:
+  the squad's +0xC0 (3.0 in LV3-6 and LV4-1 alike: the step's slow-down radius; +0xB8 speed, +0xBC turn, +0xC4 0.5)
+  and the component's "position accuracy" (+0x4C, the editor's attackCooldown, 2.0; 0.5 in a guard's copy changed
+  nothing) -- LV3-6's corner guards stood 2.4-3.9 off because the fight lock's dome round Obelix kept them out (the
+  graph doesn't know it); they stand still there. Test step S_GUARDSPOTS (GuardSpots export). Autotest guard41 (-Level
+  4, XXL_DOWNAT=1:13000 XXL_OBELIXPOTION=0) now in three parts: Asterix 12 units off (guards 1.4-2.6 off, standing:
+  the same distances 6 s on), beside Obelix hitting (they fight him: "fighting", 1.6-4.3), 15 units off (back,
+  1.5-2.3).

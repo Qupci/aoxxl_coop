@@ -5,6 +5,7 @@
 #include "kal.h"
 #include "log.h"
 #include "nolock.h"
+#include "pathfind.h"
 #include "trio.h"
 
 #include <cmath>
@@ -18,10 +19,14 @@
 // fights them to get to it. The lead goes to the standing hero and the squads run
 // for that one: their slots (vf31 -> FUN_0052B670: component 0x46, +0 slot, +0x18
 // the step towards it) would take those Romans over to it. After each squad's
-// tick their slots are moved round the downed hero, 0.8 units off, spread out (as
-// SplitSquad's and no-lock mode's), and their squads are not put away meanwhile
-// (vf35). They leave the downed hero alone (out of the objects' slicing: HeroOut)
-// and go for the one who comes.
+// tick their slots are moved to spots round the downed hero, 1.8 units off (0.8
+// had them pressing into it, walking all the time), 5 spread out as it falls --
+// a spot the level's pathfinding graph can't reach from the hero (a wall, a drop)
+// is left out, one guard fewer -- and their squads are not put away meanwhile
+// (vf35). They leave the downed hero alone (out of the objects' slicing: HeroOut).
+// The standing hero within 5 units of the downed one: the guards fight it (their
+// squads' own slots, as a Roman 2.8 off a guard's spot would); 6.5 off, back to
+// their spots.
 // A guard blocks hits with a shield: its hook's component (+0x54, the pool
 // record's +4, shared by the pool's Romans) swapped for a copy of its own with
 // the shield flag (+4 bit 0x10) and shield points (+0x110) -- the hit code
@@ -36,7 +41,9 @@ namespace {
 const int    kPerHero      = 5;
 const int    kMaxGuards    = 2 * kPerHero;
 const float  kGuardReach   = 10.0f;
-const float  kRing         = 0.8f;
+const float  kRing         = 1.8f;
+const float  kEngage       = 5.0f;    // the standing hero this near the downed one: the guards fight it
+const float  kDisengage    = 6.5f;    // ... this far again: back to their spots
 const int    kShieldPoints = 2;       // a guard's shield, for a Roman without one: a 3-hit combo gets through
 const size_t kCpntSize     = 0x180;   // CKBasicEnemyCpnt (deserialized up to +0x174)
 const uintptr_t kBasicEnemyCpnt = 0x627BD0;
@@ -47,10 +54,12 @@ Shield g_shields[kMaxGuards];
 
 // A guard, in its pool record's list (+8, chained +0x50) and not finished
 // (hook +8 bit 0) while it lasts; the squad checked to be the level's still.
-struct Guard { char* roman; char* sq; unsigned sqIdx; int pool; int hero; char* cpnt; int shield; };
+// Its spot: (dx, dz) from its hero.
+struct Guard { char* roman; char* sq; unsigned sqIdx; int pool; int hero; char* cpnt; int shield; float dx, dz; };
 Guard g_guards[kMaxGuards];
 int   g_n = 0;
 bool  g_down[2] = {};
+bool  g_engaged[2] = {};   // the standing hero near: the hero's guards fight it
 int   g_told = 0;
 
 bool Valid(const Guard& g) {
@@ -200,7 +209,8 @@ void WatchHits() {
 			Hero h = t.GetHero(g_guards[i].hero);
 			Vector3 p;
 			if (h && RomanPos(g_guards[i].roman, &p))
-				len += _snprintf(line + len, sizeof(line) - len, " %s %.1f", HeroName(g_guards[i].hero), sqrtf((p - h.Pos()).len2()));
+				len += _snprintf(line + len, sizeof(line) - len, " %s %.1f%s", HeroName(g_guards[i].hero),
+				                 sqrtf((p - h.Pos()).len2()), g_engaged[g_guards[i].hero] ? " (fighting)" : "");
 		}
 		line[sizeof(line) - 1] = 0;
 		Log("%s", line);
@@ -231,6 +241,21 @@ bool HitLanded(const Guard& g) {
 	return (st == 1 || st == 2) && re < 0x1B;
 }
 
+// The guards' spots round a hero down at `at` ((dx, dz) each): 5 on a ring, those
+// the level's pathfinding graph reaches from it (no graph here: all). Their count.
+int Spots(const Vector3& at, float dx[kPerHero], float dz[kPerHero], bool* graph) {
+	int ns = 0;
+	*graph = PfReachable(at, at) != PF_UNKNOWN;
+	for (int s = 0; s < kPerHero; s++) {
+		float a = 6.2831853f * s / kPerHero + 0.7f;
+		Vector3 p(at.x + kRing * cosf(a), at.y, at.z + kRing * sinf(a));
+		if (*graph && PfReachable(at, p) != PF_YES) continue;
+		dx[ns] = p.x - at.x;
+		dz[ns++] = p.z - at.z;
+	}
+	return ns;
+}
+
 void Collect(int hero, const Vector3& at) {
 	struct Cand { char* m; char* sq; unsigned i; int r; float d; };
 	Cand c[32];
@@ -254,17 +279,49 @@ void Collect(int hero, const Vector3& at) {
 	}
 	for (int a = 1; a < nc; a++)   // nearest first
 		for (int b = a; b > 0 && c[b].d < c[b - 1].d; b--) { Cand t = c[b]; c[b] = c[b - 1]; c[b - 1] = t; }
+	float sx[kPerHero], sz[kPerHero];
+	bool open[kPerHero], graph;
+	int ns = Spots(at, sx, sz, &graph);
+	for (int s = 0; s < ns; s++) open[s] = true;
 	static const int s_max = getenv("XXL_GUARDMAX") ? atoi(getenv("XXL_GUARDMAX")) : kPerHero;   // autotests: fewer
 	int take = nc < s_max ? nc : s_max;
+	if (take > ns) take = ns;
 	if (take < 2) take = 0;   // a lone guard goes for the standing hero (the last guard's rule)
 	for (int k = 0; k < take && g_n < kMaxGuards; k++) {
+		Vector3 p;   // the free spot nearest it
+		RomanPos(c[k].m, &p);
+		int best = -1;
+		float bd = 1e30f;
+		for (int s = 0; s < ns; s++) {
+			float ex = at.x + sx[s] - p.x, ez = at.z + sz[s] - p.z;
+			if (open[s] && ex * ex + ez * ez < bd) { bd = ex * ex + ez * ez; best = s; }
+		}
+		open[best] = false;
 		Guard& g = g_guards[g_n++];
-		g = { c[k].m, c[k].sq, c[k].i, c[k].r, hero, nullptr, -1 };
+		g = { c[k].m, c[k].sq, c[k].i, c[k].r, hero, nullptr, -1, sx[best], sz[best] };
 		GiveShield(g);
 	}
+	g_engaged[hero] = false;
 	if (g_told++ < 40)
-		Log("guard: %s is down -- %d basic Roman(s) within %.0f units, %d stay round it with a shield until it is revived",
-		    HeroName(hero), nc, kGuardReach, take);
+		Log("guard: %s is down -- %d basic Roman(s) within %.0f units, %d of %d spots round it reachable%s: %d stay there "
+		    "with a shield until it is revived", HeroName(hero), nc, kGuardReach, ns, kPerHero, graph ? "" : " (no graph)", take);
+}
+
+// The standing hero near the downed one: its guards fight it; away again: back
+// to their spots.
+void Engage(Trio t, int hero) {
+	Hero h = t.GetHero(hero), o = t.GetHero(1 - hero);
+	bool any = false;
+	for (int i = 0; i < g_n; i++) any |= g_guards[i].hero == hero;
+	if (!h || !o || !any) { g_engaged[hero] = false; return; }
+	float d = sqrtf((o.Pos() - h.Pos()).len2());
+	bool on = g_engaged[hero] ? d < kDisengage : d < kEngage;
+	if (on == g_engaged[hero]) return;
+	g_engaged[hero] = on;
+	static int s_told = 0;
+	if (s_told++ < 60)
+		Log("guard: %s %.1f units from downed %s -- its guards %s", HeroName(1 - hero), d, HeroName(hero),
+		    on ? "fight it" : "go back to their spots");
 }
 
 void Release(int hero) {
@@ -332,6 +389,7 @@ void GuardFrame() {
 				    HeroName(1 - hero));
 			Drop(last);
 		}
+		if (on) Engage(t, hero);
 	}
 }
 
@@ -341,21 +399,17 @@ void GuardSteer(char* sq) {
 	if (!t) return;
 	typedef char*(__fastcall* CpntFn)(char* self, void* edx, int id);
 	float minStep = *(float*)(sq + 0xC0);
-	int n[2] = {}, k[2] = {};
-	for (int i = 0; i < g_n; i++) n[g_guards[i].hero]++;   // one ring per hero, over all squads
 	for (int i = 0; i < g_n; i++) {
 		const Guard& g = g_guards[i];
-		int place = k[g.hero]++;
-		if (g.sq != sq || !OnDuty(g)) continue;
+		if (g.sq != sq || g_engaged[g.hero] || !OnDuty(g)) continue;   // (engaged: its squad's own slot)
 		Hero h = t.GetHero(g.hero);
 		char* node = *(char**)(g.roman + 0x10);
 		char* fr = node ? *(char**)(node + 4) : nullptr;
 		float* slot = (float*)((CpntFn)(*(void***)g.roman)[12])(g.roman, nullptr, 0x46);
 		if (!h || !fr || !slot) continue;
 		const float* rp = (const float*)(fr + 0x80);
-		float a = 6.2831853f * place / n[g.hero] + 0.7f;
 		Vector3 hp = h.Pos();
-		float sx = hp.x + kRing * cosf(a), sz = hp.z + kRing * sinf(a);
+		float sx = hp.x + g.dx, sz = hp.z + g.dz;
 		slot[0] = sx; slot[1] = hp.y; slot[2] = sz;
 		float dx = sx - rp[0], dz = sz - rp[2], len = sqrtf(dx * dx + dz * dz);
 		float f = len <= 0.01f ? 0.0f : 1.0f / (len > minStep ? len : minStep);
@@ -364,6 +418,17 @@ void GuardSteer(char* sq) {
 }
 
 bool GuardEligible(const char* rec, char* roman) { return GuardKind(rec, roman); }
+
+int GuardSpots(const Vector3& at, char* out, int room) {
+	float dx[kPerHero], dz[kPerHero];
+	bool graph;
+	int ns = Spots(at, dx, dz, &graph);
+	int len = _snprintf(out, room, "%d of %d reachable%s:", ns, kPerHero, graph ? "" : " (no graph)");
+	for (int s = 0; s < ns && len > 0 && len < room; s++)
+		len += _snprintf(out + len, room - len, " (%.1f %.1f)", at.x + dx[s], at.z + dz[s]);
+	out[room - 1] = 0;
+	return ns;
+}
 
 void GuardModelTextures(char* roman, char* out, int room) {
 	int len = 0;

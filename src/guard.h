@@ -3,6 +3,7 @@
 // fights them to get to it.
 
 #pragma once
+#include "kal.h"
 
 bool GuardInstallHooks();
 // Once a frame (coop's frame).
@@ -15,3 +16,5 @@ bool GuardKeepsSquad(char* sq);
 bool GuardEligible(const char* rec, char* roman);
 // The names of the Roman's model's textures, " name" each, in `out` (diagnostics).
 void GuardModelTextures(char* roman, char* out, int room);
+// The guards' spots round a hero down at `at` (autotests): how many, and where in `out`.
+int GuardSpots(const Vector3& at, char* out, int room);

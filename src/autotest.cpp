@@ -39,7 +39,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -3519,10 +3519,11 @@ const Step kSq36b[] = { SQ36(HERO_OBELIX, HERO_ASTERIX, VPAD(16000, 1, 0, 0, -1.
 
 // guard41 (-Level 4, XXL_DOWNAT=1:13000 XXL_OBELIXPOTION=0): LV4-1's fight lock
 // (an open field), both heroes taken out where its Romans come in at 8 s; Obelix
-// down there at 13 s among the Romans;
-// Asterix (no potion, healed every 2.5 s) faces the Roman nearest Obelix and
-// hits it every 0.5 s from 15 s: the guards' ring, their shields, a guard
-// breaking off, the last guard.
+// down there at 13 s among the Romans. Asterix (no potion, healed every 2.5 s)
+// stays 12 units off till 20 s (the guards at their spots), then faces the Roman
+// nearest Obelix and hits it every 0.5 s, then 4-hit combos (they fight him, a
+// shield blocks, a guard breaking off, the last guard), and goes 14 units off at
+// 32 s (back to their spots).
 #define HEALA(t) { t, S_GIVE, HERO_ASTERIX, 0, 0, 10.0f, 0, "heal asterix" }
 #define HIT(t) P1(t, PAD_X, 0, 0, "p1 X"), P1(t + 150, 0, 0, 0, "p1 release")
 #define FACEHIT(t) { t, S_NEAROBJ, HERO_ASTERIX, 93, HERO_OBELIX + 1, 1.3f, 0, "face the roman nearest obelix" }, HIT(t + 50)
@@ -3536,13 +3537,11 @@ const Step kGuard41[] = {
 	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
 	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
 	PLACEAT(8000, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), PLACEAT(8100, HERO_OBELIX, -294.0f, 0.5f, 90.0f),   // out where the Romans come in
-	HEALA(4500), HEALA(7000), HEALA(9500), HEALA(12000), HEALA(14500),
-	SHOT(11500, "guard41_0"), SHOT(14500, "guard41_1"),
-	FH5(15000), FH5(17500), SHOT(19900, "guard41_2"), FC4(20000), FC4(21500), FC4(23000), FC4(24500), FC4(26000), FC4(27500), FC4(29000),
-	FC4(30500),
-	SHOT(32400, "guard41_3"), FH5(32500), FH5(35000), FH5(37500), FH5(40000),
-	SHOT(42600, "guard41_4"),
-	END(44000),
+	HEALA(4500), HEALA(7000), HEALA(9500), HEALA(12000), PLACEAT(13300, HERO_ASTERIX, -306.0f, 0.5f, 92.0f),
+	HEALA(14500), HEALA(17000), SHOT(11500, "guard41_0"), SHOT(17500, "guard41_1"),
+	FH5(20000), SHOT(22400, "guard41_2"), FH5(22500), FC4(25000), FC4(26500), FC4(28000), FC4(29500), FC4(31000),
+	PLACEAT(32300, HERO_ASTERIX, -308.0f, 0.5f, 98.0f), HEALA(33000), HEALA(35500), SHOT(37500, "guard41_3"),
+	HEALA(38000), END(40000),
 };
 
 // poolkinds (any level): every squad's pools -- the enemy kind (component class,
@@ -3550,6 +3549,19 @@ const Step kGuard41[] = {
 // whether it may guard a downed hero (guard.cpp).
 #define POOLKINDS(t) { t, S_POOLKINDS, 0, 0, 0, 0, 0, "pool kinds" }
 const Step kPoolKinds[] = { MARK(0, "baseline"), POOLKINDS(2500), END(4000) };
+
+// spots26 (-Level 2): the guards' spots round each hero at LV2-6's big pit --
+// Obelix on its near edge, Asterix on the far side -- spots over the pit (the
+// graph can't reach them) left out.
+#define GUARDSPOTS(t, hero) { t, S_GUARDSPOTS, hero, 0, 0, 0, 0, "guard spots" }
+const Step kSpots26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_OBELIX, 115.53f, 3.0f, -389.57f), PLACEAT(3000, HERO_ASTERIX, 91.62f, 2.5f, -389.18f),
+	SHOT(4000, "spots26_0"), GUARDSPOTS(4200, HERO_OBELIX), GUARDSPOTS(4300, HERO_ASTERIX),
+	PLACEAT(5000, HERO_OBELIX, 120.0f, 3.0f, -389.57f), GUARDSPOTS(6000, HERO_OBELIX),
+	END(6500),
+};
 
 // over56 (-Level 5, XXL_DOWNAT=1:6000 XXL_DOWNAT2=0:9000): both heroes go down
 // at LV5-6's squad 4 fight lock: the game over and the respawn after it.
@@ -7073,6 +7085,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("guard36", kGuard36),
 	SCENARIO("guard41", kGuard41),
 	SCENARIO("poolkinds", kPoolKinds),
+	SCENARIO("spots26", kSpots26),
 	SCENARIO("twistroman", kTwistRoman),
 	SCENARIO("twistromana", kTwistRomanA),
 	SCENARIO("twistend", kTwistEnd),
@@ -8177,6 +8190,15 @@ void RunStep(const Step& s) {
 				n++;
 			}
 		Log("autotest: %d active squad(s) put away", n);
+		break;
+	}
+	case S_GUARDSPOTS: {   // the guards' spots round hero a, were it down where it stands (guard.cpp)
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		char buf[300];
+		GuardSpots(h.Pos(), buf, sizeof(buf));
+		Log("autotest: guard spots round %s at (%.1f %.1f %.1f): %s", HeroName(s.a), h.Pos().x, h.Pos().y, h.Pos().z, buf);
 		break;
 	}
 	case S_POOLKINDS: {   // every squad's pools: the component (class, flags, health, shield points), a Roman of it (bones, textures), may it guard
