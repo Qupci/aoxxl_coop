@@ -3375,3 +3375,58 @@ both halves).
   Autotest nolock36v (nolock36s's env, XXL_NOLOCKGROUP=2): the user's walk timed from the group's coming (log
   offset 10.5-17 s here, not 5.9): both Romans stop at the edge on their own (0x22, x -132.5..-132.8), no give-up,
   follow Obelix back -- the user's x -132.0 not reached in 3 runs.
+- Round 184 (user request, screenshots/horizontal_flask_overlap.png: the potion's flask on player 2's combo bar in
+  the stacked split; a left prompt box coming). The flask is in-game interface model +0xAC, part FUN_0051BA70
+  (state +0x24 bits 15-16; it rises from below to modelling y +0x280 / +0x294, current +0x29C; shown at 2D (0.08,
+  0.10), HUD camera scale 0.2). hud2.cpp LayoutFlask (Hud2BeginP1, any co-op frame, one screen too, not at the
+  merchant): moved for the pass to under the health of Asterix's player's HUD at 0.6 size -- (0.15, 0.80), (0.85,
+  0.80) for player 2 side by side, (0.15, 0.30) for player 2 stacked (its shields there at y 0.42, its combo column
+  x 0.07, y 0.03-0.39). The gate counter (LayoutGate) uses the side-by-side layout in the stacked split too (middle,
+  3/4 size, sliding up from the bottom), its sparkle with it. Autotest hudhints (XXL_P2HERO=asterix XXL_HUDPOS=1;
+  player 2's Back held shows its shields); crowd36 shows the counter on the halves' border.
+- Round 185 (user request: a prompt / hint box per player, per-player hints, combo hints). Facts found:
+  * HUD 2D: FUN_00414070 draws the menu manager's element lists first (FUN_0042A420, call at 0x4140B3; CMenuManager
+    vf12 -> FUN_0042CE00 -> each element's vf23) -- the prompt's text +0x15C and plate +0x140 are drawn there --
+    then the root container (FUN_0042A470, call at 0x4140F4). An element's vf23 (thiscall(arg), ret 4) draws it if
+    +5 bit 1 (value 2) is set, from its place +0x14/+0x18 (x a share of the width from the left, y of the height
+    from the bottom) by its alignment +6/+7 (0 rightwards / downwards, 1 middle, 2 leftwards / upwards).
+  * CText2d is 0x6DC bytes (array factory at 0x42CF4C), constructor 0x42CE60; its layout object at +0x20 (vtable
+    0x623BCC): +4 the localisation manager, +8 box width, +0x14 string id, +0x18 the string (inline, ~350 chars),
+    +0x2D4 words, +0x2D8 word pointers into it, +0x3C8 + 8i word x / y (text units: the screen is the aspect wide,
+    1 high), +0x5A8 a ushort per word (its line), +0x620 per-word skip, +0x660 font, +0x664 size, +0x6A8 line
+    spacing, +0x6B0 first line shown. FUN_0042E590 (thiscall(layout, id), ret 4) takes the string and lays it out;
+    a word draws at (place.x * aspect + x, place.y - 1 + y [+ valign]). No heap: a byte copy is a working text.
+  * xxl_widescreen2d.asi (TextDrawHook / BillboardDrawHook) records each stretched plate (+0x3C set) with its
+    unsqueezed width, and draws any text or billboard whose place is inside one (this frame's or the last) nearer
+    that plate's anchor by (4/3) / aspect -- two wide boxes' records reach into each other past the middle.
+  * The prompt kind is written per hero by FUN_0049A1A0 every frame (coop.cpp now keeps each hero's own:
+    CoopPromptKindFor; kind 9 machines mapped to the offered hero, both on the boat's deck: both).
+  * Combos: merchant item k >= 6 sets game manager +0x40 -> +0x10 bit (k - 6) and gm +0x400 + (k - 6) = 1 ("bought
+    this level", cleared by FUN_004FF1C0, undone by FUN_004FF180 from the pause menu): bit 0 Club, 1 Power Hammer, 2
+    Twister, 3 Fusion, 4 Mole, 5 Rage. Rage: Idefix's AI state 6 (bite, 0x49E4C0) on entry, with the bar full (stats
+    +0x10 bit 0x4000), bit 0x20 and trio (gm +0x14) vf53 / vf54 both 0 (combos not switched off), bites +0xB90
+    times (+0xB91), sets stats +0x10 bit 0x1000 and spends the bar with FUN_00493810(5). FUN_00493810 (thiscall(gm,
+    kind), ret 4; gauge -= cost gm+0xBC+kind of the full bar; empties it when < 0) is every combo's spend: Club 0
+    (0x493788, bit 0x80), Power Hammer 1 (0x493D3A), Twister 2 (0x494109, 0x200), Fusion 3 (0x494028, 0x400), Mole
+    4 (0x494316, 0x800), Rage 5 (0x49E648, 0x1000). The game's six combo pictures: Game Files\Combos\Combo00-05.png.
+  * Interface sound n: FUN_005153F0 (thiscall(itf, n, 0), ret 8; list +0x16C, 0x40 each): 7 a combo bar level
+    reached (the filling sound), 8 a level lost; the level sparkle is particles node +0xC0 placed at the bar.
+  * The fight gate's Romans left: squads with +0x154 >= -1, per pool to defeat (int16 +0x18, < 0 endless) - sent
+    (+0x16) + alive (squad vf42) -- gm +0x64 is not it (the counter's value at its end).
+  * The trio's fusion range +0x3D8 is 3.0; with individual heroes no Twister is copied (each player's own).
+  What changed: hints.cpp -- two boxes (copies of the prompt's text object, the game's plate set and put back
+  per draw) drawn after FUN_0042A470; the game's box left out of both 2D passes in co-op (not while a hero shops:
+  the HUD is then the shopper's half); content per box: the player's hero's prompt, else its newest hint
+  (HintShow(key, player, text, ms), HINT_BOTH), a change held 120 ms (300 ms from a prompt), slid out then in; text
+  and sparkles drawn from y 1.5 (on no plate) with the words lowered as much. Boxes: side by side and one screen
+  left (lines right-aligned) / right (left-aligned), stacked both right (player 1's 0.5 up). Sparkles: spark / glow
+  glyphs (drawn, 4 strengths) at a button word of the last line. combohints.cpp (spend hook on 0x493810; the
+  hero = LifeTickingHero, Idefix's tick wrapped in IndivEnter of the hero whose RB called him, 300 ms). icons.cpp:
+  pad_*_unpressed, key(_wide)_unpressed.png (prototypes in coop\icons), a "next" chevron (the font has no '>'), the
+  merchant's combo icons read from LVL0n\LVL0n.KWN (o_ico_massue_g01 ... o_ico_idefix_g01, their pinkish backing
+  keyed out: R/G 1.40, B/G 1.11). Combo cheat sets 0x3F. Autotests: hudhints (XXL_SPLITMODE, XXL_ICONP2KB=1 for
+  keycaps), iconsboat49 -Level 4 (both boxes' "Use"), combohint2 (player 2's A A X B lit; the Club itself not done
+  -- finished mid-air), combohint2b (Mole done -> its hint goes, the Club's next), crowd36 -Level 3 (200 to beat:
+  12 s + 8 s), fuse2 (fusion hint on both, then each player's roles while fused), rage2 (player 2's RB: Rage done).
+  Test aids S_HINTTEST / S_HINTSPARK / S_COMBOHINT (100 + k: first in line; -2: the Twister learned quietly).
+  Autotests in a remote desktop session: the window minimised and restored at 1.5 s and 5 s (else white shots).
