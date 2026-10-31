@@ -3309,3 +3309,16 @@ both halves).
   XXL_NOLOCKFIRST (ms). Autotest nolock36w (XXL_NOLOCKPAUSE=20000 XXL_NOLOCKFIRST=4000): #4 won at 13.3 s -> at
   18.4 "from squad #4's won fight in 15 s", 4 of #4's Romans at 33.3 s (before: #29's at 16.4). freeromans23 (no
   aids): "the first in 24 s" (the test's wait ends at 35.8: none came). ini text for nolock_romans.
+- Round 179 (the same log: #29's spear Romans walked backwards after Obelix). The squad's tick (vf31 ->
+  FUN_0052B670) gives each Roman a slot (+0) and a facing (+0xC, the formation's slot facing turned by the
+  formation's frame: a direction, unit, y 0) as well as the step (+0x18); NoLockSteer moved the slot and step round
+  the waiting hero and left the facing: #29 is run for Asterix on the ledge (in its box; EnemyTickHook's leader
+  pass), so its Romans faced as their formation round him while following Obelix below. NoLockSteer sets the facing
+  to the direction from the Roman to its hero (x / z). Diagnostics: once a Roman, the squad's facing more than 90
+  degrees off the hero, logged with how the Roman faces it then (its frame +0x70, forward; cap 20). Autotest
+  nolock36f (nolock36w's env, XXL_NOLOCKFIRST=2000): the fight below ended, not won (ENDFIGHT) -- no revenge to come
+  -- so #29 sends its spear Romans at #4's marker; Obelix walks round as the user's did. Built without the facing:
+  their squad's facing 90-99 deg off Obelix, they faced 59-90 deg off him, screenshots with them facing the camera
+  while walking to his side; with it they face him as they follow and stand round him. nolock36w: #4's revenge
+  Romans had their squad's facing 92-140 deg off Obelix too (run for Asterix on the ledge). ini nolock_romans: "they
+  face and go after that hero".

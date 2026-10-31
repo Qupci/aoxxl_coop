@@ -80,7 +80,7 @@ struct Waiting {
 // A Roman sent for a hero, until beaten or put away: in its pool record's list
 // and not finished (as the squad sees it). The squad is checked to be the
 // level's still (a level change frees it) before anything is read.
-struct Out { char* roman; char* sq; unsigned sqIdx; int pool; int hero; uint32_t boxBits; };
+struct Out { char* roman; char* sq; unsigned sqIdx; int pool; int hero; uint32_t boxBits; bool faced; };
 Out g_out[2 * kMaxGroup];
 int g_nOut = 0;
 int g_groupLogs = 0;
@@ -887,7 +887,10 @@ void NoLockHideFromFight(bool hide) {
 // 2.5 units off, spread out: they go after it out of their squad's fight zone
 // too, and stay on its side -- within their squad's box (x / z, 0.5 units in):
 // the hero out of it, they wait at its edge (the Roman's tick holds one stepping
-// out at its last place inside every frame: it walked on the spot there).
+// out at its last place inside every frame: it walked on the spot there). Each
+// faces the hero (slot +0xC, the formation's facing: a squad run for the other
+// hero faces that one -- LV3-6's ledge squad, run for Asterix up there, had its
+// spear Romans walk after Obelix backwards).
 void NoLockSteer(char* sq) {
 	if (!g_nOut) return;
 	Trio t = GetTrio();
@@ -897,7 +900,7 @@ void NoLockSteer(char* sq) {
 	int n[2] = {}, k[2] = {};
 	for (int i = 0; i < g_nOut; i++) if (g_out[i].sq == sq) n[g_out[i].hero]++;
 	for (int i = 0; i < g_nOut; i++) {
-		const Out& o = g_out[i];
+		Out& o = g_out[i];
 		if (o.sq != sq) continue;
 		int place = k[o.hero]++;
 		Hero h = t.GetHero(o.hero);
@@ -917,6 +920,25 @@ void NoLockSteer(char* sq) {
 		float dx = sx - rp[0], dz = sz - rp[2], len = sqrtf(dx * dx + dz * dz);
 		float f = len <= 0.01f ? 0.0f : 1.0f / (len > minStep ? len : minStep);
 		slot[6] = dx * f; slot[7] = 0.0f; slot[8] = dz * f;
+		float hx = hp.x - rp[0], hz = hp.z - rp[2], hl = sqrtf(hx * hx + hz * hz);
+		if (hl < 0.01f) continue;
+		hx /= hl; hz /= hl;
+		// Diagnostics, once a Roman: its squad's facing more than 90 degrees off the
+		// hero (it would walk to it backwards); how it faces the hero (frame +0x70,
+		// forward) then.
+		static int s_told = 0;
+		float sl = sqrtf(slot[3] * slot[3] + slot[5] * slot[5]);
+		float sq0 = sl > 0.01f ? (slot[3] * hx + slot[5] * hz) / sl : 1.0f;
+		if (!o.faced && sq0 < 0.0f && s_told < 20) {
+			o.faced = true;
+			s_told++;
+			const float* fw = (const float*)(fr + 0x70);
+			float fl = sqrtf(fw[0] * fw[0] + fw[2] * fw[2]);
+			Log("nolock: Roman %p of squad #%u, %.1f units from %s: its squad's facing %.0f deg off the hero -- turned to it "
+			    "(facing %.0f deg off it)", o.roman, o.sqIdx, hl, HeroName(o.hero), acosf(fmaxf(-1.0f, sq0)) * 57.3f,
+			    fl > 0.01f ? acosf(fmaxf(-1.0f, fminf(1.0f, (fw[0] * hx + fw[2] * hz) / fl))) * 57.3f : -1.0f);
+		}
+		slot[3] = hx; slot[4] = 0.0f; slot[5] = hz;
 	}
 }
 

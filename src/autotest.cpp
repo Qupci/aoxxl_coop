@@ -3445,6 +3445,28 @@ const Step kNoLock36E[] = {
 	GLIDEAT(28000, HERO_OBELIX, -170.0f, 3.4f, -235.0f, 2500), SHOT(32000, "nolock36e_4"),
 	END(33000),
 };
+// nolock36f (nolock36w's env, XXL_NOLOCKFIRST=2000): nolock36w with the fight
+// below the walls ended, not won (ENDFIGHT) -- no revenge to come: the ledge
+// squad (#29, never fought, run for Asterix on the ledge) sends its spear
+// Romans; Obelix walks round as the user's did: they face him as they follow
+// (they walked backwards, facing as their squad's formation round Asterix).
+const Step kNoLock36F[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), ENDFIGHT(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -177.7f, 3.1f, -216.4f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -185.0f, 2.6f, "watch romans", -218.0f },
+	SHOT(13500, "nolock36f_1"),   // Obelix behind them as they stand round him, then round as the user's did
+	GLIDEAT(14000, HERO_OBELIX, -183.8f, 3.0f, -227.7f, 2000), SHOT(14700, "nolock36f_2"), SHOT(15400, "nolock36f_3"),
+	GLIDEAT(16500, HERO_OBELIX, -187.0f, 3.0f, -225.3f, 1500), SHOT(17200, "nolock36f_4"),
+	GLIDEAT(18500, HERO_OBELIX, -185.7f, 3.0f, -231.6f, 1500), SHOT(19200, "nolock36f_5"),
+	GLIDEAT(20500, HERO_OBELIX, -184.7f, 3.0f, -236.8f, 1500), SHOT(21200, "nolock36f_6"),
+	GLIDEAT(22500, HERO_OBELIX, -186.9f, 3.0f, -218.2f, 3000), SHOT(23500, "nolock36f_7"), SHOT(24500, "nolock36f_8"),
+	SQUADS(26000, HERO_OBELIX, 5.0f), END(26500),
+};
 // nolock34m (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0
 // XXL_NOLOCKPAUSE=3000): nolock34r's wait in the library with squad #19's fight
 // (by the level's start, ~380 units off) won at 3.5 s: its Romans are brought over
@@ -7314,6 +7336,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("nolock36x", kNoLock36X),
 	SCENARIO("nolock34m", kNoLock34M),
 	SCENARIO("nolock36e", kNoLock36E),
+	SCENARIO("nolock36f", kNoLock36F),
 };
 
 // Fixed spots (level 2), from players' logs.
