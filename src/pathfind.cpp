@@ -321,6 +321,36 @@ int PfConnected(const Vector3& a, const Vector3& b) {
 	return PF_NO;
 }
 
+bool PfReachBox(const Vector3& from, float radius, Vector3* mn, Vector3* mx) {
+	Graph g;
+	if (!Load(&g)) return false;
+	std::vector<int> seeds;
+	Seeds(g, from, &seeds);
+	if (seeds.empty()) return false;
+	std::vector<uint8_t> seen;
+	Flood(g, seeds, &seen);
+	bool any = false;
+	for (int ni = 0; ni < (int)g.nodes.size(); ni++) {
+		const Node& n = g.nodes[ni];
+		for (int z = 0; z < n.nz; z++)
+			for (int x = 0; x < n.nx; x++) {
+				if (!seen[n.base + z * n.nx + x]) continue;
+				Vector3 c = Centre(n, x, z);
+				float dx = c.x - from.x, dz = c.z - from.z;
+				if (dx * dx + dz * dz > radius * radius) continue;
+				Vector3 lo(c.x - n.cw * 0.5f, n.mn[1], c.z - n.ch * 0.5f), hi(c.x + n.cw * 0.5f, n.mx[1], c.z + n.ch * 0.5f);
+				if (!any) { *mn = lo; *mx = hi; any = true; continue; }
+				if (lo.x < mn->x) mn->x = lo.x;
+				if (lo.y < mn->y) mn->y = lo.y;
+				if (lo.z < mn->z) mn->z = lo.z;
+				if (hi.x > mx->x) mx->x = hi.x;
+				if (hi.y > mx->y) mx->y = hi.y;
+				if (hi.z > mx->z) mx->z = hi.z;
+			}
+	}
+	return any;
+}
+
 bool PfSpotCutOff(const Vector3& from, float minDist, float maxDist, Vector3* out) {
 	Graph g;
 	if (!Load(&g)) return false;

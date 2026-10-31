@@ -3205,3 +3205,45 @@ both halves).
   5.5 off, then 14): fighting guards 1.1-3.3 off Obelix and 0.3-4.9 from Asterix; at 14, back at their spots,
   standing [22]. With XXL_GUARDRING=0.8: four walked into Obelix ([27]-[29]) and took their places 2 s after the
   fall, then 0.1-0.4 off their spots, [22] / [23]. guard41: shields block, a hit landed (mad); the rest as before.
+- Round 174 (user: revenge from any won squad with its zone moved over the waiting hero's reach, back as the heroes
+  reunite -- its Romans vanish, fine -- or once they are beaten, the next squad picked anew for variety; no revenge
+  from a squad for 20-90 s after its fight is won -- LV3-4's courtyard Romans at the library the moment it was won
+  felt off; LV3-6's no-lock Romans "spawning behind a wall, dying over and over", userlogs
+  20261031-xxl_coop.lv3-6_romans_spawning_behind_wall.log). nolock.cpp:
+  - The Roman's tick (Shared_Class_2_84_vf23 0x4CEE00) tests hook +0x2C against the squad's box in x, y and z (max
+    +0x11C.., min +0x128..): out with its last place (+0x38) inside -> put back there, +0x24 bit 14 (also for a place
+    off the enemies' pathfinding cells: FUN_0045caa0 / FUN_0045c560; with bit 14 vf49 adds no movement); out with
+    +0x38 out too -> +0x24 bit 1, knocked out. InBox tests y too.
+  - LV3-6: not reproduced as such (nolock36w / nolock36x, any markers on, XXL_NOLOCKCORK=0 so 4802 makes Obelix
+    wait: squad #3's Romans come in at (-177.5 2.6 -227.1) / the user's (-195.2 2.6 -219.3) and reach Obelix). The
+    user's Obelix went east to x -116 for 30 s, out of squad #3's box (x -200..-163): nolock36e (Obelix glides to
+    -152 -235.6 and back) had its Romans pile up at x -163.0, held back over and over (bit 14 on, off, on).
+    NoLockSteer keeps their slots 0.5 units inside the sender's box (x / z): they wait at its edge, no hold-backs, and
+    come on as he comes back. Asked the user for a screenshot if it happens again.
+  - NoteWonSquads (every 0.5 s): a squad turning Completed gets a pause (PauseMs, 20-90 s; log "may come back for a
+    waiting hero in N s"), CooledDown after it. SquadFor(at, idx, left): with Romans left, else spent and not
+    Completed. Revenge(hero): any squad in the level Completed, cooled down, SquadCanSend, not brought over for the
+    other hero, not one waking would start over -- at random, another than the hero's last one when there is
+    another. vf33 (0x52EF70): with +0x13C (the level's come-back time, 300 s for LV3's squads) 0 or more and +0x138
+    (time asleep, zeroed by FUN_0052d4c0 at the wake) at least that, every pool goes back (sent 0, alive = its
+    starting count +0x10) and is placed; else alive += queued + fallen and the alive count is placed per pool (what
+    can't be, queued) -- a squad asleep with its starting Romans counted alive placed those, queued 4, and vf55 had
+    none left to send ("placed no Roman" log: squad flags, phase, pool counts, free Romans).
+  - A revenge squad whose box does not hold the hero is brought over (MoveBox): its box = PfReachBox(hero, 60) plus
+    2 in x / z, -3 / +6 in y (Romans stand on the nodes' tops, jump, fly when hit); grown every 1 s round where the
+    hero is (GrowBox); its own box back (RestoreBox) once none of its Romans are out for the hero, when the wait
+    ends (those still out are knocked out at once), with no-lock Romans off / player 2 gone; forgotten on a level
+    change. It may use any squad's spawn markers (SpawnPoint anyMarkers) or the walk-to marker. pathfind.cpp
+    PfReachBox: the box round the cells flooded from a place within a radius, the nodes' heights.
+  - Diagnostics: WatchOut (a Roman out for a hero: +0x24 bits 14 / 1 as they change, its squad's box; cap 40);
+    DumpAround lists each squad's markers within 40 units (in view, walkable to) and its box's y range.
+  - Test aids: XXL_NOLOCKPAUSE (ms: the pause between groups and after a win), SQUADWON(t, i) (S_ENDFIGHT b 3:
+    squad #i's fight won wherever it is -- members taken off as beaten, alive / queued / fallen 0, sent = count, at
+    least 1, +0x154 -2, no 0D16; logs +0x13C / +0x138), S_SQUADS shows the box's y.
+  - Autotests: nolock34m (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0 XXL_NOLOCKPAUSE=3000):
+    squad #19 (the level's start, box x -18..109 z -2..59) won at 3.5 s; Obelix waits in the library: 6 of #19's
+    Romans brought over (its box x 115.5..184 y -5.4..40.5 z -356.5..-317.8), at the walk-to marker, fighting him;
+    taken off -> its box back, the next 2 from #19 again; the courtyard (#5) won -> "in 3 s"; #19's taken off -> 3
+    from the courtyard (no move: its box holds the library); those taken off -> 2 from #19 brought over; Asterix
+    pulls the lever -> the wait over, #19's box back, its 2 Romans knocked out at once. nolock34r (no pause aid): the
+    courtyard won -> "in 23 s", none came to the run's end (round 172: at once). freeromans23: 1 from squad #36.

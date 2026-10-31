@@ -15,6 +15,11 @@ int PfReachable(const Vector3& from, const Vector3& to);
 // One read of the graph for both ways.
 int PfConnected(const Vector3& a, const Vector3& b);
 
+// The box round the cells a hero at `from` can walk to (as PfReachable) within
+// `radius` units of it (x / z), from the lowest of their nodes' boxes to the
+// highest; false when `from` is in no node of the graph.
+bool PfReachBox(const Vector3& from, float radius, Vector3* mn, Vector3* mx);
+
 // Autotests: the walkable cell nearest `from` (at least `minDist` units off,
 // at most `maxDist`) that a hero at `from` can't walk to nor come from; its
 // centre on top of its node's box in `out`.

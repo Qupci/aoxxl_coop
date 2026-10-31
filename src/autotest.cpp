@@ -2795,6 +2795,8 @@ const Step kPit26A[] = {
 #define ENDFIGHTKEEP(t, hero) { t, S_ENDFIGHT, hero, 1, 0, 0, 0, "end fight, keep romans" }
 // ... every Roman of them beaten (taken off the game's way, counted), the end (0D16) given: a fight won
 #define ENDFIGHTWON(t)     { t, S_ENDFIGHT, 0, 2, 0, 0, 0, "fight won" }
+// squad #i's fight won wherever it is (its members taken off as beaten, its pools at their counts, no 0D16)
+#define SQUADWON(t, i)     { t, S_ENDFIGHT, i, 3, 0, 0, 0, "squad won" }
 // the lever (CKHkActivator 2,52) nearest (X, Y, Z) worked as a punch on it does
 #define PULLLEVERAT(t, X, Y, Z) { t, S_PULLLEVER, -1, 0, 0, X, Y, "pull lever", Z }
 const Step kPf26[] = {
@@ -3389,6 +3391,83 @@ const Step kNoLock34R[] = {
 	{ 11000, S_WATCHENEMIES, 0, 0, 0, 126.8f, -1.2f, "watch romans by obelix", -325.8f },
 	TAPS1(12000), ENDFIGHTWON(20000), SQUADRESET(20500), SHOT(21500, "nolock34r_2"), SHOT(27000, "nolock34r_3"), SHOT(33000, "nolock34r_4"),
 	SHOT(40000, "nolock34r_5"), END(46000),
+};
+// nolock36w (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_NOLOCKROMANSANY=1
+// XXL_OBELIXPOTION=0 XXL_NOLOCKPAUSE=4000): the user's LV3-6 -- the fight below the
+// walls won (ENDFIGHTWON), Asterix up on the ledge (-159.6 11.8 -209.0), Obelix
+// told to wait on the ground (-177.7 2.6 -216.4): which squad sends Romans for him,
+// where, and whether its box (x, y, z) keeps them (the user saw them come in
+// behind a wall and die over and over).
+const Step kNoLock36W[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), SQUADS(6500, HERO_OBELIX, 5.0f), ENDFIGHTWON(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -177.7f, 3.1f, -216.4f),
+	SQUADS(8500, HERO_OBELIX, 5.0f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -185.0f, 2.6f, "watch romans", -218.0f },
+	SHOT(12000, "nolock36w_1"), SHOT(14000, "nolock36w_2"), SHOT(17000, "nolock36w_3"), SHOT(22000, "nolock36w_4"),
+	SHOT(28000, "nolock36w_5"), SQUADS(28500, HERO_OBELIX, 5.0f), SHOT(36000, "nolock36w_6"),
+	END(37000),
+};
+// nolock36x: nolock36w with Obelix waiting by the fight's west marker (-195.2 2.6
+// -219.3, where the user's Romans came in).
+const Step kNoLock36X[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), ENDFIGHTWON(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -186.5f, 3.1f, -217.5f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -192.0f, 2.6f, "watch romans", -219.0f },
+	SHOT(11500, "nolock36x_1"), SHOT(12500, "nolock36x_2"), SHOT(14000, "nolock36x_3"), SHOT(17000, "nolock36x_4"),
+	SHOT(22000, "nolock36x_5"), SQUADS(22500, HERO_OBELIX, 5.0f), SHOT(30000, "nolock36x_6"),
+	END(31000),
+};
+// nolock36e: nolock36x, then Obelix walks east out of the sending squad's box
+// (x -200..-163; the user's Obelix went to -116): its Romans wait at the box's
+// edge (held back there they walked on the spot), and come on as he comes back.
+const Step kNoLock36E[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), ENDFIGHTWON(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -186.5f, 3.1f, -217.5f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -175.0f, 2.6f, "watch romans", -228.0f },
+	SHOT(14000, "nolock36e_1"),
+	GLIDEAT(16000, HERO_OBELIX, -179.5f, 3.0f, -233.0f, 1500), GLIDEAT(17600, HERO_OBELIX, -170.0f, 3.4f, -235.0f, 1500),
+	GLIDEAT(19200, HERO_OBELIX, -152.0f, 3.4f, -235.6f, 2500), SHOT(23000, "nolock36e_2"), SHOT(27000, "nolock36e_3"),
+	GLIDEAT(28000, HERO_OBELIX, -170.0f, 3.4f, -235.0f, 2500), SHOT(32000, "nolock36e_4"),
+	END(33000),
+};
+// nolock34m (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0
+// XXL_NOLOCKPAUSE=3000): nolock34r's wait in the library with squad #19's fight
+// (by the level's start, ~380 units off) won at 3.5 s: its Romans are brought over
+// to Obelix (its box moved round the library); beaten at 20 s (its own box back,
+// the next group from it again); the courtyard fight (#5) won at 25 s; #19's
+// beaten again at 29 s (the next group from the other won squad, the courtyard,
+// whose box holds the library); those beaten at 36 s (the next from #19); Asterix
+// pulls the lever by the doors at 45 s: the wait is over, #19's box back, its
+// Romans still out sent off.
+const Step kNoLock34M[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 4),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, 124.8f, 0.0f, -324.8f), PLACEAT(3000, HERO_OBELIX, 126.8f, 0.0f, -325.76f), POTION(3200),
+	SQUADWON(3500, 19),
+	GLIDEAT(4000, HERO_ASTERIX, 120.5f, -0.8f, -327.5f, 800), GLIDEAT(5500, HERO_ASTERIX, 114.0f, -0.8f, -326.0f, 800),
+	GLIDEAT(7000, HERO_ASTERIX, 108.0f, -0.8f, -319.0f, 800), GLIDEAT(8000, HERO_ASTERIX, 103.32f, -0.8f, -313.57f, 800),
+	{ 9000, S_FLAGEV, 0x578, 0, 0, 0, 0, "lock34 sphere" },
+	{ 11000, S_WATCHENEMIES, 0, 0, 0, 126.8f, -1.2f, "watch romans by obelix", -325.8f },
+	SHOT(13000, "nolock34m_1"), SHOT(17000, "nolock34m_2"), SQUADWON(20000, 19), SHOT(24500, "nolock34m_3"),
+	ENDFIGHTWON(25000), SQUADWON(29000, 19), SHOT(33500, "nolock34m_4"), SQUADWON(36000, 5), SHOT(41000, "nolock34m_5"),
+	PLACEAT(44000, HERO_ASTERIX, 113.6f, -0.6f, -320.6f), PULLLEVERAT(45000, 115.734f, -1.082f, -321.566f),
+	DOORS(47000, HERO_OBELIX, 20.0f), SHOT(47500, "nolock34m_6"), SHOT(51000, "nolock34m_7"),
+	END(52000),
 };
 const Step kFight4A[] = {
 	MARK(0, "baseline"),
@@ -7190,6 +7269,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("nolockmark36", kNoLockMark36),
 	SCENARIO("nolock34", kNoLock34),
 	SCENARIO("nolock34r", kNoLock34R),
+	SCENARIO("nolock36w", kNoLock36W),
+	SCENARIO("nolock36x", kNoLock36X),
+	SCENARIO("nolock34m", kNoLock34M),
+	SCENARIO("nolock36e", kNoLock36E),
 };
 
 // Fixed spots (level 2), from players' logs.
@@ -8177,6 +8260,35 @@ void RunStep(const Step& s) {
 	}
 	case S_ENDFIGHT: {   // the fights behind gates won: each squad a gate counts (+0x154 >= -1) put away (vf34), nothing
 		int n = 0;       // left to send or replace, and its end as the game gives it (FUN_00530570: 0D16, +0x154 = -2)
+		if (s.b == 3) {  // squad #a's fight won, wherever it is: its members taken off as beaten (FUN_00530300), every
+		                 // pool beaten to its count (sent = count, at least 1), ended (+0x154 = -2; no 0D16: the level's
+		                 // scripts left alone)
+			char* sq = s.a >= 0 && (unsigned)s.a < GetNumLvlClassInstances(4, 26) ? (char*)GetLvlObject(4, 26, s.a) : nullptr;
+			if (!sq) break;
+			char* off[64];
+			int nOff = 0;
+			char** head = ((char**(__fastcall*)(char*, void*))(*(void***)sq)[12])(sq, nullptr);
+			for (char* m = head ? *head : nullptr; m && nOff < 64; m = *(char**)(m + 4)) off[nOff++] = m;
+			for (int k = 0; k < nOff; k++) ((void(__fastcall*)(char*, void*, char*))0x530300)(sq, nullptr, off[k]);
+			char* recs = *(char**)(sq + 0x144);
+			for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); recs && r < nr && r < 16; r++) {
+				char* rec = recs + r * 0x1C;
+				rec[0x11] = 0;   // (alive: an asleep squad's starting Romans, placed as it wakes)
+				rec[0x14] = 0;
+				rec[0x15] = 0;
+				int16_t count = *(int16_t*)(rec + 0x18);
+				uint16_t sent = *(uint16_t*)(rec + 0x16);
+				if (count <= 0) count = sent ? (int16_t)sent : 1;
+				*(int16_t*)(rec + 0x18) = count;
+				*(uint16_t*)(rec + 0x16) = (uint16_t)count;
+			}
+			*(uint8_t*)(sq + 0x154) = 0xFE;
+			const float* f = (const float*)sq;
+			Log("autotest: squad #%d %p's fight won: %d member(s) taken off, box x %.1f..%.1f z %.1f..%.1f, comes back after "
+			    "%.1f s (asleep %.1f s), active %d", s.a, sq, nOff, f[0x4A], f[0x47], f[0x4C], f[0x49], f[0x4F], f[0x4E],
+			    (*(uint8_t*)(sq + 0x152) >> 1) & 1);
+			break;
+		}
 		for (unsigned i = 0, k = GetNumLvlClassInstances(4, 26); i < k; i++) {
 			char* sq = (char*)GetLvlObject(4, 26, i);
 			if (!sq || *(int8_t*)(sq + 0x154) < -1) continue;
@@ -8299,8 +8411,8 @@ void RunStep(const Step& s) {
 				float dz = p.z < f[0x4C] ? f[0x4C] - p.z : p.z > f[0x49] ? p.z - f[0x49] : 0.0f;
 				if (dx * dx + dz * dz > s.x * s.x) continue;
 				char buf[300];
-				int len = _snprintf(buf, sizeof(buf), "autotest: squad %p box x %.1f..%.1f z %.1f..%.1f (%s from %s), active %d, gate %d:",
-				                    sq, f[0x4A], f[0x47], f[0x4C], f[0x49], dx || dz ? "away" : "in", HeroName(s.a),
+				int len = _snprintf(buf, sizeof(buf), "autotest: squad %p box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f (%s from %s), active %d, gate %d:",
+				                    sq, f[0x4A], f[0x47], f[0x4B], f[0x48], f[0x4C], f[0x49], dx || dz ? "away" : "in", HeroName(s.a),
 				                    (*(uint8_t*)(sq + 0x152) >> 1) & 1, *(int8_t*)(sq + 0x154));
 				char* recs = *(char**)(sq + 0x144);
 				for (unsigned r = 0, nr = *(unsigned*)(sq + 0x14C); recs && r < nr && r < 4 && len > 0 && len < (int)sizeof(buf); r++)

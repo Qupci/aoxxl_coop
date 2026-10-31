@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 // No-lock mode's Romans ([coop_difficulty.experimental] nolock_romans): while
 // the level would have kept a player's hero waiting -- a scripted order no-lock
@@ -22,7 +23,9 @@
 // 20 to 90 s (mostly about 30) after the last of a group is gone, so the free
 // player has something to do until the other lifts the wait. They go after
 // that hero wherever it goes and start no fight music. Never for the leader:
-// the one in the locked fight (the level's scripts follow it).
+// the one in the locked fight (the level's scripts follow it). A squad whose
+// fight was won sends its Romans back ("revenge") 20 to 90 s after the win, from
+// anywhere in the level: its box is moved over the waiting hero meanwhile.
 //
 // Romans come from a squad's pools: vf55 (CKGrpSquadEnemy, the squad script's
 // "send in at a point", thiscall(args) -- args { count, Vector3* point, pool or
@@ -51,6 +54,8 @@ unsigned Random(unsigned n) {
 
 // The pause before the next group: 20 + 70 u^3 s -- 20 to 90, half under 29.
 DWORD PauseMs() {
+	static const char* s_test = getenv("XXL_NOLOCKPAUSE");   // autotests: a fixed pause (ms)
+	if (s_test) return (DWORD)atoi(s_test);
 	float u = Random(10001) / 10000.0f;
 	return 20000 + (DWORD)(70000.0f * u * u * u);
 }
@@ -65,7 +70,7 @@ struct Waiting {
 // A Roman sent for a hero, until beaten or put away: in its pool record's list
 // and not finished (as the squad sees it). The squad is checked to be the
 // level's still (a level change frees it) before anything is read.
-struct Out { char* roman; char* sq; unsigned sqIdx; int pool; int hero; };
+struct Out { char* roman; char* sq; unsigned sqIdx; int pool; int hero; uint32_t boxBits; };
 Out g_out[2 * kMaxGroup];
 int g_nOut = 0;
 int g_groupLogs = 0;
@@ -93,6 +98,28 @@ int OutFor(int hero) {
 	int n = 0;
 	for (int i = 0; i < g_nOut; i++) if (g_out[i].hero == hero) n++;
 	return n;
+}
+
+// Diagnostics: a Roman out for a hero and its squad's box as it changes (the
+// Roman's tick, Shared_Class_2_84_vf23 0x4CEE00: its place, hook +0x2C, out of
+// the box -- x, y and z -- puts it back at the last one inside, +0x38, with
+// +0x24 bit 14, as does a place off the enemies' pathfinding cells; out with the
+// last one out too, bit 1: knocked out); bounded.
+void WatchOut() {
+	static int s_told = 0;
+	for (int i = 0; i < g_nOut && s_told < 40; i++) {
+		Out& o = g_out[i];
+		uint32_t bits = *(uint32_t*)(o.roman + 0x24) & 0x4002;
+		if (bits == o.boxBits) continue;
+		o.boxBits = bits;
+		const float* p = (const float*)(o.roman + 0x2C);
+		const float* f = (const float*)o.sq;
+		s_told++;
+		Log("nolock: Roman %p of squad #%u at (%.1f %.1f %.1f)%s%s -- its squad's box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f",
+		    o.roman, o.sqIdx, p[0], p[1], p[2], bits & 0x4000 ? " held back (out of its squad's box or off the pathfinding)" : "",
+		    bits & 2 ? " knocked out: out of its squad's box" : bits ? "" : " free to go again", f[0x4A], f[0x47],
+		    f[0x4B], f[0x48], f[0x4C], f[0x49]);
+	}
 }
 
 // Squads whose end (event 0D16) has come with Romans of theirs out for a hero:
@@ -169,8 +196,75 @@ void EndFightsLeftToOurs() {
 	}
 }
 
+// A squad whose fight was won, brought over to a waiting hero out of its box
+// (the user's idea: revenge from any won fight): its box (+0x11C.., max then
+// min -- its Romans out of it are sent off) round what the hero can walk to
+// within 60 units (PfReachBox; LV3-4's library: the library), grown as the hero
+// goes (every 1 s); its own box back once none of its Romans are out for the
+// hero (the next group may come from another squad) or the wait is over (any
+// still out are sent off then: bonus Romans). One per waiting hero.
+const float kZoneReach = 60.0f;
+struct Moved { char* sq; unsigned idx; float box[6]; DWORD grown; };
+Moved g_moved[2];
+
+// Max then min as the squad has them, a little more than the cells (Romans
+// stand on the nodes' tops, jump, are knocked flying): false with no graph.
+bool ReachBox(const Vector3& at, float box[6]) {
+	Vector3 mn, mx;
+	if (!PfReachBox(at, kZoneReach, &mn, &mx)) return false;
+	box[0] = mx.x + 2.0f; box[1] = mx.y + 6.0f; box[2] = mx.z + 2.0f;
+	box[3] = mn.x - 2.0f; box[4] = mn.y - 3.0f; box[5] = mn.z - 2.0f;
+	return true;
+}
+
+bool MoveBox(int hero, char* sq, unsigned idx, const Vector3& at) {
+	float box[6];
+	if (!ReachBox(at, box)) return false;
+	Moved& m = g_moved[hero];
+	float* f = (float*)sq + 0x47;
+	m.sq = sq;
+	m.idx = idx;
+	m.grown = GetTickCount();
+	memcpy(m.box, f, sizeof(m.box));
+	memcpy(f, box, sizeof(box));
+	if (g_groupLogs++ < 200)
+		Log("nolock: squad #%u %p brought over to %s -- its box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f -> x %.1f..%.1f y "
+		    "%.1f..%.1f z %.1f..%.1f (what %s can walk to within %.0f units)", idx, sq, HeroName(hero), m.box[3], m.box[0],
+		    m.box[4], m.box[1], m.box[5], m.box[2], f[3], f[0], f[4], f[1], f[5], f[2], HeroName(hero), kZoneReach);
+	return true;
+}
+
+void GrowBox(int hero, const Vector3& at, DWORD now) {
+	Moved& m = g_moved[hero];
+	if (!m.sq || (int)(now - m.grown) < 1000 || !SquadValid(m.sq, m.idx)) return;
+	m.grown = now;
+	float box[6];
+	if (!ReachBox(at, box)) return;
+	float* f = (float*)m.sq + 0x47;
+	bool grew = false;
+	for (int k = 0; k < 3; k++) {
+		if (box[k] > f[k]) { f[k] = box[k]; grew = true; }
+		if (box[k + 3] < f[k + 3]) { f[k + 3] = box[k + 3]; grew = true; }
+	}
+	static int s_told = 0;
+	if (grew && s_told++ < 20)
+		Log("nolock: squad #%u's box grown as %s goes: x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f", m.idx, HeroName(hero), f[3],
+		    f[0], f[4], f[1], f[5], f[2]);
+}
+
+void RestoreBox(int hero, const char* why) {
+	Moved& m = g_moved[hero];
+	if (!m.sq) return;
+	if (SquadValid(m.sq, m.idx)) {
+		memcpy((float*)m.sq + 0x47, m.box, sizeof(m.box));
+		if (g_groupLogs++ < 200) Log("nolock: squad #%u %p's own box back (%s)", m.idx, m.sq, why);
+	}
+	m = Moved();
+}
+
 // Romans gone: a hero waiting with none of its group left gets the next group
-// after a pause. Ended squads forgotten 2 s after their last Roman out.
+// after a pause, a squad brought over to it its own box back. Ended squads
+// forgotten 2 s after their last Roman out.
 void Prune(DWORD now) {
 	for (int i = 0; i < g_nOut;) {
 		if (StillOut(g_out[i])) { i++; continue; }
@@ -184,6 +278,8 @@ void Prune(DWORD now) {
 				Log("nolock: none left of the Romans sent at %s -- the next ones in %.0f s", HeroName(hero), pause / 1000.0f);
 		}
 	}
+	for (int hero = HERO_ASTERIX; hero <= HERO_OBELIX; hero++)
+		if (g_moved[hero].sq && !OutFor(hero)) RestoreBox(hero, "none of its Romans left for the hero");
 	for (Ended& e : g_ended) {
 		if (!e.sq) continue;
 		bool out = false;
@@ -260,8 +356,8 @@ int PickPool(char* sq) {
 // Romans alive but those out for a hero, and a pool beaten to its count (it was
 // fought, not empty). Its Romans may come back for a waiting hero -- "revenge",
 // the user's idea: asleep (+0x152 bit 1 clear) it is woken for them (SendGroup);
-// a hero in its box usually has the game wake it first. Only for a hero in its
-// box (SquadFor): its Romans out of it are sent off at once.
+// a hero in its box usually has the game wake it first. Its Romans out of its
+// box are sent off at once: one far off is brought over (MoveBox).
 bool Completed(char* sq) {
 	if (*(int8_t*)(sq + 0x154) >= -1 || !SquadSpent(sq) || OthersAlive(sq)) return false;
 	char* recs = *(char**)(sq + 0x144);
@@ -302,6 +398,35 @@ void NoteGatedSquads() {
 
 bool GatedFight(char* sq, unsigned i) { return i < kMaxSquads && g_gated[i] == sq && !Completed(sq); }
 
+// Squads whose fight is won (Completed, looked at every 0.5 s), by squad index:
+// their Romans come back for a waiting hero only after a pause as between groups
+// (20 to 90 s) -- the user's LV3-4: the courtyard's Romans at the library the
+// moment its fight was won felt off.
+char* g_wonSq[kMaxSquads];
+bool  g_won[kMaxSquads];
+DWORD g_wonAt[kMaxSquads], g_wonPause[kMaxSquads], g_wonLooked = 0;
+
+void NoteWonSquads(DWORD now) {
+	if ((int)(now - g_wonLooked) < 500) return;
+	g_wonLooked = now;
+	static int s_told = 0;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n && i < kMaxSquads; i++) {
+		char* sq = (char*)GetLvlObject(4, 26, i);
+		if (g_wonSq[i] != sq) { g_wonSq[i] = sq; g_won[i] = false; }   // another level's
+		bool won = sq && Completed(sq);
+		if (won == g_won[i]) continue;
+		g_won[i] = won;
+		if (!won) continue;
+		g_wonAt[i] = now;
+		g_wonPause[i] = PauseMs();
+		if (s_told++ < 40)
+			Log("nolock: squad #%u %p's fight is won -- its Romans may come back for a waiting hero in %.0f s", i, sq,
+			    g_wonPause[i] / 1000.0f);
+	}
+}
+
+bool CooledDown(unsigned i, DWORD now) { return i < kMaxSquads && g_won[i] && now - g_wonAt[i] >= g_wonPause[i]; }
+
 // A squad that can send a Roman: its AI running (+0x152 bit 1, not 0x2000) or
 // its fight over (revenge: woken for them, SendGroup), a pool to send it from;
 // `left`: Romans left to send in.
@@ -318,32 +443,64 @@ bool SquadCanSend(char* sq, bool* left) {
 	return true;
 }
 
-// Is `p` in squad `sq`'s box (x and z: max +0x11C.., min +0x128..)? A squad's
-// Romans out of its box are sent off as they come in (state 1, knocked out at
-// once: a revenge squad far off had them vanish at their marker) -- they chase a
-// hero within it.
+// Is `p` in squad `sq`'s box (max +0x11C.., min +0x128..; x, y and z, as the
+// Roman's tick has it: Shared_Class_2_84_vf23 0x4CEE00)? A squad's Romans out of
+// its box are sent off as they come in (state 1, knocked out at once: a revenge
+// squad far off had them vanish at their marker); one stepping out is put back
+// at its last place inside -- they chase a hero within it.
 bool InBox(const char* sq, const Vector3& p) {
 	const float* f = (const float*)sq;
-	return p.x >= f[0x4A] && p.x <= f[0x47] && p.z >= f[0x4C] && p.z <= f[0x49];
+	return p.x >= f[0x4A] && p.x <= f[0x47] && p.y >= f[0x4B] && p.y <= f[0x48] && p.z >= f[0x4C] && p.z <= f[0x49];
 }
 
-// The squad nearest `at` that can send Romans, with `at` in its box: one with
-// Romans left first; else any (a spent pool is given one more to defeat, see
-// SendGroup; a squad whose fight is over: revenge).
-char* SquadFor(const Vector3& at, unsigned* idx) {
+// The squad nearest `at` that can send Romans, with `at` in its box: with
+// Romans left to send in (`left`); else a spent one whose fight is not won (a
+// spent pool is given one more to defeat, see SendGroup) -- a won one: Revenge.
+char* SquadFor(const Vector3& at, unsigned* idx, bool left) {
 	char* best = nullptr;
 	float bestD = 1e30f;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
 		char* sq = (char*)GetLvlObject(4, 26, i);
-		bool left;
-		if (!sq || !InBox(sq, at) || GatedFight(sq, i) || !SquadCanSend(sq, &left)) continue;
-		float penalty = left ? 0.0f : 1e6f;   // spent squads only when no other can send
+		bool l;
+		if (!sq || !InBox(sq, at) || GatedFight(sq, i) || !SquadCanSend(sq, &l) || l != left || (!left && Completed(sq)))
+			continue;
 		const float* f = (const float*)sq;
 		Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
-		float d = (c - at).len2() + penalty;
+		float d = (c - at).len2();
 		if (d < bestD) { bestD = d; best = sq; *idx = i; }
 	}
 	return best;
+}
+
+// Would waking `sq` start its fight over? vf33 (0x52EF70) on a squad that comes
+// back (+0x13C, the level's, 0 or more) asleep that long (+0x138, its time since)
+// sets every pool back (sent 0, alive its starting count) and places them.
+bool WakeStartsOver(const char* sq) {
+	const float* f = (const float*)sq;
+	return !(*(const uint8_t*)(sq + 0x152) & 2) && f[0x4F] >= 0.0f && f[0x4E] >= f[0x4F];
+}
+
+// A squad whose fight was won a while ago (CooledDown) that can send Romans, any
+// in the level ("revenge": one whose box does not hold the hero is brought over,
+// MoveBox), at random -- another than the hero's last one when there is another.
+// Not one that waking would start over.
+char* Revenge(int hero, DWORD now, unsigned* idx) {
+	static unsigned s_last[2] = { ~0u, ~0u };
+	unsigned cand[64];
+	int nc = 0;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n && nc < 64; i++) {
+		char* sq = (char*)GetLvlObject(4, 26, i);
+		bool left;
+		if (!sq || !CooledDown(i, now) || !Completed(sq) || g_moved[1 - hero].sq == sq || WakeStartsOver(sq) ||
+		    !SquadCanSend(sq, &left))
+			continue;
+		cand[nc++] = i;
+	}
+	if (!nc) return nullptr;
+	int k = (int)Random((unsigned)nc);
+	if (nc > 1 && cand[k] == s_last[hero]) k = (k + 1 + (int)Random((unsigned)nc - 1)) % nc;
+	s_last[hero] = *idx = cand[k];
+	return (char*)GetLvlObject(4, 26, cand[k]);
 }
 
 // Seen by a player as the squads' markers are (proximity.cpp): a wall between
@@ -356,14 +513,15 @@ bool InAView(const Vector3& p) {
 // Where Romans of squad `sender` come in for `h`, as squads bring theirs: a
 // spawn marker the level placed (+0x5C, 8 bytes each, +0 -> position; count
 // +0x64) -- the sender's own; any squad's with nolock_romans_any_markers (the
-// user saw Romans stuck in the air: a marker placed for other Romans) -- within
+// user saw Romans stuck in the air: a marker placed for other Romans) or for a
+// squad brought over (`anyMarkers`; its own are far off) -- within
 // 40 units, at least 6 from both heroes, in no player's view (the co-op rule for
 // squad markers) and one the hero can walk to (the level's pathfinding graph:
 // not behind a shut door, on the other hero's side) -- the nearest; else the
 // hero's walk-to marker (below). None, no Roman: places picked off the graph's
 // cells were unreliable (its walkable cells take in shallow water -- LV2-3's
 // Romans there drowned).
-bool SpawnPoint(Trio t, Hero h, char* sender, Vector3* at, const char** how) {
+bool SpawnPoint(Trio t, Hero h, char* sender, bool anyMarkers, Vector3* at, const char** how) {
 	Hero ha = t.GetHero(HERO_ASTERIX), ho = t.GetHero(HERO_OBELIX);
 	const float kReach = 40.0f;
 	float bestD = kReach * kReach;
@@ -380,7 +538,7 @@ bool SpawnPoint(Trio t, Hero h, char* sender, Vector3* at, const char** how) {
 			float d = (pv - h.Pos()).len2();
 			if (d >= kReach * kReach) continue;
 			total++;
-			if (sq != sender && !g_config.noLockRomansAnyMarkers) { others++; continue; }
+			if (sq != sender && !anyMarkers) { others++; continue; }
 			if (!InBox(sender, pv)) { outside++; continue; }
 			if ((ha && (ha.Pos() - pv).len2() < 36.0f) || (ho && (ho.Pos() - pv).len2() < 36.0f)) { nearHero++; continue; }
 			if (InAView(pv)) { seen++; continue; }
@@ -449,23 +607,31 @@ char* SquadAtOwnMarker(Trio t, Hero h, unsigned* idx, Vector3* at) {
 }
 
 // A group of 1 to 6 Romans, all from one squad at one point, each from a pool
-// picked at random (PickPool) -- fewer if the squad runs out of free Romans.
-void SendGroup(int hero, Trio t, Hero h) {
+// picked at random (PickPool) -- fewer if the squad runs out of free Romans. The
+// squad: one whose box holds the hero with Romans left (at its own marker, else
+// SpawnPoint's); else one whose fight was won a while ago (Revenge, brought over
+// if need be); else a spent one whose box holds the hero.
+void SendGroup(int hero, Trio t, Hero h, DWORD now) {
 	Waiting& w = g_wait[hero];
 	unsigned idx = 0;
 	Vector3 at;
 	const char* how = "its squad's spawn marker";
 	char* sq = g_config.noLockRomansAnyMarkers ? nullptr : SquadAtOwnMarker(t, h, &idx, &at);
+	bool placed = sq != nullptr, revenge = false, brought = false;
+	if (!sq) sq = SquadFor(h.Pos(), &idx, true);
+	if (!sq && (sq = Revenge(hero, now, &idx)) != nullptr) {
+		revenge = true;
+		if (!InBox(sq, h.Pos()) && !(brought = MoveBox(hero, sq, idx, h.Pos()))) sq = nullptr;   // (no graph here)
+	}
+	if (!sq) { sq = SquadFor(h.Pos(), &idx, false); revenge = false; }
 	if (!sq) {
-		sq = SquadFor(h.Pos(), &idx);
-		if (!sq) {
-			if (w.noneTold++ < 3) Log("nolock: no squad with Romans to send for %s (awake, or its fight over)", HeroName(hero));
-			return;
-		}
-		if (!SpawnPoint(t, h, sq, &at, &how)) {
-			if (w.noneTold++ < 3) Log("nolock: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
-			return;
-		}
+		if (w.noneTold++ < 3) Log("nolock: no squad with Romans to send for %s (awake, or its fight won a while ago)", HeroName(hero));
+		return;
+	}
+	if (!placed && !SpawnPoint(t, h, sq, g_config.noLockRomansAnyMarkers || brought, &at, &how)) {
+		if (brought) RestoreBox(hero, "no spawn marker for its Romans");
+		if (w.noneTold++ < 3) Log("nolock: no spawn marker near %s (unseen, walkable to) for a Roman", HeroName(hero));
+		return;
 	}
 	// A squad whose end has come already (spent, none of its Romans left) would
 	// send it again as these go.
@@ -495,17 +661,24 @@ void SendGroup(int hero, Trio t, Hero h) {
 		uint32_t args[3] = { 1, (uint32_t)(uintptr_t)&at, (uint32_t)pool };
 		((CmdFn)(*(void***)sq)[55])(sq, nullptr, args);
 		if ((uint8_t)rec[0x11] == alive0) {   // not placed: what it queued taken back
+			static int s_told = 0;
+			if (s_told++ < 10)
+				Log("nolock: squad #%u %p pool %d placed no Roman: squad flags %04X phase %d, pool %d to defeat, sent %u, "
+				    "fallen %u, queued %u -> %u, alive %u, %d free", idx, sq, pool, *(uint16_t*)(sq + 0x152),
+				    *(int8_t*)(sq + 0x154), *(int16_t*)(rec + 0x18), *(uint16_t*)(rec + 0x16), (uint8_t)rec[0x15], queued0,
+				    (uint8_t)rec[0x14], (uint8_t)rec[0x11], FreeRomans(rec));
 			if ((uint8_t)rec[0x14] > queued0) rec[0x14] = queued0;
 			if (spent) *(int16_t*)(rec + 0x18) -= 1;
 			break;
 		}
 		char* last = *(char**)(rec + 8);
 		while (last && *(char**)(last + 0x50)) last = *(char**)(last + 0x50);
-		if (last) g_out[g_nOut++] = { last, sq, idx, pool, hero };
+		if (last) g_out[g_nOut++] = { last, sq, idx, pool, hero, 0 };
 		sent++;
 		pk += sprintf(pools + pk, " %d", pool);
 	}
 	if (!sent) {
+		if (brought) RestoreBox(hero, "no Roman of it free");
 		if (asleep) {   // asleep again
 			typedef void(__fastcall* AwayFn)(char* self, void* edx);
 			((AwayFn)(*(void***)sq)[34])(sq, nullptr);
@@ -517,7 +690,8 @@ void SendGroup(int hero, Trio t, Hero h) {
 	w.groups++;
 	if (g_groupLogs++ < 200)
 		Log("nolock: %d of %d Romans of squad #%u %p (pools%s)%s sent at %s from %s (%.1f %.1f %.1f) [group %d]", sent, want,
-		    idx, sq, pools, asleep ? " -- its fight was over: revenge --" : "", HeroName(hero), how, at.x, at.y, at.z, w.groups);
+		    idx, sq, pools, brought ? " -- its fight was won: revenge, brought over --" : revenge ? " -- its fight was won: revenge --" : "",
+		    HeroName(hero), how, at.x, at.y, at.z, w.groups);
 }
 
 // Diagnostics, once a wait: where the level would have sent the hero (its AI
@@ -534,8 +708,8 @@ void DumpAround(int hero, Hero h) {
 		Vector3 c((f[0x47] + f[0x4A]) * 0.5f, (f[0x48] + f[0x4B]) * 0.5f, (f[0x49] + f[0x4C]) * 0.5f);
 		if ((c - h.Pos()).len2() > 60.0f * 60.0f) continue;
 		char buf[400];
-		int k = sprintf(buf, "nolock:   squad #%u %p box centre (%.1f %.1f %.1f) size %.0fx%.0f active %d gate %d markers %u pools:",
-		                i, sq, c.x, c.y, c.z, f[0x47] - f[0x4A], f[0x49] - f[0x4C], (*(uint8_t*)(sq + 0x152) >> 1) & 1,
+		int k = sprintf(buf, "nolock:   squad #%u %p box centre (%.1f %.1f %.1f) size %.0fx%.0f, y %.1f..%.1f, active %d gate %d markers %u pools:",
+		                i, sq, c.x, c.y, c.z, f[0x47] - f[0x4A], f[0x49] - f[0x4C], f[0x4B], f[0x48], (*(uint8_t*)(sq + 0x152) >> 1) & 1,
 		                *(int8_t*)(sq + 0x154), *(char**)(sq + 0x5C) ? *(unsigned*)(sq + 0x64) : 0);
 		char* recs = *(char**)(sq + 0x144);
 		for (unsigned p = 0, np = *(unsigned*)(sq + 0x14C); recs && p < np && p < 4; p++) {
@@ -543,6 +717,15 @@ void DumpAround(int hero, Hero h) {
 			k += sprintf(buf + k, " [%u: alive %d sent %d of %d]", p, *(uint8_t*)(r + 0x11), *(uint16_t*)(r + 0x16), *(int16_t*)(r + 0x18));
 		}
 		Log("%s", buf);
+		char* list = *(char**)(sq + 0x5C);   // its spawn markers within 40 units: in view, walkable to
+		for (unsigned m = 0, nm = list ? *(unsigned*)(sq + 0x64) : 0; m < nm && m < 16; m++) {
+			const float* p = *(const float**)(list + m * 8);
+			if (!p) continue;
+			Vector3 pv(p[0], p[1], p[2]);
+			if ((pv - h.Pos()).len2() >= 40.0f * 40.0f) continue;
+			Log("nolock:     marker (%.1f %.1f %.1f) %.1f units off%s, walkable to %d", pv.x, pv.y, pv.z,
+			    sqrtf((pv - h.Pos()).len2()), InAView(pv) ? ", in view" : "", PfReachable(h.Pos(), pv));
+		}
 	}
 }
 
@@ -559,11 +742,17 @@ void NoLockRomansFrame() {
 		g_nOut = 0;
 		for (Ended& e : g_ended) e = Ended();
 		for (char*& g : g_gated) g = nullptr;
+		for (Moved& m : g_moved) m = Moved();
 		return;
 	}
 	Prune(now);
+	WatchOut();
 	NoteGatedSquads();
-	if (!g_config.noLock || !g_config.noLockRomans || !CoopP2Joined() || CoopSuspended()) return;
+	NoteWonSquads(now);
+	if (!g_config.noLock || !g_config.noLockRomans || !CoopP2Joined() || CoopSuspended()) {
+		for (int hero = HERO_ASTERIX; hero <= HERO_OBELIX; hero++) RestoreBox(hero, "no-lock Romans off");
+		return;
+	}
 	Trio t = GetTrio();
 	if (!t) return;
 	for (int hero = HERO_ASTERIX; hero <= HERO_OBELIX; hero++) {
@@ -578,13 +767,15 @@ void NoLockRomansFrame() {
 		w.on = waiting;
 		w.next = now + kFirstMs;
 		if (waiting) DumpAround(hero, h);
+		else RestoreBox(hero, "the wait is over");
 	}
 	EndFightsLeftToOurs();
 	for (int hero = HERO_ASTERIX; hero <= HERO_OBELIX; hero++) {
 		Waiting& w = g_wait[hero];
+		if (g_moved[hero].sq && t.GetHero(hero)) GrowBox(hero, t.GetHero(hero).Pos(), now);
 		if (!w.on || IndivFallen(hero) || OutFor(hero) || (int)(now - w.next) < 0) continue;   // (none for a hero down)
 		w.next = now + kRetryMs;
-		SendGroup(hero, t, t.GetHero(hero));
+		SendGroup(hero, t, t.GetHero(hero), now);
 	}
 }
 
@@ -616,8 +807,10 @@ void NoLockHideFromFight(bool hide) {
 // After the squad's tick (vf31 gives each Roman a slot round its formation
 // centre: component 0x46, +0 slot, +0x18 the step towards it -- proximity.cpp
 // SplitSquad) the slots of its Romans out for a hero are moved round that hero,
-// 2.5 units off, spread out: they go after it out of their squad's box and
-// fight zone too, and stay on its side.
+// 2.5 units off, spread out: they go after it out of their squad's fight zone
+// too, and stay on its side -- within their squad's box (x / z, 0.5 units in):
+// the hero out of it, they wait at its edge (the Roman's tick holds one stepping
+// out at its last place inside every frame: it walked on the spot there).
 void NoLockSteer(char* sq) {
 	if (!g_nOut) return;
 	Trio t = GetTrio();
@@ -640,6 +833,9 @@ void NoLockSteer(char* sq) {
 		float a = 6.2831853f * place / n[o.hero] + 1.3f * o.hero;
 		Vector3 hp = h.Pos();
 		float sx = hp.x + 2.5f * cosf(a), sz = hp.z + 2.5f * sinf(a);
+		const float* b = (const float*)sq;
+		sx = sx < b[0x4A] + 0.5f ? b[0x4A] + 0.5f : sx > b[0x47] - 0.5f ? b[0x47] - 0.5f : sx;
+		sz = sz < b[0x4C] + 0.5f ? b[0x4C] + 0.5f : sz > b[0x49] - 0.5f ? b[0x49] - 0.5f : sz;
 		slot[0] = sx; slot[1] = hp.y; slot[2] = sz;
 		float dx = sx - rp[0], dz = sz - rp[2], len = sqrtf(dx * dx + dz * dz);
 		float f = len <= 0.01f ? 0.0f : 1.0f / (len > minStep ? len : minStep);
