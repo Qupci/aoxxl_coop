@@ -3467,6 +3467,53 @@ const Step kNoLock36F[] = {
 	GLIDEAT(22500, HERO_OBELIX, -186.9f, 3.0f, -218.2f, 3000), SHOT(23500, "nolock36f_7"), SHOT(24500, "nolock36f_8"),
 	SQUADS(26000, HERO_OBELIX, 5.0f), END(26500),
 };
+// nolock36s (nolock36w's env, XXL_NOLOCKPAUSE=3000 XXL_NOLOCKFIRST=8000
+// XXL_NOLOCKGROUP=3 XXL_NOLOCKTRACE=1): nolock36w with Obelix waiting by squad
+// #4's marker (-177.5 2.6 -227.1), then walking east as the user's did (userlogs
+// 20261031-xxl_coop.lv3-6_roman_stuck_running.log) out of #4's box (x max -132)
+// down to (-123.5 -4.0 -230.8), Asterix far off (the corkscrew launched him: #4 run
+// for Obelix alone), then back into the box (x -140). The user's Roman was held
+// back at the box's edge (-132.0 -233.6) for 9 s, running on the spot; here they
+// stand at the edge. With XXL_NOLOCKNOCLAMP=1 (their spots past the edge) all 3
+// are held there, running on the spot: they stand after 1 s, come on again.
+const Step kNoLock36S[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), ENDFIGHTWON(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -177.7f, 3.1f, -216.4f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -150.0f, 2.6f, "watch romans", -230.0f },
+	GLIDEAT(11000, HERO_OBELIX, -176.9f, 3.0f, -234.0f, 2000), SHOT(18500, "nolock36s_1"),
+	GLIDEAT(19000, HERO_OBELIX, -169.1f, 3.0f, -236.3f, 2000), GLIDEAT(21100, HERO_OBELIX, -155.5f, 3.0f, -235.0f, 2000),
+	PLACEAT(22000, HERO_ASTERIX, -159.67f, 1.3f, -133.62f),   // the corkscrew took the user's Asterix out of #4's box
+	GLIDEAT(23200, HERO_OBELIX, -141.3f, 0.0f, -234.4f, 2000), GLIDEAT(25300, HERO_OBELIX, -127.4f, -1.5f, -233.9f, 2000),
+	SHOT(31000, "nolock36s_2"), GLIDEAT(33000, HERO_OBELIX, -125.1f, -1.5f, -233.3f, 1000),
+	GLIDEAT(34200, HERO_OBELIX, -124.2f, -3.0f, -231.7f, 600), SHOT(36000, "nolock36s_3"),
+	GLIDEAT(37000, HERO_OBELIX, -123.5f, -3.5f, -230.8f, 1500), SHOT(40000, "nolock36s_4"), SHOT(44000, "nolock36s_5"),
+	PFDUMP(45000, HERO_OBELIX, 14.0f), GLIDEAT(46000, HERO_OBELIX, -140.0f, 0.0f, -234.2f, 2000), SHOT(49000, "nolock36s_6"),
+	SQUADS(50000, HERO_OBELIX, 5.0f), END(52000),
+};
+// nolock36u (nolock36s's env): nolock36s's Romans by Obelix at #4's marker, then
+// Asterix far off and Obelix put at the ledge spot (-159.6 12.3 -209.0, in #4's
+// box) -- he drops into the water below (-159.5 -5.5 -208.9) -- for 10 s, then
+// back on the ground (-165.0 3.0 -222.0): Romans that can't get to their spots
+// stand on their own (0x22, 18-26 units off them; no running on the spot).
+const Step kNoLock36U[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -218.05f, 6.0f, -251.66f), PLACEAT(3000, HERO_OBELIX, -216.0f, 6.0f, -251.0f),
+	PLACEAT(4000, HERO_ASTERIX, -179.3f, 3.2f, -232.8f), PLACEAT(4000, HERO_OBELIX, -185.5f, 3.2f, -228.2f),
+	POTION(4600), ENDFIGHTWON(7000),
+	PLACEAT(8000, HERO_ASTERIX, -159.6f, 12.3f, -209.0f), PLACEAT(8000, HERO_OBELIX, -177.7f, 3.1f, -216.4f),
+	{ 9000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits here (the level's 4802)" },
+	{ 9200, S_WATCHENEMIES, 0, 0, 0, -165.0f, 2.6f, "watch romans", -220.0f },
+	GLIDEAT(11000, HERO_OBELIX, -176.9f, 3.0f, -234.0f, 2000), PLACEAT(20000, HERO_ASTERIX, -159.67f, 1.3f, -133.62f),
+	SHOT(24000, "nolock36u_1"), PLACEAT(25000, HERO_OBELIX, -159.6f, 12.3f, -209.0f), SHOT(27000, "nolock36u_2"),
+	SHOT(30000, "nolock36u_3"), SHOT(34000, "nolock36u_4"), PLACEAT(36000, HERO_OBELIX, -165.0f, 3.0f, -222.0f),
+	SHOT(38000, "nolock36u_5"), SHOT(42000, "nolock36u_6"), END(44000),
+};
 // nolock34m (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0
 // XXL_NOLOCKPAUSE=3000): nolock34r's wait in the library with squad #19's fight
 // (by the level's start, ~380 units off) won at 3.5 s: its Romans are brought over
@@ -7337,6 +7384,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("nolock34m", kNoLock34M),
 	SCENARIO("nolock36e", kNoLock36E),
 	SCENARIO("nolock36f", kNoLock36F),
+	SCENARIO("nolock36s", kNoLock36S),
+	SCENARIO("nolock36u", kNoLock36U),
 };
 
 // Fixed spots (level 2), from players' logs.

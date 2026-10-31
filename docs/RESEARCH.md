@@ -3329,3 +3329,30 @@ both halves).
   (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0 XXL_NOLOCKPAUSE=3000 XXL_NOLOCKFIRST=3000
   XXL_NOLOCKGROUP=6): 24 Romans in 4 groups from #19 / #5, none from their archer pool 1 (earlier runs: pool 1 in
   most groups). ini nolock_romans: "never archers".
+- Round 181 (userlogs 20261031-xxl_coop.lv3-6_roman_stuck_running.log, LV3-6: Obelix waiting, Asterix launched far
+  off by the corkscrew -- squad #4 run for Obelix alone -- Obelix walked east out of #4's box (x max -132.0) onto
+  the pier (-123.5 -4.0 -230.8); one of #4's 3 revenge Romans held back at (-132.0 -1.9 -233.6) from 85.3 s to the
+  level's end at 94 s. The user saw Romans "stuck running to a place they couldn't reach" (single player has it
+  too) and asked for the guards' rule: give up after 1 s until a player is somewhere reachable). Test aid
+  XXL_NOLOCKTRACE: each Roman out every 15 frames (place, hero / spot distance, +0x1A4, +0x24 bits 14 / 1, stuck;
+  cap 400). Findings:
+  - A Roman a wall stops stands on its own: nolock36s's at the box edge, their spots (x -132.5) on wall cells
+    (PFDUMP: the pier's row z -233.7 walkable past x -132, the rows by it walls), 0.5-4.8 units off them, 0x22;
+    nolock36u's (Obelix dropped into the water by the ledge) 18-26 off theirs, 0x22.
+  - A Roman by a hero who walks off keeps still 1-2.5 s in 0x29 / 0x2A before it follows (0x28).
+  - Running on the spot = held back every frame (+0x24 bit 14 on end, reaction 0x28): the user's log; nolock36s
+    with XXL_NOLOCKNOCLAMP=1 (the spots not kept in the box) has all 3 held at x -132.0..-132.1 to the run's end.
+  - The user's run itself not reproduced (2, 3 and 5 Romans, Obelix stopping by the edge, Asterix off: hold-backs
+    of 0.1-0.2 s at the edge only).
+  nolock.cpp GivenUp (from NoLockSteer): a Roman held back 1 s on end, neither 0.2 units nearer its spot nor 1 unit
+  from where it was, not reacting (below 0x22), no hero within 4 units -> its slot = where it stands (it stands,
+  facing the hero; log, cap 40); it goes on again once the spot it gave up on has moved 1.5 units and
+  PfReachable(Roman, spot) is not PF_NO (checked every 0.5 s at most), or with a hero within 4. The first tries
+  (walking -- 0x24 on -- and not 0.2 nearer in 1 s; then also not 1 unit on) stopped Romans following a hero
+  faster than they walk and the ones keeping still after a fight -- one left 13-19 units behind for 7 s, its spot
+  (clamped at the box edge) moving under 1.5. Autotests nolock36s (nolock36w's env, XXL_NOLOCKPAUSE=3000
+  XXL_NOLOCKFIRST=8000 XXL_NOLOCKGROUP=3 XXL_NOLOCKTRACE=1): no give-up, one 0.2 s hold-back; with
+  XXL_NOLOCKNOCLAMP=1: built without GivenUp, held to the end; with it all 3 stand 1 s after (0x22, bit 14 off),
+  go on again as Obelix moves (held, standing again 1 s on), and with him back in the box go round him. nolock36u.
+  ini nolock_romans: "one held back from where it is going for a second stands still until the hero moves
+  somewhere it can walk to".
