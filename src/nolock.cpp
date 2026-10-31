@@ -319,14 +319,15 @@ bool PoolHasRomans(const char* rec) {
 }
 
 // Free Romans of a pool record's kind; none of the enemies left as the level
-// has them (turtles, the mobile tower, jetpack Romans) nor jumping Romans (the
-// user: such kinds make no sense coming for a hero).
-const uintptr_t kJumpingRomanCpnt = 0x627CC0;
+// has them (turtles, the mobile tower, jetpack Romans) nor jumping Romans or
+// archers (the user: such kinds make no sense coming for a hero).
+const uintptr_t kJumpingRomanCpnt = 0x627CC0, kRomanArcherCpnt = 0x627CF0;
 
 int FreeRomans(const char* rec) {
 	char* pool = *(char* const*)rec;
 	char* cpnt = *(char* const*)(rec + 4);
-	if (!pool || EnemyKindKeptAsIs(cpnt) || (cpnt && *(uintptr_t*)cpnt == kJumpingRomanCpnt)) return 0;
+	uintptr_t kind = cpnt ? *(uintptr_t*)cpnt : 0;
+	if (!pool || EnemyKindKeptAsIs(cpnt) || kind == kJumpingRomanCpnt || kind == kRomanArcherCpnt) return 0;
 	typedef char** (__fastcall* ListFn)(char* self, void* edx);
 	char** head = ((ListFn)(*(void***)pool)[12])(pool, nullptr);
 	int n = 0;
@@ -720,7 +721,8 @@ void SendGroup(int hero, Trio t, Hero h, DWORD now) {
 		typedef void(__fastcall* WakeFn)(char* self, void* edx);
 		((WakeFn)(*(void***)sq)[33])(sq, nullptr);
 	}
-	int want = 1 + (int)Random(kMaxGroup), sent = 0;
+	static const char* s_group = getenv("XXL_NOLOCKGROUP");   // autotests: a fixed group size
+	int want = s_group ? atoi(s_group) : 1 + (int)Random(kMaxGroup), sent = 0;
 	char pools[64];
 	int pk = 0;
 	pools[0] = 0;

@@ -3322,3 +3322,10 @@ both halves).
   while walking to his side; with it they face him as they follow and stand round him. nolock36w: #4's revenge
   Romans had their squad's facing 92-140 deg off Obelix too (run for Asterix on the ledge). ini nolock_romans: "they
   face and go after that hero".
+- Round 180 (user's pad test of rounds 178-179: revenge after the pause, the first group's delay and Romans facing
+  the waiting hero all fine; no-lock Romans "finally start to feel good"; asked: no archers for no-lock Romans).
+  nolock.cpp FreeRomans: no CKRomanArcherCpnt (0x627CF0) pools either (LV3's squads with an archer pool: #1, #5,
+  #8, #19, #31, #32, #33 -- testruns poolkinds). Test aid XXL_NOLOCKGROUP (a fixed group size). Autotest nolock34m
+  (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_OBELIXPOTION=0 XXL_NOLOCKPAUSE=3000 XXL_NOLOCKFIRST=3000
+  XXL_NOLOCKGROUP=6): 24 Romans in 4 groups from #19 / #5, none from their archer pool 1 (earlier runs: pool 1 in
+  most groups). ini nolock_romans: "never archers".
