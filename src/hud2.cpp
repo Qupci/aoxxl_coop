@@ -2,6 +2,7 @@
 #include "coop.h"
 #include "config.h"
 #include "detour.h"
+#include "hints.h"
 #include "individual.h"
 #include "kal.h"
 #include "log.h"
@@ -354,22 +355,55 @@ void LayoutGate(char* itf, const float* cl, bool stacked) {
 }
 
 // The magic potion's flask (model +0xAC, FUN_0051BA70: interface +0x24 bits
-// 15-16; it rises from below the screen to (0.08, 0.1), modelling +0x44 the
-// way it has come): Asterix's -- the potion is his. In co-op it sat at the
-// bottom left, under player 1's hint box (and on player 2's combo bar in the
-// stacked split). It goes under the health of Asterix's player's HUD, at 0.6 of
-// its size, right of the combo bar's column: (0.15, 0.80), mirrored (0.85) for
-// player 2's side by side, the bottom half's (0.30) stacked.
+// 15-16; it rises from below the screen to (0.08, 0.1) -- at 16:9; the HUD's
+// models are placed by shares of the screen's width, so a wider screen took it
+// in from the corner -- at the speed +0x278 a second, modelling +0x44 the way it
+// has come): Asterix's -- the potion is his. In co-op it keeps the game's
+// bottom corner, 0.142 screen heights from the edge (0.08 of the width at
+// 16:9), on the side of Asterix's player (mirrored for player 2 side by side;
+// stacked: the bottom of that player's half, right of its combo bar's column,
+// at the half's 3/4 size), and rises out of the way of the hint box under it,
+// at the game's own speed, while the box is there.
+float g_flaskLift = 0.0f;   // how far it is raised now (a share of the screen's height)
+DWORD g_flaskAt = 0;
+
+float Aspect2d() {
+	CKYellowPages* yp = YellowPages();
+	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	float a = m2d ? *(float*)(m2d + 4) : 0.0f;
+	return a > 0.5f && a < 8.0f ? a : 16.0f / 9.0f;
+}
+
 void LayoutFlask(char* itf, const float* cl) {
 	char* n = NodeAt(itf, 0xAC);
 	float* fr = n ? FrameOf(n) : nullptr;
 	if (!fr) return;
 	int p = CoopP1Hero() == HERO_ASTERIX ? 0 : 1;
-	bool stacked = Stacked();
-	float tx = stacked || p == 0 ? 0.15f : 0.85f;
-	float ty = stacked && p == 1 ? 0.30f : 0.80f;
-	const float px = 0.08f, py = 0.1f;   // where the game shows it
-	Xf3d(n, cl, Xform{ px, py, 0.6f, tx - px, ty - py }, true);
+	bool stacked = SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL;
+	const float px = 0.08f, py = 0.1f;   // where the game shows it (16:9)
+	float corner = 0.08f * (16.0f / 9.0f) / Aspect2d();
+	float s = stacked ? 0.75f : 1.0f;
+	float tx = stacked ? corner + 0.07f : p == 0 ? corner : 1.0f - corner;
+	float ty = stacked ? (p == 0 ? 0.5f : 0.0f) + py * s : py;
+	// Out of the way of a hint box under it: just above the box's top.
+	float halfW = 0.035f * s, halfH = 0.06f * s, want = 0.0f;
+	for (int q = 0; q < 2; q++) {
+		float l, r, b, t;
+		if (!HintBoxRect(q, &l, &r, &b, &t) || r < tx - halfW || l > tx + halfW || b > ty + halfH || t < ty - halfH) continue;
+		float need = t + 0.01f + halfH - ty;
+		if (need > want) want = need;
+	}
+	DWORD now = GetTickCount();
+	float dt = g_flaskAt ? (now - g_flaskAt) / 1000.0f : 0.0f;
+	g_flaskAt = now;
+	if (dt > 0.1f) dt = 0.1f;
+	float speed = *(float*)(itf + 0x278);
+	if (!(speed > 0.1f && speed < 10.0f)) speed = 1.0f;
+	if (g_flaskLift < want) g_flaskLift = g_flaskLift + speed * dt > want ? want : g_flaskLift + speed * dt;
+	else if (g_flaskLift > want) g_flaskLift = g_flaskLift - speed * dt < want ? want : g_flaskLift - speed * dt;
+	ty += g_flaskLift;
+	if (s == 1.0f && fabsf(tx - px) < 0.0005f && fabsf(ty - py) < 0.0005f) return;   // the game's own place
+	Xf3d(n, cl, Xform{ px, py, s, tx - px, ty - py }, true);
 }
 
 // The gate counter's sparkle (particles +0x114) is placed once, at the

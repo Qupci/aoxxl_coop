@@ -130,9 +130,9 @@ struct CoopState {
 
 	// Hints.
 	bool     joinHintPending = false;   // a level started: say how player 2 joins
-	int      spinHints = 0;             // "LB passes the Roman" shown this level
+	int      spinHints[HERO_COUNT] = {};   // "LB passes the Roman" shown to each hero's player this level
 	bool     spinning[HERO_COUNT] = {};
-	bool     passDone = false;          // a Roman was passed this session: no more pass hints
+	bool     passDone[HERO_COUNT] = {};    // the hero passed a Roman this session: no more pass hints for it
 
 	// Obelix's X at a machine (machine gun, boat), served next frame.
 	char*    machineReq = nullptr;
@@ -2879,7 +2879,7 @@ void CoopFrame() {
 		g.groupTookLead = g.groupPrevLeader = -1;
 		g_spyWalk.on = false;
 		g.joinHintPending = level > 0;
-		g.spinHints = 0;
+		for (int& n : g.spinHints) n = 0;
 		g.machineReq = nullptr;
 		if (g.p2Joined) {
 			// The old hero objects are gone; there is nothing to hand back.
@@ -3972,8 +3972,8 @@ static void WatchLbPass(int idx, Hero h) {
 	if (tr[0x2C] == (uint8_t)other) { tr[0x2C] = lead; tr[0x2D] = comp; }
 	*(uint32_t*)(h.raw() + 0x38C) = (*(uint32_t*)(h.raw() + 0x38C) & 0xFFC0FFFF) | 0xD0000;   // the spin's throw step
 	ProximityPassTo(roman, other);
-	g.passDone = true;
-	HintHide(HINT_PASS);
+	g.passDone[idx] = true;
+	HintHide(HINT_PASS, idx == g.p1Hero ? 0 : 1);
 	// The whistle: the AI companion's lift of a grabbed Roman (its spin's step 5)
 	// plays sound bank +0x280; the player's own spin never reaches that step.
 	PlaySound(h, 0x280);
@@ -3987,7 +3987,8 @@ static void WatchLbPass(int idx, Hero h) {
 
 // Hint: while a player's hero spins a Roman (its grab-spin at step 0x0C, the
 // Roman held in state 3) with the other player in passing range and not down, "LB passes
-// it" -- the first three spins of a level, until a Roman has been passed once.
+// it" -- the first three spins of a level for each hero, until that hero has
+// passed a Roman once.
 static void WatchSpinHint(int idx, Hero h) {
 	if (!g.p2Joined || g.suspended || (idx != g.p1Hero && idx != g.p2Hero) || !h) return;
 	char* roman = *(char**)(h.raw() + 0xF8);
@@ -3995,18 +3996,18 @@ static void WatchSpinHint(int idx, Hero h) {
 	bool started = spin && !g.spinning[idx];
 	bool ended = !spin && g.spinning[idx];
 	g.spinning[idx] = spin;
-	if ((ended && !g.spinning[OtherHero(idx)]) || (spin && IndivFallen(OtherHero(idx)))) HintHide(HINT_PASS);
-	if (!started || g.passDone || g.spinHints >= 3) return;
+	int player = idx == g.p1Hero ? 0 : 1;
+	if (ended || (spin && IndivFallen(OtherHero(idx)))) HintHide(HINT_PASS, player);
+	if (!started || g.passDone[idx] || g.spinHints[idx] >= 3) return;
 	Trio t = GetTrio();
 	int other = idx == g.p1Hero ? g.p2Hero : g.p1Hero;
 	Hero o = t ? t.GetHero(other) : Hero();
 	if (!o || IndivFallen(other) || (h.Pos() - o.Pos()).len2() > kPassRange * kPassRange) return;
-	g.spinHints++;
-	int player = idx == g.p1Hero ? 0 : 1;
+	g.spinHints[idx]++;
 	wchar_t text[96];
 	swprintf(text, 96, L"%s passes the Roman\nto %s", HintButtonName(player, HB_LB), HintHeroName(other));
 	HintShow(HINT_PASS, player, text, 8000);
-	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints, HeroName(idx));
+	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints[idx], HeroName(idx));
 }
 
 void CoopAfterLifeTick(int heroIndex, Hero hero) {

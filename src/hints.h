@@ -32,6 +32,9 @@ bool HintShown(int key);              // any player's, still timed
 bool HintShown(int key, int player);
 // The hint the box shows right now (in place or sliding in).
 bool HintOnScreen(int key, int player);
+// Where player `player`'s box (its plate) is drawn now, shares of the screen
+// from the left and the bottom; false while it is out of sight.
+bool HintBoxRect(int player, float* left, float* right, float* bottom, float* top);
 // A burst of sparkles over the `n`-th button (from 0: a word other than ">") of
 // the hint's last line, with the combo bar's level sound
 // (`sound`).

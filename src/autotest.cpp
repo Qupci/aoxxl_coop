@@ -7119,6 +7119,18 @@ const Step kComboHint2[] = {
 	SHOT(9000, "hammer_hint"),
 	END(10000),
 };
+// combohint2l: the Club's hint (combohint2's start); player 2's A lights its first
+// button and Obelix jumps; he lands without the rest: the buttons go dark again.
+const Step kComboHint2L[] = {
+	MARK(0, "combohint2l"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1500, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
+	{ 1800, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	VTAP(3500, PAD_A, "p2 A"), SHOT(3700, "jumped_a"), SHOT(5500, "landed"),
+	VTAP(6000, PAD_A, "p2 A"), VTAP(6250, PAD_A, "p2 A (double jump)"), SHOT(6450, "jumped_aa"), SHOT(8500, "landed_aa"),
+	END(9000),
+};
 #undef VTAP
 // combohint2b: every combo learned, the Mole first in line (test aid); player 1's
 // Asterix by a Roman with a full bar gets the Mole's hint; the Mole done (its
@@ -7204,6 +7216,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("hudhints", kHudHints),
 	SCENARIO("combohint2", kComboHint2),
 	SCENARIO("combohint2b", kComboHint2B),
+	SCENARIO("combohint2l", kComboHint2L),
 	SCENARIO("crowd36", kCrowd36),
 	SCENARIO("fuse2", kFuse2),
 	SCENARIO("rage2", kRage2),

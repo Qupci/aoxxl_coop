@@ -57,6 +57,7 @@ struct Player {
 	DWORD doneAt = 0;             // done: all lit until doneAt + kDoneMs
 	bool  wasFull = false;
 	int   fuseLit = 0;
+	bool  air = false;            // a jump-begun combo under way: the hero has left the ground
 };
 Player   g_p[2];
 uint32_t g_bits = 0;
@@ -338,6 +339,19 @@ void PlayerFrame(int p, Trio t) {
 	}
 	if (pl.shown < 0) return;
 	const Seq& s = kSeq[pl.shown];
+	// A combo begun with a jump (A) is pressed in the air: landing before its
+	// last button starts it again (hero +0x384 bits 0-2: off its feet).
+	bool inAir = (*(uint32_t*)(h.raw() + 0x384) & 7) != 0;
+	if (s.b[0] == HB_A && pl.lit > 0 && pl.lit < s.n) {
+		if (inAir) pl.air = true;
+		else if (pl.air) {
+			if (g_logs++ < 60) Log("combohints: player %d landed with %d of the %S's buttons: from the start", p + 1, pl.lit, kName[pl.shown]);
+			pl.lit = 0;
+			pl.air = false;
+		}
+	} else {
+		pl.air = false;
+	}
 	int before = pl.lit;
 	if (HintOnScreen(HINT_COMBO, p)) Press(pl, p, s, Pressed(p), HINT_COMBO);
 	if (pl.crowd && !pl.more && before < 2 && pl.lit >= 2) {

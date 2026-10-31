@@ -336,7 +336,7 @@ void UpdateSlot(int p, char* itf, float dt) {
 	if (p == 0 || CoopP2Joined()) Choose(p, itf, &kind, &ident, &text);
 	else { kind = 0; ident = 0; text = L""; }
 	Place pl = PlaceOf(p);
-	bool right = pl.left;   // the left edge's box: its lines' ends lined up (towards the middle)
+	bool right = false;   // every box's lines left-aligned (the left box's right-aligned lines read oddly: user)
 	DWORD now = GetTickCount();
 	if (kind == s.kind && ident == s.ident) {
 		s.pendKind = -1;
@@ -687,6 +687,28 @@ bool HintOnScreen(int key, int player) {
 	if (player < 0 || player > 1) return false;
 	const Slot& s = g_slots[player];
 	return s.kind == 2 && s.ident == (uint32_t)key && !s.leaving && s.in > 0.0f;
+}
+
+bool HintBoxRect(int player, float* left, float* right, float* bottom, float* top) {
+	if (player < 0 || player > 1 || !g_itf || g_itf != (char*)GetLvlObject(2, 132, 0)) return false;
+	const Slot& s = g_slots[player];
+	if (!s.kind || !s.laid || s.in <= 0.0f || (CoopP2Joined() && !OwnBoxes()) || !HudUp(g_itf)) return false;
+	float* plate = *(float**)(g_itf + 0x140);
+	if (!plate || *(uintptr_t*)plate != 0x6235C0) return false;
+	// As DrawSlot places it.
+	Place pl = PlaceOf(player);
+	float w = s.longest / Aspect();
+	float e = 1.0f - (1.0f - s.in) * (1.0f - s.in);
+	float off = (1.0f - e) * (w + 2.0f * kMargin + kEdge);
+	float x = pl.left ? kEdge - off : 1.0f - kEdge - w + off;
+	float up = pl.up + (s.nLines > 2 ? s.step * (s.nLines - 2) : 0.0f);
+	float y = plate[6] - 0.012f * (s.nLines - 1) + up, h = plate[14] * s.nLines + 0.015f;
+	uint8_t ay = ((uint8_t*)plate)[7];
+	*left = x - kMargin;
+	*right = x + w + kMargin;
+	*bottom = ay == 0 ? y - h : ay == 2 ? y : y - h * 0.5f;
+	*top = *bottom + h;
+	return true;
 }
 
 void HintSpark(int key, int player, int n, bool sound) {
