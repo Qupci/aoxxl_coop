@@ -6980,6 +6980,30 @@ const Step kDownComboO[] = {
 	END(12000),
 };
 
+// overcombo (level 2): Asterix goes down, then player 2's Obelix with a full
+// combo bar: the game over. After the respawn player 2's bar is empty, as
+// player 1's (user: Obelix kept his full bar through a game over -- player 2's
+// HUD copy put its full state back over the interface's reset).
+const Step kOverCombo[] = {
+	MARK(0, "overcombo"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 5.0f, 0, "obelix 5 units ahead of asterix" },
+	{ 3500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 5000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
+	{ 6500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" }, { 8000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit" },
+	{ 9500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "hit: asterix down" },
+	{ 10000, S_GIVE, HERO_OBELIX, 3, 0, 20.0f, 0, "obelix's combo bar: 20 hits (full at 30 with Asterix down)" },
+	{ 10500, S_GIVE, HERO_OBELIX, 3, 0, 20.0f, 0, "20 more: full (the bar sees it fill)" },
+	SHOT(11800, "full"),
+	{ 12000, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" }, { 13500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" },
+	{ 15000, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" }, { 16500, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit" },
+	{ 18000, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "hit: obelix down, game over" },
+	SHOT(19000, "over1"), SHOT(22000, "over2"),
+	SHOT(27000, "respawn1"), VPAD(28000, 1, PAD_BACK, 0, 0, "p2 holds back (his HUD up)"),
+	SHOT(29000, "respawn2"), SHOT(31000, "respawn3"), VPAD(31500, 1, 0, 0, 0, "p2 release"),
+	SHOT(33000, "respawn4"),
+	END(34000),
+};
+
 // catapultcombo (level 3): player 2's Obelix (not leading) hits LV3-1's Roman
 // catapult (CKHkCatapult 2,130; user: 106.0 1.0 11.5) -- his combo bar takes
 // every hit, Asterix's (leading, far off at the level's start) none
@@ -7256,6 +7280,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("downcombo", kDownCombo),
 	SCENARIO("downcombop", kDownComboP),
 	SCENARIO("downcomboo", kDownComboO),
+	SCENARIO("overcombo", kOverCombo),
 	SCENARIO("catapultcombo", kCatapultCombo),
 	SCENARIO("catapultcomboa", kCatapultComboA),
 	SCENARIO("survey", kSurvey),

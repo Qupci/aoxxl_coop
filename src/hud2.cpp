@@ -465,7 +465,7 @@ void KeepHealthIndex(char* itf, bool fromGame) {
 }
 
 typedef void(__fastcall* VoidFn)(char* self, void* edx);
-VoidFn g_origShieldsShown = nullptr, g_origItfVf15 = nullptr;
+VoidFn g_origShieldsShown = nullptr, g_origItfVf15 = nullptr, g_origItfVf16 = nullptr;
 const uint8_t kShieldsShownPrologue[8] = { 0x83, 0xEC, 0x10, 0xA1, 0xF4, 0x21, 0x66, 0x00 };
 void __fastcall ShieldsShownHook(char* self, void* edx) {
 	int prev = IndivEnter(HudOwner());
@@ -478,6 +478,19 @@ void __fastcall ItfVf15Hook(char* self, void* edx) {
 	int prev = IndivEnter(HudOwner());
 	g_origItfVf15(self, edx);
 	IndivLeave(prev);
+}
+// The interface's reset (CKHkInterfaceInGame::vf16, 0x517870: the combo bar's
+// state bits 12-14 and 23-24 cleared, its models hidden, the shields full again)
+// -- the game over's respawn (game manager vf13) calls it. Player 2's copy, put
+// back over the interface at each of its ticks, kept its full combo bar through
+// the game over (user): it starts again from player 1's, reset.
+void __fastcall ItfVf16Hook(char* self, void* edx) {
+	g_origItfVf16(self, edx);
+	if (self == g.itf && g.s2.valid) {
+		g.s2.valid = false;
+		g.lastHp[1] = g.lastShields[1] = -1;
+		Log("hud2: the interface was reset -- player 2's HUD too");
+	}
 }
 
 // More than four shields (up to six: the merchant's) at the single player HUD's
@@ -543,6 +556,8 @@ bool Hud2InstallHooks() {
 	                        sizeof(kShieldsShownPrologue), "HUD shields shown (the HUD owner's health)");
 	ok &= PatchVtableSlot(0x6285F0, 15, 0x5162A0, (void*)ItfVf15Hook, (void**)&g_origItfVf15,
 	                      "CKHkInterfaceInGame::vf15 (the HUD owner's health)");
+	ok &= PatchVtableSlot(0x6285F0, 16, 0x517870, (void*)ItfVf16Hook, (void**)&g_origItfVf16,
+	                      "CKHkInterfaceInGame::vf16 (a reset: player 2's HUD too)");
 	return ok;
 }
 
