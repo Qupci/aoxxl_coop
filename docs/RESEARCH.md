@@ -3551,3 +3551,14 @@ both halves).
   suspended co-op and made the fall a game over -- then onto the lifter (-746.7 506.5 -992.1): put back below, "no
   -- only over a lifter", brought beside Asterix 3.1 s after the fall, revived by B, stays on top. reach23g (sent
   back) and reach26c unchanged.
+- Round 192 (user, after 191 was confirmed: a hero down ON a lifter -- alone, it should wait there for the other;
+  with the other on it, they are together already). individual.cpp LifterUnderFallen: the lifter (2,47) a field of
+  which (+0x10..+0xFC) is the fallen hero's ground (+0x280, a CDynamicGround 0x6241BC -- it stays the lifter's
+  while the hero lies in 0x0E). That lifter is left out of OnPartnerGround (no put-back), IndivHoldsBack lets its
+  tick run (no put-back either), ShutLifters leaves its node open. Holding its tick (first try) froze it, and the
+  first tick after the revive rode the whole way at once (y 501.3 -> 516.5 between two 0.45 s samples, liftdie21a);
+  running, it carries both heroes up in its own ~0.7 s ride with its springy settle (516.8 -> 513.8 -> 514.3, as
+  with nobody down). Autotests (-Level 2, SQUADWON 29 first -- user: the lifter goes up once it is beaten):
+  liftdie21a (XXL_DOWNAT=0:4500: Asterix down alone on it at its foot (-746.7 501.3 -992.1), Obelix put on it at
+  7 s: no put-back, up with both, revived by B on top, health 8), liftdie21b (XXL_DOWNAT=0:3500: both on it, down
+  as it rides up: Obelix stays on it, revived). liftdown21 (fallen by the hearth, not on it) unchanged.
