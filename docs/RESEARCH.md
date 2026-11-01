@@ -3518,3 +3518,20 @@ both halves).
     34 s, revived by B in time), catrevive31 (-Level 3, XXL_DOWNAT=0:3500: by LV3-1's catapult, revived in 2.03 s).
     reach23g / reach26w (no limit) still send Obelix back after the grab's revive. Env aids XXL_REVIVELIMIT,
     XXL_REVIVEGRACE, XXL_REVIVEHOLD, XXL_REVIVEHOLDCAT.
+- Round 190 (user's pad test of 189: all worked; follow-ups). (1) The countdown only in the downed hero's player's
+  box ("X comes to revive you / N s left"), refreshed through the other's grab (TimeLimit no longer stops while it is
+  held; a released grab hides only the reviver's box). (2) Catapult hold: CKHkCatapult fields by XXL-Editor's member
+  order = deserialize order: +0x48 passive range (12; nearer it holds its fire), +0x4C attack range (LV3-1 50, LV6-4
+  30), +0x74 charge duration (LV3-1 3.5, LV6-4 5.0; the float after the CNode +0xD4); also +0x2C 1.5, +0x50 20,
+  +0x54 75 (throw angle, degrees), +0x58 0.8, +0x5C 20, +0x60 2, +0x64 2.5, +0x68 / +0x6C 4. FUN_00509E20 = the
+  throw: timer +0x70 += dt to +0x74, then state +0x1A = 2, +0x70 = 0, one of 4 stones (+0xB4 + 4 * +0x1F).
+  catrate31 (XXL_P2HERO=asterix XXL_CATTRACE=1, Asterix leading 17-43 units off, knocked 5 units back a hit):
+  throws 3.53 s apart, each stone landing 2.81 s on (2.97 at 38.6 units) -- so the stones land +0x74 apart; the
+  flight doesn't widen the gap (the next stone is in the air as one lands). Hold = revive_hold_catapult_window
+  (0.4) x the gap (several armed catapults with the fallen hero between passive and attack range: 1 / sum of 1 /
+  charge), at most revive_hold_seconds (CatapultGap / HoldSeconds; logged on change). catrevive31 (-Level 3,
+  XXL_DOWNAT=0:3500 XXL_DOWNAT2=0:14000 XXL_REVIVELIMIT=auto, ENDFIGHTWON at 2.5 s and 12.1 s): 5.0 s at the
+  user's spot (2 units off: passive), 1.41 s at (91.1 -1.8 14.4) 17 units off. Lessons: LV3-1's courtyard fight
+  (gate 60) has Romans by the catapult -- as guards of the downed hero they punched Obelix off the grab (1-point
+  hits); the user asked to beat such squads in autotests (ENDFIGHTWON). Steps must be in time order (a late step
+  early in the table holds back all after it).
