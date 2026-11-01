@@ -3651,3 +3651,53 @@ both halves).
   logged with the other hints): off, shared.cpp ShowModeHint shows nothing for SHARED_GUN / SHARED_GUN_SOLO /
   SHARED_GUN_OBELIX (the game's "Use" prompts stay). Checked with obelixgun33 and the option off: no gun hint,
   the prompts as before.
+- Round 199 (user: single player gets co-op features, each an option off by default). New ini section
+  [single_player] (config.h sp*, env aids XXL_SPCOMBOHINTS / SPICONS / SPPOTION / SPSWITCH / SPSECOND).
+  (1) sp_combo_hints: combohints.cpp Solo() -- player 1 only, its hero the trio's leader; a combo is queued
+  whoever leads and its hint waits for a hero that can do it (the Mole: Asterix); the fusion hint for the leader
+  and the AI companion (it copies the leader's Twister), fused = the leader's Twister step 0x25 / 0x26. The box is
+  hints.cpp's single-player one (the game's place, only while the game shows no prompt).
+  (2) sp_coop_icons: hints.cpp LocStringHook rewrites every string for player 1 (IconsRewrite(s, 0)).
+  (3) sp_obelix_potion: coop.cpp ReadCmdHook -- Obelix leading (only then in a player state), not fallen, gets
+  +0x388 bit 4 while the gauge runs (speed 15 vs 7, no hits). The flask stays Asterix's.
+  (4) sp_hero_switch: coop.cpp SoloHeroSwitch -- sp_hero_switch_button (PAD_* bit, any XInput pad, not with R3
+  held; dpad_up default: preset 3 binds no D-pad in play, only menus 16-35) or sp_hero_switch_key (TAB; edge via
+  pads.cpp PadsKeyPressed, game focus, not with Alt) -> CoopGiveLead(companion). SoloSwitchRefusal: pause,
+  cutscene, potion dash (gm +0x5C bit 19), either hero not mode 0 / busy / off its feet (+0x384 & 7), the leader
+  in a situation (+0x3E9 != 0: grab, lever, merchant...), the companion's AI order != 0 (held by the level),
+  fallen, f1A set, >25 units away, a merchant open; refused -> the companion's "no" (bank +0x200).
+  proximity.cpp SoloLeadFree (switch or second chance on, no player 2) runs the bundle ticks itself: SoloTick --
+  a corkscrew (CKHkCorkscrew vf15, armed +8 & 3 == 2) whose landing event makes hero H wait (CorkscrewHero) is
+  ticked with its radius +0x3C = -1 while H does not lead (vf15 compares |leader node - circle| per axis and
+  squared against +0x3C: never true); a potion spitter ticks with Asterix as the leader. DispatchAs:
+  SoloLeverHeldBack -- the safe sequence for the leader (a lever whose group switches to the hero leading drops
+  all contacts) while the companion could take the lead (order 0, mode 0, standing). coop.cpp SoloPotionDash: the
+  dash flag cleared when the drinker (IndivPotionDrinker) is not the leader (the AI never ends it).
+  (5) sp_second_chance: individual.cpp g.solo -- active without player 2 once Obelix is with Asterix (+0x1A 0 at
+  activation); a switch between co-op and single player deactivates (player 2's kept stats survive the
+  single-player activation). PlayerOf -> 0. The fallen-hero rules (IndivBlockPartnerSpot(From), IndivBlockTalk,
+  IndivHoldsBack, BlockPartnerGrounds, the detection's swapped pass, FlagEventHook's zone holding / let-through)
+  no longer need player 2. coop.cpp SoloBeforeLifeTick: a fallen hero not leading is kept in the player variant
+  (as the AI it gets up and walks after the leader, round 41) with an all-zero action array and the trio sliced
+  to it (the co-op non-leader's arrangement; CoopAfterLifeTick restores both); the SP frame's "AI companion
+  again" fix skips a fallen hero; Revive puts a solo non-leader back to the AI variant. Falls are noted in the
+  hero's own tick, HeroSendEventHook and HitHook without player 2. CoopDeathIs (revive time out): the fallen
+  hero takes the lead (single player's death). Locks: NoteTrioEventFlagged / the 4802-4803 tracking / the
+  boarding switch run with individual heroes on; SoloWatchLock notes the AI companion's cable car (order 9) and
+  rotary beam (8) rides; CoopUndoLockFor / LockedByLevel (nolock only with player 2) / UndoLock (no AI cycle
+  without player 2) undo them when the leader falls. Not ported: the guards of a downed hero (GuardFrame is
+  co-op only); the HUD shows the leader's stats only.
+  Test aids: S_SPSWITCH (the button), player 1's scripted B sets binding 6's hold time (CoopHoldTime), S_PLACE
+  writes +0x80 for an AI companion (placed by +0x40 alone it stayed; in practice FORCE around PLACEAT), env
+  XXL_FLIPWINDOW (the remote-session flip without one; screenshots were white all session -- the screen locked).
+  Autotests (level 2 unless noted): spswitch2 (switch, walk, back, refused while waiting / in the air), spcork21
+  (Obelix leading on Asterix's platform circle: shut; Asterix on it: waits, the switch refused), splever25 (sector
+  5's "switch to Asterix" lever: Asterix's punch ignored; Obelix's from 1.6 works it, lead to Asterix -- from 1.2
+  he misses), spcombo2 (Club hint, A lit, landing resets, the Mole done -> next hint; POTION so the camp's Romans
+  don't knock Asterix about), spicons33 -Level 3 (26 texts rewritten with the option, none without), sppotion2
+  (Obelix leading: 388 = 0x1004, speed 15, health kept; off: hit 15 -> 13), spsecond2 (XXL_DOWNAT=0:3000
+  XXL_REVIVEHOLD=2: Obelix plays on, Asterix stays at sit 0E unmoved, B revives, lead back), spsecond2c (Obelix
+  down as the AI: stays, revived, follows), spsecond2g (both down: game over, respawn), spsecond2h (XXL_HPAT:
+  the area hit takes the last point), spcork21d / spcork21e (Obelix down after 03C8 freed Asterix: the sequence
+  set back; Obelix down with Asterix still on the circle: the lock undone, Asterix on solid ground, revives him).
+  Co-op unchanged: combohint2, downcombo.
