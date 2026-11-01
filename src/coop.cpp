@@ -3495,8 +3495,42 @@ static int MachinePromptHero(Trio t, bool* both) {
 			if (h && *(char**)(h.raw() + 0x280) == *(char**)(m + 0x120) && !(gr & 7) && !(gr & 0x20000000)) on++;
 		}
 		*both = on == 2;
+	} else if (*(uintptr_t*)m == kMachinegunVtbl && !(*(uint8_t*)(m + 0x10C) & 1)) {
+		// The gun offers itself (FUN_004C54D0, trio 0x4A01) to the leader within
+		// its +0xAC of its node (2.2 at LV3-3), while it is free (+0x10C bit 0);
+		// offered, either player's X takes it (NoteMachineUse): both heroes by it
+		// (4 units -- two heroes are seldom both within 2.2), both prompts.
+		char* node = *(char**)(m + 0x10);
+		char* fr = node ? *(char**)(node + 4) : nullptr;
+		float r = *(float*)(m + 0xAC);
+		if (!(r >= 4.0f)) r = 4.0f;
+		int in = 0;
+		float dist[2] = { -1.0f, -1.0f };
+		const int players[2] = { g.p1Hero, g.p2Hero };
+		for (int k = 0; k < 2; k++) {
+			Hero h = t.GetHero(players[k]);
+			if (!h || !fr) continue;
+			Vector3 d = h.Pos() - *(Vector3*)(fr + 0x80);
+			dist[k] = sqrtf(d.len2());
+			if (d.len2() < r * r) in++;
+		}
+		*both = in == 2;
+		static int s_in = -1, s_told = 0;
+		if (in != s_in && s_told++ < 20)
+			Log("coop: machine gun %p offers itself within %.1f: %s %.1f away, %s %.1f", m, r, HeroName(g.p1Hero), dist[0],
+			    HeroName(g.p2Hero), dist[1]);
+		s_in = in;
 	}
 	return g.machineOfferHero;
+}
+
+// Asterix on the machine gun alone: Obelix within 6 units of its handles (his X
+// there joins him, NoteMachineUse) gets the gun's "Use" too.
+static bool ObelixAtGunHandles(Trio t) {
+	if (!g.gunSolo || g.held[HERO_OBELIX]) return false;
+	Hero o = t.GetHero(HERO_OBELIX);
+	Vector3 spot;
+	return o && GunHandles(t, &spot, nullptr) && (o.Pos() - spot).len2() < 6.0f * 6.0f;
 }
 
 static void __fastcall PromptHook(char* hero, void* edx) {
@@ -3531,6 +3565,7 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 		g_prompt.heroKind[idx] = kind;
 		if (machineBoth) g_prompt.heroKind[idx ^ 1] = kind;
 	}
+	if (idx == HERO_OBELIX && kind == kPromptNone && ObelixAtGunHandles(t)) g_prompt.heroKind[HERO_OBELIX] = kPromptMachine;
 	bool leads = idx == t.Leader();
 	if (kind != kPromptNone) {
 		if ((g_prompt.kind == kind && g_prompt.hero != idx) || machineBoth) g_prompt.both = true;   // offered to both heroes
@@ -3546,8 +3581,8 @@ unsigned CoopPromptKindFor(int player) {
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	unsigned kind = gm ? (*(uint32_t*)(gm + 0xCC) >> 4) & 0xF : kPromptNone;
 	if (!g.p2Joined) return player == 0 ? kind : kPromptNone;
-	if (kind == kPromptNone) return kPromptNone;
 	if (g.suspended || g.frameNo - g_prompt.frame > 2) {   // no hero's prompt seen (a ride): the leader's player's
+		if (kind == kPromptNone) return kPromptNone;
 		Trio t = GetTrio();
 		int lead = t ? t.Leader() : -1;
 		return player == (lead == g.p2Hero ? 1 : 0) ? kind : kPromptNone;
@@ -4003,7 +4038,7 @@ static void WatchSpinHint(int idx, Hero h) {
 	g.spinning[idx] = spin;
 	int player = idx == g.p1Hero ? 0 : 1;
 	if (ended || (spin && IndivFallen(OtherHero(idx)))) HintHide(HINT_PASS, player);
-	if (!started || g.passDone[idx] || g.spinHints[idx] >= 3) return;
+	if (!started || g.passDone[idx] || g.spinHints[idx] >= 3 || !g_config.hintPass) return;
 	Trio t = GetTrio();
 	int other = idx == g.p1Hero ? g.p2Hero : g.p1Hero;
 	Hero o = t ? t.GetHero(other) : Hero();
@@ -4372,6 +4407,7 @@ static void ShowJoinHint(Trio t) {
 	const char* why = "";
 	if (!CoopAllowedNow(t, &why)) return;
 	g.joinHintPending = false;
+	if (!g_config.hintJoin) return;   // [hints] hint_join off
 	wchar_t text[96];
 	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
 		swprintf(text, 96, L"Second pad: %s joins co-op\n(keyboard: %s), again to leave", HintButtonName(1, HB_START),

@@ -348,6 +348,36 @@ int __fastcall RomanSendHook(char* self, void* edx, int ev, void* param) {
 	return orig(self, edx, ev, param);
 }
 
+// A launcher (CKHkTrioCatapult, 2,190, vf15) offers itself (trio 0x5130: the
+// leader's +0x544 = it, +0x3F0 bit 0x4000 -- the hero's "Activate", its X then
+// starts it) to the leader standing on its platform (+0x48: the trio's vf29, the
+// leader's ground) in its sector (+0x18 == level +0x24), while it is ready (+0x14
+// bits 3, 6, 7 clear) and not counting its flight (+0x24 != +0x38). Ticked as its
+// nearest hero's, the other player's hero on it too had no prompt and its X did
+// nothing: it gets the same offer.
+const uintptr_t kTrioCatapultVtbl = 0x6264A4;
+void LauncherOfferBoth(char* l, Trio t, int p1, int p2) {
+	if (!l || *(uintptr_t*)l != kTrioCatapultVtbl || !t) return;
+	uint8_t st = *(uint8_t*)(l + 0x14);
+	if ((st & 0xC8) || *(float*)(l + 0x24) == *(float*)(l + 0x38)) return;
+	CKYellowPages* yp = YellowPages();
+	char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+	char* plat = *(char**)(l + 0x48);
+	if (!lvl || !plat || *(int8_t*)(l + 0x18) != (int)*(uint8_t*)(lvl + 0x24)) return;
+	const int heroes[2] = { p1, p2 };
+	for (int i : heroes) {
+		Hero h = t.GetHero(i);
+		if (!h || HeroOut(i) || *(char**)(h.raw() + 0x280) != plat || (*(uint32_t*)(h.raw() + 0x384) & 7)) continue;
+		uint32_t& f = *(uint32_t*)(h.raw() + 0x3F0);
+		if ((f & 0x4000) && *(char**)(h.raw() + 0x544) == l) continue;
+		*(char**)(h.raw() + 0x544) = l;
+		f |= 0x4000;
+		static char* told[2] = {};
+		if (told[i & 1] != l) Log("proximity: launcher %p offered to %s on it too (its prompt, its X)", l, HeroName(i));
+		told[i & 1] = l;
+	}
+}
+
 void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const Vector3& pos1,
               const Vector3& pos2) {
 	TickFn tick = (TickFn)(*(void***)life)[17];
@@ -492,6 +522,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	if ((d1 > range2 && d2 > range2) || tr[0x2C] == nearest) {
 		letGo.leader = tr[0x2C];
 		tick(life, nullptr, dt);
+		LauncherOfferBoth(hook, t, p1, p2);
 		return;
 	}
 	letGo.leader = (uint8_t)nearest;
@@ -501,6 +532,7 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	tr[0x2D] = (uint8_t)other;
 	InterlockedIncrement(&g_slices);
 	tick(life, nullptr, dt);
+	LauncherOfferBoth(hook, t, p1, p2);
 	if (tr[0x2C] == (uint8_t)nearest && tr[0x2D] == (uint8_t)other) {
 		tr[0x2C] = leader;
 		tr[0x2D] = companion;

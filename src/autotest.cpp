@@ -7475,6 +7475,50 @@ const Step kRage2[] = {
 	END(7000),
 };
 
+// flaskbox (user: xxl_coop.flask_offscreen.log): the potion's flask under player
+// 1's box -- it rises over a hint, and as the hint goes (the box sliding out to
+// the left) it has to come down where it was, not be dragged off the screen
+// (xxl_widescreen2d.asi pulled HUD models over a plate towards its anchor).
+const Step kFlaskBox[] = {
+	MARK(0, "flaskbox"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	POTION(1500),
+	{ 2500, S_HINTTEST, 0, 0, 0, 0, 3000.0f, "p1: the revive hint for 3 s" },
+	SHOT(4500, "raised"),
+	SHOT(5520, "out_1"), SHOT(5560, "out_2"), SHOT(5600, "out_3"), SHOT(5650, "out_4"), SHOT(5750, "out_5"),
+	SHOT(7000, "down"), SHOT(9000, "later"),
+	END(9500),
+};
+// launchboth: both heroes on sector 2's launcher -- both players' boxes show its
+// "Activate" (it offered itself to the nearer hero only).
+const Step kLaunchBoth[] = {
+	MARK(0, "launchboth"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_OBELIX, 17, 0, 0, 0, "obelix on the launcher" },
+	{ 4000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "asterix next to it" },
+	SHOT(5500, "one_on"),
+	{ 6000, S_PLACE, HERO_ASTERIX, 17, 0, 0, 0, "asterix on the launcher too" },
+	SHOT(7500, "both_on"),
+	{ 8000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "asterix off it again" },
+	SHOT(9500, "one_again"),
+	END(10000),
+};
+// gunboth33 (-Level 3): both heroes by the LV3-3 machine gun before it is taken --
+// both boxes show its "Use"; Asterix on it alone, Obelix at its handles: his box
+// shows "Use" (his X joins).
+const Step kGunBoth33[] = {
+	MGUN33_SETUP,
+	PLACEAT(4000, HERO_ASTERIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_OBELIX, 287.0f, 31.92f, -327.5f),
+	SHOT(5500, "both_near"),
+	PLACEAT(6000, HERO_OBELIX, 278.0f, 31.92f, -326.0f),
+	P1(6500, PAD_X, 0, 0, "p1 X"), P1(6700, 0, 0, 0, "p1 release"),
+	SHOT(8500, "solo"),
+	PLACEAT(9000, HERO_OBELIX, 293.9f, 31.92f, -326.5f),
+	SHOT(10500, "obelix_at_handles"),
+	END(11000),
+};
+
 struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
@@ -7484,6 +7528,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("combohint2b", kComboHint2B),
 	SCENARIO("combohint2l", kComboHint2L),
 	SCENARIO("crowd36", kCrowd36),
+	SCENARIO("flaskbox", kFlaskBox),
+	SCENARIO("launchboth", kLaunchBoth),
+	SCENARIO("gunboth33", kGunBoth33),
 	SCENARIO("fuse2", kFuse2),
 	SCENARIO("rage2", kRage2),
 	SCENARIO("towerscan", kTowerScan),
