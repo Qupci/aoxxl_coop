@@ -64,7 +64,9 @@ int PlayerOfHero(int hero) { return hero == CoopP1Hero() ? 0 : 1; }
 const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (id >= kStringId && id < kStringId + kNumStrings) return g_strings[id - kStringId];
 	const wchar_t* s = g_origLocString(loc, edx, id);
-	if (!CoopP2Joined() || !s) return s;
+	if (!s) return s;
+	// Single player ([single_player] sp_coop_icons): every text player 1's.
+	if (!CoopP2Joined()) return g_config.spCoopIcons ? IconsRewrite(s, 0) : s;
 	void** ra = (void**)_AddressOfReturnAddress();
 	uintptr_t from = (uintptr_t)ra[0];
 	if (from == kTextSetReturn) from = (uintptr_t)ra[4];

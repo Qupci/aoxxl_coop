@@ -81,6 +81,15 @@ static bool GameHasFocus() {
 	return pid == GetCurrentProcessId();
 }
 
+bool PadsKeyPressed(int vk) {
+	static bool s_down[256];
+	if (vk <= 0 || vk > 255) return false;
+	bool down = GameHasFocus() && (GetAsyncKeyState(vk) & 0x8000) != 0;
+	bool edge = down && !s_down[vk];
+	s_down[vk] = down;
+	return edge;
+}
+
 // While player 2 plays on the keyboard, their keys must not also reach the game,
 // which reads the keyboard from WM_KEYDOWN/WM_KEYUP in its window procedure
 // (0x479C10 -> FUN_00438990): with player 1 on the keyboard too, one key would

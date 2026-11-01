@@ -53,6 +53,7 @@ const int kSpareScope = 2;
 
 struct State {
 	bool     active = false;
+	bool     solo = false;             // single player's second chance ([single_player] sp_second_chance)
 	int      level = -2;
 	Stats    st[2];
 	int      ctx = -1;                 // whose stats are in the game's place (-1: the game's own)
@@ -176,7 +177,7 @@ void Commit(int idx) {
 }
 
 int Other(int idx) { return idx == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX; }
-int PlayerOf(int hero) { return hero == CoopP1Hero() ? 0 : 1; }
+int PlayerOf(int hero) { return !CoopP2Joined() || hero == CoopP1Hero() ? 0 : 1; }
 
 // A put-back is a jump, not a walk: the node's world frame (+0x80, what the
 // detection service tests) and the detection service's last position move
@@ -351,7 +352,7 @@ void PutBackLog(int up, int down, const char* what, const Vector3& spot) {
 bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	Vector3 before(beforeXyz[0], beforeXyz[1], beforeXyz[2]);
 	int down = IndivFallenHero();
-	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;
+	if (down < 0 || CoopSuspended()) return false;
 	int up = Other(down);
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
@@ -403,7 +404,7 @@ void IndivPutOnSafeGround(int hero) {
 
 bool IndivBlockTalk(const char* what) {
 	int down = IndivFallenHero();
-	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;
+	if (down < 0 || CoopSuspended()) return false;
 	static DWORD s_told = 0;
 	DWORD now = GetTickCount();
 	if (now - s_told > 2000) {
@@ -426,7 +427,7 @@ void IndivNoteLevelLead(int hero) {
 
 bool IndivBlockPartnerSpot(const char* what) {
 	int down = IndivFallenHero();
-	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return false;
+	if (down < 0 || CoopSuspended()) return false;
 	int up = Other(down);
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
@@ -513,7 +514,7 @@ bool OnPartnerGround(Hero h, const char** what) {
 
 bool IndivHoldsBack(char* hook) {
 	int down = IndivFallenHero();
-	if (down < 0 || !hook || CoopSuspended() || !CoopP2Joined()) return false;
+	if (down < 0 || !hook || CoopSuspended()) return false;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(Other(down)) : Hero();
 	if (!h) return false;
@@ -589,7 +590,7 @@ namespace {
 
 void BlockPartnerGrounds() {
 	int down = IndivFallenHero();
-	if (down < 0 || CoopSuspended() || !CoopP2Joined()) return;
+	if (down < 0 || CoopSuspended()) return;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(Other(down)) : Hero();
 	if (!h) return;
@@ -895,6 +896,15 @@ void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 	Raise(h);
 	g.fallen[idx] = false;
 	g.revive[idx] = 0;
+	// Single player (second chance): up as the AI companion again -- kept in the
+	// player variant for its death (coop.cpp); the lead comes back to it below
+	// if it led when it fell.
+	Trio tr = GetTrio();
+	uint8_t f18 = h.Flags18();
+	if (g.solo && tr && tr.Leader() != idx && HeroModePlayable(f18) && HeroIsPlayerVariant(f18)) {
+		*(uint8_t*)(h.raw() + 0x18) = HeroAiVariant(f18);
+		Log("indiv: %s up as the AI companion (single player)", HeroName(idx));
+	}
 	// It led when it fell: the lead went to the other hero meanwhile, and comes
 	// back to it (next frame -- a launcher's revive is inside a hero's tick).
 	if (g.fellLeading[idx] && !g.levelLead[idx]) g.leadBack = idx;
@@ -957,7 +967,8 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	if (now - g.limitHintAt < 250) return false;
 	g.limitHintAt = now;
 	wchar_t text[160];
-	swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
+	if (g.solo) swprintf(text, 160, L"Revive %s\n%d s left", HintHeroName(down), SecondsLeft(down));
+	else swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
 	HintShow(HINT_REVIVE, PlayerOf(down), text, 600);
 	return false;
 }
@@ -1018,8 +1029,9 @@ void Activate(Trio t) {
 		g.kept = false;
 		return;
 	}
-	g.kept = false;
-	Log("indiv: individual heroes on -- each starts with health %d, %d shields, combo hits %u", s.hp, s.shields, s.hits);
+	if (!g.solo) g.kept = false;   // (single player: player 2's stats still kept for their return)
+	Log("indiv: individual heroes on%s -- each starts with health %d, %d shields, combo hits %u",
+	    g.solo ? " (single player: second chance)" : "", s.hp, s.shields, s.hits);
 }
 
 void Deactivate(Trio t) {
@@ -1439,8 +1451,15 @@ void IndivFrame() {
 		g.leadBack = g.sendBack = -1;
 	}
 	Trio t = GetTrio();
-	bool want = g_config.individual && CoopP2Joined() && t && t.GetHero(HERO_ASTERIX) && t.GetHero(HERO_OBELIX);
-	if (want && !g.active) Activate(t);
+	// Co-op: individual_heroes. Single player: sp_second_chance, from the moment
+	// Obelix is with Asterix (level 1: hero +0x1A until he is found). Co-op begun
+	// or ended: afresh, as the other way of playing.
+	bool solo = !CoopP2Joined();
+	Hero ob = t ? t.GetHero(HERO_OBELIX) : Hero();
+	bool want = (solo ? g_config.spSecondChance : g_config.individual) && t && t.GetHero(HERO_ASTERIX) && ob &&
+	            (g.active || *(uint8_t*)(ob.raw() + 0x1A) == 0);
+	if (g.active && g.solo != solo) Deactivate(t);
+	if (want && !g.active) { g.solo = solo; Activate(t); }
 	if (!want && g.active) Deactivate(t);
 	if (!g.active) {
 		// A game over in single player starts everyone afresh.

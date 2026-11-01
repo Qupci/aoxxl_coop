@@ -106,6 +106,9 @@ bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 int CoopUndoLockFor(int fallen);
 // What R3 + B does for `hero` (autotests): unlocks it from a level lock.
 void CoopUnlockHero(int hero);
+// Single player ([single_player] sp_hero_switch): a press of the hero switch
+// button (autotests).
+void CoopSoloSwitchRequest();
 // No-lock mode: `hero` has a scripted order the mode leaves unfollowed (it would be waiting).
 bool CoopNoLockWaiting(int hero);
 // An event that commands the trio was just flagged (before its group runs): the

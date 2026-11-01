@@ -43,6 +43,8 @@ const char* PadName(int i);   // "pad 2", "the keyboard"
 // While true, key-downs of player 2's keyboard keys are kept from the game (set
 // each frame: player 2 joined on the keyboard).
 void PadsSetKeyboardOwnedByP2(bool owned);
+// Key `vk` went down since the last call (the game window has the focus).
+bool PadsKeyPressed(int vk);
 
 bool PadsInit();               // false if no XInput DLL could be loaded
 void PadsShutdown();

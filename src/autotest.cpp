@@ -42,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7551,10 +7551,232 @@ const Step kObelixGun33[] = { MGUN33_SETUP, OBELIXGUN33_STEPS };
 const Step kObelixGun33L[] = { MGUN33_SETUP, { 4500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" }, OBELIXGUN33_STEPS };
 #undef OBELIXGUN33_STEPS
 
+// ---- single player ([single_player], each switched on by its env aid) ----
+// spswitch2 (level 2, XXL_SPSWITCH=1): the hero switch button: Obelix leads and
+// walks (Asterix follows); back to Asterix; refused while Obelix is told to wait
+// (trio 0x4802) and while Asterix is in the air; Obelix again once free.
+const Step kSpSwitch2[] = {
+	MARK(0, "spswitch2"),
+	SHOT(1000, "start"),
+	{ 1500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch" },
+	SHOT(2500, "obelix_leads"),
+	P1(3000, 0, 0, 1.0f, "p1 forward"), P1(4500, 0, 0, 0, "p1 stop"),
+	SHOT(5000, "obelix_walked"),
+	{ 5500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back" },
+	SHOT(6500, "asterix_leads"),
+	{ 7000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix told to wait" },
+	{ 7500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: obelix waits)" },
+	{ 8000, S_TRIOEV, 0x4803, 0, 0, 0, 0, "obelix follows again" },
+	P1(8500, PAD_A, 0, 0, "p1 jump"), { 8650, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: in the air)" },
+	P1(8700, 0, 0, 0, "p1 release"),
+	{ 10500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch" },
+	SHOT(11500, "obelix_again"),
+	END(12000),
+};
+// spcork21 (level 2, XXL_SPSWITCH=1): LV2-1's spinning platform (its circle makes
+// Asterix wait): Obelix leading walks onto it -- nothing; the switch to Asterix,
+// who walks onto it: he waits there, Obelix leads; the switch then refused.
+const Step kSpCork21[] = {
+	MARK(0, "spcork21"),
+	FORCE(800, HERO_OBELIX, 1), PLACEAT(1000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1000, HERO_OBELIX, -763.0f, 516.5f, -980.5f), FORCE(1400, HERO_OBELIX, 0),
+	{ 2000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	GLIDEAT(2500, HERO_OBELIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(4200, HERO_OBELIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(6000, "obelix_on_circle"),
+	FORCE(6300, HERO_ASTERIX, 1), PLACEAT(6500, HERO_ASTERIX, -775.0f, 517.0f, -980.0f), FORCE(6900, HERO_ASTERIX, 0),
+	{ 7500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	FORCE(7800, HERO_OBELIX, 1), PLACEAT(8000, HERO_OBELIX, -762.0f, 516.5f, -979.2f), FORCE(8400, HERO_OBELIX, 0),
+	GLIDEAT(8500, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1000),
+	GLIDEAT(9700, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(11500, "asterix_on_circle"),
+	{ 12500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: asterix waits)" },
+	SHOT(13500, "after"),
+	END(14000),
+};
+// splever25 (level 2, XXL_SPSWITCH=1): sector 5's lever behind the iron crates
+// ("switch to Asterix"): Asterix leading punches it -- safe sequence, nothing;
+// the switch to Obelix, who punches it: the lead goes to Asterix.
+#define SPLEVER_PUNCHES(t, hero) \
+	{ t, S_NEAROBJ, hero, 52, 0, 1.2f, 0, "facing the lever" }, \
+	P1(t + 400, PAD_X, 0, 0, "p1 X"), P1(t + 600, 0, 0, 0, "p1 release"), \
+	P1(t + 1400, PAD_X, 0, 0, "p1 X"), P1(t + 1600, 0, 0, 0, "p1 release")
+const Step kSpLever25[] = {
+	MARK(0, "splever25"),
+	LOADSECTOR(200, 5),
+	{ 2500, S_LEVERS, 0, 0, 0, 0, 0, "levers" },
+	FORCE(2800, HERO_OBELIX, 1),
+	{ 3000, S_PLACE, HERO_ASTERIX, 15, 0, 0, 0, "asterix at the lever" },
+	{ 3000, S_PLACE, HERO_OBELIX, 16, 0, 0, 0, "obelix at the hearth" },
+	FORCE(3400, HERO_OBELIX, 0),
+	SPLEVER_PUNCHES(3600, HERO_ASTERIX),
+	SHOT(5800, "asterix_punched"),
+	{ 6500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(6800, HERO_ASTERIX, 1),
+	{ 7000, S_PLACE, HERO_OBELIX, 15, 0, 0, 0, "obelix at the lever" },
+	{ 7000, S_PLACE, HERO_ASTERIX, 16, 0, 0, 0, "asterix at the hearth" },
+	FORCE(7400, HERO_ASTERIX, 0),
+	SPLEVER_PUNCHES(7600, HERO_OBELIX),
+	{ 9600, S_NEAROBJ, HERO_OBELIX, 52, 0, 1.6f, 0, "obelix 1.6 from the lever" },
+	P1(10000, PAD_X, 0, 0, "p1 X"), P1(10200, 0, 0, 0, "p1 release"),
+	{ 11000, S_NEAROBJ, HERO_OBELIX, 52, 0, 2.0f, 0, "obelix 2.0 from the lever" },
+	P1(11400, PAD_X, 0, 0, "p1 X"), P1(11600, 0, 0, 0, "p1 release"),
+	SHOT(12500, "obelix_punched"),
+	END(13500),
+};
+#undef SPLEVER_PUNCHES
+// spcombo2 (level 2, XXL_SPCOMBOHINTS=1): single player's combo hints: every
+// combo learned, Asterix by a Roman with a full bar -- the Club's hint in
+// player 1's box (the game's place), its buttons lit as pressed; the Club done,
+// it goes; the Power Hammer's the next time.
+#define P1TAP(t, b, what) P1(t, b, 0, 0, what), P1(t + 90, 0, 0, 0, "p1 release")
+const Step kSpCombo2[] = {
+	MARK(0, "spcombo2"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1500, S_ENEMY, HERO_ASTERIX, 1, 0, 0, 0, "asterix next to a roman" },
+	{ 1800, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	SHOT(3000, "club_hint"),
+	P1TAP(3500, PAD_A, "p1 A"), SHOT(3620, "pressed_a"),
+	POTION(4800),   // (invincible: the camp's Romans knocked him about, no combo could start)
+	{ 5000, S_COMBOHINT, 104, 0, 0, 0, 0, "the Mole first in line" },
+	{ 5100, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman (no hits)" },
+	{ 5400, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	SHOT(6500, "mole_hint"),
+	{ 7000, S_P1COMBO, 3, 0, 0, 0, 0, "player 1: the Mole" },
+	SHOT(7200, "mole_done"), SHOT(9000, "after"),
+	END(10000),
+};
+#undef P1TAP
+// spicons33 (-Level 3, XXL_SPICONS=1 / 0): single player, Asterix at sector 3's
+// machine gun: its "Use" prompt with player 1's button; the pause menu's texts.
+const Step kSpIcons33[] = {
+	MARK(0, "spicons33"),
+	LOADSECTOR(200, 3),
+	PLACEAT(3000, HERO_ASTERIX, 288.0f, 31.92f, -324.0f), PLACEAT(3000, HERO_OBELIX, 280.0f, 31.92f, -326.0f),
+	SHOT(5000, "prompt"),
+	{ 6000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	SHOT(7500, "pause"),
+	{ 8000, S_POKE8, -3, 1, 0, 0, 0, "unpause" },
+	END(9000),
+};
+// sppotion2 (level 2, XXL_SPPOTION=1 / 0): single player, Obelix leading runs
+// without, then with the magic potion; with it, by a Roman for a while (hits).
+const Step kSpPotion2[] = {
+	MARK(0, "sppotion2"),
+	{ 1000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 1500, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields" },
+	P1(2000, 0, 0, 1, "p1 run"), { 3500, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields running" }, P1(4000, 0, 0, 0, "p1 stop"),
+	POTION(4500),
+	{ 5000, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields potion" },
+	P1(5500, 0, 0, -1, "p1 run back"), { 7000, S_HEROFIELDS, 0, 0, 0, 0, 0, "fields potion running" }, P1(7500, 0, 0, 0, "p1 stop"),
+	SHOT(7600, "potion_ran"),
+	{ 8000, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" },
+	SHOT(12000, "potion_roman"),
+	END(16000),
+};
+// spsecond2 (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2):
+// single player's second chance: Asterix (leading) goes down -- player 1 plays
+// Obelix on, Asterix stays down; Obelix holds B by him: Asterix back up and
+// leading again, Obelix the AI companion following him.
+const Step kSpSecond2[] = {
+	MARK(0, "spsecond2"),
+	SHOT(3500, "asterix_down"),
+	P1(4500, 0, 0, 1.0f, "p1 forward (obelix)"), P1(6500, 0, 0, 0, "p1 stop"),
+	SHOT(7000, "obelix_walked"),
+	{ 7200, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: asterix down; sp_hero_switch on)" },
+	GLIDEBY(7500, HERO_OBELIX, 1.0f, 0.0f, 600),
+	P1(8500, PAD_B, 0, 0, "p1 holds B"), SHOT(9500, "reviving"), P1(11500, 0, 0, 0, "p1 release"),
+	SHOT(12500, "revived"),
+	P1(13000, 0, 0, 1.0f, "p1 forward (asterix)"), P1(15000, 0, 0, 0, "p1 stop"),
+	SHOT(16000, "walked_on"),
+	END(17000),
+};
+// spsecond2c (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2): the
+// AI companion Obelix goes down -- he stays there as Asterix walks off and back;
+// Asterix's B by him gets him up, following again.
+const Step kSpSecond2C[] = {
+	MARK(0, "spsecond2c"),
+	SHOT(3500, "obelix_down"),
+	P1(4500, 0, 0, 1.0f, "p1 forward"), P1(6500, 0, 0, 0, "p1 stop"),
+	SHOT(7000, "asterix_walked"),
+	GLIDEBY(7500, HERO_ASTERIX, 1.0f, 0.0f, 600),
+	P1(8500, PAD_B, 0, 0, "p1 holds B"), P1(11500, 0, 0, 0, "p1 release"),
+	SHOT(12500, "revived"),
+	P1(13000, 0, 0, -1.0f, "p1 back"), P1(15000, 0, 0, 0, "p1 stop"),
+	SHOT(16000, "follows"),
+	END(17000),
+};
+// spsecond2g (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_DOWNAT2=0:6000):
+// both heroes down -- the game over, the respawn with both up.
+const Step kSpSecond2G[] = {
+	MARK(0, "spsecond2g"),
+	SHOT(4000, "obelix_down"),
+	SHOT(7000, "both_down"),
+	SHOT(12000, "game_over"),
+	SHOT(20000, "respawned"),
+	P1(21000, 0, 0, 1.0f, "p1 forward"), P1(23000, 0, 0, 0, "p1 stop"),
+	SHOT(24000, "after"),
+	END(25000),
+};
+// spsecond2h (level 2, XXL_SPSECOND=1 XXL_HPAT=0:2500:1): a real hit takes
+// Asterix's last point (the trio's area hit): he goes down, Obelix plays on.
+const Step kSpSecond2H[] = {
+	MARK(0, "spsecond2h"),
+	{ 3000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "shockwave on asterix (his last point)" },
+	SHOT(3500, "hit"),
+	P1(4500, 0, 0, 1.0f, "p1 forward (obelix)"), P1(6000, 0, 0, 0, "p1 stop"),
+	SHOT(7000, "after"),
+	END(8000),
+};
+// spcork21d (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:9000 XXL_REVIVEHOLD=2): Asterix
+// leading onto LV2-1's spinning platform: he waits there, Obelix leads and walks
+// through zone 03C8 (Asterix freed, the platform's turn under way); Obelix goes
+// down -- the sequence set back (the pillar on), Asterix leading comes over and
+// revives Obelix. spcork21e: Obelix stays put (Asterix still locked on the
+// circle) -- the lock undone: the level as before the circle's event, Asterix
+// off it on his last solid ground, leading.
+#define SPCORK21D_START \
+	FORCE(800, HERO_OBELIX, 1), PLACEAT(1000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1000, HERO_OBELIX, -763.0f, 516.5f, -980.5f), FORCE(1400, HERO_OBELIX, 0), \
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500), \
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000), \
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f), \
+	SHOT(6000, "asterix_waits")
+#define SPCORK21D_END \
+	SHOT(9500, "obelix_down"), \
+	SHOT(11000, "asterix_freed"), \
+	GLIDEBY(11500, HERO_ASTERIX, 1.0f, 0.0f, 1500), \
+	P1(13500, PAD_B, 0, 0, "p1 holds B"), P1(16500, 0, 0, 0, "p1 release"), \
+	SHOT(17500, "revived"), \
+	END(18500)
+const Step kSpCork21D[] = {
+	MARK(0, "spcork21d"),
+	SPCORK21D_START,
+	P1(6500, 0, 0, 1.0f, "p1 forward (obelix)"), P1(7500, 0, 0, 0, "p1 stop"),
+	SPCORK21D_END,
+};
+const Step kSpCork21E[] = {
+	MARK(0, "spcork21e"),
+	SPCORK21D_START,
+	SPCORK21D_END,
+};
+#undef SPCORK21D_START
+#undef SPCORK21D_END
+
 struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
+	SCENARIO("spswitch2", kSpSwitch2),
+	SCENARIO("spcork21", kSpCork21),
+	SCENARIO("splever25", kSpLever25),
+	SCENARIO("spcombo2", kSpCombo2),
+	SCENARIO("spicons33", kSpIcons33),
+	SCENARIO("sppotion2", kSpPotion2),
+	SCENARIO("spsecond2", kSpSecond2),
+	SCENARIO("spsecond2c", kSpSecond2C),
+	SCENARIO("spsecond2g", kSpSecond2G),
+	SCENARIO("spsecond2h", kSpSecond2H),
+	SCENARIO("spcork21d", kSpCork21D),
+	SCENARIO("spcork21e", kSpCork21E),
 	SCENARIO("hudhints", kHudHints),
 	SCENARIO("combohint2", kComboHint2),
 	SCENARIO("combohint2b", kComboHint2B),
@@ -10305,6 +10527,12 @@ void RunStep(const Step& s) {
 		if (h.hook->node && h.hook->node->matrix) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
 			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+			// An AI companion (single player) goes by its world frame (+0x80) too:
+			// placed by +0x40 alone, it stayed where it was.
+			if (h.IsCompanion()) {
+				hp = (float*)((char*)h.hook->node->matrix + 0x80);
+				hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
+			}
 		}
 		Log("autotest: %s placed at spot %d", HeroName(s.a), s.b);
 		break;
@@ -10477,6 +10705,10 @@ void RunStep(const Step& s) {
 	case S_COMBOHINT:   // combo a as if just bought, for both players (-1: the crowd's Twister hint again)
 		ComboHintsQueue(s.a);
 		break;
+	case S_SPSWITCH:   // single player: the hero switch button pressed ([single_player] sp_hero_switch)
+		Log("autotest: the hero switch button");
+		CoopSoloSwitchRequest();
+		break;
 	case S_HUDDIFF:
 		HudDiffStart();
 		break;
@@ -10502,6 +10734,15 @@ void InjectP1() {
 	BuildActionsFromPad(at.p1, tmp, n);
 	for (int i = 0; i < n; i++)
 		if (tmp[i]) values[i] = tmp[i];
+	// B held: binding 6's hold time (+0x18, seconds), which CKInput times from a
+	// real device only -- the revive's grab (CoopHoldTime) reads it.
+	static DWORD s_bSince = 0;
+	if (at.p1.buttons & PAD_B) {
+		if (!s_bSince) s_bSince = GetTickCount();
+		if (n > 6) *(float*)(im.Binding(6) + 0x18) = (GetTickCount() - s_bSince) / 1000.0f;
+	} else {
+		s_bSince = 0;
+	}
 	// The right stick: the game camera's input view (service +0x580) maps its
 	// actions 0-3 (up, down, right, left) to bindings, as CoopP2CameraValues does.
 	CKYellowPages* yp = YellowPages();
@@ -10556,7 +10797,8 @@ bool AutotestActive() { return at.phase != AutotestState::OFF; }
 void RemoteDesktopFlip(DWORD now) {
 	static DWORD first = 0;
 	static int done = 0;
-	if (!at.hwnd || done >= 2 || !GetSystemMetrics(SM_REMOTESESSION)) return;
+	// (XXL_FLIPWINDOW=1: the same without a remote session -- white shots otherwise)
+	if (!at.hwnd || done >= 2 || !(GetSystemMetrics(SM_REMOTESESSION) || getenv("XXL_FLIPWINDOW"))) return;
 	if (!first) first = now;
 	if (now - first < (done == 0 ? 1500u : 5000u)) return;
 	done++;

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 enum SplitMode {
 	SPLIT_HORIZONTAL = 0,  // stacked, player 1 on top
@@ -56,6 +57,15 @@ struct CoopConfig {
 	float comboFullDrainFactor = 1.5f; // a full combo bar running out
 	bool  noLockRomans     = true;  // no-lock mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
 	bool  noLockRomansAnyMarkers = false; // ... at any squad's spawn markers near it, not only its own squad's
+
+	// Single player ([single_player]; co-op features without player 2, each off by default)
+	bool  spComboHints   = false;  // sp_combo_hints: the combo hints in player 1's box
+	bool  spCoopIcons    = false;  // sp_coop_icons: the mod's button icons (pad or keyboard) in the game's texts
+	bool  spObelixPotion = false;  // sp_obelix_potion: Obelix leading runs and is invincible on Asterix's potion
+	bool  spHeroSwitch   = false;  // sp_hero_switch: a button gives the lead to the other hero
+	uint16_t spSwitchButton = 0x0001;   // ... its pad button (PAD_*: D-pad up)
+	int   spSwitchKey    = 0x09;   // ... its key with player 1 on the keyboard (TAB)
+	bool  spSecondChance = false;  // sp_second_chance: each hero its own health; a fallen one waits to be revived
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

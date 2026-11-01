@@ -117,6 +117,27 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_NOLOCKROMANSANY")) noLockRomansAnyMarkers = atoi(getenv("XXL_NOLOCKROMANSANY")) != 0;
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
 	if (getenv("XXL_OBELIXPOTION")) obelixPotion = atoi(getenv("XXL_OBELIXPOTION")) != 0;
+	spComboHints   = ReadBool("single_player", "sp_combo_hints", spComboHints, full);
+	spCoopIcons    = ReadBool("single_player", "sp_coop_icons", spCoopIcons, full);
+	spObelixPotion = ReadBool("single_player", "sp_obelix_potion", spObelixPotion, full);
+	spHeroSwitch   = ReadBool("single_player", "sp_hero_switch", spHeroSwitch, full);
+	spSecondChance = ReadBool("single_player", "sp_second_chance", spSecondChance, full);
+	{
+		char sb[32] = {};
+		GetPrivateProfileStringA("single_player", "sp_hero_switch_button", "dpad_up", sb, sizeof(sb), full);
+		static const struct { const char* name; uint16_t bit; } kButtons[] = {
+			{ "dpad_up", 0x0001 }, { "dpad_down", 0x0002 }, { "dpad_left", 0x0004 }, { "dpad_right", 0x0008 },
+			{ "back", 0x0020 }, { "l3", 0x0040 }, { "none", 0 },
+		};
+		for (const auto& b : kButtons) if (!_stricmp(sb, b.name)) spSwitchButton = b.bit;
+		GetPrivateProfileStringA("single_player", "sp_hero_switch_key", "", sb, sizeof(sb), full);
+		if (sb[0]) spSwitchKey = ParseKey(sb);
+	}
+	if (getenv("XXL_SPCOMBOHINTS")) spComboHints = atoi(getenv("XXL_SPCOMBOHINTS")) != 0;   // autotests
+	if (getenv("XXL_SPICONS")) spCoopIcons = atoi(getenv("XXL_SPICONS")) != 0;
+	if (getenv("XXL_SPPOTION")) spObelixPotion = atoi(getenv("XXL_SPPOTION")) != 0;
+	if (getenv("XXL_SPSWITCH")) spHeroSwitch = atoi(getenv("XXL_SPSWITCH")) != 0;
+	if (getenv("XXL_SPSECOND")) spSecondChance = atoi(getenv("XXL_SPSECOND")) != 0;
 	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
 	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
 
@@ -192,4 +213,7 @@ void CoopConfig::Load(const char* iniPath) {
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);
 	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
 	    hintMachineGun);
+	Log("config: single player: combo hints %d, co-op icons %d, Obelix's potion %d, hero switch %d (pad %04X, key %02X), "
+	    "second chance %d", spComboHints, spCoopIcons, spObelixPotion, spHeroSwitch, spSwitchButton, spSwitchKey,
+	    spSecondChance);
 }

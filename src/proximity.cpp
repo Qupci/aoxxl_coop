@@ -300,6 +300,62 @@ bool TickCorkscrew(int* life, void* dt, char* cork, Trio t) {
 	return true;
 }
 
+// Single player with the lead changing hands ([single_player] sp_hero_switch,
+// sp_second_chance: either hero may lead anywhere now), what the level leaves to
+// one hero answers only that hero. A corkscrew's circle is landed on only with
+// the hero it makes wait leading (CorkscrewHero) -- otherwise its radius (+0x3C,
+// its box and sphere test against the leader's node) is out of reach for the
+// tick: Obelix leading on Asterix's circle set it off for Asterix wherever he
+// was. A spitter's potion flask waits for Asterix (ticked with him as the
+// leader: it flies to him even as the AI companion -- his to drink).
+bool SoloLeadFree() { return !CoopP2Joined() && (g_config.spHeroSwitch || g_config.spSecondChance); }
+
+// Logged once per object and leader (40 lines at most).
+bool SoloToldOnce(char* hook, int leader) {
+	static struct { char* hook; int leader; } s_told[16];
+	static int s_n = 0, s_lines = 0;
+	for (int i = 0; i < s_n; i++)
+		if (s_told[i].hook == hook) {
+			if (s_told[i].leader == leader) return false;
+			s_told[i].leader = leader;
+			return s_lines++ < 40;
+		}
+	if (s_n < 16) s_told[s_n++] = { hook, leader };
+	return s_lines++ < 40;
+}
+
+bool SoloTick(int* life, void* dt, char* hook, Trio t) {
+	TickFn tick = (TickFn)(*(void***)life)[17];
+	uintptr_t vt = *(uintptr_t*)hook;
+	if (vt == kCorkscrewVtbl && (*(uint32_t*)(hook + 8) & 3) == 2) {
+		int who = CorkscrewHero(hook);
+		if (who < 0 || who == t.Leader()) return false;
+		float r = *(float*)(hook + 0x3C);
+		*(float*)(hook + 0x3C) = -1.0f;
+		tick(life, nullptr, dt);
+		*(float*)(hook + 0x3C) = r;
+		if (SoloToldOnce(hook, t.Leader())) {
+			Log("proximity: corkscrew %p is %s's (its landing makes that hero wait) -- shut while %s leads", hook,
+			    HeroName(who), HeroName(t.Leader()));
+		}
+		return true;
+	}
+	if (vt == kBonusSpitterVtbl && SpitsPotion(hook) && t.Leader() != HERO_ASTERIX) {
+		uint8_t* tr = (uint8_t*)t.raw();
+		uint8_t leader = tr[0x2C], companion = tr[0x2D];
+		tr[0x2C] = HERO_ASTERIX;
+		tr[0x2D] = HERO_OBELIX;
+		tick(life, nullptr, dt);
+		if (tr[0x2C] == HERO_ASTERIX) { tr[0x2C] = leader; tr[0x2D] = companion; }
+		if (SoloToldOnce(hook, leader)) {
+			Log("proximity: spitter %p's next is the magic potion -- ticks with Asterix as the leader (%s leads)", hook,
+			    HeroName(leader));
+		}
+		return true;
+	}
+	return false;
+}
+
 // Romans passed from one player to the other (LB): flying (state +0x21 == 4),
 // they tick with the receiver as the trio leader.
 struct Pass { char* roman; int receiver; int thrower; DWORD since; };
@@ -551,15 +607,19 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 	// A hero the game has borrowed for a scripted order (Asterix riding the cable
 	// car Obelix pulls) is not a player's: objects see the real leader.
 	if (!CoopP2Joined() || CoopSuspended() || !h1 || !h2 || HeroOut(p1) || HeroOut(p2)) {
-		// Individual heroes with one down (a hero out): the same ticks, but what
-		// needs both heroes skips its tick while the standing hero is at it.
-		if (CoopP2Joined() && !CoopSuspended() && IndivFallenHero() >= 0) {
+		// Individual heroes with one down (a hero out; co-op or single player's
+		// second chance): the same ticks, but what needs both heroes skips its
+		// tick while the standing hero is at it. Single player with the lead
+		// changing hands: what answers one hero only (SoloTick).
+		bool solo = t && SoloLeadFree();
+		if ((!CoopSuspended() && IndivFallenHero() >= 0) || solo) {
 			int* groupLife = *(int**)(bundle + 0x0C);
 			if (groupLife && (groupLife[1] & 3) == 0) ((TickFn)(*(void***)groupLife)[17])(groupLife, nullptr, dt);
 			for (int* life = *(int**)(bundle + 0x10); life; life = (int*)life[2]) {
 				if (*(uint8_t*)(life + 1) & 2) continue;
 				char* hook = *(char**)((char*)life + 0x10);
 				if (hook && IndivHoldsBack(hook)) continue;
+				if (solo && hook && SoloTick(life, dt, hook, t)) continue;
 				((TickFn)(*(void***)life)[17])(life, nullptr, dt);
 			}
 			return;
@@ -1884,6 +1944,25 @@ bool LeverHeldBack(char* receiver, Trio t) {
 	return false;
 }
 
+// Single player with the lead changing hands: the safe sequence for the leader
+// -- a lever whose event gives the lead to the hero leading (the level has the
+// other hero pull it and hand over) takes no hits while the other hero could
+// lead instead (following, standing: switch and pull it with that one). With
+// the other held by the level (a wait) or down, the lever is the game's.
+static bool SoloLeverHeldBack(char* receiver, Trio t) {
+	if (!SoloLeadFree() || !LeverHeldBack(receiver, t)) return false;
+	int l = t.Leader();
+	int c = l == HERO_ASTERIX ? HERO_OBELIX : l == HERO_OBELIX ? HERO_ASTERIX : -1;
+	Hero h = c >= 0 ? t.GetHero(c) : Hero();
+	if (!h || IndivFallen(c) || h.Order() != AI_FOLLOW_LEADER || ((h.Flags18() >> 2) & 7) != 0) return false;   // (mode 0)
+	if (g_heldBackLogged != receiver) {
+		g_heldBackLogged = receiver;
+		Log("proximity: safe sequence: lever %p ignores %s -- it switches to %s, who leads already (%s's to pull)", receiver,
+		    HeroName(l), HeroName(l), HeroName(c));
+	}
+	return true;
+}
+
 // `maskOf(entry, h1, h2)`: bit 0 if player 1's hero is in that contact, bit 1
 // for player 2's. Entries are chained through their first word. A contact list
 // with both heroes in it (both fighting the same Roman) is delivered in two
@@ -1893,7 +1972,10 @@ template <class MaskOf>
 int DispatchAs(char* receiver, int event, void* list, MaskOf maskOf) {
 	SendEventFn send = (SendEventFn)(*(void***)receiver)[5];
 	Trio t = GetTrio();
-	if (!t || !CoopP2Joined() || CoopSuspended()) return send(receiver, nullptr, event, list);
+	if (!t || !CoopP2Joined() || CoopSuspended()) {
+		if (t && SoloLeverHeldBack(receiver, t)) return 0;
+		return send(receiver, nullptr, event, list);
+	}
 	int p1 = CoopP1Hero(), p2 = CoopP2Hero();
 	Hero h1 = t.GetHero(p1), h2 = t.GetHero(p2);
 	if (!h1 || !h2 || HeroOut(p1) || HeroOut(p2)) return send(receiver, nullptr, event, list);
@@ -2064,7 +2146,7 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 	// (A fallen hero -- individual heroes -- counts here: zones bound to it are
 	// still tried with the standing hero, so what needs both heroes is caught.)
 	int fallen = IndivFallenHero();
-	bool coop = t && CoopP2Joined() && !CoopSuspended() && *(uint8_t*)(det + 0x2A) &&
+	bool coop = t && (CoopP2Joined() || fallen >= 0) && !CoopSuspended() && *(uint8_t*)(det + 0x2A) &&
 	            (!HeroOut(HERO_ASTERIX) || fallen == HERO_ASTERIX) && (!HeroOut(HERO_OBELIX) || fallen == HERO_OBELIX);
 	int ia = coop ? NodeIndex(det, t.GetHero(HERO_ASTERIX)) : -1;
 	int io = coop ? NodeIndex(det, t.GetHero(HERO_OBELIX)) : -1;
@@ -2185,7 +2267,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		int up = IndivFallenHero() == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
 		if (IndivFallenHero() >= 0 && GroupNeedsBoth(eventId, up)) {
 			int zh = ZoneEventHero(eventId & 0xFFFF);
-			if (CoopP2Joined() && !CoopSuspended()) {
+			if ((CoopP2Joined() || IndivActive()) && !CoopSuspended()) {
 				// (zh: the hero who set it off -- in the swapped pass too)
 				if (zh != IndivFallenHero() && !GroupNeedsBoth(eventId, up, false))
 					IndivBlockTalk("a Roman agent's talk");
@@ -2212,7 +2294,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		}
 		// Only "lead" switches to the standing hero (and "the sidekick may move"):
 		// let through, the level's choice of leader kept for after the revive.
-		if (IndivFallenHero() >= 0 && CoopP2Joined() && !CoopSuspended() && GroupCommandsTrio(eventId)) {
+		if (IndivFallenHero() >= 0 && !CoopSuspended() && GroupCommandsTrio(eventId)) {
 			char* objs[32];
 			uint16_t msgs[32];
 			for (int k = 0, n = GroupTargets(eventId, objs, msgs, 32); k < n; k++)

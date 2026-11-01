@@ -78,8 +78,14 @@ uint32_t Learned() {
 	char* sg = gm ? *(char**)(gm + 0x40) : nullptr;
 	return sg ? *(uint32_t*)(sg + 0x10) : 0;
 }
-int HeroOf(int p) { return p == 0 ? CoopP1Hero() : CoopP2Hero(); }
-int PlayerOf(int hero) { return hero == CoopP1Hero() ? 0 : hero == CoopP2Hero() ? 1 : -1; }
+// Single player ([single_player] sp_combo_hints): player 1 alone, its hero the
+// trio's leader; a combo is queued for whichever hero leads when it comes up.
+bool Solo() { return !CoopP2Joined(); }
+int Players() { return Solo() ? 1 : 2; }
+int HeroOf(int p) {
+	if (Solo()) { Trio t = GetTrio(); return p == 0 && t ? t.Leader() : -1; }
+	return p == 0 ? CoopP1Hero() : CoopP2Hero();
+}
 
 bool Full(int hero) {
 	int hp, sh, hits;
@@ -89,6 +95,9 @@ bool Full(int hero) {
 }
 
 bool CanDo(int hero, int c) { return c != C_FUSION && (c != C_MOLE || hero == HERO_ASTERIX); }
+// Queued for a player: what its hero can do (single player: either hero may lead
+// later, the hint waits for one that can).
+bool Queues(int hero, int c) { return c != C_FUSION && (Solo() || CanDo(hero, c)); }
 
 // Combos switched off by the level (the boss runs' trio 0x48EE / 0x48F1): game
 // manager +0x14 (the trio) vf53 / vf54 (thiscall, no arguments), asked by the
@@ -103,7 +112,7 @@ bool CombosOff(Trio) {
 }
 
 void Push(Player& pl, int hero, int c) {
-	if (!CanDo(hero, c)) return;
+	if (!Queues(hero, c)) return;
 	for (int i = 0; i < pl.n; i++) if (pl.queue[i] == c) return;
 	if (pl.n < C_COUNT) pl.queue[pl.n++] = c;
 }
@@ -326,7 +335,8 @@ void PlayerFrame(int p, Trio t) {
 	}
 	// A combo bought this level: its hint while the bar is full and a Roman near.
 	if (!pl.crowd) {
-		int c = pl.n ? pl.queue[0] : -1;
+		int c = -1;
+		for (int i = 0; i < pl.n && c < 0; i++) if (CanDo(hero, pl.queue[i])) c = pl.queue[i];
 		if (c != pl.shown) { pl.shown = -1; pl.lit = 0; HintHide(HINT_COMBO, p); }
 		if (c >= 0 && full && NearestRoman2(h.Pos()) <= kNear[c] * kNear[c]) {
 			if (pl.shown != c) {
@@ -370,7 +380,9 @@ void PlayerFrame(int p, Trio t) {
 void FuseFrame(Trio t) {
 	bool on = false;
 	if (t && (Learned() & 8) && !g_fused && !CoopOneScreen() && !CoopSuspended()) {
-		Hero a = t.GetHero(CoopP1Hero()), b = t.GetHero(CoopP2Hero());
+		int l = t.Leader();
+		Hero a = Solo() ? t.GetHero(l) : t.GetHero(CoopP1Hero());
+		Hero b = Solo() ? (l == HERO_ASTERIX || l == HERO_OBELIX ? t.GetHero(l ^ 1) : Hero()) : t.GetHero(CoopP2Hero());
 		auto spin = [](Hero h) {
 			uint8_t s = *(uint8_t*)(h.raw() + 0x135), st = *(uint8_t*)(h.raw() + 0x38E) & 0x3F;
 			return (s == 9 || s == 10) && st == 0x23;
@@ -387,7 +399,7 @@ void FuseFrame(Trio t) {
 		else Log("combohints: both Twisters near: X fuses them (both players' hints)");
 	}
 	if (!on) return;
-	for (int p = 0; p < 2; p++) {
+	for (int p = 0; p < Players(); p++) {
 		Player& pl = g_p[p];
 		if (HintOnScreen(HINT_FUSE, p) && (Pressed(p) & (1u << HB_X)) && !pl.fuseLit) {
 			pl.fuseLit = 1;
@@ -418,7 +430,7 @@ void ComboHintsQueue(int kind) {
 	bool first = kind >= 100;   // 100 + k: combo k first in line
 	if (first) kind -= 100;
 	if (kind >= C_COUNT) return;
-	for (int p = 0; p < 2; p++) {
+	for (int p = 0; p < Players(); p++) {
 		Player& pl = g_p[p];
 		Push(pl, HeroOf(p), kind);
 		for (int i = 1; first && i < pl.n; i++)
@@ -433,7 +445,8 @@ void ComboHintsFrame() {
 	int level = gm ? *(int*)(gm + ax::kGM_currentLevel) : -1;
 	if (level != g_level || itf != g_itf) { g_itf = itf; ResetLevel(level); }
 	Trio t = GetTrio();
-	if (!gm || !t || !CoopP2Joined() || !itf || !g_config.hintCombos) {   // ([hints] hint_combos off: none)
+	// ([hints] hint_combos off: none; single player only with [single_player] sp_combo_hints)
+	if (!gm || !t || (Solo() && !g_config.spComboHints) || !itf || !g_config.hintCombos) {
 		HintHide(HINT_COMBO);
 		HintHide(HINT_FUSE);
 		g_bitsKnown = false;
@@ -446,11 +459,15 @@ void ComboHintsFrame() {
 	g_bits = bits;
 	for (int c = 0; c < C_COUNT && added; c++) {
 		if (!(added & (1u << c))) continue;
-		for (int p = 0; p < 2; p++) Push(g_p[p], HeroOf(p), c);
+		for (int p = 0; p < Players(); p++) Push(g_p[p], HeroOf(p), c);
 		Log("combohints: the %S learned (bought this level: %d) -- its hint waits for a full bar by a Roman", kName[c],
 		    *(uint8_t*)(gm + 0x400 + c));
 	}
-	if (SharedCurrentMode() == SHARED_FUSION && !g_fused) {
+	// (Single player: the leader's Twister merging or fused, +0x38E & 0x3F 0x25 / 0x26.)
+	Hero lh = t.GetHero(t.Leader());
+	uint8_t lstep = lh ? *(uint8_t*)(lh.raw() + 0x38E) & 0x3F : 0;
+	bool soloFused = Solo() && lh && *(uint8_t*)(lh.raw() + 0x135) == 10 && (lstep == 0x25 || lstep == 0x26);
+	if ((SharedCurrentMode() == SHARED_FUSION || soloFused) && !g_fused) {
 		g_fused = true;
 		Log("combohints: Twister Fusion: its X hint is done for this level");
 	}
@@ -460,7 +477,7 @@ void ComboHintsFrame() {
 		g_fuseUp = false;
 		return;
 	}
-	for (int p = 0; p < 2; p++) PlayerFrame(p, t);
+	for (int p = 0; p < Players(); p++) PlayerFrame(p, t);
 	FuseFrame(t);
 }
 
