@@ -87,7 +87,8 @@ struct State {
 	int      leadBack = -1;            // revived, it was leading: the lead goes back to it
 	// The hero brought to a fallen leader (BringToFallenLeader): where from, where to.
 	bool     brought[2] = {};
-	bool     broughtPastLifter[2] = {};   // ... cut off only by a lifter shut while the other was down: it stays
+	bool     broughtStays[2] = {};     // ... past a lifter shut while the other was down, or having cut itself off: it stays
+	bool     hadWay[2] = {};           // down: the other hero could walk to it at some time since the fall
 	Vector3  broughtFrom[2], broughtTo[2];
 	int      sendBack = -1;            // revived its leader: that hero goes back where it came from
 	DWORD    fellAt[2] = {};
@@ -822,7 +823,9 @@ Vector3 CatchUpSpot(int down, Hero h, int up, Hero o, float* way) {
 // "auto" from that walk. The lifters count as shut (ShutLifters): one cut off
 // only by a lifter -- which the mod keeps shut -- is brought over whoever led
 // (the level would never bring the heroes together there), and stays after the
-// revive.
+// revive. So is one that could walk to it since the fall and can't any more (it
+// cut itself off: a drop it jumped down, user) -- a fallen sidekick out of
+// reach from the start still waits for the level.
 void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
 	if (!HeroModePlayable(o.Flags18())) return;   // (on the machine gun: brought once off it)
@@ -846,6 +849,7 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	}
 	if (r != PF_NO) {
 		g.cutOff[down] = 0;
+		if (r == PF_YES) g.hadWay[down] = true;
 		if (g_config.reviveLimit < 0.0f && !g.limitSet[down]) {
 			float w = r == PF_YES ? PfWalk(o.Pos(), h.Pos()) : -1.0f;
 			if (w >= 0.0f) SetLimit(down, w, "its walk there");
@@ -853,9 +857,10 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 		}
 		return;
 	}
-	if (!(g.fellLeading[down] || byLifter) || ++g.cutOff[down] < 3) return;
+	bool cutItself = !g.fellLeading[down] && !byLifter && g.hadWay[down];
+	if (!(g.fellLeading[down] || byLifter || cutItself) || ++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
-	g.broughtPastLifter[up] = byLifter;
+	g.broughtStays[up] = byLifter || cutItself;
 	float way = 0.0f;
 	Vector3 spot = CatchUpSpot(down, h, up, o, &way);
 	spot.y += 0.5f;
@@ -867,8 +872,10 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	PlaceHero(o, spot);
 	g.placedAt[up] = now;
 	Log("indiv: %s can't walk to %s%s -- brought where it can walk to it from (%.1f %.1f %.1f)", HeroName(up),
-	    HeroName(down), byLifter ? " but over a lifter, shut while it is down" : ", who led when it fell", spot.x, spot.y,
-	    spot.z);
+	    HeroName(down),
+	    byLifter ? " but over a lifter, shut while it is down" : cutItself ? " any more (it could since the fall)"
+	                                                                      : ", who led when it fell",
+	    spot.x, spot.y, spot.z);
 	if (g_config.reviveLimit < 0.0f && !g.limitSet[down]) SetLimit(down, way, "its walk from where it was brought");
 }
 
@@ -891,12 +898,13 @@ void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 	// came from (the leader's place can be one only Asterix gets out of) -- unless
 	// it goes on from where it revived it. A revive at a sector change or a
 	// launcher leaves it where it is; so does one brought past a lifter (the
-	// heroes together again is what the lifter was for).
+	// heroes together again is what the lifter was for) or one that had cut
+	// itself off (it can go back the way it went).
 	int up = Other(idx);
 	if (g.brought[up]) {
 		Trio t = GetTrio();
 		Hero o = t ? t.GetHero(up) : Hero();
-		if (byGrab && o && !g.broughtPastLifter[up]) {
+		if (byGrab && o && !g.broughtStays[up]) {
 			g.sendBack = up;
 			g.broughtTo[up] = o.Pos();
 		} else g.brought[up] = false;
@@ -1337,6 +1345,7 @@ bool IndivHeroDown(int hero, const char* how) {
 	g.fellAt[hero] = GetTickCount();
 	g.cutOff[hero] = 0;
 	g.reachTold[hero] = -2;
+	g.hadWay[hero] = false;
 	// A fixed revive time limit counts from the fall; "auto" from the first way
 	// known (WayToFallen).
 	g.limitSet[hero] = g_config.reviveLimit > 0.0f;

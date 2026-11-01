@@ -2936,6 +2936,21 @@ const Step kLiftDown21[] = {
 	END(16500),
 };
 
+// liftdown21r (-Level 2, XXL_P2HERO=asterix XXL_DOWNAT=1:4000): liftdown21 the
+// other way round (user): Obelix (not leading) down by the hearth on top, player
+// 2's Asterix (leading) by him, then gone down below and onto the lifter: put
+// back below, brought up to Obelix, revives him by B, stays.
+const Step kLiftDown21R[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, -745.06f, 515.2f, -979.92f), PLACEAT(2500, HERO_ASTERIX, -747.0f, 515.2f, -978.0f),
+	PLACEAT(6800, HERO_ASTERIX, -766.3f, 508.5f, -1001.0f), PLACEAT(7600, HERO_ASTERIX, -746.709f, 506.5f, -992.057f),
+	SHOT(8000, "liftdown21r_0"), SHOT(10500, "liftdown21r_1"), REACH(10700),
+	VPAD(11000, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(16500, 1, 0, 0, 0, "p2 release"),
+	SHOT(17000, "liftdown21r_2"), REACH(17200),
+	END(18000),
+};
+
 // liftdie21a (-Level 2, XXL_DOWNAT=0:4500): Asterix down alone on LV2-1's
 // lifter (at its foot, the user's -746.7 505.7 -992.1), Obelix comes onto it:
 // not put back (user: the fallen hero waits on the lifter); the lifter held while
@@ -2976,6 +2991,22 @@ const Step kCatRate31[] = {
 	SHOT(5200, "catrate31_0"), HEALA3(6000), HEALA3(9000), HEALA3(12000), HEALA3(15000), HEALA3(18000),
 	HEALA3(21000), HEALA3(24000), SHOT(14000, "catrate31_1"), SHOT(24500, "catrate31_2"),
 	END(26000),
+};
+
+// reach26s (-Level 2, XXL_P2HERO=asterix XXL_DOWNAT=1:4000): both on LV2-6's
+// far side, Obelix (not leading) down; player 2's Asterix (leading) can walk to
+// him, then cuts himself off (put across the pit: a drop jumped down, user) --
+// he is brought back where he can walk to Obelix, revives him by B and stays.
+// (reach26o: Obelix leading, Asterix down out of reach from the start -- stays.)
+const Step kReach26S[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, 90.5f, 3.5f, -389.3f), PLACEAT(2500, HERO_OBELIX, 84.7f, 3.5f, -385.0f),
+	SHOT(5000, "reach26s_0"), PLACEAT(7000, HERO_ASTERIX, 115.53f, 3.0f, -389.57f), REACH(7300),
+	SHOT(9200, "reach26s_1"), { 9500, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 1.5f, 0, "asterix by obelix" },
+	VPAD(10000, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(15500, 1, 0, 0, 0, "p2 release"),
+	SHOT(16000, "reach26s_2"), REACH(16300),
+	END(17000),
 };
 
 // reach23 (-Level 2, XXL_DOWNAT=0:8000): LV2-3, Asterix lights the hearth and
@@ -7669,10 +7700,12 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach26o", kReach26O),
 	SCENARIO("reach26c", kReach26C),
 	SCENARIO("reach26f", kReach26F),
+	SCENARIO("reach26s", kReach26S),
 	SCENARIO("revive41", kRevive41),
 	SCENARIO("catrevive31", kCatRevive31),
 	SCENARIO("catrate31", kCatRate31),
 	SCENARIO("liftdown21", kLiftDown21),
+	SCENARIO("liftdown21r", kLiftDown21R),
 	SCENARIO("liftdie21a", kLiftDie21A),
 	SCENARIO("liftdie21b", kLiftDie21B),
 	SCENARIO("reach26b", kReach26B),
