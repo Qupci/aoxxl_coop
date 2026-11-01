@@ -3009,6 +3009,37 @@ const Step kReach26S[] = {
 	END(17000),
 };
 
+// zonejump26 (-Level 2, XXL_DOWNAT=1:3500): the user's LV2-6 softlock
+// (xxl_coop.lv2-6_stuck.log): Obelix down at (21.8 2.1 -386.3), Asterix off the
+// ledge at y 13 (43.0 13.0 -391.8) and down through zone 0CA8 (it needs both
+// heroes): put back from the frame before -- in the air -- a step further back,
+// he was left in the ledge's rock (48.1 8.2 -392.2) for good.
+const Step kZoneJump26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, 21.77f, 2.6f, -386.33f), PLACEAT(2500, HERO_ASTERIX, 60.6f, 10.9f, -390.4f),
+	PLACEAT(3000, HERO_ASTERIX, 49.08f, 13.4f, -391.08f), SHOT(5500, "zonejump26_0"),
+	GLIDEAT(6000, HERO_ASTERIX, 43.0f, 13.3f, -391.8f, 600), GLIDEAT(6700, HERO_ASTERIX, 36.0f, 4.0f, -390.0f, 700),
+	SHOT(7700, "zonejump26_1"), SHOT(9000, "zonejump26_2"), SHOT(11000, "zonejump26_3"),
+	END(12000),
+};
+
+// zonejump26j (-Level 2, XXL_P2HERO=asterix XXL_DOWNAT=1:3500): zonejump26 the
+// user's way -- player 2's Asterix jumps from (48.8 13.2 -389.4) ahead onto the
+// belly slide's slope and slides down through zone 0CA8.
+const Step kZoneJump26J[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, 21.77f, 2.6f, -386.33f), PLACEAT(2500, HERO_ASTERIX, 60.6f, 10.9f, -390.4f),
+	PLACEAT(3000, HERO_ASTERIX, 48.836f, 13.6f, -389.419f), SHOT(5500, "zonejump26j_0"),
+	VPAD(6000, 1, 0, 0, 1, "p2 ahead"), VPAD(6100, 1, PAD_A, 0, 1, "p2 ahead + jump"), VPAD(6400, 1, 0, 0, 1, "p2 ahead"),
+	VPAD(7200, 1, 0, 0, 0, "p2 stops"),
+	SHOT(7500, "zonejump26j_1"), SHOT(9000, "zonejump26j_2"),
+	VPAD(9500, 1, 0, 0, -1, "p2 back"), VPAD(10500, 1, 0, 1, 0, "p2 right"), VPAD(11500, 1, 0, 0, 0, "p2 stops"),
+	SHOT(12000, "zonejump26j_3"),
+	END(12500),
+};
+
 // reach23 (-Level 2, XXL_DOWNAT=0:8000): LV2-3, Asterix lights the hearth and
 // the door shuts behind him; he falls (leading): Obelix is brought in.
 const Step kReach23[] = {
@@ -7701,6 +7732,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach26c", kReach26C),
 	SCENARIO("reach26f", kReach26F),
 	SCENARIO("reach26s", kReach26S),
+	SCENARIO("zonejump26", kZoneJump26),
+	SCENARIO("zonejump26j", kZoneJump26J),
 	SCENARIO("revive41", kRevive41),
 	SCENARIO("catrevive31", kCatRevive31),
 	SCENARIO("catrate31", kCatRate31),

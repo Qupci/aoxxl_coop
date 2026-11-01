@@ -357,6 +357,21 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	Hero h = t ? t.GetHero(up) : Hero();
 	if (!h) return false;
 	Vector3 now = h.Pos();
+	// Off its feet (+0x384 bits 0-2: a jump, a fall, down a steep slope) or on the
+	// belly slide's ground, the frame before is in the air: a step back from it at
+	// its height went into the slope it came down -- LV2-6, jumped from (48.8 13.2
+	// -389.4) onto the slide's ramp and through zone 0CA8, put at (44.4 8.3 -387.4)
+	// and stuck in the rock for good (xxl_coop.lv2-6_stuck.log, zonejump26j). Its
+	// last solid ground then.
+	char* ground = *(char**)(h.raw() + 0x280);
+	bool slide = ground && !IsBadReadPtr(ground, 0x2C) && (*(uint8_t*)(ground + 0x2A) & 8);
+	if ((*(uint8_t*)(h.raw() + 0x384) & 7) != 0 || slide) {
+		static int s_told = 0;
+		if (s_told++ < 20)
+			Log("indiv: %s came into %s %s -- its last solid ground", HeroName(up), what,
+			    slide ? "on the belly slide" : "off its feet");
+		return IndivBlockPartnerSpot(what);
+	}
 	Vector3 back = before - now;
 	back.y = 0.0f;
 	float len = std::sqrt(back.len2());
