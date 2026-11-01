@@ -3586,3 +3586,19 @@ both halves).
   +0x384, not the ground's +0x2A. The belly slide's ground check (round 62) is the Slide-flagged slope itself, apart
   from the slide's start zone (0x480B to CKAsterixSlideFP): slide.log had the start zone held and the slope walked
   down past it to the level's end.
+- Round 195 (user, after 194 worked on the pad). (1) The belly slide's Slide-ground put-back (round 62, ground +0x2A bit
+  3) is gone from BlockPartnerGrounds and from the zone put-back's in-air rule: it dated from before round 64 made the
+  slide's start zone fire with a hero down (slide.log: the plane walked past, the slope walked down to the level's
+  end). The slide's start is LV2-2's cross detector (plane z -903.82 -- the user's -906.187 534.706 -903.680 --, event
+  0x0028, group 5 -> 0x480B to CKAsterixSlideFP): slidecross3 (XXL_DOWNAT=1:4000) logs "zone event 0028 held back",
+  the first put-back the frame before's step back (-906.0 524.9 -905.2), Asterix ends before the plane (-904.8).
+  (2) User: xxl_coop.lv2-6_unreachable.log -- Asterix up on the slide ramp (54.9 10.0 -390.0), Obelix down below it
+  (27.4 1.9 -391.6), apart since before the fall: "no" every 0.5 s, nobody moved (round 83: a fallen sidekick
+  waits; round 193's hadWay only once a way was known after the fall). Now the catch-up runs whoever led;
+  broughtStays only for a lifter or hadWay (its own drop) -- otherwise sent back after the grab's revive (the
+  fallen hero's place may be one it can't leave). Log "(not since the fall)". Autotest unreach26 (-Level 2,
+  XXL_P2HERO=asterix XXL_DOWNAT=1:4000; SQUADWON 13/14/15 first -- the LV2-6 fight's guards knocked Asterix off the
+  grab; ENDFIGHTWON found no gated fight there): brought onto Obelix 3 s after the fall, revived in 5.0 s, back up
+  at (54.9 2.5 -390.0). reach26o (Obelix leading, Asterix never reachable): now brought too. zonejump26j: still the
+  last solid ground (48.8 13.7 -389.4). Lesson: a no-op `sed -i` turned individual.cpp's CRLF into LF (unix2dos
+  put it back) -- never run sed -i on sources.
