@@ -25,6 +25,9 @@ struct CoopConfig {
 	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)
 	bool  individual    = true;   // each hero its own health, shields and combo bar; a fallen hero can be revived
 	bool  romansGuardDowned = true; // ... the basic Romans near a fallen hero stay round it, shielded, until it is revived
+	bool  hintJoin    = true;   // [hints] hint_join: how player 2 joins, at a level's start
+	bool  hintPass    = true;   // [hints] hint_pass_roman: "LB passes the Roman" while spinning one
+	bool  hintCombos  = true;   // [hints] hint_combos: the combo hints (combohints.cpp)
 	float reviveHold    = 5.0f;   // ... seconds the other player holds the grab button by it to revive it
 	float reviveHoldCatapultWindow = 0.4f; // ... under catapult fire: this share of the time between its stones (at most reviveHold)
 	float reviveLimit   = 0.0f;   // ... seconds to revive it before the game over: 0 none, -1 auto (the walk there + reviveGrace)

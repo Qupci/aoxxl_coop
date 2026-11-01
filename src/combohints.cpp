@@ -1,4 +1,5 @@
 #include "combohints.h"
+#include "config.h"
 #include "coop.h"
 #include "detour.h"
 #include "hints.h"
@@ -432,7 +433,7 @@ void ComboHintsFrame() {
 	int level = gm ? *(int*)(gm + ax::kGM_currentLevel) : -1;
 	if (level != g_level || itf != g_itf) { g_itf = itf; ResetLevel(level); }
 	Trio t = GetTrio();
-	if (!gm || !t || !CoopP2Joined() || !itf) {
+	if (!gm || !t || !CoopP2Joined() || !itf || !g_config.hintCombos) {   // ([hints] hint_combos off: none)
 		HintHide(HINT_COMBO);
 		HintHide(HINT_FUSE);
 		g_bitsKnown = false;
