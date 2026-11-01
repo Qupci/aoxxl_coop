@@ -3473,3 +3473,48 @@ both halves).
     units, y within 1; the tick puts back a step off them -- LV2-1's walk-to marker: walkable to, yet held again
     1 s on each time). Log: one given up held back still 1 s on (cap 20); the give-up line has the place.
   ini nolock_romans: a won fight's Romans follow the hero anywhere it walks; only other squads' wait at their edge.
+- Round 188 (user: after a game over player 2's Obelix, not leading, kept his full combo bar; "a P2 combo bar
+  issue"). The stats were right: the respawn (CKAsterixGameManager::vf13, 0x501940) sets the health, then calls the
+  in-game interface's reset through gm +0xF8 (CKHkInterfaceInGame::vf16, 0x517870, thiscall, plain ret: +0x24 bits
+  12-14 (combo bar state) and 23-24 ("Combo" word) cleared, the combo models +0xA4/+0xB4/+0xB8/+0xC0/+0xCC hidden,
+  shields' alpha 0xFF), then empties the combo fields. hud2.cpp puts player 2's copy (g.s2: +0x24 bits, ranges,
+  models) back over the interface at each of its ticks, so its bar stayed in state 4 (full, glowing) after the reset.
+  Now a vf16 hook (slot 16 of vt 0x6285F0) drops the copy (it starts again from player 1's, reset) and P2's health
+  marks. Autotest overcombo (level 2: Asterix down by area hits, Obelix 20 + 20 hits -- the bar has to see it fill:
+  30 at once is already full while the heroes are apart, then no "Combo" -- then down too): before, after the
+  respawn "bars p1 00002000 p2 18004000" and P2's bar glowing; after, both 00002000, empty.
+- Round 189 (user's list: revives and the game over). individual.cpp / pathfind.cpp / config.cpp:
+  - pathfind.cpp Steps: one step list (8 ways in a grid past walkable corners, walked over to a node at its box,
+    the sidekick's jumps) for Flood and two new searches: PfWalk(from, to) (Dijkstra from `from`, stops at `to`'s
+    cells; 0.3 ms, 436 cells for LV4-1's 28 units) and PfWayTo(to) + PfWayFrom(p) (the steps turned round -- CSR of
+    predecessors over all 33337 cells of level 2 -- and Dijkstra from `to`: every cell's walk there, 16.6 ms once).
+    Lengths are cell centre to centre (cells 2 x 2 units), x / z. Node boxes' y is no ground height (LV2-6 node 99:
+    0..6.3, ground ~2.7) -- never place a hero on a cell.
+  - Catch-up (CatchUpSpot): a fallen leader the other can't walk to (3 noes as before) -> the other is brought to
+    the candidate nearest it with a way to the fallen hero: PathSpot list per hero (a spot every 3 units of the same
+    solid ground NoteSafeSpot takes, 64 kept, with the loaded sector, level +0x24; only this sector's), both heroes',
+    1+ unit off the fallen one; else SpotBesideFallen as before. Fixed limit: only spots whose walk <= (time left -
+    grace) * speed. Send-back after the revive only for a revive by the grab (Revive byGrab; broughtTo = where it
+    revived; > 10 units on from there -> stays); a sector change's / launcher's revive leaves it where it is.
+  - Time limit (revive_time_limit off / N / auto, revive_time_limit_grace 30): N set at the fall; auto at the first
+    reach answer that has a way (PfWalk, or the straight line with no graph) or at the catch-up (its walk), once.
+    Walk speed 115.36 / 17 = 6.79 units/s (user's measure; an autotest's Obelix up a slight slope ~6.1). Counts
+    while not paused (gm +0xCC & 3 != 2), no shopper, not suspended, last reach answer not "no". Hints every 250 ms:
+    the fallen player's box "X comes to revive you / N s left", the other's the down hint + "N s left" (or the grab's
+    with it). Run out, grab not held -> TimeOut: gameOver, spared = the standing hero, Use(down) (gm sees 0), Raise
+    the fallen hero (its death from the first frame: the 0x0E handler sets gm +0x2FD at the animation's end -- left
+    lying, the reload came at once), coop.cpp CoopDeathIs = NoteDeath + LeadTheDeath (it leads, the other the AI
+    companion: the death sequence -- lightning, camera, fade -- on it, one screen). IndivEnter's spare scope
+    (kSpareScope 2): the spared hero's business writes its own health into cb +0x50 and the place's back after
+    (Hero_PreLifeTick would kill it on the 0). Respawn 7.1 s on, as a both-down game over.
+  - Hold time revive_hold_seconds (5) / revive_hold_seconds_catapult (2): CKHkCatapult (2,130) fires at the leader
+    from +0x48 to +0x4C units off (x / z) its node (+0x10 -> frame +4, world +0x80) when +0x14 & 0x14 == 0x10 (0x10
+    armed, 4 destroyed); the fallen hero within +0x4C -> 2 s. LV3-1's: 12 to 50 units, flags 18.
+  - Autotests: reach26c (-Level 2, XXL_DOWNAT=0:6800 XXL_REVIVELIMIT=auto XXL_REVIVEGRACE=8: Asterix placed spot by
+    spot round LV2-6's far side, down at (84.7 2.5 -378.5); Obelix brought to the pit's edge (90.5 2.7 -389.3, a
+    14-unit walk, 24 from him), 11 s, ran out, death on Asterix, Obelix walking as the AI companion, sit never 0E),
+    reach26f (XXL_REVIVELIMIT=14 XXL_REVIVEGRACE=10: the edge past the 11-unit ceiling, brought to 86.0 -389.3, a
+    10-unit walk), revive41 (-Level 4, XXL_DOWNAT=0:4000 auto 30: heroes connected on LV4-1's field, 28 units ->
+    34 s, revived by B in time), catrevive31 (-Level 3, XXL_DOWNAT=0:3500: by LV3-1's catapult, revived in 2.03 s).
+    reach23g / reach26w (no limit) still send Obelix back after the grab's revive. Env aids XXL_REVIVELIMIT,
+    XXL_REVIVEGRACE, XXL_REVIVEHOLD, XXL_REVIVEHOLDCAT.
