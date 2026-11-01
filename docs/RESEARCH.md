@@ -3572,3 +3572,17 @@ both halves).
   (90.5 2.7 -389.3, an 8-unit walk), revived, stays at 85.7 -384.2), liftdown21r (same env: Obelix down by the
   hearth, Asterix below then onto the lifter: put back, "only over a lifter", brought up, revived, stays),
   reach26o (Obelix leading, Asterix never reachable: stays, as round 83).
+- Round 194 (user: xxl_coop.lv2-6_stuck.log -- Obelix down at (21.8 2.1 -386.3); Asterix, trying an unreachable
+  jump, went from the ledge (49.1 13.1 -391.1) onto the belly slide's ramp and through zone 0CA8 (its group messages
+  the slide path: GroupNeedsBoth): "put back" to (41.3 8.2 -390.2), then stuck at (48.05 8.21 -392.22) to the level's
+  end). IndivBlockPartnerSpotFrom (zones, round 65) puts a hero at the detection service's place of the frame before
+  plus 1.5 units back the way it came, at that place's height + 0.3 -- coming down the steep ramp in the air (hero
+  +0x384 = 09: bits 0-2 off its feet), 1.5 units back up the slope at the lower height is under the ramp. Autotest
+  zonejump26j (-Level 2, XXL_P2HERO=asterix XXL_DOWNAT=1:3500: P2's Asterix jumps from the user's spot (48.836 13.209
+  -389.419) with the stick ahead): before, put at (44.4 8.3 -387.4), stuck at (48.06 8.00 -389.28), +0x384 09, for
+  good (the stick moved nothing); now off its feet or on Slide ground (+0x2A bit 3) -> IndivBlockPartnerSpot (the
+  trail), back at (48.8 13.7 -389.4) on his feet, walking again. zonejump26 (glides) the same; slidecross3 (LV2-2,
+  walking glides) still steps back before z -903.82. Note: the autotest state line's "gr %p/%vt %02X" byte is hero
+  +0x384, not the ground's +0x2A. The belly slide's ground check (round 62) is the Slide-flagged slope itself, apart
+  from the slide's start zone (0x480B to CKAsterixSlideFP): slide.log had the start zone held and the slope walked
+  down past it to the level's end.
