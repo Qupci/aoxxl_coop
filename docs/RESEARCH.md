@@ -3602,3 +3602,25 @@ both halves).
   at (54.9 2.5 -390.0). reach26o (Obelix leading, Asterix never reachable): now brought too. zonejump26j: still the
   last solid ground (48.8 13.7 -389.4). Lesson: a no-op `sed -i` turned individual.cpp's CRLF into LF (unix2dos
   put it back) -- never run sed -i on sources.
+- Round 196 (user: userlogs 20261101-050700-xxl_coop.flask_offscreen.log + screenshots/Snipaste_2026-11-01_05-05-56.png:
+  the flask off the left edge after the last combo hint went; prompts of the launcher and the gun on one screen
+  only; options for the join, pass and combo hints). (1) xxl_widescreen2d.asi CloseRows pulls a HUD model whose 2D
+  spot is on a recorded plate (this frame's or the last, PlateAt) towards that plate's anchor by its squeeze; the
+  co-op box's plate was recorded, the flask rising over player 1's box was pulled with it, and as the box slid out
+  (its anchor off the screen) dragged off the screen; the records only rotated on a 2D billboard / text draw, so a
+  frame with none kept them. The asi now exports Widescreen2dRecordPlates(int) (hints.cpp switches it off around
+  the boxes' plates: squeezed, not recorded, not pulled; an older asi: logged, as before) and CloseRows calls
+  PlatesNextFrame. Autotest flaskbox (XXL_OBELIXPOTION=0, vertical): old asi -- flask at the edge then gone; new --
+  in its column, down to its place. (2) Launcher = CKHkTrioCatapult (2,190, vtable 0x6264A4) vf15: ready (+0x14
+  bits 3, 6, 7 clear), not timing (+0x24 != +0x38), its sector (+0x18 == level yp+0x90 -> +0x24) and the leader
+  on its platform (trio vf29 == +0x48) -> trio 0x5130 (FUN_00482610 case 0x30: leader +0x544 = it, +0x3F0 |=
+  0x4000; cleared by the game each frame -- an "Activate" goes once the hero steps off). proximity.cpp
+  LauncherOfferBoth (after its tick, sliced or not): the other player's hero on +0x48, on its feet, gets the same.
+  The machine gun offers itself (FUN_004C54D0, trio 0x4A01) within +0xAC (2.2 at LV3-3) of its node while free
+  (+0x10C bit 0); offered, either player's X takes it (NoteMachineUse's request): coop.cpp MachinePromptHero
+  shows "Use" to both heroes within 4 units; with Asterix alone on it, Obelix within 6 of its handles gets "Use"
+  (ObelixAtGunHandles). CoopPromptKindFor no longer needs the game's prompt kind (gm +0xCC) set for a hero's own.
+  Autotests launchboth (level 2: one on -> P2's, both -> both, off again -> P1's goes), gunboth33 (-Level 3). Not
+  tested in autotests: the second hero's X on the launcher. (3) [hints] hint_join, hint_pass_roman, hint_combos
+  (config.h hintJoin / hintPass / hintCombos, all on; logged "config: hints: ..."); combohint2b with all off: no
+  join or combo hint.
