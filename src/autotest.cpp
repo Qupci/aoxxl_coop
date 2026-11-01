@@ -2936,6 +2936,33 @@ const Step kLiftDown21[] = {
 	END(16500),
 };
 
+// liftdie21a (-Level 2, XXL_DOWNAT=0:4500): Asterix down alone on LV2-1's
+// lifter (at its foot, the user's -746.7 505.7 -992.1), Obelix comes onto it:
+// not put back (user: the fallen hero waits on the lifter); the lifter held while
+// he is on it, revived by B, then it goes up with both. Squad 29 beaten first
+// (user: the lifter goes up once it is).
+// liftdie21b (-Level 2, XXL_DOWNAT=0:3500): both on it as it goes up, Asterix
+// down on the way: Obelix stays on it, the lifter held, revived, on up.
+const Step kLiftDie21A[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), SQUADWON(1500, 29),
+	PLACEAT(2500, HERO_ASTERIX, -746.709f, 506.5f, -992.057f), PLACEAT(2500, HERO_OBELIX, -766.3f, 508.5f, -1001.0f),
+	SHOT(5000, "liftdie21a_0"), PLACEAT(7000, HERO_OBELIX, -746.2f, 506.5f, -990.0f),
+	SHOT(7500, "liftdie21a_1"), REACH(7600),
+	VPAD(8000, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(10000, "liftdie21a_2"), VPAD(13500, 1, 0, 0, 0, "p2 release"),
+	SHOT(14000, "liftdie21a_3"), SHOT(17000, "liftdie21a_4"),
+	END(18000),
+};
+const Step kLiftDie21B[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), SQUADWON(1500, 29),
+	PLACEAT(2500, HERO_ASTERIX, -746.709f, 506.5f, -992.057f), PLACEAT(2500, HERO_OBELIX, -746.2f, 506.5f, -990.0f),
+	SHOT(3400, "liftdie21b_0"), SHOT(4500, "liftdie21b_1"), REACH(4600),
+	VPAD(5500, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(7500, "liftdie21b_2"), VPAD(11000, 1, 0, 0, 0, "p2 release"),
+	SHOT(11500, "liftdie21b_3"), SHOT(14000, "liftdie21b_4"),
+	END(15000),
+};
+
 // catrate31 (-Level 3, XXL_P2HERO=asterix XXL_CATTRACE=1): player 2's Asterix
 // (leading) from LV3-1's catapult walks out into its reach and stands there,
 // healed, while it fires at him: the trace has each fire (the charge back to 0)
@@ -7646,6 +7673,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("catrevive31", kCatRevive31),
 	SCENARIO("catrate31", kCatRate31),
 	SCENARIO("liftdown21", kLiftDown21),
+	SCENARIO("liftdie21a", kLiftDie21A),
+	SCENARIO("liftdie21b", kLiftDie21B),
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),

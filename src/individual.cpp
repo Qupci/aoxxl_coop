@@ -438,6 +438,26 @@ bool IndivBlockPartnerSpot(const char* what) {
 
 namespace {
 
+// The lifter (2,47) whose own moving ground (a field of it pointing at a
+// CDynamicGround) the fallen hero lies on, else null. That lifter is no partner
+// spot (user): the other hero may come onto it -- the fallen hero waits there
+// for it, or it was on it already -- and revive it; the lifter goes on as with
+// both heroes on it (IndivHoldsBack), the fallen one riding along.
+char* LifterUnderFallen() {
+	int down = IndivFallenHero();
+	Trio t = GetTrio();
+	Hero f = down >= 0 && t ? t.GetHero(down) : Hero();
+	char* ground = f ? *(char**)(f.raw() + 0x280) : nullptr;
+	if (!ground || IsBadReadPtr(ground, 4) || *(uintptr_t*)ground != 0x6241BC) return nullptr;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n; i++) {
+		char* o = (char*)GetLvlObject(2, 47, i);
+		if (!o || IsBadReadPtr(o, 0x100)) continue;
+		for (int off = 0x10; off < 0x100; off += 4)
+			if (*(char**)(o + off) == ground) return o;
+	}
+	return nullptr;
+}
+
 // The grounds of what needs both heroes: lifters (2,47), the spinning platform
 // (CKHkCorkscrew 2,44), cable cars (CKHkTelepher 2,158, CKHkTowedTelepher
 // 2,159) -- any field of theirs pointing at the ground the hero stands on --,
@@ -459,10 +479,11 @@ bool OnPartnerGround(Hero h, const char** what) {
 	}
 	static const struct { int id; const char* what; } kinds[] = {
 		{ 47, "a lifter" }, { 44, "the spinning platform" }, { 158, "a cable car" }, { 159, "a cable car" } };
+	char* fallenLifter = LifterUnderFallen();
 	for (const auto& k : kinds)
 		for (unsigned i = 0, n = GetNumLvlClassInstances(2, k.id); i < n; i++) {
 			char* o = (char*)GetLvlObject(2, k.id, i);
-			if (!o || IsBadReadPtr(o, 0x100)) continue;
+			if (!o || IsBadReadPtr(o, 0x100) || o == fallenLifter) continue;
 			for (int off = 0x10; off < 0x100; off += 4)   // its own moving ground (CDynamicGround), not a station's
 				if (*(char**)(o + off) == ground && *(uintptr_t*)ground == 0x6241BC) { *what = k.what; return true; }
 		}
@@ -510,6 +531,18 @@ bool IndivHoldsBack(char* hook) {
 		bool on = false;
 		for (int off = 0x10; off < 0x100 && !on; off += 4) on = *(char**)(hook + off) == ground;
 		if (!on) return false;
+		if (hook == LifterUnderFallen()) {
+			// The fallen hero lies on this lifter: the other may come onto it to revive it,
+			// and the lifter goes on as it would with both on it -- carrying the fallen
+			// one too. (Held, its ride caught up at once after the revive: 15 units in a
+			// frame, liftdie21a.)
+			static DWORD s_told = 0;
+			if (GetTickCount() - s_told > 2000) {
+				s_told = GetTickCount();
+				Log("indiv: %s is on the lifter %s lies on -- no put-back", HeroName(Other(down)), HeroName(down));
+			}
+			return false;
+		}
 		what = vt == 0x628E0C ? "the spinning platform" : vt == 0x625E2C ? "a lifter" : "a cable car";
 	} else {
 		return false;
@@ -702,14 +735,16 @@ namespace {
 // below and the hearth above, joined by the sidekick's jumps, always on: Obelix
 // below, Asterix down by the hearth, "can walk: yes", and no way up
 // (xxl_coop.lv2-1_lifter_revival_tp.log). For the revive's own path queries,
-// the nodes holding a lifter (its node's place, matrix +0x40) are shut.
+// the nodes holding a lifter (its node's place, matrix +0x40) are shut -- all
+// but the one the fallen hero lies on (LifterUnderFallen: the way to it).
 struct ShutLifters {
 	Vector3 at[16];
 	int n = 0;
 	ShutLifters() {
+		char* under = LifterUnderFallen();   // (not the one the fallen hero lies on: that one is its way)
 		for (unsigned i = 0, c = GetNumLvlClassInstances(2, 47); i < c && n < 16; i++) {
 			KHook* lifter = (KHook*)GetLvlObject(2, 47, i);
-			if (!lifter || !lifter->node || !lifter->node->matrix) continue;
+			if (!lifter || (char*)lifter == under || !lifter->node || !lifter->node->matrix) continue;
 			const float* m = (const float*)((char*)lifter->node->matrix + 0x40);
 			if (m[0] == 0.0f && m[1] == 0.0f && m[2] == 0.0f) continue;   // (one of LV2's is at the origin)
 			at[n++] = Vector3(m[0], m[1], m[2]);
