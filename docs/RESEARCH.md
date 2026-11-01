@@ -3647,3 +3647,7 @@ both halves).
   (his copy not leading: the take runs in his tick). Prompts: Asterix's kind 9 while Obelix is on it alone is
   no one's; Asterix within 4 gets "Use" (his X joins). Autotests obelixgun33 / obelixgun33l (-Level 3,
   XXL_GUNLOG=1: rail +0x68 3.06 -> 0.10 left, -> 2.40 right; no 0x4A02 on Obelix's X; far X: none).
+- Round 198 (user: the machine gun's hints as an option). [hints] hint_machine_gun (config.h hintMachineGun, on;
+  logged with the other hints): off, shared.cpp ShowModeHint shows nothing for SHARED_GUN / SHARED_GUN_SOLO /
+  SHARED_GUN_OBELIX (the game's "Use" prompts stay). Checked with obelixgun33 and the option off: no gun hint,
+  the prompts as before.
