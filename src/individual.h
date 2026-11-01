@@ -15,9 +15,14 @@
 //
 // A hero at 0 health falls (its own situation 0x0E, the death animation) but
 // the game goes on: the lead passes to the other hero, who can revive it by
-// holding the grab button next to it for 10 seconds, or by going on into
-// another sector. Both down, or one down on a ride (co-op suspended), is the
-// game over of single player.
+// holding the grab button next to it (revive_hold_seconds; within a Roman
+// catapult's reach revive_hold_seconds_catapult), or by going on into another
+// sector. Both down, or one down on a ride (co-op suspended), is the game over
+// of single player; so is a revive time limit run out (revive_time_limit:
+// seconds, or "auto" -- the other hero's walk there over the level's
+// pathfinding plus revive_time_limit_grace), the death sequence on the fallen
+// hero. A fallen leader the other hero can't walk to gets it brought to the
+// nearest place it can walk to it from.
 
 #pragma once
 #include <cstdint>

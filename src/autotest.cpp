@@ -2847,6 +2847,67 @@ const Step kReach26B[] = {
 	END(11000),
 };
 
+// reach26c (-Level 2, XXL_DOWNAT=0:6800 XXL_REVIVELIMIT=auto XXL_REVIVEGRACE=8):
+// Asterix (leading) walks LV2-6's far side from the pit's edge round the
+// corner north (placed spot by spot: his path's solid ground) and falls there;
+// Obelix across the pit can't walk to him: he is brought to the nearest spot he
+// can walk to him from (the pit's edge), not beside him (user). The limit is that
+// walk plus 8 s; nobody revives him: the game over, the death sequence on
+// Asterix, Obelix on his feet through it.
+// reach26f: the same with a fixed limit (XXL_REVIVELIMIT=14 XXL_REVIVEGRACE=10):
+// only spots within the walk the time left leaves before the 10 s (~2 s, 11
+// units).
+#define REACH26C_PATH \
+	PLACEAT(3000, HERO_OBELIX, 115.53f, 3.0f, -389.57f), PLACEAT(3000, HERO_ASTERIX, 90.5f, 3.5f, -389.3f), \
+	PLACEAT(3700, HERO_ASTERIX, 86.0f, 3.5f, -389.3f), PLACEAT(4400, HERO_ASTERIX, 84.7f, 3.5f, -385.0f), \
+	PLACEAT(5100, HERO_ASTERIX, 84.7f, 3.5f, -381.0f), PLACEAT(5800, HERO_ASTERIX, 84.7f, 3.5f, -378.5f)
+const Step kReach26C[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	REACH26C_PATH, SHOT(6500, "reach26c_0"),
+	SHOT(9000, "reach26c_1"), SHOT(10400, "reach26c_2"), SHOT(14000, "reach26c_3"), SHOT(19500, "reach26c_4"),
+	SHOT(21500, "reach26c_5"), SHOT(22500, "reach26c_6"), SHOT(23500, "reach26c_7"), SHOT(25000, "reach26c_8"),
+	SHOT(27000, "reach26c_9"), SHOT(31000, "reach26c_10"),
+	END(33000),
+};
+const Step kReach26F[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	REACH26C_PATH, SHOT(10400, "reach26f_0"), SHOT(12000, "reach26f_1"),
+	END(13000),
+};
+
+// revive41 (-Level 4, XXL_DOWNAT=0:4000 XXL_REVIVELIMIT=auto XXL_REVIVEGRACE=30):
+// LV4-1's open field, the heroes able to walk to each other (user): Obelix ~30
+// units off, Asterix falls: the limit is Obelix's walk to him plus 30 s.
+// Obelix comes to him and holds B: revived in time.
+const Step kRevive41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 117.27f), PLACEAT(2600, HERO_OBELIX, -296.0f, 0.5f, 92.0f),
+	PFDUMP(3300, HERO_ASTERIX, 30.0f), REACH(3500),
+	SHOT(5000, "revive41_0"), SHOT(7000, "revive41_1"), SHOT(9500, "revive41_2"),
+	{ 10000, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix by asterix" },
+	VPAD(10500, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(12500, "revive41_3"), VPAD(16500, 1, 0, 0, 0, "p2 release"),
+	SHOT(17000, "revive41_4"),
+	END(18000),
+};
+
+// catrevive31 (-Level 3, XXL_DOWNAT=0:3500): Asterix down by LV3-1's Roman
+// catapult (the user's spot, 106.0 1.0 11.5), Obelix holds B by him: revived in
+// 2 s, not 5 (user: LV6-4's catapult can't be reached, its stones keep a revive
+// from ending).
+const Step kCatRevive31[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, 106.008f, 0.951f, 11.521f), PLACEAT(1500, HERO_OBELIX, 104.0f, 1.0f, 13.0f),
+	SHOT(4500, "catrevive31_0"),
+	{ 5000, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix by asterix" },
+	VPAD(5500, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(6500, "catrevive31_1"), VPAD(9000, 1, 0, 0, 0, "p2 release"),
+	SHOT(9500, "catrevive31_2"),
+	END(10500),
+};
+
 // reach23 (-Level 2, XXL_DOWNAT=0:8000): LV2-3, Asterix lights the hearth and
 // the door shuts behind him; he falls (leading): Obelix is brought in.
 const Step kReach23[] = {
@@ -7536,6 +7597,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("pf23", kPf23),
 	SCENARIO("reach26", kReach26),
 	SCENARIO("reach26o", kReach26O),
+	SCENARIO("reach26c", kReach26C),
+	SCENARIO("reach26f", kReach26F),
+	SCENARIO("revive41", kRevive41),
+	SCENARIO("catrevive31", kCatRevive31),
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),

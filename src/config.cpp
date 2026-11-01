@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -76,6 +77,24 @@ void CoopConfig::Load(const char* iniPath) {
 	safeSequence = ReadBool("coop", "safe_sequence", safeSequence, full);
 	individual = ReadBool("coop", "individual_heroes", individual, full);
 	romansGuardDowned = ReadBool("coop", "romans_guard_downed", romansGuardDowned, full);
+	{
+		// Seconds; `env` (autotests) over the ini; "off" = 0, "auto" = -1 where allowed.
+		auto readSeconds = [&](const char* key, const char* env, float def, float lo, float hi, bool autoOk) {
+			char sb[32] = {};
+			GetPrivateProfileStringA("coop", key, "", sb, sizeof(sb), full);
+			if (const char* e = getenv(env)) lstrcpynA(sb, e, sizeof(sb));
+			if (!sb[0]) return def;
+			if (!_stricmp(sb, "off") || !_stricmp(sb, "none")) return autoOk ? 0.0f : def;
+			if (!_stricmp(sb, "auto")) return autoOk ? -1.0f : def;
+			float f = (float)atof(sb);
+			if (autoOk && f <= 0.0f) return 0.0f;
+			return f < lo ? lo : f > hi ? hi : f;
+		};
+		reviveHold = readSeconds("revive_hold_seconds", "XXL_REVIVEHOLD", reviveHold, 0.1f, 60.0f, false);
+		reviveHoldCatapult = readSeconds("revive_hold_seconds_catapult", "XXL_REVIVEHOLDCAT", reviveHoldCatapult, 0.1f, 60.0f, false);
+		reviveLimit = readSeconds("revive_time_limit", "XXL_REVIVELIMIT", reviveLimit, 1.0f, 3600.0f, true);
+		reviveGrace = readSeconds("revive_time_limit_grace", "XXL_REVIVEGRACE", reviveGrace, 0.0f, 3600.0f, false);
+	}
 	noLock = ReadBool("coop", "nolock", noLock, full);
 	noLockExceptCorkscrews = ReadBool("coop", "nolock_except_corkscrews", noLockExceptCorkscrews, full);
 	noLockExceptBeams = ReadBool("coop", "nolock_except_rotarybeams", noLockExceptBeams, full);
@@ -150,13 +169,19 @@ void CoopConfig::Load(const char* iniPath) {
 	deadzone = (float)atof(buf);
 	if (deadzone < 0.0f || deadzone > 0.9f) deadzone = 0.24f;
 
+	char limitText[64];
+	if (reviveLimit > 0.0f) sprintf_s(limitText, "%.0f s, %.0f s of it to revive", reviveLimit, reviveGrace);
+	else if (reviveLimit < 0.0f) sprintf_s(limitText, "auto: the walk + %.0f s", reviveGrace);
+	else strcpy_s(limitText, "off");
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d (guards %d) nolock=%d (except corkscrews %d, rotary beams %d) riderLeads=%d romansInView=%d "
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d (guards %d, revive hold %.1f s / %.1f s by a catapult, "
+		"time limit %s) nolock=%d (except corkscrews %d, rotary beams %d) riderLeads=%d romansInView=%d "
 		"co-op difficulty: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f (%s, %s, "
 		"pathfinding %d, to defeat stays %d), nolock romans %d (any markers %d)",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
 		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual,
-		romansGuardDowned, noLock, noLockExceptCorkscrews, noLockExceptBeams, carRiderLeads, romansInView, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
+		romansGuardDowned, reviveHold, reviveHoldCatapult, limitText,
+		noLock, noLockExceptCorkscrews, noLockExceptBeams, carRiderLeads, romansInView, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
 		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too",
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);
 }

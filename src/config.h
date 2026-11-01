@@ -25,6 +25,10 @@ struct CoopConfig {
 	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)
 	bool  individual    = true;   // each hero its own health, shields and combo bar; a fallen hero can be revived
 	bool  romansGuardDowned = true; // ... the basic Romans near a fallen hero stay round it, shielded, until it is revived
+	float reviveHold    = 5.0f;   // ... seconds the other player holds the grab button by it to revive it
+	float reviveHoldCatapult = 2.0f; // ... the same within a Roman catapult's reach
+	float reviveLimit   = 0.0f;   // ... seconds to revive it before the game over: 0 none, -1 auto (the walk there + reviveGrace)
+	float reviveGrace   = 30.0f;  // ... the limit's seconds for the revive itself once there
 	bool  safeSequence  = true;   // the non-leading player can't set off levers meant for the leader's switch
 	int   sectorCatchUpMs = 1000; // a hero left in an unloaded sector this long is brought to the other
 	int   p2Hero        = 1;      // player 2's hero: 0 Asterix, 1 Obelix, -1 the one player 1 is not leading with

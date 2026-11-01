@@ -675,6 +675,11 @@ void LeadTheDeath() {
 
 } // namespace
 
+void CoopDeathIs(int idx, const char* how) {
+	NoteDeath(idx, how);
+	LeadTheDeath();
+}
+
 void CoopGiveLead(int idx, const char* why) {
 	Trio t = GetTrio();
 	if (!t || g.sliced || t.Leader() == idx) return;

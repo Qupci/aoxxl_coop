@@ -33,9 +33,22 @@ const uint8_t kBarFlags = 0x14;
 struct SafeSpot { Vector3 pos; DWORD at = 0; };
 const int kSafeSpots = 8;
 
-const float kReviveSeconds = 5.0f;
+// (The grab's hold time: [coop] revive_hold_seconds, revive_hold_seconds_catapult.)
 const float kReviveRange = 3.0f;      // horizontally
 const float kReviveHeight = 2.5f;
+// A hero's walk, units a second (user: 115.4 units in 17 s; an autotest's
+// Obelix up a slight slope: ~6.1), for the revive time limit's "auto": the walk
+// to the fallen hero over the level's pathfinding, then revive_time_limit_grace.
+const float kWalkSpeed = 115.36f / 17.0f;
+
+// The way a hero walked (a spot every 3 units on solid ground, 64 of them), with
+// the sector loaded then: where the hero cut off from its fallen leader may be
+// brought to (CatchUpSpot).
+struct PathSpot { Vector3 pos; int sector = -1; };
+const int kPathSpots = 64;
+// A revive time run out: the scope IndivEnter opens for the hero still
+// standing (its own health in the game's place for its own business only).
+const int kSpareScope = 2;
 
 struct State {
 	bool     active = false;
@@ -53,6 +66,8 @@ struct State {
 	// what needs both heroes: far enough not to be walked back onto at once).
 	Vector3  trail[2][16];
 	int      trailN[2] = {}, trailNext[2] = {};
+	PathSpot path[2][kPathSpots];
+	int      pathN[2] = {}, pathNext[2] = {};
 	// Where the hero was lately, whatever it stood on (every 0.1 s, 2 s): the
 	// last resort of a put-back.
 	Vector3  recent[2][20];
@@ -77,6 +92,17 @@ struct State {
 	DWORD    reachAt[2] = {};          // last asked whether the other hero can walk to it
 	int      cutOff[2] = {};           // ... and was told no that many times in a row
 	int      reachTold[2] = { -2, -2 };
+	// The revive time limit ([coop] revive_time_limit): seconds left, counted
+	// while the other hero is known to have a way to it.
+	bool     limitSet[2] = {};
+	float    limitLeft[2] = {};
+	DWORD    limitHintAt = 0;
+	// It ran out: the hero still standing (its own health kept for its own
+	// business through the game over -- not a second death), the game's place
+	// while it is in.
+	int      spared = -1;
+	bool     sparing = false;
+	uint8_t  sparedPlace = 0;
 	DWORD    lastFrame = 0;
 	DWORD    hintAt = 0;
 	int      p2Hero = -1;              // player 2's hero while individual heroes are on
@@ -185,6 +211,13 @@ bool OnDeathGround(Hero h) {
 bool OnPartnerGround(Hero h, const char** what);
 bool SafeSpotAway(int idx, const Vector3& from, Vector3* out);
 
+// The level's sector loaded now (level +0x24), -1 none.
+int LoadedSector() {
+	CKYellowPages* yp = YellowPages();
+	char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
+	return lvl ? *(int*)(lvl + 0x24) : -1;
+}
+
 // Where a hero stood last on solid ground: a static ground (CGround, not a
 // lifter's CDynamicGround), not a death pit, on its feet (+0x384 bits 0-2).
 void NoteSafeSpot(int idx, Hero h, DWORD now) {
@@ -209,6 +242,13 @@ void NoteSafeSpot(int idx, Hero h, DWORD now) {
 		g.trail[idx][g.trailNext[idx]] = s.pos;
 		g.trailNext[idx] = (g.trailNext[idx] + 1) % 16;
 		if (g.trailN[idx] < 16) g.trailN[idx]++;
+	}
+	last = (g.pathNext[idx] + kPathSpots - 1) % kPathSpots;
+	if (g.pathN[idx] == 0 || (g.path[idx][last].pos - s.pos).len2() >= 3.0f * 3.0f) {
+		g.path[idx][g.pathNext[idx]].pos = s.pos;
+		g.path[idx][g.pathNext[idx]].sector = LoadedSector();
+		g.pathNext[idx] = (g.pathNext[idx] + 1) % kPathSpots;
+		if (g.pathN[idx] < kPathSpots) g.pathN[idx]++;
 	}
 }
 
@@ -524,11 +564,60 @@ void BlockPartnerGrounds() {
 	IndivBlockPartnerSpot(what);
 }
 
+// Within a Roman catapult's reach (CKHkCatapult 2,130): its tick (FUN_00508E70)
+// fires at the leader from +0x48 to +0x4C units off (x / z) its node's place
+// (+0x10 -> frame +4, world +0x80) while +0x14 bit 4 is up, until it is
+// destroyed (+0x14 bit 2; LV3-1's: 12 to 50 units). LV6-4's can't be reached
+// to be beaten, and its stones kept the grab's revive from ever ending (user).
+bool NearCatapult(const Vector3& p) {
+	static unsigned s_lastNear = ~0u;
+	static int s_told = 0;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 130); i < n; i++) {
+		char* c = (char*)GetLvlObject(2, 130, i);
+		if (!c || IsBadReadPtr(c, 0x50) || (*(uint8_t*)(c + 0x14) & 0x14) != 0x10) continue;
+		char* node = *(char**)(c + 0x10);
+		char* fr = node && !IsBadReadPtr(node, 8) ? *(char**)(node + 4) : nullptr;
+		if (!fr || IsBadReadPtr(fr, 0x8C)) continue;
+		const float* at = (const float*)(fr + 0x80);
+		float reach = *(float*)(c + 0x4C);
+		if (!(reach > 0.0f && reach < 1000.0f)) continue;
+		float dx = p.x - at[0], dy = p.y - at[1], dz = p.z - at[2];
+		if (dx * dx + dz * dz >= reach * reach || fabsf(dy) >= reach) continue;
+		if (i != s_lastNear && s_told < 20) {
+			s_told++;
+			Log("indiv: (%.1f %.1f %.1f) is in catapult #%u's reach (%.1f units off; it fires from %.1f to %.1f, flags %02X, "
+			    "sector %d) -- the revive's hold is %.1f s", p.x, p.y, p.z, i, sqrtf(dx * dx + dz * dz), *(float*)(c + 0x48),
+			    reach, *(uint8_t*)(c + 0x14), *(int8_t*)(c + 0x19), g_config.reviveHoldCatapult);
+		}
+		s_lastNear = i;
+		return true;
+	}
+	s_lastNear = ~0u;
+	return false;
+}
+
+// How long the grab is held to revive the hero fallen at `at`.
+float HoldSeconds(const Vector3& at) {
+	return NearCatapult(at) ? g_config.reviveHoldCatapult : g_config.reviveHold;
+}
+
+int SecondsLeft(int down) {
+	float s = g.limitLeft[down];
+	return s > 0.0f ? (int)ceilf(s) : 0;
+}
+
 void ShowDownHint(int down) {
 	int up = Other(down);
-	wchar_t text[160];
-	swprintf(text, 160, L"%s is down!\nHold %s by him for %d s to revive", HintHeroName(down),
-	         HintButtonName(PlayerOf(up), HB_B), (int)kReviveSeconds);
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(down) : Hero();
+	wchar_t text[200];
+	swprintf(text, 200, L"%s is down!\nHold %s by him for %g s to revive", HintHeroName(down),
+	         HintButtonName(PlayerOf(up), HB_B), h ? HoldSeconds(h.Pos()) : g_config.reviveHold);
+	if (g.limitSet[down]) {
+		wchar_t left[40];
+		swprintf(left, 40, L"\n%d s left", SecondsLeft(down));
+		wcscat(text, left);
+	}
 	HintShow(HINT_REVIVE, PlayerOf(up), text, 8000);
 }
 
@@ -596,14 +685,70 @@ bool IndivJoinSpot(int to, Vector3* out) {
 
 namespace {
 
+// The revive time limit's "auto": the walk to the fallen hero, then the grace.
+void SetLimit(int down, float way, const char* what) {
+	g.limitLeft[down] = way / kWalkSpeed + g_config.reviveGrace;
+	g.limitSet[down] = true;
+	Log("indiv: %s has %.0f s to revive %s (%s: %.0f units, %.0f s; + %.0f s)", HeroName(Other(down)), g.limitLeft[down],
+	    HeroName(down), what, way, way / kWalkSpeed, g_config.reviveGrace);
+}
+
+// Where the hero cut off from its fallen leader is brought: of the places it
+// can walk to the fallen hero from (the level's pathfinding), the one nearest
+// it -- where either hero walked lately in this sector (solid ground), else
+// beside the fallen hero (SpotBesideFallen) -- so it walks the rest of the way
+// (user). With a fixed time limit no further than the walk the time left leaves
+// before the revive itself (grace). `*way`: that walk's length.
+Vector3 CatchUpSpot(int down, Hero h, int up, Hero o, float* way) {
+	Vector3 at = h.Pos(), from = o.Pos();
+	Vector3 best = SpotBesideFallen(down, at);
+	*way = sqrtf((best - at).len2());
+	if (!PfWayTo(at)) {
+		Log("indiv: no pathfinding where %s lies -- %s is brought beside it", HeroName(down), HeroName(up));
+		return best;
+	}
+	float w0 = PfWayFrom(best);
+	if (w0 >= 0.0f) *way = w0;
+	float ceiling = 1e30f;
+	if (g_config.reviveLimit > 0.0f && g.limitSet[down]) {
+		float t = g.limitLeft[down] - g_config.reviveGrace;
+		ceiling = t > 0.0f ? t * kWalkSpeed : 0.0f;
+	}
+	float bestD = (best - from).len2();
+	int sector = LoadedSector(), nearer = 0, cut = 0, tooFar = 0;
+	for (int k = 0; k < 2; k++) {
+		int who = k ? up : down;
+		for (int n = 0; n < g.pathN[who]; n++) {
+			const PathSpot& s = g.path[who][n];
+			Vector3 d = s.pos - at;
+			if (s.sector != sector || d.x * d.x + d.z * d.z < 1.0f) continue;   // (on the fallen hero)
+			float dd = (s.pos - from).len2();
+			if (dd >= bestD) continue;
+			nearer++;
+			float w = PfWayFrom(s.pos);
+			if (w < 0.0f) { cut++; continue; }
+			if (w > ceiling) { tooFar++; continue; }
+			best = s.pos;
+			bestD = dd;
+			*way = w;
+		}
+	}
+	Log("indiv: %s's catch-up spot: %.1f units from it, a %.0f-unit walk to %s (%d nearer spots walked: %d with no way, "
+	    "%d past the time limit's %.0f units)", HeroName(up), sqrtf(bestD), *way, HeroName(down), nearer, cut, tooFar,
+	    ceiling < 1e29f ? ceiling : -1.0f);
+	return best;
+}
+
 // A fallen hero the other can't walk to (the level's pathfinding graph,
 // pathfind.cpp: LV2-6's pit before its bridge is out, LV2-3's hearth room once
-// its door has shut): if it led when it fell, the other hero is brought to it,
-// as the AI sidekick is brought to the player in single player. One that did
-// not lead stays where it is -- the level brings the leader back to it.
-// Asked every 0.5 s from 2 s after the fall; three noes in a row (not a hero in
-// mid-jump over a gap's cells) before the move.
-void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
+// its door has shut): if it led when it fell, the other hero is brought to the
+// nearest place it can walk to it from (CatchUpSpot), as the AI sidekick is
+// brought to the player in single player. One that did not lead stays where it
+// is -- the level brings the leader back to it. Asked every 0.5 s from 2 s after
+// the fall; three noes in a row (not a hero in mid-jump over a gap's cells)
+// before the move. The first answer that it has a way sets the time limit's
+// "auto" from that walk.
+void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
 	if (!HeroModePlayable(o.Flags18())) return;   // (on the machine gun: brought once off it)
 	g.reachAt[down] = now;
@@ -617,11 +762,17 @@ void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	}
 	if (r != PF_NO) {
 		g.cutOff[down] = 0;
+		if (g_config.reviveLimit < 0.0f && !g.limitSet[down]) {
+			float w = r == PF_YES ? PfWalk(o.Pos(), h.Pos()) : -1.0f;
+			if (w >= 0.0f) SetLimit(down, w, "its walk there");
+			else SetLimit(down, sqrtf((h.Pos() - o.Pos()).len2()), "no walk known, the straight line");
+		}
 		return;
 	}
 	if (!g.fellLeading[down] || ++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
-	Vector3 spot = SpotBesideFallen(down, h.Pos());
+	float way = 0.0f;
+	Vector3 spot = CatchUpSpot(down, h, up, o, &way);
 	spot.y += 0.5f;
 	if (!g.brought[up]) {   // the first move's start: where it goes back to
 		g.brought[up] = true;
@@ -630,11 +781,12 @@ void BringToFallenLeader(int down, Hero h, int up, Hero o, DWORD now) {
 	g.broughtTo[up] = spot;
 	PlaceHero(o, spot);
 	g.placedAt[up] = now;
-	Log("indiv: %s can't walk to %s, who led when it fell -- brought beside it (%.1f %.1f %.1f)", HeroName(up),
-	    HeroName(down), spot.x, spot.y, spot.z);
+	Log("indiv: %s can't walk to %s, who led when it fell -- brought where it can walk to it from (%.1f %.1f %.1f)",
+	    HeroName(up), HeroName(down), spot.x, spot.y, spot.z);
+	if (g_config.reviveLimit < 0.0f && !g.limitSet[down]) SetLimit(down, way, "its walk from where it was brought");
 }
 
-void Revive(int idx, Hero h, const char* how) {
+void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 	Stats& s = Current(idx);
 	int hp = (s.shields * 5 + 1) / 2;   // half the health back (1.5 of 3 shields)
 	s.hp = (uint8_t)(hp > 0 ? hp : 1);
@@ -648,11 +800,66 @@ void Revive(int idx, Hero h, const char* how) {
 	if (g.fellLeading[idx] && !g.levelLead[idx]) g.leadBack = idx;
 	g.fellLeading[idx] = false;
 	g.levelLead[idx] = false;
-	// The other hero was brought to it: back where it came from (the leader's
-	// place can be one only Asterix gets out of).
-	if (g.brought[Other(idx)]) g.sendBack = Other(idx);
+	g.limitSet[idx] = false;
+	// The other hero was brought to it and revived it by the grab: back where it
+	// came from (the leader's place can be one only Asterix gets out of) -- unless
+	// it goes on from where it revived it. A revive at a sector change or a
+	// launcher leaves it where it is.
+	int up = Other(idx);
+	if (g.brought[up]) {
+		Trio t = GetTrio();
+		Hero o = t ? t.GetHero(up) : Hero();
+		if (byGrab && o) {
+			g.sendBack = up;
+			g.broughtTo[up] = o.Pos();
+		} else g.brought[up] = false;
+	}
 	HintHide(HINT_REVIVE);
 	Log("indiv: %s is back on its feet (%s), health %d", HeroName(idx), how, s.hp);
+}
+
+// The revive time ran out: the game over, the fallen hero's death (single
+// player's death sequence on it: it leads, it dies again from its first frame
+// as the chooser picks the death once more). The hero still standing keeps its
+// own health for its own business (IndivEnter's spare scope): it does not die
+// beside it.
+void TimeOut(int down, Hero h, int up) {
+	Log("indiv: %s was not revived in time -- game over, the death is %s's (%s stays on its feet)", HeroName(down),
+	    HeroName(down), HeroName(up));
+	g.gameOver = true;
+	g.spared = up;
+	g.limitSet[down] = false;
+	g.drain[down] = g.drain[up] = false;
+	Use(down);   // the game manager sees its 0
+	HintHide(HINT_REVIVE);
+	Raise(h);
+	CoopDeathIs(down, "its revive time ran out");
+}
+
+// The revive time limit of fallen `down`, counted while the game runs (no pause
+// menu, merchant, scripted mode) and the other hero is not known to be cut off
+// from it; the countdown in both players' boxes. True: it ran out (the game
+// over) -- not while the grab is held by it.
+bool TimeLimit(int down, Hero h, int up, bool close, bool holding, float dt, DWORD now) {
+	if (!g.limitSet[down]) return false;
+	char* gm = GM();
+	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
+	bool counting = !paused && !CoopSuspended() && CoopShopper() < 0 && g.reachTold[down] != PF_NO;
+	if (counting) g.limitLeft[down] -= dt;
+	if (counting && !holding && g.limitLeft[down] <= 0.0f) {
+		TimeOut(down, h, up);
+		return true;
+	}
+	if (holding || now - g.limitHintAt < 250) return false;
+	g.limitHintAt = now;
+	wchar_t text[160];
+	swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
+	HintShow(HINT_REVIVE, PlayerOf(down), text, 600);
+	if (close) return false;   // (the grab's hint, with the time left)
+	swprintf(text, 160, L"%s is down!\nHold %s by him for %g s to revive\n%d s left", HintHeroName(down),
+	         HintButtonName(PlayerOf(up), HB_B), HoldSeconds(h.Pos()), SecondsLeft(down));
+	HintShow(HINT_REVIVE, PlayerOf(up), text, 600);
+	return false;
 }
 
 // After a game over: both heroes as the respawn left the game's values.
@@ -661,9 +868,12 @@ void Respawned() {
 	Read(s);
 	g.st[0] = g.st[1] = s;
 	g.gameOver = false;
+	g.spared = -1;
+	g.sparing = false;
 	Trio t = GetTrio();
 	g.leadBack = g.sendBack = -1;   // the respawn's lead and places are the game's
 	for (int i = 0; i < 2; i++) {
+		g.limitSet[i] = false;
 		g.brought[i] = false;
 		g.fallen[i] = false;
 		g.drain[i] = false;
@@ -686,9 +896,12 @@ void Activate(Trio t) {
 	g.depth = 0;
 	g.active = true;
 	g.gameOver = false;
+	g.spared = -1;
+	g.sparing = false;
 	memset(g.fallen, 0, sizeof(g.fallen));
 	memset(g.drain, 0, sizeof(g.drain));
 	memset(g.revive, 0, sizeof(g.revive));
+	memset(g.limitSet, 0, sizeof(g.limitSet));
 	memset(g.safe, 0, sizeof(g.safe));
 	g.p2Hero = CoopP2Hero();
 	if (g.kept && g.keptLevel == g.level && g.keptHero == g.p2Hero && g.p2Hero >= 0) {
@@ -730,6 +943,9 @@ void Deactivate(Trio t) {
 		g.fallen[i] = false;
 	}
 	memset(g.drain, 0, sizeof(g.drain));
+	memset(g.limitSet, 0, sizeof(g.limitSet));
+	g.spared = -1;
+	g.sparing = false;
 	g.active = false;
 	g.ctx = -1;
 	HintHide(HINT_REVIVE);
@@ -916,6 +1132,19 @@ int IndivPotionDrinker() {
 bool IndivActive() { return g.active; }
 
 int IndivEnter(int hero) {
+	// A revive time run out (TimeOut): the hero still standing has its own
+	// health in place for its own business, and the game's back after it
+	// (Hero_PreLifeTick would see the fallen hero's 0 and kill it too).
+	if (g.active && g.gameOver && hero == g.spared && hero >= 0 && !g.sparing) {
+		char* cb = CB();
+		if (cb) {
+			g.sparedPlace = *(uint8_t*)(cb + 0x50);
+			uint8_t hp = g.st[hero].hp;
+			*(uint8_t*)(cb + 0x50) = hp ? hp : 1;
+			g.sparing = true;
+			return kSpareScope;
+		}
+	}
 	// Game over: one health for both again (0, then what the respawn gives) --
 	// a hero ticking with its own 0 after the respawn would die once more.
 	if (!g.active || g.gameOver || (hero != HERO_ASTERIX && hero != HERO_OBELIX)) return -1;
@@ -933,6 +1162,12 @@ static int StandingOr(int idx) {
 }
 
 void IndivLeave(int prev) {
+	if (prev == kSpareScope) {
+		char* cb = CB();
+		if (g.sparing && cb) *(uint8_t*)(cb + 0x50) = g.sparedPlace;
+		g.sparing = false;
+		return;
+	}
 	if (!g.active || prev < 0) return;
 	if (g.depth > 0) g.depth--;
 	// Still inside another hero's business: that hero's own, fallen or not --
@@ -1017,6 +1252,11 @@ bool IndivHeroDown(int hero, const char* how) {
 	g.fellAt[hero] = GetTickCount();
 	g.cutOff[hero] = 0;
 	g.reachTold[hero] = -2;
+	// A fixed revive time limit counts from the fall; "auto" from the first way
+	// known (WayToFallen).
+	g.limitSet[hero] = g_config.reviveLimit > 0.0f;
+	g.limitLeft[hero] = g_config.reviveLimit;
+	if (g.limitSet[hero]) Log("indiv: %s has %.0f s to revive %s", HeroName(other), g.limitLeft[hero], HeroName(hero));
 	Vector3 spot;
 	if (OnDeathGround(h) && SafeSpotFor(hero, &spot)) {
 		Log("indiv: %s fell into a pit at (%.1f %.1f %.1f) -- laid on its last solid ground (%.1f %.1f %.1f)",
@@ -1091,6 +1331,10 @@ void IndivFrame() {
 		memset(g.fellLeading, 0, sizeof(g.fellLeading));
 		memset(g.levelLead, 0, sizeof(g.levelLead));
 		memset(g.brought, 0, sizeof(g.brought));
+		memset(g.limitSet, 0, sizeof(g.limitSet));
+		memset(g.pathN, 0, sizeof(g.pathN));
+		g.spared = -1;
+		g.sparing = false;
 		g.leadBack = g.sendBack = -1;
 	}
 	Trio t = GetTrio();
@@ -1121,11 +1365,10 @@ void IndivFrame() {
 	RunDownCombo(Other(lead));
 	for (int i = 0; i < 2; i++) DrainCombo(i, dt);
 
-	// The hero brought to its fallen leader goes back once it has revived it --
-	// unless it has gone on more than 10 units from where it was put (a sector
-	// change's revive, a launcher). Waits out a suspension (the revive by the grab
-	// suspends co-op for a frame as the hero gets up -- lv2-3_tp_back.log: dropped
-	// there).
+	// The hero brought to its fallen leader goes back once it has revived it by
+	// the grab -- unless it has gone on more than 10 units from where it did.
+	// Waits out a suspension (the revive by the grab suspends co-op for a frame as
+	// the hero gets up -- lv2-3_tp_back.log: dropped there).
 	if (g.sendBack >= 0 && !CoopSuspended()) {
 		int who = g.sendBack;
 		g.sendBack = -1;
@@ -1135,7 +1378,7 @@ void IndivFrame() {
 		if (!b || g.fallen[who]) {
 			Log("indiv: %s stays where it was brought", HeroName(who));
 		} else if (d.len2() > 10.0f * 10.0f) {
-			Log("indiv: %s has gone on from where it was brought (%.0f units) -- stays", HeroName(who), sqrtf(d.len2()));
+			Log("indiv: %s has gone on from where it revived its leader (%.0f units) -- stays", HeroName(who), sqrtf(d.len2()));
 		} else {
 			Vector3 back = g.broughtFrom[who];
 			back.y += 0.5f;
@@ -1188,21 +1431,25 @@ void IndivFrame() {
 			Revive(i, h, "the other hero went on into another area");
 			continue;
 		}
-		BringToFallenLeader(i, h, up, o, now);
+		WayToFallen(i, h, up, o, now);
 		Vector3 d = h.Pos() - o.Pos();
 		bool close = d.x * d.x + d.z * d.z < kReviveRange * kReviveRange && fabsf(d.y) < kReviveHeight;
 		bool holding = close && CoopHoldTime(PlayerOf(up), 6) > 0.0f;
+		float hold = HoldSeconds(h.Pos());
 		if (holding) {
 			g.revive[i] += dt;
 			wchar_t text[128], bar[24];
-			int n = (int)(g.revive[i] / kReviveSeconds * 20.0f);
+			int n = (int)(g.revive[i] / hold * 20.0f);
 			if (n > 20) n = 20;
 			// The game's font has '=' and '-' (no '|', '#' or '%').
 			for (int k = 0; k < 20; k++) bar[k] = k < n ? L'=' : L'-';
 			bar[20] = 0;
 			swprintf(text, 128, L"Reviving %s\n%s", HintHeroName(i), bar);
 			HintShow(HINT_REVIVE, PlayerOf(up), text, 500);
-			if (g.revive[i] >= kReviveSeconds) Revive(i, h, "revived");
+			if (g.revive[i] >= hold) {
+				Revive(i, h, hold < g_config.reviveHold ? "revived by a catapult" : "revived", true);
+				continue;
+			}
 		} else {
 			if (g.revive[i] > 0.0f) HintHide(HINT_REVIVE);
 			g.revive[i] = 0.0f;
@@ -1210,9 +1457,15 @@ void IndivFrame() {
 				g.hintAt = now;
 				wchar_t text[128];
 				swprintf(text, 128, L"Hold %s to revive %s", HintButtonName(PlayerOf(up), HB_B), HintHeroName(i));
+				if (g.limitSet[i]) {
+					wchar_t left[40];
+					swprintf(left, 40, L"\n%d s left", SecondsLeft(i));
+					wcscat(text, left);
+				}
 				HintShow(HINT_REVIVE, PlayerOf(up), text, 600);
 			}
 		}
+		if (TimeLimit(i, h, up, close, holding, dt, now)) return;   // the game over
 	}
 }
 

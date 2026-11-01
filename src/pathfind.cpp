@@ -245,48 +245,63 @@ int NodeOfCell(const Graph& g, int c) {
 	return lo;
 }
 
+// Each step a hero can take from cell `c`: fn(cell, its length in units, x / z
+// from cell centre to cell centre).
+template <class Fn> void Steps(const Graph& g, int c, Fn fn) {
+	int ni = NodeOfCell(g, c);
+	const Node& n = g.nodes[ni];
+	int x = (c - n.base) % n.nx, z = (c - n.base) / n.nx;
+	for (int dz = -1; dz <= 1; dz++)
+		for (int dx = -1; dx <= 1; dx++) {
+			if (!dx && !dz) continue;
+			int ax = x + dx, az = z + dz;
+			if (ax < 0 || az < 0 || ax >= n.nx || az >= n.nz) continue;
+			// diagonally only past a walkable corner
+			if (dx && dz && !Walkable(g, ni, x + dx, z) && !Walkable(g, ni, x, z + dz)) continue;
+			if (!Walkable(g, ni, ax, az)) continue;
+			fn(n.base + az * n.nx + ax, sqrtf(dx * dx * n.cw * n.cw + dz * dz * n.ch * n.ch));
+		}
+	// over to the next node: a cell at (or a cell from) its box
+	Vector3 ctr = Centre(n, x, z);
+	auto toward = [&](int ti, int tx, int tz) {
+		Vector3 d = Centre(g.nodes[ti], tx, tz) - ctr;
+		fn(g.nodes[ti].base + tz * g.nodes[ti].nx + tx, sqrtf(d.x * d.x + d.z * d.z));
+	};
+	for (int ti : g.walkTo[ni]) {
+		const Node& t = g.nodes[ti];
+		if (ctr.x < t.mn[0] - n.cw || ctr.x > t.mx[0] + n.cw || ctr.z < t.mn[2] - n.ch || ctr.z > t.mx[2] + n.ch)
+			continue;
+		int tx, tz;
+		CellOf(t, ctr.x, ctr.z, &tx, &tz);
+		if (Walkable(g, ti, tx, tz)) toward(ti, tx, tz);
+	}
+	// a jump from within a cell of its take-off box's centre (that one may be a ledge's)
+	for (const Jump& j : g.jumps)
+		if (j.from == ni && abs(j.sx - x) <= 1 && abs(j.sz - z) <= 1) toward(j.to, j.dx, j.dz);
+}
+
 // Every cell walked to from `seeds` (marks in `seen`).
 void Flood(const Graph& g, const std::vector<int>& seeds, std::vector<uint8_t>* seen) {
 	seen->assign(g.cells, 0);
 	std::vector<int> queue(seeds);
 	for (int c : seeds) (*seen)[c] = 1;
-	auto push = [&](int ni, int x, int z, bool any) {
-		const Node& n = g.nodes[ni];
-		if (x < 0 || z < 0 || x >= n.nx || z >= n.nz) return;
-		int c = n.base + z * n.nx + x;
-		if ((*seen)[c] || (!any && !Walkable(g, ni, x, z))) return;
-		(*seen)[c] = 1;
-		queue.push_back(c);
-	};
-	for (size_t q = 0; q < queue.size(); q++) {
-		int c = queue[q];
-		int ni = NodeOfCell(g, c);
-		const Node& n = g.nodes[ni];
-		int x = (c - n.base) % n.nx, z = (c - n.base) / n.nx;
-		for (int dz = -1; dz <= 1; dz++)
-			for (int dx = -1; dx <= 1; dx++) {
-				if (!dx && !dz) continue;
-				int ax = x + dx, az = z + dz;
-				if (ax < 0 || az < 0 || ax >= n.nx || az >= n.nz) continue;
-				// diagonally only past a walkable corner
-				if (dx && dz && !Walkable(g, ni, x + dx, z) && !Walkable(g, ni, x, z + dz)) continue;
-				push(ni, ax, az, false);
-			}
-		// over to the next node: a cell at (or a cell from) its box
-		Vector3 ctr = Centre(n, x, z);
-		for (int ti : g.walkTo[ni]) {
-			const Node& t = g.nodes[ti];
-			if (ctr.x < t.mn[0] - n.cw || ctr.x > t.mx[0] + n.cw || ctr.z < t.mn[2] - n.ch || ctr.z > t.mx[2] + n.ch)
-				continue;
-			int tx, tz;
-			CellOf(t, ctr.x, ctr.z, &tx, &tz);
-			push(ti, tx, tz, false);
-		}
-		// a jump from within a cell of its take-off box's centre (that one may be a ledge's)
-		for (const Jump& j : g.jumps)
-			if (j.from == ni && abs(j.sx - x) <= 1 && abs(j.sz - z) <= 1) push(j.to, j.dx, j.dz, true);
-	}
+	for (size_t q = 0; q < queue.size(); q++)
+		Steps(g, queue[q], [&](int d, float) {
+			if ((*seen)[d]) return;
+			(*seen)[d] = 1;
+			queue.push_back(d);
+		});
 }
+
+// The walks' lengths to one place (PfWayTo): every cell's shortest way there,
+// over the steps turned round (a drop is walked one way only).
+struct WayField {
+	Graph g;
+	std::vector<float> len;
+	DWORD at = 0;
+	bool ok = false;
+} s_way;
+const float kNoWay = 1e30f;
 
 } // namespace
 
@@ -302,6 +317,137 @@ int PfReachable(const Vector3& from, const Vector3& to) {
 	for (int c : b)
 		if (seen[c]) return PF_YES;
 	return PF_NO;
+}
+
+namespace {
+// Milliseconds since `t0` (QueryPerformanceCounter), for the logs.
+double MsSince(const LARGE_INTEGER& t0) {
+	LARGE_INTEGER t1, f;
+	QueryPerformanceCounter(&t1);
+	QueryPerformanceFrequency(&f);
+	return (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart;
+}
+}
+
+float PfWalk(const Vector3& from, const Vector3& to) {
+	LARGE_INTEGER t0;
+	QueryPerformanceCounter(&t0);
+	Graph g;
+	if (!Load(&g)) return -2.0f;
+	std::vector<int> a, b;
+	Seeds(g, from, &a);
+	Seeds(g, to, &b);
+	if (a.empty() || b.empty()) return -2.0f;
+	std::vector<uint8_t> target(g.cells, 0);
+	for (int c : b) target[c] = 1;
+	std::vector<float> len(g.cells, kNoWay);
+	typedef std::pair<float, int> Item;
+	std::vector<Item> heap;
+	auto later = [](const Item& x, const Item& y) { return x.first > y.first; };
+	for (int c : a) {
+		const Node& n = g.nodes[NodeOfCell(g, c)];
+		Vector3 d = Centre(n, (c - n.base) % n.nx, (c - n.base) / n.nx) - from;
+		float l = sqrtf(d.x * d.x + d.z * d.z);
+		if (l < len[c]) len[c] = l;
+		heap.push_back(Item(l, c));
+	}
+	std::make_heap(heap.begin(), heap.end(), later);
+	float found = -1.0f;
+	int popped = 0;
+	while (!heap.empty()) {
+		std::pop_heap(heap.begin(), heap.end(), later);
+		Item it = heap.back();
+		heap.pop_back();
+		if (it.first > len[it.second]) continue;
+		popped++;
+		if (target[it.second]) { found = it.first; break; }
+		Steps(g, it.second, [&](int d, float l) {
+			float nl = it.first + l;
+			if (nl >= len[d]) return;
+			len[d] = nl;
+			heap.push_back(Item(nl, d));
+			std::push_heap(heap.begin(), heap.end(), later);
+		});
+	}
+	static int s_told = 0;
+	if (s_told < 20) {
+		s_told++;
+		Log("pf: a walk from (%.1f %.1f %.1f) to (%.1f %.1f %.1f): %.1f units (%d cells looked at, %.1f ms)", from.x, from.y,
+		    from.z, to.x, to.y, to.z, found, popped, MsSince(t0));
+	}
+	return found;
+}
+
+bool PfWayTo(const Vector3& to) {
+	LARGE_INTEGER t0;
+	QueryPerformanceCounter(&t0);
+	WayField& w = s_way;
+	w.ok = false;
+	w.g = Graph();
+	if (!Load(&w.g)) return false;
+	const Graph& g = w.g;
+	std::vector<int> targets;
+	Seeds(g, to, &targets);
+	if (targets.empty()) return false;
+	// The steps turned round: for each cell, the cells a step leads to it from.
+	std::vector<int> first(g.cells + 1, 0);
+	for (int c = 0; c < g.cells; c++) Steps(g, c, [&](int d, float) { first[d + 1]++; });
+	for (int c = 0; c < g.cells; c++) first[c + 1] += first[c];
+	std::vector<int> from(first[g.cells]);
+	std::vector<float> stepLen(first[g.cells]);
+	std::vector<int> fill(first.begin(), first.end() - 1);
+	for (int c = 0; c < g.cells; c++)
+		Steps(g, c, [&](int d, float l) {
+			from[fill[d]] = c;
+			stepLen[fill[d]++] = l;
+		});
+	w.len.assign(g.cells, kNoWay);
+	typedef std::pair<float, int> Item;
+	std::vector<Item> heap;
+	auto later = [](const Item& a, const Item& b) { return a.first > b.first; };
+	for (int c : targets) {
+		w.len[c] = 0.0f;
+		heap.push_back(Item(0.0f, c));
+	}
+	std::make_heap(heap.begin(), heap.end(), later);
+	while (!heap.empty()) {
+		std::pop_heap(heap.begin(), heap.end(), later);
+		Item it = heap.back();
+		heap.pop_back();
+		if (it.first > w.len[it.second]) continue;
+		for (int k = first[it.second]; k < first[it.second + 1]; k++) {
+			float l = it.first + stepLen[k];
+			if (l >= w.len[from[k]]) continue;
+			w.len[from[k]] = l;
+			heap.push_back(Item(l, from[k]));
+			std::push_heap(heap.begin(), heap.end(), later);
+		}
+	}
+	w.at = GetTickCount();
+	w.ok = true;
+	static int s_told = 0;
+	if (s_told < 20) {
+		s_told++;
+		Log("pf: the walks to (%.1f %.1f %.1f) over %d cells: %.1f ms", to.x, to.y, to.z, g.cells, MsSince(t0));
+	}
+	return true;
+}
+
+float PfWayFrom(const Vector3& from) {
+	const WayField& w = s_way;
+	if (!w.ok || GetTickCount() - w.at > 1000) return -2.0f;
+	std::vector<int> seeds;
+	Seeds(w.g, from, &seeds);
+	if (seeds.empty()) return -2.0f;
+	float best = kNoWay;
+	for (int c : seeds) {
+		if (w.len[c] >= kNoWay) continue;
+		const Node& n = w.g.nodes[NodeOfCell(w.g, c)];
+		Vector3 d = Centre(n, (c - n.base) % n.nx, (c - n.base) / n.nx) - from;
+		float l = w.len[c] + sqrtf(d.x * d.x + d.z * d.z);
+		if (l < best) best = l;
+	}
+	return best < kNoWay ? best : -1.0f;
 }
 
 int PfLineInNodes(const Vector3& from, const Vector3& to) {

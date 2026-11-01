@@ -49,6 +49,10 @@ int  CoopShopHero();
 // Gives hero `idx` the trio's lead the game's way (switch event), as a player's
 // hero (individual heroes: a leader that went down).
 void CoopGiveLead(int idx, const char* why);
+// The game over is hero `idx`'s death (individual heroes: a fallen hero's
+// revive time ran out): it leads, the other is the AI companion, as when a
+// hero loses its last point.
+void CoopDeathIs(int idx, const char* how);
 // Where a hero joining hero `to` is put (R3 + A, the sector catch-up, a revive
 // at a sector change): beside `to` on its own solid ground, else just above it.
 struct Vector3;

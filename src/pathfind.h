@@ -15,6 +15,18 @@ int PfReachable(const Vector3& from, const Vector3& to);
 // One read of the graph for both ways.
 int PfConnected(const Vector3& a, const Vector3& b);
 
+// The shortest walk from `from` to `to` in units (as PfWayTo / PfWayFrom, one
+// search that stops there): -1 no way, -2 either place in no node.
+float PfWalk(const Vector3& from, const Vector3& to);
+
+// The lengths of the walks to `to` (units, cell centre to cell centre: eight
+// ways in a node's grid, over to the next node, the sidekick's jumps), for
+// PfWayFrom in the same frame. False: no graph, or `to` in no node.
+bool PfWayTo(const Vector3& to);
+// The shortest walk from `from` to the last PfWayTo's place, in units: -1 no
+// way there, -2 `from` in no node (or no PfWayTo this second).
+float PfWayFrom(const Vector3& from);
+
 // Does the straight line from `from` to `to` stay within the graph's node boxes
 // (x / z, y within 1 unit)? An enemy stepping out of them is put back where it
 // was (its tick, 0x4CEE00). PF_UNKNOWN when the level has no graph.
