@@ -3535,3 +3535,19 @@ both halves).
   (gate 60) has Romans by the catapult -- as guards of the downed hero they punched Obelix off the grab (1-point
   hits); the user asked to beat such squads in autotests (ENDFIGHTWON). Steps must be in time order (a late step
   early in the table holds back all after it).
+- Round 191 (user, before round 189: xxl_coop.lv2-1_lifter_revival_tp.log -- Asterix down by the hearth at the top of
+  LV2-1's lifter (-745.1 515.0 -979.9), Obelix put back off the lifter and left below (-747.2 507.6 -1008.6), put
+  back again each time he stepped on it, "can Obelix walk to fallen Asterix? yes": a softlock). PFDUMP: the lifter
+  shaft is node 53 (-751.5 491.5 -998.0)..(-742.3 531.5 -985.8), 5x7 cells of 1.84 x 1.74, joined to the corridor
+  below (node 24) and the hearth's floor (node 54) only by the sidekick's jumps (kind 1, flags FFFFFFFD: on), the
+  lifter's node place (matrix +0x40, (-746.8 495.9 -991.7)) inside it. pathfind.cpp PfCloseNodesAt(places): nodes at
+  most 16 units across x and z holding a place are shut (Walkable false, no steps out, no jumps in) for every query
+  until cleared. individual.cpp ShutLifters (all CKHkLifter 2,47 node places but the origin) around WayToFallen's
+  queries: no way with them shut but one without -> "only over a lifter" (reachTold 2: the countdown waits), the
+  catch-up whoever led (the level never brings them together past a lifter the mod keeps shut), CatchUpSpot /
+  PfWalk with the lifters shut too, and no send-back after the revive (broughtPastLifter). Autotest liftdown21
+  (-Level 2, XXL_DOWNAT=0:4000 [XXL_REVIVELIMIT=auto]): Asterix placed on top, Obelix below at (-766.3 508.5
+  -1001.0) -- 20 units off the Roman agent at (-745.5 508.0 -1010.2), whose dialogue (Obelix placed by him) had
+  suspended co-op and made the fall a game over -- then onto the lifter (-746.7 506.5 -992.1): put back below, "no
+  -- only over a lifter", brought beside Asterix 3.1 s after the fall, revived by B, stays on top. reach23g (sent
+  back) and reach26c unchanged.
