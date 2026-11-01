@@ -2821,7 +2821,8 @@ const Step kPf26[] = {
 // reach26 (-Level 2, XXL_DOWNAT=0:5000): LV2-6, Asterix (leading) falls on the
 // pit's far side, Obelix on the near side can't walk to him: Obelix is brought
 // beside him. reach26o: Obelix leads when Asterix
-// falls -- nobody moves. reach26b: the bridge is out first -- nobody moves.
+// falls -- brought all the same (since round 195, user; nobody moved before).
+// reach26b: the bridge is out first -- nobody moves.
 const Step kReach26[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -2997,7 +2998,8 @@ const Step kCatRate31[] = {
 // far side, Obelix (not leading) down; player 2's Asterix (leading) can walk to
 // him, then cuts himself off (put across the pit: a drop jumped down, user) --
 // he is brought back where he can walk to Obelix, revives him by B and stays.
-// (reach26o: Obelix leading, Asterix down out of reach from the start -- stays.)
+// (reach26o / unreach26: out of reach from the start -- brought too, then sent
+// back after the revive.)
 const Step kReach26S[] = {
 	MARK(0, "baseline"), LOADSECTOR(200, 6),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -3022,6 +3024,23 @@ const Step kZoneJump26[] = {
 	GLIDEAT(6000, HERO_ASTERIX, 43.0f, 13.3f, -391.8f, 600), GLIDEAT(6700, HERO_ASTERIX, 36.0f, 4.0f, -390.0f, 700),
 	SHOT(7700, "zonejump26_1"), SHOT(9000, "zonejump26_2"), SHOT(11000, "zonejump26_3"),
 	END(12000),
+};
+
+// unreach26 (-Level 2, XXL_P2HERO=asterix XXL_DOWNAT=1:4000): the user's
+// xxl_coop.lv2-6_unreachable.log -- Obelix (not leading) down below the belly
+// slide's ramp (27.4 1.9 -391.6), player 2's Asterix (leading) up on it (54.9
+// 10.0 -390.0), cut off before the fall: brought to Obelix, revives him by B,
+// back up where he was.
+const Step kUnreach26[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 6),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_OBELIX, 27.43f, 2.5f, -391.57f), PLACEAT(2500, HERO_ASTERIX, 54.9f, 10.4f, -390.0f),
+	SQUADWON(2800, 13), SQUADWON(2800, 14), SQUADWON(2800, 15),   // (the fight round Obelix -- its Romans hit Asterix off the grab)
+	REACH(3500), SHOT(5000, "unreach26_0"), SHOT(8000, "unreach26_1"),
+	{ 8500, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 1.5f, 0, "asterix by obelix" },
+	VPAD(9000, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(14500, 1, 0, 0, 0, "p2 release"),
+	SHOT(15500, "unreach26_2"),
+	END(16500),
 };
 
 // zonejump26j (-Level 2, XXL_P2HERO=asterix XXL_DOWNAT=1:3500): zonejump26 the
@@ -7734,6 +7753,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach26s", kReach26S),
 	SCENARIO("zonejump26", kZoneJump26),
 	SCENARIO("zonejump26j", kZoneJump26J),
+	SCENARIO("unreach26", kUnreach26),
 	SCENARIO("revive41", kRevive41),
 	SCENARIO("catrevive31", kCatRevive31),
 	SCENARIO("catrate31", kCatRate31),

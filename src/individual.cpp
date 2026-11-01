@@ -357,19 +357,14 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	Hero h = t ? t.GetHero(up) : Hero();
 	if (!h) return false;
 	Vector3 now = h.Pos();
-	// Off its feet (+0x384 bits 0-2: a jump, a fall, down a steep slope) or on the
-	// belly slide's ground, the frame before is in the air: a step back from it at
-	// its height went into the slope it came down -- LV2-6, jumped from (48.8 13.2
-	// -389.4) onto the slide's ramp and through zone 0CA8, put at (44.4 8.3 -387.4)
-	// and stuck in the rock for good (xxl_coop.lv2-6_stuck.log, zonejump26j). Its
-	// last solid ground then.
-	char* ground = *(char**)(h.raw() + 0x280);
-	bool slide = ground && !IsBadReadPtr(ground, 0x2C) && (*(uint8_t*)(ground + 0x2A) & 8);
-	if ((*(uint8_t*)(h.raw() + 0x384) & 7) != 0 || slide) {
+	// Off its feet (+0x384 bits 0-2: a jump, a fall, down a steep slope), the
+	// frame before is in the air: a step back from it at its height went into the
+	// slope it came down -- LV2-6, jumped from (48.8 13.2 -389.4) onto the slide's
+	// ramp and through zone 0CA8, put at (44.4 8.3 -387.4) and stuck in the rock
+	// for good (xxl_coop.lv2-6_stuck.log, zonejump26j). Its last solid ground then.
+	if ((*(uint8_t*)(h.raw() + 0x384) & 7) != 0) {
 		static int s_told = 0;
-		if (s_told++ < 20)
-			Log("indiv: %s came into %s %s -- its last solid ground", HeroName(up), what,
-			    slide ? "on the belly slide" : "off its feet");
+		if (s_told++ < 20) Log("indiv: %s came into %s off its feet -- its last solid ground", HeroName(up), what);
 		return IndivBlockPartnerSpot(what);
 	}
 	Vector3 back = before - now;
@@ -604,13 +599,10 @@ void BlockPartnerGrounds() {
 		IndivBlockPartnerSpot("a cable car");
 		return;
 	}
-	// The belly slide's slope (ground flags +0x2A bit 3, "Slide"): walked down
-	// past its start zone it led on to the level's end without the partner.
-	char* ground = *(char**)(h.raw() + 0x280);
-	if (ground && !IsBadReadPtr(ground, 0x2C) && (*(uint8_t*)(ground + 0x2A) & 8)) {
-		IndivBlockPartnerSpot("the belly slide");
-		return;
-	}
+	// (The belly slide's slope -- ground +0x2A bit 3, "Slide" -- is no partner
+	// spot any more, user: the slide starts at its cross detector, LV2-2's event
+	// 0x0028 to CKAsterixSlideFP, which zones hold back with the frame before's
+	// put-back since round 65; the slope check dates from before that.)
 	if (!OnPartnerGround(h, &what)) return;   // (launchers: in the hero's prompt, coop.cpp)
 	IndivBlockPartnerSpot(what);
 }
@@ -829,18 +821,18 @@ Vector3 CatchUpSpot(int down, Hero h, int up, Hero o, float* way) {
 
 // A fallen hero the other can't walk to (the level's pathfinding graph,
 // pathfind.cpp: LV2-6's pit before its bridge is out, LV2-3's hearth room once
-// its door has shut): if it led when it fell, the other hero is brought to the
-// nearest place it can walk to it from (CatchUpSpot), as the AI sidekick is
-// brought to the player in single player. One that did not lead stays where it
-// is -- the level brings the leader back to it. Asked every 0.5 s from 2 s after
-// the fall; three noes in a row (not a hero in mid-jump over a gap's cells)
-// before the move. The first answer that it has a way sets the time limit's
-// "auto" from that walk. The lifters count as shut (ShutLifters): one cut off
-// only by a lifter -- which the mod keeps shut -- is brought over whoever led
-// (the level would never bring the heroes together there), and stays after the
-// revive. So is one that could walk to it since the fall and can't any more (it
-// cut itself off: a drop it jumped down, user) -- a fallen sidekick out of
-// reach from the start still waits for the level.
+// its door has shut): the other hero is brought to the nearest place it can walk
+// to it from (CatchUpSpot), as the AI sidekick is brought to the player in single
+// player -- whoever led (user: the heroes are apart from then on either way;
+// round 83 had a fallen sidekick wait for the level, and LV2-6's slide ramp left
+// Asterix above Obelix for good, xxl_coop.lv2-6_unreachable.log). Asked every
+// 0.5 s from 2 s after the fall; three noes in a row (not a hero in mid-jump over
+// a gap's cells) before the move. After the grab's revive it goes back where it
+// came from (the fallen hero's place may be one it can't leave: LV2-3's hearth
+// room) -- not when only a lifter (the mod keeps them shut, ShutLifters) or its
+// own way since the fall (it could walk there after the fall, then cut itself
+// off: a drop jumped down) parted them. The first answer that it has a way sets
+// the time limit's "auto" from that walk.
 void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
 	if (!HeroModePlayable(o.Flags18())) return;   // (on the machine gun: brought once off it)
@@ -872,8 +864,8 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 		}
 		return;
 	}
-	bool cutItself = !g.fellLeading[down] && !byLifter && g.hadWay[down];
-	if (!(g.fellLeading[down] || byLifter || cutItself) || ++g.cutOff[down] < 3) return;
+	bool cutItself = !byLifter && g.hadWay[down];
+	if (++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
 	g.broughtStays[up] = byLifter || cutItself;
 	float way = 0.0f;
@@ -889,7 +881,7 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	Log("indiv: %s can't walk to %s%s -- brought where it can walk to it from (%.1f %.1f %.1f)", HeroName(up),
 	    HeroName(down),
 	    byLifter ? " but over a lifter, shut while it is down" : cutItself ? " any more (it could since the fall)"
-	                                                                      : ", who led when it fell",
+	    : g.fellLeading[down] ? ", who led when it fell" : " (not since the fall)",
 	    spot.x, spot.y, spot.z);
 	if (g_config.reviveLimit < 0.0f && !g.limitSet[down]) SetLimit(down, way, "its walk from where it was brought");
 }
@@ -1493,7 +1485,7 @@ void IndivFrame() {
 			back.y += 0.5f;
 			PlaceHero(b, back);
 			g.placedAt[who] = now;
-			Log("indiv: %s revived its leader -- back where it was brought from (%.1f %.1f %.1f)", HeroName(who), back.x,
+			Log("indiv: %s revived its partner -- back where it was brought from (%.1f %.1f %.1f)", HeroName(who), back.x,
 			    back.y, back.z);
 		}
 	}
