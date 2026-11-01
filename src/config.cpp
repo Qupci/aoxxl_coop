@@ -91,7 +91,9 @@ void CoopConfig::Load(const char* iniPath) {
 			return f < lo ? lo : f > hi ? hi : f;
 		};
 		reviveHold = readSeconds("revive_hold_seconds", "XXL_REVIVEHOLD", reviveHold, 0.1f, 60.0f, false);
-		reviveHoldCatapult = readSeconds("revive_hold_seconds_catapult", "XXL_REVIVEHOLDCAT", reviveHoldCatapult, 0.1f, 60.0f, false);
+		// (a share, 0.05 to 1, read the same way)
+		reviveHoldCatapultWindow = readSeconds("revive_hold_catapult_window", "XXL_REVIVECATWINDOW", reviveHoldCatapultWindow,
+		                                       0.05f, 1.0f, false);
 		reviveLimit = readSeconds("revive_time_limit", "XXL_REVIVELIMIT", reviveLimit, 1.0f, 3600.0f, true);
 		reviveGrace = readSeconds("revive_time_limit_grace", "XXL_REVIVEGRACE", reviveGrace, 0.0f, 3600.0f, false);
 	}
@@ -174,13 +176,13 @@ void CoopConfig::Load(const char* iniPath) {
 	else if (reviveLimit < 0.0f) sprintf_s(limitText, "auto: the walk + %.0f s", reviveGrace);
 	else strcpy_s(limitText, "off");
 	Log("config: enabled=%d p1Pad=%d split=%d mode=%s deadzone=%.2f forceLevel=%d watchdog=%d "
-		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d (guards %d, revive hold %.1f s / %.1f s by a catapult, "
+		"splitTest=%d verbose=%d keyboard=%d cheats=%d skipCutscenes=%d safeSequence=%d sectorCatchUpMs=%d individual=%d (guards %d, revive hold %.1f s / %.2f of a catapult's gap, "
 		"time limit %s) nolock=%d (except corkscrews %d, rotary beams %d) riderLeads=%d romansInView=%d "
 		"co-op difficulty: squad at once x%.2f, to defeat x%.2f, prices x%.2f, combo bar x%.2f drain x%.2f / x%.2f (%s, %s, "
 		"pathfinding %d, to defeat stays %d), nolock romans %d (any markers %d)",
 		enabled, p1Pad, splitScreen, splitMode == SPLIT_VERTICAL ? "vertical" : "horizontal",
 		deadzone, forceLevel, watchdog, splitTest, verbose, keyboard, cheats, skipCutscenes, safeSequence, sectorCatchUpMs, individual,
-		romansGuardDowned, reviveHold, reviveHoldCatapult, limitText,
+		romansGuardDowned, reviveHold, reviveHoldCatapultWindow, limitText,
 		noLock, noLockExceptCorkscrews, noLockExceptBeams, carRiderLeads, romansInView, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
 		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too",
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);

@@ -15,8 +15,9 @@
 //
 // A hero at 0 health falls (its own situation 0x0E, the death animation) but
 // the game goes on: the lead passes to the other hero, who can revive it by
-// holding the grab button next to it (revive_hold_seconds; within a Roman
-// catapult's reach revive_hold_seconds_catapult), or by going on into another
+// holding the grab button next to it (revive_hold_seconds; under a Roman
+// catapult's fire a share of the time between its stones,
+// revive_hold_catapult_window), or by going on into another
 // sector. Both down, or one down on a ride (co-op suspended), is the game over
 // of single player; so is a revive time limit run out (revive_time_limit:
 // seconds, or "auto" -- the other hero's walk there over the level's

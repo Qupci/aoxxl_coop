@@ -2893,19 +2893,44 @@ const Step kRevive41[] = {
 	END(18000),
 };
 
-// catrevive31 (-Level 3, XXL_DOWNAT=0:3500): Asterix down by LV3-1's Roman
-// catapult (the user's spot, 106.0 1.0 11.5), Obelix holds B by him: revived in
-// 2 s, not 5 (user: LV6-4's catapult can't be reached, its stones keep a revive
-// from ending).
+// catrevive31 (-Level 3, XXL_DOWNAT=0:3500 XXL_DOWNAT2=0:14000
+// XXL_REVIVELIMIT=auto): Asterix down by LV3-1's Roman catapult (the user's
+// spot, 106.0 1.0 11.5: 2 units off, inside its 12-unit passive range), Obelix
+// holds B: the usual 5 s. Then Asterix down again 17 units off, under its fire
+// (a stone every 3.5 s): revived in 0.4 x 3.5 = 1.4 s (user: LV6-4's catapult
+// can't be reached, its stones keep a revive from ending). Asterix's player's box
+// keeps the time left through the holds. The courtyard's fight won first (its
+// Romans punched Obelix off the grab -- user: beat them in autotests).
 const Step kCatRevive31[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	PLACEAT(1500, HERO_ASTERIX, 106.008f, 0.951f, 11.521f), PLACEAT(1500, HERO_OBELIX, 104.0f, 1.0f, 13.0f),
+	ENDFIGHTWON(2500),
 	SHOT(4500, "catrevive31_0"),
 	{ 5000, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix by asterix" },
-	VPAD(5500, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(6500, "catrevive31_1"), VPAD(9000, 1, 0, 0, 0, "p2 release"),
-	SHOT(9500, "catrevive31_2"),
-	END(10500),
+	VPAD(6000, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(8000, "catrevive31_1"), VPAD(11500, 1, 0, 0, 0, "p2 release"),
+	SHOT(12000, "catrevive31_2"), ENDFIGHTWON(12100),
+	PLACEAT(12500, HERO_ASTERIX, 91.14f, -1.4f, 14.38f), PLACEAT(12500, HERO_OBELIX, 93.0f, -1.4f, 16.0f),
+	SHOT(15000, "catrevive31_3"),
+	{ 15500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix by asterix" },
+	VPAD(16000, 1, PAD_B, 0, 0, "p2 holds B"), SHOT(16700, "catrevive31_4"), VPAD(18500, 1, 0, 0, 0, "p2 release"),
+	SHOT(19000, "catrevive31_5"),
+	END(20000),
+};
+
+// catrate31 (-Level 3, XXL_P2HERO=asterix XXL_CATTRACE=1): player 2's Asterix
+// (leading) from LV3-1's catapult walks out into its reach and stands there,
+// healed, while it fires at him: the trace has each fire (the charge back to 0)
+// and each hit -- the stones' flight and their spacing.
+#define HEALA3(t) { t, S_GIVE, HERO_ASTERIX, 0, 0, 15.0f, 0, "heal asterix" }
+const Step kCatRate31[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1500, HERO_ASTERIX, 106.008f, 0.951f, 11.521f), PFDUMP(1800, HERO_ASTERIX, 40.0f),
+	VPAD(2500, 1, 0, 0, -1, "p2 walks toward his camera"), VPAD(5000, 1, 0, 0, 0, "p2 stops"),
+	SHOT(5200, "catrate31_0"), HEALA3(6000), HEALA3(9000), HEALA3(12000), HEALA3(15000), HEALA3(18000),
+	HEALA3(21000), HEALA3(24000), SHOT(14000, "catrate31_1"), SHOT(24500, "catrate31_2"),
+	END(26000),
 };
 
 // reach23 (-Level 2, XXL_DOWNAT=0:8000): LV2-3, Asterix lights the hearth and
@@ -7601,6 +7626,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("reach26f", kReach26F),
 	SCENARIO("revive41", kRevive41),
 	SCENARIO("catrevive31", kCatRevive31),
+	SCENARIO("catrate31", kCatRate31),
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),
@@ -10407,6 +10433,51 @@ void AutotestFrame() {
 	}
 	while (at.phase == AutotestState::RUN && at.next < at.sc->count && at.sc->steps[at.next].t <= t)
 		RunStep(at.sc->steps[at.next++]);
+	if (getenv("XXL_CATTRACE")) {
+		// XXL_CATTRACE: Roman catapults (CKHkCatapult 2,130) -- its fields once, its
+		// state (+0x14 flags, +0x1A, charge timer +0x70 of +0x74) as it changes, the
+		// leader's distance (x / z) and each hero's health drop.
+		static bool s_dumped[8];
+		static uint32_t s_key[8];
+		static int s_hp[2] = { -1, -1 }, s_lines = 0;
+		Trio tr = GetTrio();
+		Hero lead = tr ? tr.GetHero(tr.Leader()) : Hero();
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 130); i < n && i < 8 && s_lines < 600; i++) {
+			char* c = (char*)GetLvlObject(2, 130, i);
+			char* node = c ? *(char**)(c + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr) continue;
+			const float* at = (const float*)(fr + 0x80);
+			if (!s_dumped[i]) {
+				s_dumped[i] = true;
+				s_lines++;
+				Log("autotest: catapult #%u at (%.1f %.1f %.1f): +2C %.2f +48 %.2f +4C %.2f +50 %.2f +54 %.2f +58 %.2f +5C %.2f "
+				    "+60 %.2f +64 %.2f +68 %.2f +6C %.2f +74 %.2f, +18 %02X +19 %d +1B %02X +1C %02X +1D %02X", i, at[0], at[1],
+				    at[2], *(float*)(c + 0x2C), *(float*)(c + 0x48), *(float*)(c + 0x4C), *(float*)(c + 0x50),
+				    *(float*)(c + 0x54), *(float*)(c + 0x58), *(float*)(c + 0x5C), *(float*)(c + 0x60), *(float*)(c + 0x64),
+				    *(float*)(c + 0x68), *(float*)(c + 0x6C), *(float*)(c + 0x74), *(uint8_t*)(c + 0x18),
+				    *(int8_t*)(c + 0x19), *(uint8_t*)(c + 0x1B), *(uint8_t*)(c + 0x1C), *(uint8_t*)(c + 0x1D));
+			}
+			uint32_t key = *(uint8_t*)(c + 0x14) | *(uint8_t*)(c + 0x1A) << 8 | (*(float*)(c + 0x70) < 0.05f) << 16;
+			if (key != s_key[i] && lead) {
+				s_key[i] = key;
+				s_lines++;
+				float dx = lead.Pos().x - at[0], dz = lead.Pos().z - at[2];
+				Log("autotest: catapult #%u %.2f s: flags %02X state %u charge %.2f / %.2f, leader %.1f off", i, t / 1000.0f,
+				    *(uint8_t*)(c + 0x14), *(uint8_t*)(c + 0x1A), *(float*)(c + 0x70), *(float*)(c + 0x74),
+				    sqrtf(dx * dx + dz * dz));
+			}
+		}
+		for (int k = 0; k < 2; k++) {
+			int hp, sh;
+			if (!IndivStats(k, &hp, &sh)) continue;
+			if (s_hp[k] >= 0 && hp < s_hp[k] && s_lines < 600) {
+				s_lines++;
+				Log("autotest: catapult trace %.2f s: %s hit, health %d -> %d", t / 1000.0f, HeroName(k), s_hp[k], hp);
+			}
+			s_hp[k] = hp;
+		}
+	}
 	{
 		// XXL_DOWNAT=<hero>:<ms>: that hero (0 Asterix, 1 Obelix) goes down that long
 		// into the run (individual heroes): any scenario with a fallen ally.

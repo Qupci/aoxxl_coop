@@ -33,7 +33,8 @@ const uint8_t kBarFlags = 0x14;
 struct SafeSpot { Vector3 pos; DWORD at = 0; };
 const int kSafeSpots = 8;
 
-// (The grab's hold time: [coop] revive_hold_seconds, revive_hold_seconds_catapult.)
+// (The grab's hold time: [coop] revive_hold_seconds, under catapult fire
+// revive_hold_catapult_window -- HoldSeconds.)
 const float kReviveRange = 3.0f;      // horizontally
 const float kReviveHeight = 2.5f;
 // A hero's walk, units a second (user: 115.4 units in 17 s; an autotest's
@@ -564,41 +565,55 @@ void BlockPartnerGrounds() {
 	IndivBlockPartnerSpot(what);
 }
 
-// Within a Roman catapult's reach (CKHkCatapult 2,130): its tick (FUN_00508E70)
-// fires at the leader from +0x48 to +0x4C units off (x / z) its node's place
-// (+0x10 -> frame +4, world +0x80) while +0x14 bit 4 is up, until it is
-// destroyed (+0x14 bit 2; LV3-1's: 12 to 50 units). LV6-4's can't be reached
-// to be beaten, and its stones kept the grab's revive from ever ending (user).
-bool NearCatapult(const Vector3& p) {
-	static unsigned s_lastNear = ~0u;
+// Roman catapults (CKHkCatapult 2,130) firing where `p` is: the tick
+// (FUN_00508E70) fires at the leader from +0x48 units off its node's place
+// (+0x10 -> frame +4, world +0x80; nearer: its passive range) to +0x4C (x / z),
+// armed (+0x14 bit 0x10) and not destroyed (bit 4); a stone every +0x74 seconds
+// (its charge duration, FUN_00509E20: timer +0x70 from 0 at each throw), each
+// landing ~2.8-3.0 s after its throw -- so they land +0x74 apart too (catrate31:
+// LV3-1's 12 / 50 / 3.5, thrown 3.53 s apart, landing 2.81-2.97 s on). The
+// seconds between stones landing there (several catapults: theirs together),
+// 0 for none.
+float CatapultGap(const Vector3& p) {
+	static float s_lastGap = -1.0f;
 	static int s_told = 0;
+	float rate = 0.0f;
+	int seen = -1;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 130); i < n; i++) {
 		char* c = (char*)GetLvlObject(2, 130, i);
-		if (!c || IsBadReadPtr(c, 0x50) || (*(uint8_t*)(c + 0x14) & 0x14) != 0x10) continue;
+		if (!c || IsBadReadPtr(c, 0x78) || (*(uint8_t*)(c + 0x14) & 0x14) != 0x10) continue;
 		char* node = *(char**)(c + 0x10);
 		char* fr = node && !IsBadReadPtr(node, 8) ? *(char**)(node + 4) : nullptr;
 		if (!fr || IsBadReadPtr(fr, 0x8C)) continue;
 		const float* at = (const float*)(fr + 0x80);
-		float reach = *(float*)(c + 0x4C);
-		if (!(reach > 0.0f && reach < 1000.0f)) continue;
-		float dx = p.x - at[0], dy = p.y - at[1], dz = p.z - at[2];
-		if (dx * dx + dz * dz >= reach * reach || fabsf(dy) >= reach) continue;
-		if (i != s_lastNear && s_told < 20) {
-			s_told++;
-			Log("indiv: (%.1f %.1f %.1f) is in catapult #%u's reach (%.1f units off; it fires from %.1f to %.1f, flags %02X, "
-			    "sector %d) -- the revive's hold is %.1f s", p.x, p.y, p.z, i, sqrtf(dx * dx + dz * dz), *(float*)(c + 0x48),
-			    reach, *(uint8_t*)(c + 0x14), *(int8_t*)(c + 0x19), g_config.reviveHoldCatapult);
-		}
-		s_lastNear = i;
-		return true;
+		float passive = *(float*)(c + 0x48), reach = *(float*)(c + 0x4C), charge = *(float*)(c + 0x74);
+		if (!(reach > 0.0f && reach < 1000.0f && charge > 0.1f && charge < 600.0f)) continue;
+		float dx = p.x - at[0], dz = p.z - at[2], d2 = dx * dx + dz * dz;
+		if (d2 < passive * passive || d2 >= reach * reach) continue;
+		rate += 1.0f / charge;
+		seen = (int)i;
 	}
-	s_lastNear = ~0u;
-	return false;
+	float gap = rate > 0.0f ? 1.0f / rate : 0.0f;
+	if (fabsf(gap - s_lastGap) > 0.01f && s_told < 20) {
+		s_told++;
+		if (gap > 0.0f)
+			Log("indiv: (%.1f %.1f %.1f) is under catapult fire (#%d and any others): a stone every %.2f s", p.x, p.y, p.z, seen,
+			    gap);
+		else if (s_lastGap > 0.0f)
+			Log("indiv: (%.1f %.1f %.1f) is under no catapult's fire", p.x, p.y, p.z);
+	}
+	s_lastGap = gap;
+	return gap;
 }
 
-// How long the grab is held to revive the hero fallen at `at`.
+// How long the grab is held to revive the hero fallen at `at`: under catapult
+// fire, revive_hold_catapult_window of the time between stones (user: LV6-4's
+// can't be reached to be beaten, and its stones kept the revive from ever
+// ending), never longer than revive_hold_seconds.
 float HoldSeconds(const Vector3& at) {
-	return NearCatapult(at) ? g_config.reviveHoldCatapult : g_config.reviveHold;
+	float hold = g_config.reviveHold, gap = CatapultGap(at);
+	if (gap > 0.0f && gap * g_config.reviveHoldCatapultWindow < hold) hold = gap * g_config.reviveHoldCatapultWindow;
+	return hold < 0.1f ? 0.1f : hold;
 }
 
 int SecondsLeft(int down) {
@@ -613,11 +628,6 @@ void ShowDownHint(int down) {
 	wchar_t text[200];
 	swprintf(text, 200, L"%s is down!\nHold %s by him for %g s to revive", HintHeroName(down),
 	         HintButtonName(PlayerOf(up), HB_B), h ? HoldSeconds(h.Pos()) : g_config.reviveHold);
-	if (g.limitSet[down]) {
-		wchar_t left[40];
-		swprintf(left, 40, L"\n%d s left", SecondsLeft(down));
-		wcscat(text, left);
-	}
 	HintShow(HINT_REVIVE, PlayerOf(up), text, 8000);
 }
 
@@ -838,9 +848,10 @@ void TimeOut(int down, Hero h, int up) {
 
 // The revive time limit of fallen `down`, counted while the game runs (no pause
 // menu, merchant, scripted mode) and the other hero is not known to be cut off
-// from it; the countdown in both players' boxes. True: it ran out (the game
-// over) -- not while the grab is held by it.
-bool TimeLimit(int down, Hero h, int up, bool close, bool holding, float dt, DWORD now) {
+// from it; the countdown in the fallen hero's player's box only, the grab's bar
+// or not (user). True: it ran out (the game over) -- not while the grab is held
+// by it.
+bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	if (!g.limitSet[down]) return false;
 	char* gm = GM();
 	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
@@ -850,15 +861,11 @@ bool TimeLimit(int down, Hero h, int up, bool close, bool holding, float dt, DWO
 		TimeOut(down, h, up);
 		return true;
 	}
-	if (holding || now - g.limitHintAt < 250) return false;
+	if (now - g.limitHintAt < 250) return false;
 	g.limitHintAt = now;
 	wchar_t text[160];
 	swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
 	HintShow(HINT_REVIVE, PlayerOf(down), text, 600);
-	if (close) return false;   // (the grab's hint, with the time left)
-	swprintf(text, 160, L"%s is down!\nHold %s by him for %g s to revive\n%d s left", HintHeroName(down),
-	         HintButtonName(PlayerOf(up), HB_B), HoldSeconds(h.Pos()), SecondsLeft(down));
-	HintShow(HINT_REVIVE, PlayerOf(up), text, 600);
 	return false;
 }
 
@@ -1451,21 +1458,16 @@ void IndivFrame() {
 				continue;
 			}
 		} else {
-			if (g.revive[i] > 0.0f) HintHide(HINT_REVIVE);
+			if (g.revive[i] > 0.0f) HintHide(HINT_REVIVE, PlayerOf(up));
 			g.revive[i] = 0.0f;
 			if (close && now - g.hintAt > 400) {
 				g.hintAt = now;
 				wchar_t text[128];
 				swprintf(text, 128, L"Hold %s to revive %s", HintButtonName(PlayerOf(up), HB_B), HintHeroName(i));
-				if (g.limitSet[i]) {
-					wchar_t left[40];
-					swprintf(left, 40, L"\n%d s left", SecondsLeft(i));
-					wcscat(text, left);
-				}
 				HintShow(HINT_REVIVE, PlayerOf(up), text, 600);
 			}
 		}
-		if (TimeLimit(i, h, up, close, holding, dt, now)) return;   // the game over
+		if (TimeLimit(i, h, up, holding, dt, now)) return;   // the game over
 	}
 }
 
