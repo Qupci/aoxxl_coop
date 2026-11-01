@@ -3624,3 +3624,26 @@ both halves).
   tested in autotests: the second hero's X on the launcher. (3) [hints] hint_join, hint_pass_roman, hint_combos
   (config.h hintJoin / hintPass / hintCombos, all on; logged "config: hints: ..."); combohint2b with all off: no
   join or combo hint.
+- Round 197 (user: Obelix alone on the machine gun -- LV4 / LV5 boss fights; the leader flag must not matter). The
+  gun (CKHkMachinegun, vtable 0x6265E0, tick FUN_004C51F0): +0x10C bit 0 in use (its event 0x4A00: param != 0
+  on, 0 off -- also flags its in-use / free event group, +0x1A / +0x1C), +0x14 bit 7 the rail move on (0x4A08, sent
+  by trio 0x480A for Obelix); in use FUN_004C5560 reads the gun map: rail input +0x4C = action 1 - action 0
+  (with +0x14 bit 7), action 2 -> +0x10C bit 3 -> trio 0x4A02 (fire); FUN_004C5620 moves it along its rail
+  (+0x68, its spline +0xF8, clamped 0.2 from the ends; LV3-3: 0.1 .. ~3.1). Trio 48xx (FUN_00482BB0): 0x4809
+  case 9 -- Asterix (slot 0, whoever leads) f18 mode 2 player, gun 0x4A00(1), +0x3F4 |= 4, Obelix (AI state 0 /
+  4 / 5 / 0xB) AI order 7 to 0x4A05's spot, Idefix to 0x4A06's; 0x480A(hero) case 10 -- that hero's f18 state 5
+  (Obelix's CKHkObelixLife::State5_Ai: follows the gun, 0x4A07 its facing; entry 0x4A05 puts him at the handles),
+  Obelix -> gun 0x4A08; 0x4806 case 6 -- only with Asterix in state 4: orders 0, gun 0x4A00(0), +0x3F4 &= ~4; all
+  f18 to mode 0. The trio's offer (+0x48, +0x3F4 bits 10-11) stays after a take: Asterix's X anywhere took the
+  gun through it (FUN_0049A080). coop.cpp: Obelix's X at the offered free gun (NoteMachineUse, in his tick) ->
+  ObelixTakesGun: gun 0x4A00(1), +0x3F4 = (& ~0xC00) | 4, trio 0x480A(1); ObelixGunSolo (Obelix mode 2, Asterix
+  not, gun in use, not held) -> no suspension (split on), shared.cpp SHARED_GUN_OBELIX (gun actions 0 / 1 his
+  player's, 2 nobody's: Route -2 = 0); WatchObelixGun: his player's A (values 4 / 44) or his fall -> ObelixLeavesGun
+  (gun 0x4A00(0), +0x3F4 &= ~4, f18 mode 0, order 0); ForgetP2 too. Asterix's X within 4 of the gun node -> trio
+  0x4809 in his tick (SHARED_GUN, one screen); not leading, the mode he starts in his tick keeps the lead till the
+  gun is left (gunAlone exception off for it: asterixGunJoin) -- as Obelix leading he had been the one screen's
+  AI companion (f18 08 -> 0B), unable to fire or leave; GiveBackLead after (4801). Obelix's take keeps the real
+  lead (gunAlone for obelixGunTook). The gun's camera (rail camera, vt 0x624624) goes to Obelix's half either way
+  (his copy not leading: the take runs in his tick). Prompts: Asterix's kind 9 while Obelix is on it alone is
+  no one's; Asterix within 4 gets "Use" (his X joins). Autotests obelixgun33 / obelixgun33l (-Level 3,
+  XXL_GUNLOG=1: rail +0x68 3.06 -> 0.10 left, -> 2.40 right; no 0x4A02 on Obelix's X; far X: none).
