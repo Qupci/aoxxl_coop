@@ -15,6 +15,11 @@ int PfReachable(const Vector3& from, const Vector3& to);
 // One read of the graph for both ways.
 int PfConnected(const Vector3& a, const Vector3& b);
 
+// The graph's small nodes (16 units across at most: a lifter's shaft) holding
+// any of these `n` places count as shut -- no step into, within or out of them
+// -- for every query until PfCloseNodesAt(nullptr, 0).
+void PfCloseNodesAt(const Vector3* at, int n);
+
 // The shortest walk from `from` to `to` in units (as PfWayTo / PfWayFrom, one
 // search that stops there): -1 no way, -2 either place in no node.
 float PfWalk(const Vector3& from, const Vector3& to);

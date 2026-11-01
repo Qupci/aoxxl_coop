@@ -40,8 +40,16 @@ struct Graph {
 	std::vector<Jump> jumps;
 	std::vector<std::vector<int>> walkTo;   // per node: nodes walked over to
 	std::vector<uint8_t> closedDoor;        // per cell: a closed door stands on it
+	std::vector<uint8_t> closedNode;        // per node: shut (PfCloseNodesAt)
 	int cells = 0;
 };
+
+// PfCloseNodesAt's places, and the nodes they shut last time (for the log).
+Vector3 s_closeAt[16];
+int s_nCloseAt = 0;
+// A node shut by a place in it is a small one (LV2-1's lifter shaft, node 53:
+// 9.2 x 12.2 units) -- not a room a lifter stands in.
+const float kClosedNodeMax = 16.0f;
 
 const uintptr_t kSrvVt = 0x62483C, kNodeVt = 0x6247DC, kTransVt = 0x62480C;
 
@@ -164,6 +172,13 @@ bool Load(Graph* g) {
 			}
 		}
 	}
+	g->closedNode.assign(count, 0);
+	for (int k = 0; k < s_nCloseAt; k++)
+		for (unsigned i = 0; i < count; i++) {
+			const Node& n = g->nodes[i];
+			if (n.mx[0] - n.mn[0] <= kClosedNodeMax && n.mx[2] - n.mn[2] <= kClosedNodeMax && Inside(n, s_closeAt[k], 2.0f))
+				g->closedNode[i] = 1;
+		}
 	// The enemies-only cells (doors) by a closed door are shut.
 	g->closedDoor.assign(g->cells, 0);
 	std::vector<Door> doors;
@@ -189,6 +204,7 @@ bool Load(Graph* g) {
 }
 
 bool Walkable(const Graph& g, int ni, int x, int z) {
+	if (g.closedNode[ni]) return false;
 	const Node& n = g.nodes[ni];
 	int v = Value(n, x, z);
 	if (v & 8 || v == 7) return false;
@@ -249,6 +265,7 @@ int NodeOfCell(const Graph& g, int c) {
 // from cell centre to cell centre).
 template <class Fn> void Steps(const Graph& g, int c, Fn fn) {
 	int ni = NodeOfCell(g, c);
+	if (g.closedNode[ni]) return;   // (a shut node: no way out of it either)
 	const Node& n = g.nodes[ni];
 	int x = (c - n.base) % n.nx, z = (c - n.base) / n.nx;
 	for (int dz = -1; dz <= 1; dz++)
@@ -277,7 +294,7 @@ template <class Fn> void Steps(const Graph& g, int c, Fn fn) {
 	}
 	// a jump from within a cell of its take-off box's centre (that one may be a ledge's)
 	for (const Jump& j : g.jumps)
-		if (j.from == ni && abs(j.sx - x) <= 1 && abs(j.sz - z) <= 1) toward(j.to, j.dx, j.dz);
+		if (j.from == ni && abs(j.sx - x) <= 1 && abs(j.sz - z) <= 1 && !g.closedNode[j.to]) toward(j.to, j.dx, j.dz);
 }
 
 // Every cell walked to from `seeds` (marks in `seen`).
@@ -327,6 +344,11 @@ double MsSince(const LARGE_INTEGER& t0) {
 	QueryPerformanceFrequency(&f);
 	return (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart;
 }
+}
+
+void PfCloseNodesAt(const Vector3* at, int n) {
+	s_nCloseAt = 0;
+	for (int i = 0; at && i < n && s_nCloseAt < 16; i++) s_closeAt[s_nCloseAt++] = at[i];
 }
 
 float PfWalk(const Vector3& from, const Vector3& to) {

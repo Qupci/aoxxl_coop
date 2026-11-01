@@ -2918,6 +2918,24 @@ const Step kCatRevive31[] = {
 	END(20000),
 };
 
+// liftdown21 (-Level 2, XXL_DOWNAT=0:4000): the user's LV2-1 softlock
+// (xxl_coop.lv2-1_lifter_revival_tp.log): Asterix down by the hearth at the
+// lifter's top, Obelix at its bottom steps onto the lifter (-746.7 505.7 -992.1):
+// put back on his last solid ground below, where only the lifter (shut while a
+// hero is down) leads up -- he has to be brought up to Asterix, revives him by
+// B and stays up there. (Obelix's spot below is 20 units off the Roman agent at
+// -745.5 508.0 -1010.2: nearer, his dialogue starts and the fall is a game over.)
+const Step kLiftDown21[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -745.06f, 515.2f, -979.92f), PLACEAT(2500, HERO_OBELIX, -766.3f, 508.5f, -1001.0f),
+	REACH(3200), PLACEAT(4600, HERO_OBELIX, -746.709f, 506.5f, -992.057f),
+	SHOT(5000, "liftdown21_0"), SHOT(6500, "liftdown21_1"), SHOT(8500, "liftdown21_2"), REACH(8700),
+	VPAD(9500, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(15000, 1, 0, 0, 0, "p2 release"),
+	SHOT(15500, "liftdown21_3"), REACH(15700),
+	END(16500),
+};
+
 // catrate31 (-Level 3, XXL_P2HERO=asterix XXL_CATTRACE=1): player 2's Asterix
 // (leading) from LV3-1's catapult walks out into its reach and stands there,
 // healed, while it fires at him: the trace has each fire (the charge back to 0)
@@ -7627,6 +7645,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("revive41", kRevive41),
 	SCENARIO("catrevive31", kCatRevive31),
 	SCENARIO("catrate31", kCatRate31),
+	SCENARIO("liftdown21", kLiftDown21),
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),

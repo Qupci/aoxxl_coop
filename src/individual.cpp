@@ -87,6 +87,7 @@ struct State {
 	int      leadBack = -1;            // revived, it was leading: the lead goes back to it
 	// The hero brought to a fallen leader (BringToFallenLeader): where from, where to.
 	bool     brought[2] = {};
+	bool     broughtPastLifter[2] = {};   // ... cut off only by a lifter shut while the other was down: it stays
 	Vector3  broughtFrom[2], broughtTo[2];
 	int      sendBack = -1;            // revived its leader: that hero goes back where it came from
 	DWORD    fellAt[2] = {};
@@ -695,6 +696,32 @@ bool IndivJoinSpot(int to, Vector3* out) {
 
 namespace {
 
+// While a hero is down the lifters (2,47) stay shut (IndivBlockPartnerSpot: the
+// standing hero is put back off one), but the pathfinding graph still leads
+// over them -- LV2-1's lifter shaft is a node of its own (53) between the floor
+// below and the hearth above, joined by the sidekick's jumps, always on: Obelix
+// below, Asterix down by the hearth, "can walk: yes", and no way up
+// (xxl_coop.lv2-1_lifter_revival_tp.log). For the revive's own path queries,
+// the nodes holding a lifter (its node's place, matrix +0x40) are shut.
+struct ShutLifters {
+	Vector3 at[16];
+	int n = 0;
+	ShutLifters() {
+		for (unsigned i = 0, c = GetNumLvlClassInstances(2, 47); i < c && n < 16; i++) {
+			KHook* lifter = (KHook*)GetLvlObject(2, 47, i);
+			if (!lifter || !lifter->node || !lifter->node->matrix) continue;
+			const float* m = (const float*)((char*)lifter->node->matrix + 0x40);
+			if (m[0] == 0.0f && m[1] == 0.0f && m[2] == 0.0f) continue;   // (one of LV2's is at the origin)
+			at[n++] = Vector3(m[0], m[1], m[2]);
+		}
+		Close();
+	}
+	~ShutLifters() { Open(); }
+	void Close() { PfCloseNodesAt(at, n); }
+	void Open() { PfCloseNodesAt(nullptr, 0); }
+};
+const int kReachOnlyLifter = 2;   // reachTold: no way but over a lifter
+
 // The revive time limit's "auto": the walk to the fallen hero, then the grace.
 void SetLimit(int down, float way, const char* what) {
 	g.limitLeft[down] = way / kWalkSpeed + g_config.reviveGrace;
@@ -757,18 +784,30 @@ Vector3 CatchUpSpot(int down, Hero h, int up, Hero o, float* way) {
 // is -- the level brings the leader back to it. Asked every 0.5 s from 2 s after
 // the fall; three noes in a row (not a hero in mid-jump over a gap's cells)
 // before the move. The first answer that it has a way sets the time limit's
-// "auto" from that walk.
+// "auto" from that walk. The lifters count as shut (ShutLifters): one cut off
+// only by a lifter -- which the mod keeps shut -- is brought over whoever led
+// (the level would never bring the heroes together there), and stays after the
+// revive.
 void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	if (CoopSuspended() || now - g.fellAt[down] < 2000 || now - g.reachAt[down] < 500) return;
 	if (!HeroModePlayable(o.Flags18())) return;   // (on the machine gun: brought once off it)
 	g.reachAt[down] = now;
+	ShutLifters shut;
 	int r = PfReachable(o.Pos(), h.Pos());
-	if (r != g.reachTold[down]) {
+	bool byLifter = false;
+	if (r == PF_NO && shut.n) {
+		shut.Open();
+		byLifter = PfReachable(o.Pos(), h.Pos()) == PF_YES;
+		shut.Close();
+	}
+	int told = byLifter ? kReachOnlyLifter : r;
+	if (told != g.reachTold[down]) {
 		static int s_told;
 		if (s_told++ < 40)
 			Log("indiv: can %s walk to fallen %s (%s when it fell)? %s", HeroName(up), HeroName(down),
-			    g.fellLeading[down] ? "leading" : "not leading", r == PF_YES ? "yes" : r == PF_NO ? "no" : "not known");
-		g.reachTold[down] = r;
+			    g.fellLeading[down] ? "leading" : "not leading",
+			    r == PF_YES ? "yes" : byLifter ? "no -- only over a lifter, shut while it is down" : r == PF_NO ? "no" : "not known");
+		g.reachTold[down] = told;
 	}
 	if (r != PF_NO) {
 		g.cutOff[down] = 0;
@@ -779,8 +818,9 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 		}
 		return;
 	}
-	if (!g.fellLeading[down] || ++g.cutOff[down] < 3) return;
+	if (!(g.fellLeading[down] || byLifter) || ++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
+	g.broughtPastLifter[up] = byLifter;
 	float way = 0.0f;
 	Vector3 spot = CatchUpSpot(down, h, up, o, &way);
 	spot.y += 0.5f;
@@ -791,8 +831,9 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 	g.broughtTo[up] = spot;
 	PlaceHero(o, spot);
 	g.placedAt[up] = now;
-	Log("indiv: %s can't walk to %s, who led when it fell -- brought where it can walk to it from (%.1f %.1f %.1f)",
-	    HeroName(up), HeroName(down), spot.x, spot.y, spot.z);
+	Log("indiv: %s can't walk to %s%s -- brought where it can walk to it from (%.1f %.1f %.1f)", HeroName(up),
+	    HeroName(down), byLifter ? " but over a lifter, shut while it is down" : ", who led when it fell", spot.x, spot.y,
+	    spot.z);
 	if (g_config.reviveLimit < 0.0f && !g.limitSet[down]) SetLimit(down, way, "its walk from where it was brought");
 }
 
@@ -814,12 +855,13 @@ void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 	// The other hero was brought to it and revived it by the grab: back where it
 	// came from (the leader's place can be one only Asterix gets out of) -- unless
 	// it goes on from where it revived it. A revive at a sector change or a
-	// launcher leaves it where it is.
+	// launcher leaves it where it is; so does one brought past a lifter (the
+	// heroes together again is what the lifter was for).
 	int up = Other(idx);
 	if (g.brought[up]) {
 		Trio t = GetTrio();
 		Hero o = t ? t.GetHero(up) : Hero();
-		if (byGrab && o) {
+		if (byGrab && o && !g.broughtPastLifter[up]) {
 			g.sendBack = up;
 			g.broughtTo[up] = o.Pos();
 		} else g.brought[up] = false;
@@ -855,7 +897,8 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	if (!g.limitSet[down]) return false;
 	char* gm = GM();
 	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
-	bool counting = !paused && !CoopSuspended() && CoopShopper() < 0 && g.reachTold[down] != PF_NO;
+	bool counting = !paused && !CoopSuspended() && CoopShopper() < 0 && g.reachTold[down] != PF_NO &&
+	                g.reachTold[down] != kReachOnlyLifter;
 	if (counting) g.limitLeft[down] -= dt;
 	if (counting && !holding && g.limitLeft[down] <= 0.0f) {
 		TimeOut(down, h, up);
