@@ -3562,3 +3562,13 @@ both halves).
   liftdie21a (XXL_DOWNAT=0:4500: Asterix down alone on it at its foot (-746.7 501.3 -992.1), Obelix put on it at
   7 s: no put-back, up with both, revived by B on top, health 8), liftdie21b (XXL_DOWNAT=0:3500: both on it, down
   as it rides up: Obelix stays on it, revived). liftdown21 (fallen by the hearth, not on it) unchanged.
+- Round 193 (user: a softlock by jumping down a drop after the partner's fall -- covered? Only for a fallen leader:
+  the 0.5 s checks run all through the fall, but round 83's rule (the user's: the level brings the leader to its
+  sidekick) left a non-leading fallen hero waiting for a sector change). Narrow fix (user's go): hadWay[down] is set
+  by any "yes" (lifters shut) since the fall; three noes after one -> cut itself off -> the catch-up whoever led,
+  broughtStays (no send-back after the grab's revive; it can go back the way it went). A fallen sidekick never
+  reachable since the fall still waits. Autotests (-Level 2): reach26s (XXL_P2HERO=asterix XXL_DOWNAT=1:4000: both
+  on LV2-6's far side, "yes" at 2 s, Asterix put across the pit at 7 s: "no" 1 s later, brought to the pit's edge
+  (90.5 2.7 -389.3, an 8-unit walk), revived, stays at 85.7 -384.2), liftdown21r (same env: Obelix down by the
+  hearth, Asterix below then onto the lifter: put back, "only over a lifter", brought up, revived, stays),
+  reach26o (Obelix leading, Asterix never reachable: stays, as round 83).
