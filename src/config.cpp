@@ -80,6 +80,7 @@ void CoopConfig::Load(const char* iniPath) {
 	hintJoin   = ReadBool("hints", "hint_join", hintJoin, full);
 	hintPass   = ReadBool("hints", "hint_pass_roman", hintPass, full);
 	hintCombos = ReadBool("hints", "hint_combos", hintCombos, full);
+	hintMachineGun = ReadBool("hints", "hint_machine_gun", hintMachineGun, full);
 	{
 		// Seconds; `env` (autotests) over the ini; "off" = 0, "auto" = -1 where allowed.
 		auto readSeconds = [&](const char* key, const char* env, float def, float lo, float hi, bool autoOk) {
@@ -189,5 +190,6 @@ void CoopConfig::Load(const char* iniPath) {
 		noLock, noLockExceptCorkscrews, noLockExceptBeams, carRiderLeads, romansInView, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
 		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too",
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);
-	Log("config: hints: join %d, pass the Roman %d, combos %d", hintJoin, hintPass, hintCombos);
+	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
+	    hintMachineGun);
 }

@@ -1,4 +1,5 @@
 #include "shared.h"
+#include "config.h"
 #include "coop.h"
 #include "detour.h"
 #include "hints.h"
@@ -168,6 +169,8 @@ SharedMode DetectMode(Trio t) {
 // fused tornado's for as long as it lasts (refreshed every frame).
 void ShowModeHint(SharedMode m) {
 	if (m == SHARED_NONE) { HintHide(HINT_MODE); return; }
+	bool gun = m == SHARED_GUN || m == SHARED_GUN_SOLO || m == SHARED_GUN_OBELIX;
+	if (gun && !g_config.hintMachineGun) { HintHide(HINT_MODE); return; }   // [hints] hint_machine_gun off
 	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
 	wchar_t ta[96] = {}, to[96] = {};
 	switch (m) {
