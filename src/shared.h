@@ -17,6 +17,6 @@ bool SharedInstallHooks();
 void SharedFrame();
 
 // Which shared mode is on (for hints and the log).
-enum SharedMode { SHARED_NONE, SHARED_GUN, SHARED_GUN_SOLO, SHARED_BOAT, SHARED_SLIDE, SHARED_FUSION };
+enum SharedMode { SHARED_NONE, SHARED_GUN, SHARED_GUN_SOLO, SHARED_BOAT, SHARED_SLIDE, SHARED_FUSION, SHARED_GUN_OBELIX };
 SharedMode SharedCurrentMode();
 const char* SharedModeName(SharedMode m);

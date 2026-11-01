@@ -7519,6 +7519,38 @@ const Step kGunBoth33[] = {
 	END(11000),
 };
 
+// obelixgun33 (-Level 3; obelixgun33l: Obelix leading): player 2's Obelix takes
+// the LV3-3 machine gun alone (X), turns it on his half (stick left), presses X
+// (fires nothing); player 1's Asterix far off: X does nothing; by the gun his X
+// joins as the gunner (one screen); his A leaves (both off, split back); Obelix
+// takes it again and leaves with A.
+#define OBELIXGUN33_STEPS \
+	PLACEAT(4000, HERO_OBELIX, 289.3f, 31.92f, -325.6f), PLACEAT(4000, HERO_ASTERIX, 276.0f, 31.92f, -326.0f), \
+	VPAD(6000, 1, PAD_X, 0, 0, "p2 X: obelix takes the gun"), VPAD(6200, 1, 0, 0, 0, "p2 release"), \
+	SHOT(8000, "on_alone"), \
+	VPAD(8500, 1, 0, -1.0f, 0, "p2 turns left"), SHOT(9200, "turning"), VPAD(9300, 1, 0, 1.0f, 0, "p2 turns right"), \
+	VPAD(10000, 1, 0, 0, 0, "p2 release"), SHOT(10300, "turned"), \
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X (no fire)"), VPAD(10700, 1, 0, 0, 0, "p2 release"), \
+	P1(11000, PAD_X, 0, 0, "p1 X far off"), P1(11200, 0, 0, 0, "p1 release"), SHOT(11800, "asterix_far"), \
+	PLACEAT(12000, HERO_ASTERIX, 288.0f, 31.92f, -324.0f), SHOT(13000, "asterix_by_it"), \
+	P1(13500, PAD_X, 0, 0, "p1 X: asterix joins"), P1(13700, 0, 0, 0, "p1 release"), \
+	SHOT(15500, "joined"), \
+	P1(16000, 0, -1.0f, 0, "p1 stick (ignored)"), VPAD(16000, 1, 0, 1.0f, 0, "p2 turns right"), \
+	P1(16500, PAD_X, 0, 0, "p1 fires"), P1(16900, 0, 0, 0, "p1 release"), VPAD(17000, 1, 0, 0, 0, "p2 release"), \
+	SHOT(17200, "joined_fired"), \
+	P1(18000, PAD_A, 0, 0, "p1 A: leaves"), P1(18200, 0, 0, 0, "p1 release"), \
+	SHOT(20000, "after_join"), \
+	PLACEAT(20500, HERO_OBELIX, 294.9f, 31.92f, -326.2f), PLACEAT(20500, HERO_ASTERIX, 276.0f, 31.92f, -326.0f), \
+	VPAD(22000, 1, PAD_X, 0, 0, "p2 X: obelix again"), VPAD(22200, 1, 0, 0, 0, "p2 release"), \
+	SHOT(24000, "on_again"), \
+	VPAD(24500, 1, PAD_A, 0, 0, "p2 A: leaves"), VPAD(24700, 1, 0, 0, 0, "p2 release"), \
+	SHOT(26500, "left"), \
+	VPAD(27000, 1, 0, 0, 1.0f, "p2 walks"), VPAD(28500, 1, 0, 0, 0, "p2 stop"), SHOT(29000, "walked"), \
+	END(29500)
+const Step kObelixGun33[] = { MGUN33_SETUP, OBELIXGUN33_STEPS };
+const Step kObelixGun33L[] = { MGUN33_SETUP, { 4500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" }, OBELIXGUN33_STEPS };
+#undef OBELIXGUN33_STEPS
+
 struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
@@ -7531,6 +7563,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("flaskbox", kFlaskBox),
 	SCENARIO("launchboth", kLaunchBoth),
 	SCENARIO("gunboth33", kGunBoth33),
+	SCENARIO("obelixgun33", kObelixGun33),
+	SCENARIO("obelixgun33l", kObelixGun33L),
 	SCENARIO("fuse2", kFuse2),
 	SCENARIO("rage2", kRage2),
 	SCENARIO("towerscan", kTowerScan),

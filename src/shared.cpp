@@ -87,7 +87,8 @@ void LogAction(const char* view, uint32_t action, uint8_t v, void* caller) {
 }
 
 // Which player answers (map, action) in the current mode: 0 = player 1,
-// 1 = player 2, 2 = either (the larger value), -1 = leave it to the game.
+// 1 = player 2, 2 = either (the larger value), -1 = leave it to the game,
+// -2 = nobody (0).
 int Route(int map, uint32_t action) {
 	int ast = g.owner[HERO_ASTERIX], obe = g.owner[HERO_OBELIX];
 	// The merchant's words and menu: the shopper's alone (the other player plays
@@ -106,6 +107,11 @@ int Route(int map, uint32_t action) {
 		// of it his -- the gun's own tick reads the game's values, which are
 		// player 1's even when Asterix is player 2's.
 		return map == MAP_GUN ? ast : -1;
+	case SHARED_GUN_OBELIX:
+		// Obelix alone on the gun: he turns it; no one fires (Asterix's X by it
+		// joins him -- coop.cpp).
+		if (map == MAP_GUN) return action == 0 || action == 1 ? obe : -2;
+		return -1;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
 		// Obelix steers (and the camera), Asterix jumps.
@@ -129,6 +135,7 @@ uint8_t __fastcall GetActionHook(char* view, void* edx, uint32_t action) {
 	int map = MapOf(view);
 	if (map == MAP_OTHER) return v;
 	int who = Route(map, action);
+	if (who == -2) return 0;
 	if (who < 0) return v;
 	uint8_t idx = (*(uint8_t**)(view + 8))[action & 0xFF];
 	uint8_t a = g.p1[idx];
@@ -152,6 +159,7 @@ SharedMode DetectMode(Trio t) {
 	uint8_t ma = HeroMode(a.Flags18()), mo = HeroMode(o.Flags18());
 	if (ma == 2) return mo == 2 ? SHARED_GUN : SHARED_GUN_SOLO;
 	if (ma == 1) return SHARED_BOAT;
+	if (mo == 2 && CoopObelixGun()) return SHARED_GUN_OBELIX;
 	if (mo == 3 && t.Leader() == HERO_OBELIX && HeroIsPlayerVariant(o.Flags18())) return SHARED_SLIDE;
 	return SHARED_NONE;
 }
@@ -172,6 +180,11 @@ void ShowModeHint(SharedMode m) {
 		         HintButtonName(o, HB_X), HintHeroName(HERO_ASTERIX));
 		HintShow(HINT_MODE, o, to, 6000);
 		return;
+	case SHARED_GUN_OBELIX:
+		swprintf(to, 96, L"%s: turn the gun\n%s leaves it", HintHeroName(HERO_OBELIX), HintButtonName(o, HB_A));
+		swprintf(ta, 96, L"%s: %s at the gun\nfires it for %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_X),
+		         HintHeroName(HERO_OBELIX));
+		break;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
 		swprintf(to, 96, L"%s: steer and camera", HintHeroName(HERO_OBELIX));
@@ -193,6 +206,7 @@ const char* SharedModeName(SharedMode m) {
 	switch (m) {
 	case SHARED_GUN: return "machine gun";
 	case SHARED_GUN_SOLO: return "machine gun (Asterix alone)";
+	case SHARED_GUN_OBELIX: return "machine gun (Obelix alone)";
 	case SHARED_BOAT: return "boat";
 	case SHARED_SLIDE: return "belly slide";
 	case SHARED_FUSION: return "Twister Fusion";
