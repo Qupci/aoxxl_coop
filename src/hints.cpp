@@ -438,7 +438,21 @@ void DrawSlot(int p, char* itf, void* arg) {
 		plate[13] = (w + 2.0f * kMargin) / PlateDrawScale();
 		plate[14] = sv[3] * s.nLines + 0.015f;
 		plate[6] = sv[1] - 0.012f * (s.nLines - 1) + up;
+		// Not one of xxl_widescreen2d.asi's plates (a HUD model over it -- the
+		// potion's flask rising over the box -- was pulled towards its anchor, off
+		// the screen as the box slid out); an older asi without the switch: as before.
+		typedef void(__cdecl* RecordFn)(int on);
+		static RecordFn record = nullptr;
+		static bool looked = false;
+		if (!looked) {
+			HMODULE ws = GetModuleHandleA("xxl_widescreen2d.asi");
+			record = ws ? (RecordFn)GetProcAddress(ws, "Widescreen2dRecordPlates") : nullptr;
+			looked = true;   // (the ASI loader loads every asi before the game's first frame)
+			Log("hints: xxl_widescreen2d.asi %s", !ws ? "not loaded" : record ? "takes the boxes' plates out of its plates" : "has no plate switch (older build)");
+		}
+		if (record) record(0);
 		((DrawFn)(*(void***)plate)[23])((char*)plate, nullptr, arg);
+		if (record) record(1);
 		pb[5] = f5;
 		pb[6] = f6;
 		plate[5] = sv[0]; plate[6] = sv[1]; plate[13] = sv[2]; plate[14] = sv[3];

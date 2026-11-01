@@ -271,6 +271,13 @@ const Plate* PlateAt(float x, float y) {
 typedef int(__fastcall* Draw2dFn)(char* self, void* edx, float* pos, int a, char alignX, char alignY, int b);
 Draw2dFn g_origBillboard = nullptr, g_origText = nullptr;
 
+// Plates drawn by another mod around what it places itself (xxl_coop.asi's hint
+// boxes, its texts drawn off any plate): squeezed as any, but neither pulled
+// nor recorded -- a HUD model over one (the potion's flask rising over a box)
+// was pulled towards its anchor, off the screen as the box slid out.
+bool g_recordPlates = true;
+extern "C" __declspec(dllexport) void __cdecl Widescreen2dRecordPlates(int on) { g_recordPlates = on != 0; }
+
 int __fastcall BillboardDrawHook(char* self, void* edx, float* pos, int a, char alignX, char alignY, int b) {
 	PlatesNextFrame();
 	float s = PlateSqueeze();
@@ -278,12 +285,18 @@ int __fastcall BillboardDrawHook(char* self, void* edx, float* pos, int a, char 
 	float* w = (float*)(self + 0x14);
 	float h = *(float*)(self + 0x18);
 	float p[2] = { pos[0], pos[1] };
-	const Plate* on = PlateAt(pos[0], pos[1]);
+	const Plate* on = g_recordPlates ? PlateAt(pos[0], pos[1]) : nullptr;
 	bool stretched = *(char*)(self + 0x1C) != 0 && *w > 0.0f && *w < 0.95f;
 	if (on && !(stretched && on->right - on->left <= *w * 1.01f))   // not itself
 		p[0] = on->anchor + (p[0] - on->anchor) * s;
 	if (!stretched) return g_origBillboard(self, edx, p, a, alignX, alignY, b);
 	float width = *w;
+	if (!g_recordPlates) {
+		*w = width * s;
+		int r = g_origBillboard(self, edx, p, a, alignX, alignY, b);
+		*w = width;
+		return r;
+	}
 	Plate& rec = g_plates[g_platesNow][g_nPlates[g_platesNow] < 64 ? g_nPlates[g_platesNow]++ : 63];
 	rec.anchor = pos[0];
 	rec.left = alignX == 2 ? pos[0] - width : alignX == 1 ? pos[0] - width * 0.5f : pos[0];
@@ -379,6 +392,7 @@ void CloseRows(const char* cam, const float* camLtm, float s, int n) {
 	// jumped onto it.)
 	HudMap hm;
 	float sp = PlateSqueeze();
+	PlatesNextFrame();   // (a frame with no 2D drawn kept older frames' plates: they pulled models for good)
 	static const Plate* on[256];
 	static float px[256];
 	bool mapped = sp < 0.995f && GetHudMap(cam, hm);
