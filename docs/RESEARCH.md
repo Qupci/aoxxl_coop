@@ -3757,3 +3757,32 @@ both halves).
   XXL_OBELIXPOTION=0: 5 guards, fight Obelix within 5, back at 6.5+), sphud2 (rows, tint, the switch), spsecond2
   (countdown left, bar right), sppotion2 (XXL_SPSWITCHLOCK=0: its plain 4801 is a no-lock switch), spcork21d,
   spswitch2 (isolated: nothing; not: as before). Co-op unchanged: bump2, hudhints.
+- Round 201 (user's pad test of round 200: all fine; difficulty_coop_only taken as on under isolation approved;
+  two sp_hero_switch_lock reports, userlogs 20261102-xxl_coop.cable_car.log / .strange_switch_after_keg.log).
+  (1) LV2-1's rope cable car: Asterix's landing at the rope's end crosses zone 0020 (box -780.8..-777.8 x,
+  512.9..516.9 y, -1073.4..-1070.4 z), group 004: trio 4800 + 4803 (+ detector offs) -- GroupOnlySwitches took it
+  for a plain switch and dropped the 4800; its 4803 went to the companion before the landing set Asterix's AI order
+  3, so he stayed the AI companion waiting, never "free", never given the lead back. Now a switch to the hero you
+  play (g_solo.choice) is never dropped: the level ends a lock of your hero that way. (2) LV2-1's keg (Asterix
+  blows it up after the platform's top): group 069 (event 0348) = 4801 + 4803 + 099A to the platform + 4878
+  (Idefix follows); the 4878 made it "more than switches", kept, and the watch handed the lead back 0.3 s later
+  (the hop the user saw). Idefix's orders (4877, 4878, 4885..48B6) now count as part of a switch-only group;
+  dropped, its 4803 frees Obelix (waiting after 0058's walk). Groups sending trio 4878 in LV2: 069, 0AA (S_FINDGROUPS).
+  (3) Obelix's machine gun in single player (user: Asterix runs over, no fire until he is there, off it the lead
+  stays Obelix's): coop.cpp SoloNoteMachineUse (NoteMachineUse without player 2, SoloMod) -- Obelix leading, X at
+  the free gun, Asterix following within 40 units: ObelixTakesGun, then trio 0x4804 with {Vector3* pos, Vector3*
+  dir} (CKGrpTrio_OnEvent48xx case 4: companion AI order 1, +0x568 / +0x574 copied at 0x483AE0) to the gun's frame
+  +0x80 / +0x70 (it faces -z at LV3-3 and moves on its rail along x as it turns). SoloGunFrame: re-called when the
+  order is lost (2 s) or the gun moved over 1 unit (0.5 s); within 3.5 units (its place is inside its body: he gets
+  2.5-3.1 off, on top of it at worst) Obelix steps off (ObelixLeavesGun), CoopGiveLead(Asterix) with both normal, the
+  next frame trio +0x48 = the gun, +0x3F4 kind 2 | 8 and 0x4809 (Obelix's AI state +0x561 forced 0 for it: case 9
+  sends him to the handles only from 0/4/5/0x0B; it was 0x0F) -- the game's gun, Obelix f18 2B life 5 at the
+  handles; both normal again -> CoopGiveLead(Obelix). Not there in 10 s: put 1.5 behind the gun. A (values 4 / 44)
+  while alone leaves it. First try switched with Obelix still in the gun's mode: he went to mode 3 (life 6) and
+  the switch back put him at a garbage position -- the game froze. shared.cpp GetActionHook: the gun map ("Astérix
+  Baliste") action 2 (fire) answered 0 while CoopSoloGunAlone (the game's X, Obelix's own, fired it); PromptHook
+  hides the machine "Use" then. (4) The co-op Twister push-through (round 52) for the hero you lead (SoloMod).
+  Autotests spgun33 -Level 3 (Asterix held back 3 s by FORCE -- which clears his AI order: the re-call path; no
+  fire alone; joined, fired, A, lead back), splockev2 (S_FLAGEV 0020 with Asterix held: kept, he leads; S_FLAGEV
+  0348 with Obelix held: dropped, Asterix keeps the lead, Obelix order 0), spfindkeg2; splockcar21 (rope car: S_CARPOS
+  never reaches the ride's end -- the landing itself not covered); splever25, splock21, co-op obelixgun33 unchanged.
