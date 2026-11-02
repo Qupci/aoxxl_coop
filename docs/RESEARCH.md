@@ -3900,3 +3900,26 @@ both halves).
   4 + 1 placed -- the next section's). The user's Obelix took the shield in the arena's north passage at 711.1 s,
   at (-24.1 2.1 -548.5): inside 03DC9A3C's box. spsq24n (XXL_SPISOLATION=1, the game's own): Asterix there wakes it
   (active 1, sent 4 + 1), the gate counter stays 60 -- the game's own level layout, nothing of the mod's.
+- Round 205 (user: round 204's fixes work; userlogs 20261102-xxl_coop.lv3-6_boss_jump_{far,near}_as_{asterix,obelix}.log,
+  ..._specific_jump_over_detector_as_obelix.log; XXL-Editor screenshots Snipaste_2026-11-02_19-06-30 / 19-11-21).
+  (1) LV3-6's boss run with the roles swapped (sp_hero_switch_lock, you play Obelix): after the far jump off the
+  platform (-229.6 13.6 -181.4) the boss never rolled. Detectors: #46 (On Cross Rectangle, centre -232.0 9.8 -173.9,
+  15 x 10, direction 2: flat -- the hero falling through y 9.8; node index 0 = Asterix's slot; group 0BB / event 05D8:
+  disable 46, PF transition, enable 52, cutscene 0501, enable 143, 4824 the sidekick to marker 17, 48EE / 48F1) and
+  #143 (centre -235.8 11.5 -174.7, 9.5 x 10.28, direction 0: the plane x -235.8; node index 1 = Obelix's; group 0x70
+  / event 0380: the boss 4C15 "move to the other end", disable 143) -- #27 is the same rectangle on Asterix's slot,
+  no event. The far jump crosses x -235.8 above the arena before falling through #46, so #143 is switched on behind
+  it; in the game the move comes from the walked Obelix passing #143 (user's far-jump-as-Asterix log: 0380 at
+  24.86 s, Asterix landed at 23.5 s, Obelix coming down; the user: Asterix's far jump waits for Obelix too). Round
+  204 sent the run's walk to Asterix, not bound to #143: no 0380 at all (spboss36j before). Now BossRun keeps the
+  detector tests its groups enable (AddBossRunGroup: ops 0x14..0x18, list << 8 | index; #143 and #52 from 0BB), and
+  SoloZonesTick runs those bound to the hero you play in its second pass too, with the companion's node in that slot
+  (moved = 2: answered by both). spboss36j (-Level 3, XXL_SPISOLATION=0: Obelix glides the far jump, -238 11.5 -178
+  then -240 5.6 -177): "zone event 0380 (... set off by Asterix)", the roller after Obelix. FlagEventHook's solo-pass
+  line names the hero (ZoneEventHero). spboss210, spboss36 unchanged.
+  (2) Second chance, Obelix down, Asterix hit: Obelix's row "went down like the HUD just appeared". The rows show
+  together (SoloBeforeTick: either hero's change); the health part (FUN_0051A140) slides a row in (state 1) and in
+  state 2 only goes on with health or a last shown +0x270 -- 0 and 0: hidden at once (the game's own HUD at a death).
+  XXL_HUDPOS now logs the other row (bits, +0x270, +0x234, shown models): 0x10 -> 0x20 -> 0x00 within 15 ms on each
+  hit. Now Hud2AfterInterfaceTick clears the show flags for a fallen other row (and its pending): it stays hidden;
+  after the revive it shows again (spdownhud2, XXL_SPSECOND=1 XXL_DOWNAT=1:2000, and with XXL_UPAT=6000).
