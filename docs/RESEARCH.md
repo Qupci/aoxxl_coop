@@ -3842,3 +3842,61 @@ both halves).
   S_FLAGEV 0050 with Asterix on the circle, Obelix through 03C8 to the turnstile): the top box 0058 (4800 + 4828
   "the sidekick walks to a marker") holds Obelix, so its switch is kept -- Asterix leads, Obelix waits at the
   marker as in the game; no softlock there. splockord2, splock21, splockev2 unchanged.
+- Round 204 (user: round 203's LV3-5 corkscrew fixed, the Fusion works with second chance, the belly-slide death
+  works; userlogs 20261102-xxl_coop.prolonged_twister_fusion_isolation_on.log,
+  20261102-xxl_coop.lv2-10_boss_doesnt_activate_as_obelix.log, 20261102-xxl_coop.lv2-10_boss_activates_as_asterix.log,
+  20261102-xxl_coop.lv2-4_squad_unintended_reinforcement.log).
+  (1) The Twister Fusion's cost. Measured (spbar2, the game's own): the Twister's entry spends 23 of the 30 (gm +0xA4
+  6.5 left, FUN_00493810 / the plain one's inline spend; only a hero with f18 & 0x1E == 0 pays), the full bar's rest
+  drains ~1 a second, out at ~6.5 s; the leader's spin lasts trio +0x3AC (10 s, from +0x164 set at the end of the
+  0x22 start step FUN_00497B90). The AI companion's chooser (FUN_00494DB0's AI branch) re-asks FUN_004963D0 every
+  tick while the leader twists (not in 0x25-0x27): bar out -> 9, FUN_00491FE0 exits 10 (FUN_00498D70) and enters 9:
+  the companion's start pose again (0x22, 2 s), then a fresh plain spin -- the user's "re-do". The leader's +0x189
+  stays 1, and the request (Hero_ProcessPlayerInput 0x49971A: own +0x135 10, X +0x3EC bit 0x10, +0x189) is all the
+  game asks: the leader's FUN_004984F0 sees the partner at 0x23 (the plain Twister's spin is 0x23 too) -> 0x25 and the
+  Fusion's spend (nothing: bit 0x4000 clear); the plain Twister has no merge step, so the leader merged (0x25) until
+  the companion's spin ended (9 s), then 0x26 (FUN_00498A30) ran a whole trio +0x3AC from the merge's +0x164 = now:
+  spbarx2 (X at 12-13.2 s): the Twister from 2.5 s to ~33 s, free (user's log, isolated: Asterix's Twister body for 20
+  s, no "did the Twister Fusion" -- the combo hints see the spend). Round 203's forced 10 made it worse with second
+  chance (Fusion-ready to the leader's end, X free).
+  Now: ChooseAttackHook -- single player, individual heroes, an AI hero while the leader twists: the chooser runs with
+  the leader's stats in place (IndivEnter(leader) / IndivLeave), its FUN_004963D0 asks the leader's bar as the game's
+  one bar (10 while some is left, then 9 as in the game). FuseHook (co-op, or single player with the mod's features;
+  isolated single player stays the game's own): a request (the hero's own +0x188, or the leader's the AI follows)
+  only when CoopFusionAllowed(leader) -- both heroes in attack 10 and the leader's bar full (IndivStats' gauge >= 0,
+  else stats +0x10 bit 0x4000); else both requests cleared, "Twister Fusion refused". The combo hints' "X fuses
+  them" asks the same. spbarx2 (XXL_SPISOLATION=0, second chance 0 / 1): refused x4, the Twister ends at 14.6 s;
+  second chance: the companion 10 then 9 at the bar's end (9.06 s) as in the game. spfuse2 (second chance 1 / 0) and
+  fuse2 (co-op) fuse as before. LogTick shows the bar (gm +0xA4 / +0xA0, full) and a Twister's age (tw), n +0x189, r
+  +0x188.
+  (2) LV2-10 / LV3-6 bosses with sp_hero_switch_lock, you play Obelix. LV2-10: checkpoint 05A0 (CKGrpAsterixCheckpoint
+  0x536FED: 4800 + 4803 + pillar) and zone 0498 (#34 at x 1672.3: the intro, group 093 4C18 + 4800 + 4803) and 00A0
+  (#4 at 1687.1: group 014, boss 4C18 / 4C15, 4829 the sidekick to marker 22, camera 0701) -- #34 and #4 bound to
+  Asterix: Obelix crossed both, nothing; the AI Asterix behind him set them off (spboss210 before: 0498 at Asterix's
+  x 1672.68, 00A0 when he reached 1687). The intro freezes Asterix (as in the game, where he is the player: user's
+  Asterix log, 1672.49 through it); the Obelix you play walked on in it (p1 stick: 1678 -> 1684). Then 4829 lent the
+  lead to Asterix (round 202's SoloOrderNeedsLead) -- he stood at the gate, the boss went for Obelix alone at marker
+  22 (user). Now: (a) g_solo.levelLeader also starts as the level's first leader (SoloSwitchLockWatch's "you play");
+  CoopSoloLevelLeaderAway() = the level's leader when it is the AI companion. DetectTickHook -> SoloZonesTick: the
+  enabled tests bound to that hero, minus "while outside" and ZoneMeansItsHero (orders for the hero itself), are off
+  in the engine's pass and run alone in a second one with the leader's node and last place in the companion's slot
+  (as co-op's swapped pass; g_inSoloPass, "(the level's leader's zone, for the hero you play)"). (b) SoloBeforeLifeTick:
+  the leader while CutsceneBars() and roles swapped gets a zeroed action values array for its tick ("holds still").
+  (c) SoloOrderNeedsLead: an order from a boss run's group (ProximityDispatchInBossRun: GroupStartsBossRun -- 48EE /
+  48F1 + a marker walk -- or a group of g_bossRun, now collected in single player too while the roles are swapped)
+  is not lent: it reaches the companion (user's wish: Obelix leads, Asterix as the sidekick goes to the marker; the
+  walk ends in a wait, order 3, at marker 22 in the arena -- where the game's Obelix waits). spboss210 (XXL_SPISOLATION=0
+  XXL_LOGFLAGS=1): 0498 and 00A0 by Obelix, Obelix still through the intro, "a boss run's order for the sidekick
+  (4829) -- Asterix goes, Obelix keeps the lead", Asterix walks to (1712.8 -747.8 -1143.1), the spiked roller after
+  Obelix in the canyon. spboss36 (-Level 3): 0388 and 05D8 by Obelix, boss run 0BB 0D3 0D4 (walks 4825 4823 4824),
+  4824 and 4825 to Asterix running ahead, Obelix keeps the lead (the test's Obelix stops and is crushed). Not tested:
+  the LV2-10 fight's later steps (the automatic cable car to the boss's button is Asterix's in the game; the boss's own
+  4801 / 4802 are not group switches -- kept). splockord2 (482D still lent), splockev2, splockcork21, splock21,
+  splockcork35 unchanged.
+  (3) LV2-4's "reinforcements the counter did not count" (user's log: the arena's gate, 2 squads, 60 Romans, from
+  648.98 s; no rise logged; Obelix played from 672.7 s). spsq24 (S_SQUADS round the arena): the gate's squads are
+  03DC78DC (box x -49..42.3, z -616.3..-542.2: 47 + 8) and 03DC7A40 (1 + 4); not the gate's (+0x154 -2) and reaching
+  the arena: 03DC7E6C (x -65.1..-30.9, z -583.2..-545.9: 4 placed) and 03DC9A3C (x -34..51.1, z -549.1..-489.7: 15 + 2,
+  4 + 1 placed -- the next section's). The user's Obelix took the shield in the arena's north passage at 711.1 s,
+  at (-24.1 2.1 -548.5): inside 03DC9A3C's box. spsq24n (XXL_SPISOLATION=1, the game's own): Asterix there wakes it
+  (active 1, sent 4 + 1), the gate counter stays 60 -- the game's own level layout, nothing of the mod's.
