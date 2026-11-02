@@ -376,7 +376,8 @@ void PlayerFrame(int p, Trio t) {
 }
 
 // Twister Fusion: both heroes spinning (attack state +0x135 9 / 10, its step
-// +0x38E & 0x3F 0x23) within the trio's fusion range (+0x3D8).
+// +0x38E & 0x3F 0x23) within the trio's fusion range (+0x3D8), and the fusion
+// can start (both Fusion-ready, the leader's bar not run out: CoopFusionAllowed).
 void FuseFrame(Trio t) {
 	bool on = false;
 	if (t && (Learned() & 8) && !g_fused && !CoopOneScreen() && !CoopSuspended()) {
@@ -387,7 +388,7 @@ void FuseFrame(Trio t) {
 			uint8_t s = *(uint8_t*)(h.raw() + 0x135), st = *(uint8_t*)(h.raw() + 0x38E) & 0x3F;
 			return (s == 9 || s == 10) && st == 0x23;
 		};
-		if (a && b && spin(a) && spin(b)) {
+		if (a && b && spin(a) && spin(b) && CoopFusionAllowed(t.Leader())) {
 			Vector3 d = a.Pos() - b.Pos();
 			float r = *(float*)(t.raw() + 0x3D8);
 			on = d.len2() < r * r;

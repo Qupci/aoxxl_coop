@@ -1967,7 +1967,7 @@ static int CurrentLevel() {
 
 // A zone event was flagged by the detection service (`det`) for hero `zh`.
 static void NoteBossRunZone(char* det, unsigned ev, int zh) {
-	if (!CoopP2Joined()) return;
+	if (!CoopP2Joined() && CoopSoloLevelLeaderAway() < 0) return;   // (single player: DispatchInBossRun)
 	EventTable et;
 	if (!et.Load()) return;
 	unsigned g = (ev & 0xFFFF) >> 3;
@@ -1991,6 +1991,25 @@ static void NoteBossRunZone(char* det, unsigned ev, int zh) {
 	}
 	for (int i = 0; i < r.ng; i++)
 		if (r.groups[i] == g) r.flaggedAt = GetTickCount();
+}
+
+// Is the group being dispatched that sends `msg` to the trio a boss run's (its
+// start, or one it enables that walks the sidekick on)?
+bool DispatchInBossRun(unsigned msg) {
+	EventTable et;
+	if (!et.Load()) return false;
+	const BossRun& r = g_bossRun;
+	for (int i = 0; i < g_nDispatching; i++) {
+		unsigned g = g_dispatching[i] >> 3;
+		if (g >= et.n) continue;
+		bool sends = false;
+		for (unsigned k = et.First(g), e = k + et.tab[g * 3]; k < e && !sends; k++) sends = et.IsTrio(k) && et.msgs[k] == msg;
+		if (!sends) continue;
+		if (GroupStartsBossRun(et, g)) return true;
+		for (int j = 0; r.level == CurrentLevel() && j < r.ng; j++)
+			if (r.groups[j] == g) return true;
+	}
+	return false;
 }
 
 bool BossRunDropsWalk(int ev) {
@@ -2218,6 +2237,80 @@ int NodeIndex(char* det, Hero h) {
 	return -1;
 }
 
+// Single player, sp_hero_switch_lock: you play the hero the level means as the
+// sidekick (its switch to the other dropped; CoopSoloLevelLeaderAway: the AI
+// companion `away` is the level's leader). A zone bound to the level's leader is
+// the player's in the game -- unless it orders that hero itself
+// (ZoneMeansItsHero) or means the pair away ("while outside"): it answers the
+// hero you play, tested with its node and last place, and no longer the AI
+// companion (LV2-10's boss gate: #34 the intro, #4 the boss, both bound to
+// Asterix -- Obelix walked through both, the AI Asterix behind him set them off).
+bool g_inSoloPass = false;
+
+static bool SoloZonesTick(char* det, void* edx, int arg, Trio t, int away) {
+	int iw = NodeIndex(det, t.GetHero(away)), iy = NodeIndex(det, t.GetHero(away ^ 1));
+	if (iw < 0 || iy < 0) return false;
+	struct List { int base, count; bool level; } lists[5] = {
+		{ 0x2C, 0x30, false }, { 0x34, 0x38, false }, { 0x3C, 0x40, false },
+		{ 0x44, 0x48, true }, { 0x4C, 0x50, true } };
+	size_t total = 0;
+	for (const List& l : lists) total += *(char**)(det + l.base) ? *(uint16_t*)(det + l.count) : 0;
+	static uint8_t saved[4096], moved[4096];
+	if (total > sizeof(saved)) return false;
+	size_t k = 0;
+	bool any = false;
+	for (const List& l : lists) {   // the first pass without the moved tests
+		char* e = *(char**)(det + l.base);
+		unsigned n = *(uint16_t*)(det + l.count);
+		for (unsigned i = 0; e && i < n; i++, e += 8, k++) {
+			saved[k] = (uint8_t)e[4];
+			moved[k] = (e[4] & 1) && *(uint16_t*)(e + 2) == (unsigned)iw && !(l.level && !(e[5] & 1)) &&
+			           !ZoneMeansItsHero(*(uint16_t*)(e + 6));
+			if (moved[k]) { any = true; e[4] &= ~1; }
+		}
+	}
+	float* prev = *(float**)(det + 0x1C);
+	float prevW[3], prevY[3];
+	memcpy(prevW, prev + 3 * iw, 12);
+	memcpy(prevY, prev + 3 * iy, 12);
+	g_origDetectTick(det, edx, arg);
+	if (any) {   // the second: only those, with the hero you play in the companion's place
+		k = 0;
+		for (const List& l : lists) {
+			char* e = *(char**)(det + l.base);
+			unsigned n = *(uint16_t*)(det + l.count);
+			for (unsigned i = 0; e && i < n; i++, e += 8, k++) e[4] = moved[k] ? (char)saved[k] : (char)(saved[k] & ~1);
+		}
+		char** nodes = *(char***)(det + 0x18);
+		float curW[3], curY[3];
+		memcpy(curW, prev + 3 * iw, 12);
+		memcpy(curY, prev + 3 * iy, 12);
+		std::swap(nodes[iw], nodes[iy]);
+		memcpy(prev + 3 * iw, prevY, 12);
+		memcpy(prev + 3 * iy, prevW, 12);
+		g_inSoloPass = true;
+		g_origDetectTick(det, edx, arg);
+		g_inSoloPass = false;
+		std::swap(nodes[iw], nodes[iy]);
+		memcpy(prev + 3 * iw, curW, 12);
+		memcpy(prev + 3 * iy, curY, 12);
+	}
+	k = 0;
+	for (const List& l : lists) {
+		char* e = *(char**)(det + l.base);
+		unsigned n = *(uint16_t*)(det + l.count);
+		for (unsigned i = 0; e && i < n; i++, e += 8, k++) e[4] = (char)saved[k];
+	}
+	static int s_told = 0, s_last = -1;
+	if (away != s_last && s_told < 20) {
+		s_told++;
+		Log("proximity: sp_hero_switch_lock: zones for %s (the level's leader) answer %s, the hero you play", HeroName(away),
+		    HeroName(away ^ 1));
+	}
+	s_last = away;
+	return true;
+}
+
 void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 	Trio t = GetTrio();
 	// (A fallen hero -- individual heroes -- counts here: zones bound to it are
@@ -2228,6 +2321,8 @@ void __fastcall DetectTickHook(char* det, void* edx, int arg) {
 	int ia = coop ? NodeIndex(det, t.GetHero(HERO_ASTERIX)) : -1;
 	int io = coop ? NodeIndex(det, t.GetHero(HERO_OBELIX)) : -1;
 	g_tickingDet = det;
+	int away = !coop && t && *(uint8_t*)(det + 0x2A) ? CoopSoloLevelLeaderAway() : -1;
+	if (away >= 0 && SoloZonesTick(det, edx, arg, t, away)) { g_tickingDet = nullptr; return; }
 	if (ia < 0 || io < 0) { g_origDetectTick(det, edx, arg); g_tickingDet = nullptr; return; }
 
 	float* prev = *(float**)(det + 0x1C);
@@ -2387,7 +2482,8 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		if (zh >= 0 && g_inSwappedPass && GroupCommandsTrio(eventId) && GroupPlaysCutscene(eventId)) CoopNoteStoryZone(zh);
 		NoteBossRunZone(g_tickingDet, eventId, zh);
 		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
-		    g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
+		    g_inSwappedPass ? " (the other hero's zone, for co-op)"
+		    : g_inSoloPass  ? " (the level's leader's zone, for the hero you play)" : "");
 	}
 	// (a blue circle's, a spinning platform's...: the level as it was, should
 	// the lock it starts need undoing)
@@ -2418,6 +2514,7 @@ void ProximityPassTo(char* roman, int receiver) {
 	slot->roman = roman; slot->receiver = receiver; slot->thrower = -1; slot->since = GetTickCount();
 }
 bool ProximityBossRunDropsWalk(int ev) { return BossRunDropsWalk(ev); }
+bool ProximityDispatchInBossRun(unsigned msg) { return DispatchInBossRun(msg); }
 void ProximityForgetMove(void* heroNode, const float at[3]) { ForgetMove(heroNode, at); }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
 

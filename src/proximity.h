@@ -23,6 +23,9 @@ bool ProximityInstallHooks();
 // zone by zone. In co-op those walks are dropped (each player runs their own
 // hero) -- does trio event `ev` belong to such a run, flagged just now?
 bool ProximityBossRunDropsWalk(int ev);
+// The event group being dispatched that sends trio message `msg` is a boss
+// run's (LV2-10, LV3-6: the boss woken, the sidekick walked on to markers).
+bool ProximityDispatchInBossRun(unsigned msg);
 // A hero was put somewhere else: the detection service's last position for it
 // becomes `at`, so the jump does not cross any zone on the way.
 void ProximityForgetMove(void* heroNode, const float at[3]);

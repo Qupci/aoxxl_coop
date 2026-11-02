@@ -8021,6 +8021,98 @@ const Step kSpFuse2[] = {
 	SHOT(7000, "fuse_x"), SHOT(8500, "fused"), SHOT(11000, "fused_later"),
 	END(13000),
 };
+// spbar2 (level 2; XXL_SPISOLATION=1 the game's own, or XXL_SPSECOND=1):
+// spfuse2 without X -- the Twister's spend, the bar left after it and how long
+// the companion stays Fusion-ready (LogTick: bar, tw).
+const Step kSpBar2[] = {
+	MARK(0, "spbar2"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix 1.5 units ahead of asterix (the trio's fusion range)" },
+	{ 1500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1: the Twister" },
+	SHOT(3300, "both_start"), SHOT(6000, "spin"), SHOT(9000, "spin_2"), SHOT(14000, "after"),
+	END(18000),
+};
+// spbarx2 (as spbar2): X once the bar has run out (9.2 s; the companion back in
+// the plain Twister at 11.2 s) -- no Fusion without combo left (user: the game
+// fused, free, and the tornado ran its full time from there).
+const Step kSpBarX2[] = {
+	MARK(0, "spbarx2"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix 1.5 units ahead of asterix (the trio's fusion range)" },
+	{ 1500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1: the Twister" },
+	SHOT(6000, "spin"),
+	TAP1(12000), TAP1(12400), TAP1(12800), TAP1(13200),
+	SHOT(13500, "after_x"), SHOT(17000, "later"), SHOT(22000, "later_2"),
+	END(26000),
+};
+// spboss210 (level 2, XXL_SPISOLATION=0; sp_hero_switch_lock on): you play
+// Obelix; sector 10's boss gate (#34 at x 1672.3: the intro cutscene, "Asterix
+// leads"; #4 at 1687.1: the boss wakes, "the sidekick walks to marker 22"),
+// both bound to Asterix, crossed by Obelix with Asterix 25 units back (user:
+// nothing for Obelix, the AI Asterix behind him set both off); p1's stick
+// during the intro (user: Obelix free in it).
+const Step kSpBoss210[] = {
+	MARK(0, "spboss210"), LOADSECTOR(200, 10),
+	PLACEAT(2500, HERO_ASTERIX, 1664.54f, -743.6f, -1210.02f), PLACEAT(2500, HERO_OBELIX, 1665.95f, -743.6f, -1210.66f),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	PLACEAT(5000, HERO_ASTERIX, 1640.0f, -742.5f, -1210.1f),
+	GLIDEAT(5300, HERO_OBELIX, 1678.0f, -742.8f, -1210.5f, 1500),
+	SHOT(7100, "intro"),
+	P1(7300, 0, 0, 1.0f, "p1 forward (during the intro)"), P1(8800, 0, 0, 0, "p1 stop"),
+	SHOT(8900, "intro_moved"),
+	CINE_ENTER(9300),
+	GLIDEAT(10800, HERO_OBELIX, 1695.0f, -742.8f, -1210.5f, 2000),
+	SHOT(13300, "boss_wake"), SHOT(16000, "boss_2"), SHOT(20000, "boss_3"),
+	END(23000),
+};
+// spboss36 (-Level 3, XXL_SPISOLATION=0; sp_hero_switch_lock on): spboss210 on
+// LV3-6 -- you play Obelix, Asterix 10 units back; Obelix crosses the rectangle
+// that loads the boss (-208.3 -> -226), drops onto #46 (wakes it, the sidekick
+// walked to a marker) and runs on to x -248.
+const Step kSpBoss36[] = {
+	MARK(0, "spboss36"), LOADSECTOR(200, 6),
+	PLACEAT(2500, HERO_ASTERIX, -208.28f, 11.5f, -200.22f), PLACEAT(2500, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	PLACEAT(5000, HERO_ASTERIX, -198.0f, 11.5f, -200.22f),
+	GLIDEAT(5300, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	SHOT(7500, "loaded"),
+	PLACEAT(9000, HERO_OBELIX, -232.0f, 16.0f, -173.9f),
+	SHOT(10500, "woken"),
+	GLIDEAT(11000, HERO_OBELIX, -248.0f, 11.0f, -173.4f, 3000),
+	SHOT(14500, "run"), SHOT(18000, "run_2"), SHOT(23000, "run_3"),
+	END(26000),
+};
+// spsq24 (level 2, XXL_SPISOLATION=0 XXL_GATELOG=1): LV2-4's arena fight (zone
+// 00D8: 2 squads, 60 Romans behind the gate) -- the squads round it, which the
+// gate counts (+0x154 >= -1) and which are active, as it goes (user: Romans came
+// that the counter did not count).
+const Step kSpSq24[] = {
+	MARK(0, "spsq24"), LOADSECTOR(200, 4),
+	PLACEAT(2500, HERO_ASTERIX, -8.0f, 3.0f, -570.5f), PLACEAT(2500, HERO_OBELIX, -6.9f, 3.0f, -571.1f),
+	{ 3500, S_SQUADS, HERO_ASTERIX, 0, 0, 120.0f, 0, "squads before" },
+	{ 4000, S_FLAGEV, 0x00D8, 0, 0, 0, 0, "zone 00d8: the arena's fight" },
+	{ 9000, S_SQUADS, HERO_ASTERIX, 0, 0, 120.0f, 0, "squads 5 s in" }, SHOT(9000, "fight"),
+	{ 20000, S_SQUADS, HERO_ASTERIX, 0, 0, 120.0f, 0, "squads 16 s in" }, SHOT(20000, "fight_2"),
+	END(21000),
+};
+// spsq24n (as spsq24; XXL_SPISOLATION=1 the game's own): Asterix walks to the
+// arena's north edge where the user's Obelix stood at 711 s (-24.1 2.1 -548.5)
+// -- inside squad 03DC9A3C's box (z -549.1..-489.7, not the gate's).
+const Step kSpSq24N[] = {
+	MARK(0, "spsq24n"), LOADSECTOR(200, 4),
+	PLACEAT(2500, HERO_ASTERIX, -8.0f, 3.0f, -570.5f), PLACEAT(2500, HERO_OBELIX, -6.9f, 3.0f, -571.1f),
+	{ 4000, S_FLAGEV, 0x00D8, 0, 0, 0, 0, "zone 00d8: the arena's fight" },
+	{ 9000, S_SQUADS, HERO_ASTERIX, 0, 0, 30.0f, 0, "squads 5 s in" },
+	GLIDEAT(10000, HERO_ASTERIX, -24.0f, 2.4f, -556.0f, 2000),
+	GLIDEAT(12500, HERO_ASTERIX, -24.14f, 2.1f, -548.52f, 1000),
+	SHOT(14000, "north_edge"),
+	{ 16000, S_SQUADS, HERO_ASTERIX, 0, 0, 30.0f, 0, "squads at the north edge" }, SHOT(16000, "north_edge_2"),
+	SHOT(20000, "north_edge_3"),
+	{ 21000, S_SQUADS, HERO_ASTERIX, 0, 0, 30.0f, 0, "squads later" },
+	END(22000),
+};
 // splockcork35 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=1; sp_hero_switch_lock
 // on): you play Asterix; LV3-5's cable car end -- zone 0C38 (flagged): Asterix
 // leads, Obelix put on the corkscrew, waits; Asterix hits the turnstile (user's
@@ -8112,6 +8204,12 @@ const Scenario kScenarios[] = {
 	SCENARIO("sphud2", kSpHud2),
 	SCENARIO("spfuse2", kSpFuse2),
 	SCENARIO("splockcork35", kSpLockCork35),
+	SCENARIO("spbar2", kSpBar2),
+	SCENARIO("spbarx2", kSpBarX2),
+	SCENARIO("spboss210", kSpBoss210),
+	SCENARIO("spboss36", kSpBoss36),
+	SCENARIO("spsq24", kSpSq24),
+	SCENARIO("spsq24n", kSpSq24N),
 	SCENARIO("splockcork21", kSpLockCork21),
 	SCENARIO("spgun33", kSpGun33),
 	SCENARIO("spslide2", kSpSlide2),
@@ -8756,6 +8854,11 @@ void LogTick(float t) {
 		}
 		char* tgt = *(char**)(h.raw() + 0xF8);   // the enemy the hero is after / holding, and its state (+0x21)
 		if (tgt && !IsBadReadPtr(tgt, 0x24)) line.Add(" tgt %p st %d", tgt, *(uint8_t*)(tgt + 0x21));
+		uint8_t atk = *(uint8_t*)(h.raw() + 0x135);
+		char* clk = *(char**)(h.raw() + 0x368);
+		if ((atk == 9 || atk == 10) && clk)   // a Twister: its spin's age (+0x164 start), partner near +0x189, fusion asked +0x188
+			line.Add(" tw %.2f n%d r%d", *(float*)(clk + 4) - *(float*)(h.raw() + 0x164), *(uint8_t*)(h.raw() + 0x189),
+			         *(uint8_t*)(h.raw() + 0x188));
 	}
 	line.Add(" | lead=%d p2=%s", tr.Leader(), CoopP2Joined() ? HeroName(CoopP2Hero()) : "-");
 	{   // shared health (game manager +0x40 -> +0x50 points, +0x51 shields) and each hero's dead bit (+0x390 bit 2)
@@ -8763,8 +8866,9 @@ void LogTick(float t) {
 		char* gm = yp ? (char*)yp->gameManager : nullptr;
 		char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
 		Hero a = tr.GetHero(HERO_ASTERIX), o = tr.GetHero(HERO_OBELIX);
-		if (cb) line.Add(" | hp=%d/%d dead=%d%d", *(uint8_t*)(cb + 0x50), *(uint8_t*)(cb + 0x51),
-		                 a ? (*(uint8_t*)(a.raw() + 0x390) >> 2) & 1 : 9, o ? (*(uint8_t*)(o.raw() + 0x390) >> 2) & 1 : 9);
+		if (cb) line.Add(" | hp=%d/%d dead=%d%d bar %.1f/%.1f%s", *(uint8_t*)(cb + 0x50), *(uint8_t*)(cb + 0x51),
+		                 a ? (*(uint8_t*)(a.raw() + 0x390) >> 2) & 1 : 9, o ? (*(uint8_t*)(o.raw() + 0x390) >> 2) & 1 : 9,
+		                 *(float*)(gm + 0xA4), *(float*)(gm + 0xA0), (*(uint32_t*)(cb + 0x10) & 0x4000) ? " full" : "");
 		int hp[2], sh[2], hits[2];
 		float gauge[2];
 		if (IndivStats(HERO_ASTERIX, &hp[0], &sh[0], &hits[0], &gauge[0]) && IndivStats(HERO_OBELIX, &hp[1], &sh[1], &hits[1], &gauge[1]))

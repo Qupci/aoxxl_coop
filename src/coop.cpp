@@ -3045,6 +3045,7 @@ void CoopFrame() {
 		GuardFrame();          // (second chance: romans_guard_downed)
 		ShowJoinHint(t);
 		TryJoin(t);
+		g.bossRunHero = -1;    // (noted for a co-op bring-along: the switch lock's boss runs)
 		return;
 	}
 
@@ -3998,23 +3999,30 @@ static void TrackTwisters(Trio t) {
 }
 
 static char __fastcall ChooseAttackHook(char* hero, void* edx, int current) {
-	char next = g_origChooseAttack(hero, edx, current);
 	// Single player, second chance (each hero its own combo bar): the AI
-	// companion's copy of the leader's Twister asks FUN_004963D0 with its own bar
-	// in the game's place -- never full: the plain Twister (9), whose spin never
-	// marks the partner near (+0x189), so X never fused them. The leader's kind
-	// (10: its bar full and the Fusion learned as it began) -- each frame: the
-	// chooser runs every tick, its 9 would replace the 10.
-	if (!g.p2Joined && next == 9 && (uint8_t)current != 9 && IndivActive() && (*(uint8_t*)(hero + 0x18) & 1)) {
+	// companion's copy of the leader's Twister asks FUN_004963D0, every tick,
+	// whether the bar is still full (the Fusion-ready Twister, 10) -- with the
+	// companion's own bar in the game's place, never full: the plain Twister (9),
+	// whose spin never marks the partner near (+0x189), so X never fused them.
+	// The game's one bar is the leader's: the chooser asks with it in place. Its
+	// rest after the Twister's spend runs out in a few seconds, and the companion
+	// falls back to the plain Twister, no longer Fusion-ready, as in the game.
+	if (!g.p2Joined && IndivActive() && (*(uint8_t*)(hero + 0x18) & 1)) {
 		Trio ts = GetTrio();
-		Hero lead = ts ? ts.GetHero(ts.Leader()) : Hero();
-		if (lead && lead.raw() != hero && *(uint8_t*)(lead.raw() + 0x135) == 10) {
+		int li = ts ? ts.Leader() : -1;
+		Hero lead = ts ? ts.GetHero(li) : Hero();
+		if ((li == HERO_ASTERIX || li == HERO_OBELIX) && lead && lead.raw() != hero && Twisting(lead)) {
+			int prev = IndivEnter(li);
+			char next = g_origChooseAttack(hero, edx, current);
+			IndivLeave(prev);
 			static int s_told = 0;
-			if ((uint8_t)current != 10 && s_told++ < 20)
-				Log("coop: the AI companion spins along with the leader's Twister (Fusion-ready, as the leader's)");
-			return 10;
+			if ((next == 9 || next == 10) && next != (char)current && s_told++ < 20)
+				Log("coop: the AI companion copies %s's Twister by %s's combo bar: %s", HeroName(li), HeroName(li),
+				    next == 10 ? "Fusion-ready (some left)" : "the plain one (none left)");
+			return next;
 		}
 	}
+	char next = g_origChooseAttack(hero, edx, current);
 	// Individual heroes: each Twister is its own (its own combo bar).
 	if (!g.p2Joined || g.suspended || next == 9 || next == 10 || IndivActive()) return next;
 	Trio t = GetTrio();
@@ -4060,8 +4068,50 @@ DWORD g_fusionAsked = 0;
 
 static uint8_t SubState(Hero h) { return *(uint8_t*)(h.raw() + 0x38E) & 0x3F; }
 
+// The Fusion's cost (FUN_00493810(3), in the leader's tick: the leader's bar)
+// was never asked for by the game: its X only needs the leader's Twister begun
+// Fusion-ready (10) and the partner once near (+0x189, kept). Once the bar's rest
+// after the Twister ran out, the AI companion fell back to the plain Twister (9:
+// spinning, 0x23, but no merge step) -- X still fused: the leader held merging
+// (0x25) until the companion's spin ended, then a whole fused tornado for free
+// (user, single player: a Twister of 20 s and more).
+bool CoopFusionAllowed(int lead) {
+	Trio t = GetTrio();
+	if (!t || (lead != HERO_ASTERIX && lead != HERO_OBELIX)) return false;
+	Hero l = t.GetHero(lead), o = t.GetHero(lead ^ 1);
+	if (!l || !o || *(uint8_t*)(l.raw() + 0x135) != 10 || *(uint8_t*)(o.raw() + 0x135) != 10) return false;
+	int hp, sh;
+	float gauge;
+	if (IndivStats(lead, &hp, &sh, nullptr, &gauge)) return gauge >= 0.0f;   // its own bar, full (some left)
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
+	return cb && (*(uint32_t*)(cb + 0x10) & 0x4000);
+}
+
 static char __fastcall FuseHook(char* hero, void* edx) {
 	Trio t = GetTrio();
+	// Co-op, or single player with the mod's features: a fusion asked for (the
+	// hero's own X, or the leader's the AI companion follows) only when it can be
+	// paid for and the partner can merge.
+	if (t && (g.p2Joined || g_config.SoloMod())) {
+		int li = g.p2Joined && g.sliced ? g.savedLeader : t.Leader();
+		Hero lh = t.GetHero(li);
+		uint8_t* own = (uint8_t*)(hero + 0x188);
+		uint8_t* lead = lh ? (uint8_t*)(lh.raw() + 0x188) : nullptr;
+		if ((*own || (lead && *lead)) && !CoopFusionAllowed(li)) {
+			static int s_told = 0;
+			if (s_told++ < 20) {
+				Hero o = (li == HERO_ASTERIX || li == HERO_OBELIX) ? t.GetHero(li ^ 1) : Hero();
+				bool ready = lh && o && *(uint8_t*)(lh.raw() + 0x135) == 10 && *(uint8_t*)(o.raw() + 0x135) == 10;
+				Log("coop: Twister Fusion refused -- %s", ready ? "no combo left on the leader's bar"
+				                                                : "a hero not in the Fusion-ready Twister");
+			}
+			*own = 0;
+			if (lead) *lead = 0;
+			return 0;
+		}
+	}
 	if (!g.p2Joined || !t) return g_origFuse(hero, edx);
 	int me = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
 	int leadIdx = g.sliced ? g.savedLeader : t.Leader();   // the real leader, also inside a sliced tick
@@ -4217,6 +4267,27 @@ static void SoloPotionDash(Trio t) {
 static void SoloBeforeLifeTick(int heroIndex, Hero hero) {
 	Trio t = GetTrio();
 	SoloPotionDash(t);
+	// sp_hero_switch_lock, you play the hero the level means as the sidekick: a
+	// cutscene holds the level's leader (LV2-10's boss intro: the AI Asterix) --
+	// the hero you play, not in it, walked on unseen (user: Obelix free in the
+	// intro). It takes no input while the cutscene is up.
+	if (t && heroIndex == t.Leader() && CutsceneBars() && CoopSoloLevelLeaderAway() >= 0) {
+		InputManager im = GetInputManager();
+		if (im) {
+			static uint8_t s_still[kMaxActions + 64];
+			uint8_t** values = (uint8_t**)(im.raw() + 0x1C);
+			g.savedValues = *values;
+			*values = s_still;
+			g.savedBindings = nullptr;
+			g.swapped = true;
+			static DWORD s_toldAt = 0;
+			static int s_told = 0;
+			if (GetTickCount() - s_toldAt > 3000 && s_told++ < 20)
+				Log("coop: sp_hero_switch_lock: a cutscene -- %s, the hero you play, holds still", HeroName(heroIndex));
+			s_toldAt = GetTickCount();
+		}
+		return;
+	}
 	if (!t || !IndivFallen(heroIndex) || heroIndex == t.Leader() || (heroIndex != HERO_ASTERIX && heroIndex != HERO_OBELIX))
 		return;
 	uint8_t f = *F18(hero);
@@ -4458,6 +4529,14 @@ struct SoloLock {
 
 static bool SoloSwitchLockOn() { return !g.p2Joined && g_config.spSwitchLock; }
 
+int CoopSoloLevelLeaderAway() {
+	if (!SoloSwitchLockOn() || g.suspended || g_solo.level != g.lastLevel) return -1;
+	Trio t = GetTrio();
+	int l = t ? t.Leader() : -1, ll = g_solo.levelLeader;
+	if ((l != HERO_ASTERIX && l != HERO_OBELIX) || (ll != HERO_ASTERIX && ll != HERO_OBELIX) || ll == l) return -1;
+	return ll;
+}
+
 static bool SoloDropsSwitch(int ev) {
 	if (!SoloSwitchLockOn() || !IsLeaderSwitch(ev)) return false;
 	extern void* g_trioEventCaller;
@@ -4529,6 +4608,17 @@ static void SoloOrderNeedsLead(int ev) {
 	if (from < 0x46B180 || from >= 0x46B331 || !t) return;
 	g_solo.release = -1;   // (the level's own order for the sidekick from now)
 	if (t.Leader() == lead) return;
+	// A boss run's (LV2-10, LV3-6: the boss woken, the sidekick walked to a
+	// marker in the arena, where it waits): the hero you play woke it and fights
+	// it, the companion goes to the marker in the other's place (user: lent to
+	// Asterix, he stood back at the gate while the boss went for Obelix alone).
+	if (ProximityDispatchInBossRun(e)) {
+		static int s_boss = 0;
+		if (s_boss++ < 20)
+			Log("coop: sp_hero_switch_lock: a boss run's order for the sidekick (%04X) -- %s goes, %s keeps the lead", e,
+			    HeroName(OtherHero(t.Leader())), HeroName(t.Leader()));
+		return;
+	}
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) meaning %s -- %s leads for it first", e,
@@ -4601,6 +4691,7 @@ static void SoloSwitchLockWatch(Trio t) {
 	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
 	if (s.choice < 0) {
 		s.choice = l;
+		if (s.levelLeader < 0) s.levelLeader = l;   // (the level's leader as it begins: its zones are that hero's)
 		Log("coop: sp_hero_switch_lock: you play %s", HeroName(l));
 	}
 	if (l == s.choice || IndivFallenHero() >= 0) { s.freeSince = s.farSince = 0; return; }
