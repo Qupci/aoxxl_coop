@@ -8006,6 +8006,68 @@ const Step kSpGun33[] = {
 	SHOT(15500, "left"),
 	END(16500),
 };
+// spfuse2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 / 0): single player, every
+// combo learned, the bar full; player 1's Twister, the AI Obelix beside spins
+// along; X while both spin: the Twister Fusion (user: none with second chance).
+const Step kSpFuse2[] = {
+	MARK(0, "spfuse2"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix 1.5 units ahead of asterix (the trio's fusion range)" },
+	{ 1500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2400, S_WATCHRW, HERO_OBELIX, 0x189, 0, 0, 0, "obelix's 'partner near' (+0x189): who reads / writes it" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1: the Twister" },
+	SHOT(3300, "both_start"), SHOT(4800, "both_spin"),
+	TAP1(5000), TAP1(5400), TAP1(5800), TAP1(6200), TAP1(6600),
+	SHOT(7000, "fuse_x"), SHOT(8500, "fused"), SHOT(11000, "fused_later"),
+	END(13000),
+};
+// splockcork35 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=1; sp_hero_switch_lock
+// on): you play Asterix; LV3-5's cable car end -- zone 0C38 (flagged): Asterix
+// leads, Obelix put on the corkscrew, waits; Asterix hits the turnstile (user's
+// spot -143.4 5.5 -257.7), Obelix rises, jumps off at the top (0C08's 484C) into
+// box 0340 (4801 "Obelix leads" + 4803): the switch dropped -- Obelix must follow
+// after (user: held there for good).
+const Step kSpLockCork35[] = {
+	MARK(0, "splockcork35"), LOADSECTOR(200, 5),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, -168.0f, 5.6f, -255.5f), PLACEAT(3000, HERO_OBELIX, -174.3f, -0.6f, -261.6f),
+	FORCE(3400, HERO_OBELIX, 0),
+	{ 4000, S_FLAGEV, 0x0C38, 0, 0, 0, 0, "zone 0c38: asterix leads, obelix on the corkscrew waits" },
+	SHOT(5000, "obelix_waits"),
+	GLIDEAT(5500, HERO_ASTERIX, -150.0f, 5.55f, -257.2f, 1200),
+	GLIDEAT(6800, HERO_ASTERIX, -143.39f, 5.54f, -257.725f, 900),
+	SHOT(7900, "at_the_turnstile"),
+	TAP1(8000), TAP1(8450), TAP1(8900), TAP1(9350), TAP1(9800), TAP1(10250), TAP1(10700), TAP1(11150), TAP1(11600), TAP1(12050), TAP1(12500), TAP1(12950), TAP1(13400), TAP1(13850), TAP1(14300), TAP1(14750), TAP1(15200), TAP1(15650), TAP1(16100), TAP1(16550), TAP1(17000), TAP1(17450), TAP1(17900), TAP1(18350), TAP1(18800), TAP1(19250), TAP1(19700), TAP1(20150), TAP1(20600), TAP1(21050), TAP1(21500), TAP1(21950),
+	SHOT(14000, "rising"), SHOT(18000, "rising_2"), SHOT(22500, "after_turns"),
+	SHOT(26000, "after"), SHOT(30000, "later"),
+	END(33000),
+};
+// splockcork21 (level 2, XXL_SPISOLATION=0; sp_hero_switch_lock on):
+// splockcork35's LV2-1 mirror -- you play Obelix; Asterix (put there) on the
+// spinning platform's circle waits; Obelix through zone 03C8, to the turnstile
+// (0528: Asterix walks onto the platform), hits it: Asterix rises, jumps off at
+// the top (0530's 484C) into box 0058 ("Asterix leads"): dropped -- Asterix
+// must follow after.
+const Step kSpLockCork21[] = {
+	MARK(0, "splockcork21"),
+	FORCE(800, HERO_OBELIX, 1), PLACEAT(1000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1000, HERO_OBELIX, -763.0f, 516.5f, -980.5f), FORCE(1400, HERO_OBELIX, 0),
+	{ 1800, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(2200, HERO_ASTERIX, 1),
+	GLIDEAT(2400, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(4000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	{ 5100, S_FLAGEV, 0x0050, 0, 0, 0, 0, "the circle's landing event 0050: obelix leads, asterix waits" },
+	FORCE(5200, HERO_ASTERIX, 0),
+	PLACEAT(5400, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	SHOT(6000, "asterix_waits"),
+	GLIDEAT(6300, HERO_OBELIX, -744.5f, 515.6f, -977.8f, 1500),   // through zone 03C8 (turnstile21c)
+	GLIDEAT(8000, HERO_OBELIX, -775.878f, 515.614f, -990.0f, 2000),
+	GLIDEAT(10200, HERO_OBELIX, -775.878f, 515.614f, -983.604f, 600),
+	SHOT(12000, "at_turnstile"),
+	TAP1(13000), TAP1(13500), TAP1(14000), TAP1(14500), TAP1(15000), TAP1(15500), TAP1(16000), TAP1(16500), TAP1(17000), TAP1(17500), TAP1(18000), TAP1(18500), TAP1(19000), TAP1(19500), TAP1(20000), TAP1(20500), TAP1(21000), TAP1(21500), TAP1(22000), TAP1(22500), TAP1(23000), TAP1(23500), TAP1(24000), TAP1(24500), TAP1(25000),
+	SHOT(17000, "rising"), SHOT(21000, "rising_2"), SHOT(25500, "after_turns"),
+	SHOT(29000, "after"), SHOT(33000, "later"),
+	END(35000),
+};
 // sphud2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1): second
 // chance's two health rows -- Asterix's (red) first, Obelix's (blue) under it:
 // shown by a hit on Obelix, then one on Asterix; the switch to Obelix (the rows
@@ -8048,6 +8110,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("spguard41", kSpGuard41),
 	SCENARIO("spmod2", kSpMod2),
 	SCENARIO("sphud2", kSpHud2),
+	SCENARIO("spfuse2", kSpFuse2),
+	SCENARIO("splockcork35", kSpLockCork35),
+	SCENARIO("splockcork21", kSpLockCork21),
 	SCENARIO("spgun33", kSpGun33),
 	SCENARIO("spslide2", kSpSlide2),
 	SCENARIO("spslidemode2", kSpSlideMode2),

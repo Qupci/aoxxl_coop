@@ -3999,6 +3999,22 @@ static void TrackTwisters(Trio t) {
 
 static char __fastcall ChooseAttackHook(char* hero, void* edx, int current) {
 	char next = g_origChooseAttack(hero, edx, current);
+	// Single player, second chance (each hero its own combo bar): the AI
+	// companion's copy of the leader's Twister asks FUN_004963D0 with its own bar
+	// in the game's place -- never full: the plain Twister (9), whose spin never
+	// marks the partner near (+0x189), so X never fused them. The leader's kind
+	// (10: its bar full and the Fusion learned as it began) -- each frame: the
+	// chooser runs every tick, its 9 would replace the 10.
+	if (!g.p2Joined && next == 9 && (uint8_t)current != 9 && IndivActive() && (*(uint8_t*)(hero + 0x18) & 1)) {
+		Trio ts = GetTrio();
+		Hero lead = ts ? ts.GetHero(ts.Leader()) : Hero();
+		if (lead && lead.raw() != hero && *(uint8_t*)(lead.raw() + 0x135) == 10) {
+			static int s_told = 0;
+			if ((uint8_t)current != 10 && s_told++ < 20)
+				Log("coop: the AI companion spins along with the leader's Twister (Fusion-ready, as the leader's)");
+			return 10;
+		}
+	}
 	// Individual heroes: each Twister is its own (its own combo bar).
 	if (!g.p2Joined || g.suspended || next == 9 || next == 10 || IndivActive()) return next;
 	Trio t = GetTrio();
@@ -4436,6 +4452,8 @@ struct SoloLock {
 	int   level = -1;        // ... in this level
 	DWORD freeSince = 0, farSince = 0;
 	int   levelLeader = -1;  // the hero the level's last switch (an event group's) means to lead
+	int   release = -1;      // a dropped switch's hero, held by the level then: freed once it waits (SoloReleaseWatch)
+	DWORD releaseAt = 0;
 } g_solo;
 
 static bool SoloSwitchLockOn() { return !g.p2Joined && g_config.spSwitchLock; }
@@ -4459,7 +4477,40 @@ static bool SoloDropsSwitch(int ev) {
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: no lock) ignored -- %s keeps the lead",
 		    ev & 0xFFFF, group, HeroName(t.Leader()));
+	// The switch is what frees a hero the level held (LV3-5: Obelix jumps off the
+	// corkscrew -- 484C, AI order 2 -- into box 0340: "Obelix leads" + "the
+	// sidekick may move"). Dropped, the group's 4803 reaches him mid-jump, where
+	// the trio takes no new order (FUN_00481810), and the jump ends in a wait (3):
+	// held for good. SoloReleaseWatch frees him once he waits.
+	Hero th = t.GetHero(to);
+	if (th && th.Order() != AI_FOLLOW_LEADER) {
+		g_solo.release = to;
+		g_solo.releaseAt = GetTickCount();
+	}
 	return true;
+}
+
+// A dropped switch's hero (SoloDropsSwitch), held by the level as it came (a
+// jump to a mark, a wait): the level meant it to lead -- no wait was meant for
+// it. Once it waits (AI order 3, its jump or walk done), trio 4803 ("the sidekick
+// may move"): it follows the hero you play. Not after 10 s, nor once it leads,
+// nor after a later order of the level's for the sidekick (SoloOrderNeedsLead).
+static void SoloReleaseWatch(Trio t) {
+	SoloLock& s = g_solo;
+	if (s.release < 0) return;
+	Hero h = t.GetHero(s.release);
+	if (!h || t.Leader() == s.release || GetTickCount() - s.releaseAt > 10000 || h.Order() == AI_FOLLOW_LEADER) {
+		s.release = -1;
+		return;
+	}
+	if ((int)h.Order() != 3 || IndivFallen(s.release)) return;
+	static int s_told = 0;
+	if (s_told++ < 20)
+		Log("coop: sp_hero_switch_lock: %s, the dropped switch's hero, waits where the level held it -- trio 4803, it follows",
+		    HeroName(s.release));
+	s.release = -1;
+	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
 }
 
 // A level's order for "the sidekick" (wait here, walk / run / be put at a
@@ -4475,7 +4526,9 @@ static void SoloOrderNeedsLead(int ev) {
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	Trio t = GetTrio();
-	if (from < 0x46B180 || from >= 0x46B331 || !t || t.Leader() == lead) return;
+	if (from < 0x46B180 || from >= 0x46B331 || !t) return;
+	g_solo.release = -1;   // (the level's own order for the sidekick from now)
+	if (t.Leader() == lead) return;
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) meaning %s -- %s leads for it first", e,
@@ -4537,11 +4590,13 @@ static void SoloSwitchLockWatch(Trio t) {
 	if (!SoloSwitchLockOn() || !t || s.level != g.lastLevel) {
 		s.choice = -1;
 		s.levelLeader = -1;
+		s.release = -1;
 		s.level = g.lastLevel;
 		s.freeSince = s.farSince = 0;
 		return;
 	}
 	if (!CoopGameplayLive()) { s.freeSince = s.farSince = 0; return; }   // (a cutscene's: your hero stays yours)
+	SoloReleaseWatch(t);
 	int l = t.Leader();
 	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
 	if (s.choice < 0) {
