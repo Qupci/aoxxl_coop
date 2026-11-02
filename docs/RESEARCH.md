@@ -3786,3 +3786,27 @@ both halves).
   fire alone; joined, fired, A, lead back), splockev2 (S_FLAGEV 0020 with Asterix held: kept, he leads; S_FLAGEV
   0348 with Obelix held: dropped, Asterix keeps the lead, Obelix order 0), spfindkeg2; splockcar21 (rope car: S_CARPOS
   never reaches the ride's end -- the landing itself not covered); splever25, splock21, co-op obelixgun33 unchanged.
+- Round 202 (user: round 201's cases fixed; three reports, userlogs 20261102-xxl_coop.lv3-5_strange_landing_switches.log).
+  (1) Second chance on the belly slide: a fall started a revive -- IndivHeroDown's game over at once only knew
+  co-op's CoopSuspended (the boat's death went the game's own way). Now also g.solo with either hero in mode 3
+  (slide) or 1 (boat). The slide no longer starts from slidecross's sector load (its cross detector, z -903.82,
+  waits for LV2-2's opening); spslidemode2 checks the rule: Obelix's f18 0x0D (mode 3) 50 ms around Asterix's
+  XXL_DOWNAT -> "down too ... during a scripted mode -- game over".
+  (2) LV3-4's launcher to LV3-5, two hops of the lead: (a) zone 0B10's "Asterix leads" arrived mid-flight
+  (CoopDeferTrioEvent: deferred to the landing, then re-sent by the mod -- out of the dispatch) and (b) event
+  0850's group 10A (27 targets: CKHkLight 0999/099B, trio 4800 + 4803, detectors, camera sectors 0700, a
+  CKManageEventCinematicBloc 0x624C2C <- 0501 -- round 30: it starts its node, a music stream) was kept as "plays a
+  cutscene"; both handed back 0.3 s later. GroupOnlySwitches no longer asks GroupPlaysCutscene (targets up to 64);
+  what keeps a switch is the group's own trio orders. Dropping a switch the level relies on later (LV2-10's boss: #34
+  "Asterix leads" + 4803, then #4's 4829 "the sidekick walks to marker 22" -- meant for Obelix) is made safe:
+  g_solo.levelLeader = the hero every group switch from the dispatch means to lead (dropped or kept);
+  SoloOrderNeedsLead (CoopDeferTrioEvent, before the event runs): a group order for the sidekick (4802,
+  4813..4876, 48BB..48EC) while the other hero leads -> CoopGiveLead(levelLeader) first, the order reaches the
+  hero the level meant, a hold of yours the watch gives back. splockord2: S_FLAGEV 0020 with Obelix played (dropped),
+  then 0528 (its group 0A5: 482D + detectors + a camera bloc): "Asterix leads for it first", Obelix order 1.
+  (3) The Twister's camera (user: no pull-back or shake in LV3-4's arena, after player 2 had joined and left at the
+  level's start): sptwist2 / sptwist2j (S_CAMFOV: renderer fov svc +0x18 -> +0x28, the view window, the shake at
+  +0xC bit 0x1000 / +0x668..+0x680): LV2, with or without a join first, fov 70 -> 120, view window 0.934 -> 2.309,
+  shake 24 s / 0.05 -- the round-200 Twister push change (contact handler, push vector only) leaves it alone.
+  sptwist34 (-Level 3, the arena via S_FLAGEV 0578: an activator, the squad, 4821, a music bloc): no Roman came to
+  Asterix in 20 s (S_ENEMY found none visible), no Twister -- not reproduced; isolated and not the same.
