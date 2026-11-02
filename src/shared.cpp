@@ -132,6 +132,10 @@ int Route(int map, uint32_t action) {
 uint8_t __fastcall GetActionHook(char* view, void* edx, uint32_t action) {
 	uint8_t v = g_origGetAction(view, edx, action);
 	if (g.logActions > 0) LogAction(view, action, v, _ReturnAddress());
+	// Single player: Obelix alone on the machine gun, Asterix on his way to it
+	// (coop.cpp SoloGunFrame) -- he turns it, nobody fires (user; the game's X,
+	// his own, fired it).
+	if (!g.joined && v && action == 2 && CoopSoloGunAlone() && MapOf(view) == MAP_GUN) return 0;
 	if (!g.joined || !g.p1 || !g.p2) return v;
 	int map = MapOf(view);
 	if (map == MAP_OTHER) return v;

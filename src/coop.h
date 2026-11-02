@@ -112,6 +112,8 @@ void CoopSoloSwitchRequest();
 // Single player ([debug] cheats): the mod's buttons pressed with R3 held (PAD_*
 // bits; autotests).
 void CoopSoloModRequest(int buttons);
+// Single player: Obelix alone on the machine gun, Asterix on his way (no fire).
+bool CoopSoloGunAlone();
 // No-lock mode: `hero` has a scripted order the mode leaves unfollowed (it would be waiting).
 bool CoopNoLockWaiting(int hero);
 // An event that commands the trio was just flagged (before its group runs): the

@@ -7856,6 +7856,78 @@ const Step kSpMod2[] = {
 	{ 8500, S_SPMOD, PAD_Y, 0, 0, 0, 0, "R3 + Y" },
 	END(9500),
 };
+// splockcar21 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock
+// on): the user's -- Asterix leading boards LV2-1's rope cable car (its boarding
+// hands Obelix the lead: kept, Asterix locked); the car pulled to its rope's end,
+// Asterix lands through zone 0020 ("switch to Asterix" + "the sidekick may
+// move"): the switch is to the hero you play -- kept, Asterix leads again.
+const Step kSpLockCar21[] = {
+	MARK(0, "splockcar21"),
+	PLACEAT(1400, HERO_ASTERIX, -782.0f, 511.5f, -1059.9f),
+	GLIDEAT(1500, HERO_ASTERIX, -790.45f, 510.6f, -1059.94f, 1200),
+	P1(2800, 0, -1, 0, "p1 left (held)"), P1(3300, 0, 0, 0, "p1 neutral"),
+	PLACEAT(3600, HERO_ASTERIX, -793.761f, 511.812f, -1060.196f),   // the car's seat
+	SHOT(4500, "in_the_car"),
+	{ 6000, S_CARPOS, HERO_ASTERIX, 0, 0, 6.0f, 0, "car along its rope" },
+	{ 7000, S_CARPOS, HERO_ASTERIX, 0, 0, 12.0f, 0, "car along its rope" },
+	{ 8000, S_CARPOS, HERO_ASTERIX, 0, 0, 18.0f, 0, "car along its rope" },
+	{ 9000, S_CARPOS, HERO_ASTERIX, 0, 0, 24.0f, 0, "car along its rope" },
+	{ 10000, S_CARPOS, HERO_ASTERIX, 0, 0, 30.0f, 0, "car along its rope" },
+	SHOT(12000, "end"), SHOT(15000, "after"),
+	END(16000),
+};
+// spfindkeg2 (level 2): the event groups sending the trio Idefix's follow (4878)
+// and "switch to Asterix" (4800) -- the keg's and the rope car's end.
+const Step kSpFindKeg2[] = {
+	MARK(0, "spfindkeg2"),
+	{ 2000, S_FINDGROUPS, 0x6256A0, 0x4878, 0, 2.0f, 0, "groups: idefix follows" },
+	{ 2100, S_FINDGROUPS, 0x6256A0, 0x4800, 0, 2.0f, 0, "groups: switch to asterix" },
+	END(3000),
+};
+// splockev2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
+// the user's two -- (1) Asterix held by a lock that gave Obelix the lead (4801 +
+// 4802, as a rope car's boarding), then LV2-1's landing zone 0020 (its group
+// 004: "switch to Asterix" + "the sidekick may move"): the switch is to the hero
+// you play -- kept, Asterix leads at once. (2) Asterix leading, Obelix held
+// (4802), then the groups sending Idefix's follow (069, 0AA -- the keg's: 4801 +
+// 4803 + 4878): the switch to Obelix dropped, Asterix keeps the lead, no hop.
+const Step kSpLockEv2[] = {
+	MARK(0, "splockev2"),
+	{ 2000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads (a lock's switch)" },
+	{ 2000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix waits (the lock)" },
+	SHOT(3000, "asterix_held"),
+	{ 4000, S_FLAGEV, 0x0020, 0, 0, 0, 0, "zone 0020: switch to asterix + the sidekick may move" },
+	SHOT(5000, "asterix_leads"),
+	{ 6000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits" },
+	{ 7000, S_FLAGEV, 0x0348, 0, 0, 0, 0, "group 069 (sends 4878)" },
+	{ 8500, S_FLAGEV, 0x0550, 0, 0, 0, 0, "group 0AA (sends 4878)" },
+	SHOT(9500, "after_keg"),
+	END(10500),
+};
+// spgun33 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=0): single player, Obelix
+// leading takes LV3-3's machine gun (X): he turns it, nobody fires; Asterix, the
+// AI companion 13 units off, runs to it and joins as its gunner (the lead his,
+// player 1 fires); A leaves -- the lead back to Obelix.
+const Step kSpGun33[] = {
+	MARK(0, "spgun33"), LOADSECTOR(200, 3),
+	FORCE(2800, HERO_OBELIX, 1), PLACEAT(3000, HERO_ASTERIX, 284.4f, 31.92f, -325.9f), PLACEAT(3000, HERO_OBELIX, 289.3f, 31.92f, -325.6f),
+	FORCE(3400, HERO_OBELIX, 0), SECTORS(3500),
+	{ 4000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(4300, HERO_ASTERIX, 1), PLACEAT(4500, HERO_ASTERIX, 276.0f, 31.92f, -326.0f), PLACEAT(4500, HERO_OBELIX, 289.3f, 31.92f, -325.6f),
+	SHOT(5500, "by_the_gun"),
+	P1(6000, PAD_X, 0, 0, "p1 X: obelix takes the gun (asterix held back)"), P1(6200, 0, 0, 0, "p1 release"),
+	SHOT(7000, "obelix_on"),
+	P1(7200, 0, -1.0f, 0, "p1 turns left"), P1(7800, 0, 0, 0, "p1 release"),
+	P1(8000, PAD_X, 0, 0, "p1 X (alone: no fire)"), P1(8400, 0, 0, 0, "p1 release"),
+	SHOT(8600, "alone_x"),
+	FORCE(9000, HERO_ASTERIX, 0),
+	SHOT(9800, "asterix_coming"), SHOT(12000, "joined"),
+	P1(12500, PAD_X, 0, 0, "p1 fires"), P1(12900, 0, 0, 0, "p1 release"),
+	SHOT(13100, "fired"),
+	P1(14000, PAD_A, 0, 0, "p1 A: leaves"), P1(14200, 0, 0, 0, "p1 release"),
+	SHOT(15500, "left"),
+	END(16500),
+};
 // sphud2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1): second
 // chance's two health rows -- Asterix's (red) first, Obelix's (blue) under it:
 // shown by a hit on Obelix, then one on Asterix; the switch to Obelix (the rows
@@ -7898,6 +7970,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("spguard41", kSpGuard41),
 	SCENARIO("spmod2", kSpMod2),
 	SCENARIO("sphud2", kSpHud2),
+	SCENARIO("spgun33", kSpGun33),
+	SCENARIO("splockev2", kSpLockEv2),
+	SCENARIO("spfindkeg2", kSpFindKeg2),
+	SCENARIO("splockcar21", kSpLockCar21),
 	SCENARIO("hudhints", kHudHints),
 	SCENARIO("combohint2", kComboHint2),
 	SCENARIO("combohint2b", kComboHint2B),

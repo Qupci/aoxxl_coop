@@ -1727,8 +1727,9 @@ bool GroupOnlyLeadsTo(unsigned ev, int up) {
 
 // Does event `ev`'s group only switch the lead (sp_hero_switch_lock, coop.cpp):
 // to the trio nothing but switches (0x4800 / 0x48B7 Asterix, 0x4801 / 0x48B8
-// Obelix), "the sidekick may move" (0x4803) and the fight mode's timer (0x2000),
-// no cutscene? Its switches into `out` (their count; 0 for any other group).
+// Obelix), "the sidekick may move" (0x4803), the fight mode's timer (0x2000) and
+// Idefix's orders, no cutscene? Its switches into `out` (their count; 0 for any
+// other group).
 int GroupOnlySwitches(unsigned ev, uint16_t* out, int max) {
 	char* objs[32];
 	uint16_t msgs[32];
@@ -1738,6 +1739,9 @@ int GroupOnlySwitches(unsigned ev, uint16_t* out, int max) {
 		if (!objs[i] || *(uintptr_t*)objs[i] != 0x6256A0) continue;
 		unsigned m = msgs[i];
 		if (m == 0x4803 || m == 0x2000) continue;
+		// Idefix's wait / follow and his teleports to markers (LV2-1's keg: 4801 +
+		// 4803 + 4878 -- the switch was kept, given back 0.3 s later: user)
+		if (m == 0x4877 || m == 0x4878 || (m >= 0x4885 && m <= 0x48B6)) continue;
 		if (m != 0x4800 && m != 0x4801 && m != 0x48B7 && m != 0x48B8) return 0;
 		if (k < max) out[k++] = (uint16_t)m;
 	}
