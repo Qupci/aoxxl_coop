@@ -3701,3 +3701,59 @@ both halves).
   the area hit takes the last point), spcork21d / spcork21e (Obelix down after 03C8 freed Asterix: the sequence
   set back; Obelix down with Asterix still on the circle: the lock undone, Asterix on solid ground, revives him).
   Co-op unchanged: combohint2, downcombo.
+- Round 200 (user's pad test of round 199 -- switching and the revive softlock cases fine; notes and choices).
+  Config: [single_player] sp_isolation (on): single player is the game's own -- config.cpp clears every sp_ flag
+  (the ini's values logged), and the general options' single player parts ask CoopConfig::SoloMod() (obelix_potion,
+  cheats and the mod buttons; difficulty_coop_only taken as on); only the join hint stays. sp_combo_hints /
+  sp_coop_icons / sp_hero_switch on by default, sp_second_chance off; sp_obelix_potion gone ([coop] obelix_potion
+  covers single player with SoloMod). Env aids XXL_SPISOLATION, XXL_SPSWITCHLOCK (XXL_SPPOTION gone).
+  (1) The hop over a downed hero: the fallen one is kept in the player variant (SoloBeforeLifeTick), so the leader
+  walking into it was "touched by a player's hero" -- pushed aside and hopping (FUN_0049CDF0, vertical speed 12; round
+  44). HeroSendEventHook's contact rule (the other hero passes for a waiting sidekick: +0x18 bit 0, +0x561 = 3) now
+  also runs without player 2 while a hero is down (user: the sidekick's own hop stays). Watch: S_WATCHRW x 7 is armed
+  on the watchdog's next 2 s tick -- set it well before the move (one watch at a time: a second replaces it).
+  (2) The revive countdown: hints.cpp's player 2 box is a second box at the bottom left without player 2
+  (HINT_LEFT_BOX, own hints only -- not HINT_BOTH); TimeLimit shows there in single player (in player 1's box it
+  took turns with the revive bar, same key HINT_REVIVE, every 250 ms). The potion's flask (LayoutFlask) keeps the
+  game's corner and rises over it as in co-op.
+  (3) sp_hero_switch_lock (with sp_hero_switch): event groups are flagged by inlined code in many places
+  (CKHkActivator's lever among them: 0x460C20's detour never saw it), so the groups are known at their dispatch:
+  CKSrvEvent::vf17 (vtable 0x624FF0 slot 17, 0x46B180, thiscall(arg), RET 4 -- wrapped with no argument it
+  crashed at startup) wrapped -- the groups about to run noted (table +0xC: 3 bytes per group, count / mask /
+  flags; first set +0x1C groups run with any flag, the next +0x1E and +0x20 with flags == mask); a trio switch
+  (4800/4801/48B7/48B8) from the dispatch (callers 0x46B1F3 / 0x46B276 / 0x46B2FA) is dropped when the groups under
+  way that send it only switch (GroupOnlySwitches: trio messages only switches, 0x4803, 0x2000; no cutscene).
+  coop.cpp SoloSwitchLockWatch: `choice` = the leader at the level's start, then the switch button / R3 + X; the
+  leader not the choice and the choice free (SoloSwitchRefusal null) for 0.3 s -> CoopGiveLead(choice); "too far"
+  for 3 s -> the leader becomes the choice; nothing while a hero is down or the choice's lock sequence goes on
+  (g_seqHero == choice && SequenceUnderWay: LV2-1, 03C8 frees Asterix but 0528 at the turnstile walks "the
+  companion" onto the platform -- given the lead back, Obelix was sent there). LocksTracked() (p2, second chance,
+  cheats in single player, the switch lock) gates the lock bookkeeping (NoteTrioEventFlagged, 4802/4803, the AI's
+  rides, the pending lead). The automatic cable car (CKHkTelepher) sends no switch: the rider keeps the lead.
+  (4) Second chance + the co-op rules: GuardFrame / WatchPendingLead also run in the single player frame, guard.cpp's
+  gates take IndivActive (romans_guard_downed); the single player bundle loop puts a catapult's blow on its hitter's
+  combo bar (CatapultHitter, as TickLife).
+  (5) Two health rows (hud2.cpp SoloRows: second chance, no merchant open): the game's HUD is the leader's (HudOwner
+  -> the trio leader; hints.cpp's tick enters Hud2HudHero()), the other hero's health a copy ticked as player 2's
+  (s2, health part only, the HUD button and "changed" shown on both rows); when the lead changes hands
+  SoloBeforeTick swaps s1 / s2 (and their changed / pending bookkeeping). Draw: DrawHudHook runs Hud2BeginP1 /
+  the game's / DrawP2Hud in single player too; Obelix's row kRowGap (0.085 of the screen's height) under
+  Asterix's, whichever leads (Xf3d on elements 0-30). Colours (tint.cpp): the shields' textures (X8R8G8B8 64x64 /
+  32x32 here; DXT1/3/5 by end colours, 565 / 1555 / 4444 too) copied per hero into managed textures, each texel
+  0.2 itself + 0.8 luma x colour x 1.75 (Asterix 1 / .32 / .26, Obelix .30 / .52 / 1); bound in the original's
+  place by a wrapper on IDirect3DDevice9::SetTexture (device 0x668978, vtable slot 65). Learned in the other
+  row's pass (only its shields and chips drawn), swapped in the game's pass by that list. RenderWare's stage cache
+  (RwRaster* at 0x668600 + 24 * stage, FUN_0058BE30; raster ext at DAT_0066FD7C: +0 the IDirect3DTexture9) is
+  cleared, with the device's stage 0, at each tinted pass's start and end.
+  (6) The mod buttons (R3 + A / B included) only with [debug] cheats; single player (SoloModButtons, SoloMod): R3 +
+  A brings the other hero (CoopJoinSpot; down: you to it), R3 + B undoes its lock (UnlockByPlayer) or frees it from
+  a scripted order (4803), R3 + X forces the switch, Y / D-pad as in co-op (ModCheats). Autotest step S_SPMOD.
+  Not done (asked): Obelix alone at the machine gun in single player. Autotests (level 2 unless noted; XXL_
+  SPISOLATION=0): spbump2 (XXL_SPSECOND=1 XXL_DOWNAT=0:3000; downed Asterix put 2.5 ahead of running Obelix --
+  without the fix the watch saw the hop's 12, with it none, Obelix stops against him), spbump2b, splever25 (the
+  lever's 48B7 from event 0168's group dropped, Obelix keeps the lead, the light pillar lit), splock21 (0050 kept,
+  03C8: "sequence under way", 0528 walks Asterix onto the platform), sptele36 -Level 3 (the automatic cable car:
+  Asterix leads all the ride, the switch refused), spmod2 (R3 + B / A / X / Y), spguard41 -Level 4 (XXL_DOWNAT=0:13000
+  XXL_OBELIXPOTION=0: 5 guards, fight Obelix within 5, back at 6.5+), sphud2 (rows, tint, the switch), spsecond2
+  (countdown left, bar right), sppotion2 (XXL_SPSWITCHLOCK=0: its plain 4801 is a no-lock switch), spcork21d,
+  spswitch2 (isolated: nothing; not: as before). Co-op unchanged: bump2, hudhints.
