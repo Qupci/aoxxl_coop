@@ -691,6 +691,14 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 	if (g.pending[1]) f |= 0x4000;
 	// (single player: the HUD button shows both rows; the combo bar is the leader's alone)
 	if (solo ? (saved & 0x1000000) != 0 : CoopP2ShowsHud()) f |= 0x1000000;
+	// Second chance: a downed hero's row stays hidden. The health part drops a
+	// row it has just slid in with no health (FUN_0051A140's shown state needs
+	// some, or a last shown +0x270) -- each time the rows came up (the other hero
+	// hit, the HUD button) Obelix's slid in and was gone at once (user).
+	if (solo && IndivFallen(g.soloOther)) {
+		f &= ~kShowFlags;
+		g.pending[1] = false;
+	}
 	int prev = IndivEnter(solo ? g.soloOther : CoopP2Hero());
 	g.inP2Tick = true;
 	if (!(f & 0x100000)) {
@@ -701,6 +709,23 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 		}
 	}
 	g.inP2Tick = false;
+	if (posLog) {   // the other row's health part as it changes: state bits 4-5, last shown health +0x270, +0x234
+		static char lastVis[40] = {};
+		static uint32_t lastKey = ~0u;
+		static int logged = 0;
+		char vis[40] = {};
+		for (int i = 0; i < 30; i++) vis[i] = ElemPtr(itf, i) && !(*(uint16_t*)(ElemPtr(itf, i) + 0x10) & 2) ? '1' : '0';
+		uint32_t key = (*(uint32_t*)(itf + 0x24) & 0x30) | *(uint32_t*)(itf + 0x270) << 8;
+		if ((key != lastKey || strcmp(vis, lastVis)) && logged++ < 200) {
+			int hp = -1, sh = -1;
+			IndivStats(solo ? g.soloOther : CoopP2Hero(), &hp, &sh);
+			Log("hud2: other row bits %08X 270 %u 234 %.1f A4 f10 %04X (hp %d, flag %d) shown %s", *(uint32_t*)(itf + 0x24),
+			    *(uint32_t*)(itf + 0x270), *(float*)(itf + 0x234), *(char**)(itf + 0xA4) ? *(uint16_t*)(*(char**)(itf + 0xA4) + 0x10) : 0,
+			    hp, (f & 0x4000) != 0, vis);
+			lastKey = key;
+			memcpy(lastVis, vis, sizeof(vis));
+		}
+	}
 	if (g.pending[1] && !(f & 0x4000)) g.pending[1] = false;   // shown
 	HideIdleShields(itf);   // player 2's
 	IndivLeave(prev);

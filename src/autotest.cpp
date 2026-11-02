@@ -8084,6 +8084,38 @@ const Step kSpBoss36[] = {
 	SHOT(14500, "run"), SHOT(18000, "run_2"), SHOT(23000, "run_3"),
 	END(26000),
 };
+// spboss36j (-Level 3, XXL_SPISOLATION=0; sp_hero_switch_lock on): you play
+// Obelix; the far jump off the platform (user: -229.6 13.6 -181.4) -- past #143's
+// plane (x -235.8, the boss's "move to the other end", Obelix's) above the arena,
+// then through #46 (flat, y 9.8: the boss wakes, #143 switched on, the sidekick
+// walked to marker 17). The boss must roll once the walked Asterix passes #143,
+// as the walked Obelix does in the game (user: it never moved).
+const Step kSpBoss36J[] = {
+	MARK(0, "spboss36j"), LOADSECTOR(200, 6),
+	PLACEAT(2500, HERO_ASTERIX, -208.28f, 11.5f, -200.22f), PLACEAT(2500, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	GLIDEAT(5000, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	PLACEAT(7000, HERO_ASTERIX, -228.0f, 13.7f, -185.0f), PLACEAT(7000, HERO_OBELIX, -229.575f, 13.7f, -181.374f),
+	SHOT(8500, "on_the_platform"),
+	GLIDEAT(9000, HERO_OBELIX, -238.0f, 11.5f, -178.0f, 500),
+	GLIDEAT(9550, HERO_OBELIX, -240.0f, 5.6f, -177.0f, 300),
+	SHOT(10500, "landed"), SHOT(13000, "walk"), SHOT(16000, "rolls"), SHOT(20000, "rolls_2"),
+	END(22000),
+};
+// sphud2 / spdownhud2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1
+// XXL_DOWNAT=1:2000 XXL_HUDPOS=1): second chance, Obelix down; Asterix takes
+// three area hits -- each shows both health rows (user: Obelix's row went down
+// each time, as if the HUD had just come up).
+const Step kSpDownHud2[] = {
+	MARK(0, "spdownhud2"),
+	{ 4000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "shockwave on asterix" },
+	SHOT(4200, "hit_1"), SHOT(4600, "hit_1b"),
+	{ 9000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "shockwave on asterix" },
+	SHOT(9200, "hit_2"), SHOT(9600, "hit_2b"),
+	{ 14000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "shockwave on asterix" },
+	SHOT(14200, "hit_3"),
+	END(18000),
+};
 // spsq24 (level 2, XXL_SPISOLATION=0 XXL_GATELOG=1): LV2-4's arena fight (zone
 // 00D8: 2 squads, 60 Romans behind the gate) -- the squads round it, which the
 // gate counts (+0x154 >= -1) and which are active, as it goes (user: Romans came
@@ -8208,6 +8240,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("spbarx2", kSpBarX2),
 	SCENARIO("spboss210", kSpBoss210),
 	SCENARIO("spboss36", kSpBoss36),
+	SCENARIO("spboss36j", kSpBoss36J),
+	SCENARIO("spdownhud2", kSpDownHud2),
 	SCENARIO("spsq24", kSpSq24),
 	SCENARIO("spsq24n", kSpSq24N),
 	SCENARIO("splockcork21", kSpLockCork21),

@@ -1897,6 +1897,8 @@ struct BossRun {
 	int      ng = 0;
 	uint16_t walks[16] = {};
 	int      nw = 0;
+	uint16_t tests[32] = {};  // the detector tests its groups enable: list (0..4: box-enter .. sphere-level) << 8 | index
+	int      nt = 0;
 	DWORD    flaggedAt = 0;   // a run group's zone fired (its events come later in the frame)
 } g_bossRun;
 
@@ -1953,6 +1955,10 @@ static void AddBossRunGroup(const EventTable& et, char* det, unsigned g, int dep
 		if (depth >= 8 || et.objs[k] != det) continue;
 		unsigned op = et.msgs[k] >> 8, idx = et.msgs[k] & 0xFF;
 		if (op < 0x14 || op > 0x18) continue;
+		uint16_t test = (uint16_t)((op - 0x14) << 8 | idx);
+		bool knownTest = false;
+		for (int i = 0; i < r.nt; i++) if (r.tests[i] == test) knownTest = true;
+		if (!knownTest && r.nt < 32) r.tests[r.nt++] = test;
 		static const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
 		char* tests = *(char**)(det + bases[op - 0x14]);
 		unsigned cnt = *(uint16_t*)(det + bases[op - 0x14] + 4);
@@ -1977,7 +1983,7 @@ static void NoteBossRunZone(char* det, unsigned ev, int zh) {
 		bool known = false;
 		for (int i = 0; i < r.ng; i++) if (r.groups[i] == g) known = true;
 		if (!known) {
-			r.ng = r.nw = 0;
+			r.ng = r.nw = r.nt = 0;
 			AddBossRunGroup(et, det, g, 0);
 			char lb[512];
 			LineBuf l(lb);
@@ -2257,17 +2263,28 @@ static bool SoloZonesTick(char* det, void* edx, int arg, Trio t, int away) {
 	for (const List& l : lists) total += *(char**)(det + l.base) ? *(uint16_t*)(det + l.count) : 0;
 	static uint8_t saved[4096], moved[4096];
 	if (total > sizeof(saved)) return false;
+	// A boss run's own zones (the tests its groups enable) bound to the hero you
+	// play -- the level's sidekick -- answer the companion too: it is the one
+	// walked along the run (LV3-6: #143, the boss rolls once the walked sidekick
+	// passes it -- Obelix's far jump off the platform crossed it nowhere).
+	const BossRun& r = g_bossRun;
+	bool run = r.nt > 0 && r.level == CurrentLevel();
 	size_t k = 0;
 	bool any = false;
+	int li = 0;
 	for (const List& l : lists) {   // the first pass without the moved tests
 		char* e = *(char**)(det + l.base);
 		unsigned n = *(uint16_t*)(det + l.count);
 		for (unsigned i = 0; e && i < n; i++, e += 8, k++) {
 			saved[k] = (uint8_t)e[4];
-			moved[k] = (e[4] & 1) && *(uint16_t*)(e + 2) == (unsigned)iw && !(l.level && !(e[5] & 1)) &&
-			           !ZoneMeansItsHero(*(uint16_t*)(e + 6));
+			unsigned obj = *(uint16_t*)(e + 2);
+			bool on = (e[4] & 1) && !(l.level && !(e[5] & 1));
+			moved[k] = on && obj == (unsigned)iw && !ZoneMeansItsHero(*(uint16_t*)(e + 6)) ? 1 : 0;
 			if (moved[k]) { any = true; e[4] &= ~1; }
+			for (int j = 0; run && on && obj == (unsigned)iy && j < r.nt; j++)
+				if (r.tests[j] == (uint16_t)(li << 8 | i)) { moved[k] = 2; any = true; }
 		}
+		li++;
 	}
 	float* prev = *(float**)(det + 0x1C);
 	float prevW[3], prevY[3];
@@ -2481,9 +2498,11 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		if (zh >= 0) CoopNoteZoneHero(zh);
 		if (zh >= 0 && g_inSwappedPass && GroupCommandsTrio(eventId) && GroupPlaysCutscene(eventId)) CoopNoteStoryZone(zh);
 		NoteBossRunZone(g_tickingDet, eventId, zh);
-		Log("proximity: zone event %04X%s", eventId & 0xFFFF,
-		    g_inSwappedPass ? " (the other hero's zone, for co-op)"
-		    : g_inSoloPass  ? " (the level's leader's zone, for the hero you play)" : "");
+		if (g_inSoloPass)
+			Log("proximity: zone event %04X (single player, the heroes' roles swapped: set off by %s)", eventId & 0xFFFF,
+			    zh >= 0 ? HeroName(zh) : "?");
+		else
+			Log("proximity: zone event %04X%s", eventId & 0xFFFF, g_inSwappedPass ? " (the other hero's zone, for co-op)" : "");
 	}
 	// (a blue circle's, a spinning platform's...: the level as it was, should
 	// the lock it starts need undoing)
