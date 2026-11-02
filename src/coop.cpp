@@ -49,6 +49,10 @@ static void ShowJoinHint(Trio t);
 static void SoloHeroSwitch(Trio t);
 static void SoloWatchLock(Trio t);
 static void SoloPotionDash(Trio t);
+static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
+static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
+static bool SoloDropsSwitch(int ev);
+static void ModCheats(uint16_t pressed, int me, const char* player);
 static void WatchLifterHint(Trio t);
 static bool GunSolo(Trio t);
 static bool ObelixGunSolo(Trio t);                       // below: Obelix on the machine gun alone
@@ -344,8 +348,15 @@ static void TakePicture(LockPicture& p) {
 
 static int CamerasBack(const LockPicture& p);
 
+// Locks are kept track of (their "before" pictures, to undo them) in co-op, with
+// second chance's fallen hero, for the mod's R3 + B in single player, and for
+// sp_hero_switch_lock (a lock's sequence still under way).
+static bool LocksTracked() {
+	return g.p2Joined || IndivActive() || (g_config.cheats && g_config.SoloMod()) || g_config.spSwitchLock;
+}
+
 void NoteTrioEventFlagged(unsigned eventId) {
-	if (!g.p2Joined && !IndivActive()) return;   // (single player: second chance's undo)
+	if (!LocksTracked()) return;   // (single player: second chance's undo, R3 + B)
 	TakePicture(g_prePic);
 	g_prePic.event = eventId & 0xFFFF;
 	// The level starting a wait's sequence over (LV2-8's zone 03B8, Asterix off the
@@ -1796,6 +1807,8 @@ static char* NearestTowedCar(Hero h);
 static int KeptOffCars();
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
+	// Single player, sp_hero_switch_lock: a level's switch that holds nobody.
+	if (SoloDropsSwitch(ev)) return true;
 	// Individual heroes: a cable car takes the hero who steps on it from the
 	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
 	// AI order 9) -- with the partner down the ride is not started: the hero
@@ -2114,10 +2127,11 @@ int CoopUndoLockFor(int fallen) {
 // "wait here" is noted by its 0x4802 (CoopNoteTrioEvent), a cable car's ride
 // (AI order 9) and the rotary beam's (8) by the order -- so that the leader
 // going down undoes it (CoopUndoLockFor: a pulled car back at its start, the
-// circle's light pillar back) and the companion comes to revive it.
+// circle's light pillar back) and the companion comes to revive it. The same
+// for the mod's R3 + B ([debug] cheats).
 static bool g_soloOrderLock = false;
 static void SoloWatchLock(Trio t) {
-	if (!t || !IndivActive() || g.p2Joined) { g_soloOrderLock = false; return; }
+	if (!t || !LocksTracked() || g.p2Joined) { g_soloOrderLock = false; return; }
 	int l = t.Leader();
 	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
 	int c = OtherHero(l);
@@ -2148,7 +2162,7 @@ struct PendingLead { int who = -1; DWORD at = 0; } g_pendingLead;
 static void GiveLeadLater(int who) { g_pendingLead.who = who; g_pendingLead.at = GetTickCount(); }
 static void WatchPendingLead(Trio t) {
 	if (g_pendingLead.who < 0 || GetTickCount() - g_pendingLead.at < 300) return;
-	if (t && (g.p2Joined || IndivActive())) GiveLead(t, g_pendingLead.who);
+	if (t && LocksTracked()) GiveLead(t, g_pendingLead.who);
 	g_pendingLead.who = -1;
 }
 
@@ -2621,7 +2635,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		g.machineOffer = param;
 		g.machineOfferHero = to;
 	}
-	if ((g.p2Joined || IndivActive()) && ((event & 0xFFFF) == 0x4800 || (event & 0xFFFF) == 0x4801) &&
+	if (LocksTracked() && ((event & 0xFFFF) == 0x4800 || (event & 0xFFFF) == 0x4801) &&
 	    (uintptr_t)g_trioEventCaller >= 0x49AC80 && (uintptr_t)g_trioEventCaller < 0x49AD00) {
 		Trio tl = GetTrio();
 		// (before the switch; the real leader -- boarded by the hero not leading, its
@@ -2634,7 +2648,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		Trio tl = GetTrio();
 		if (tl) g_telepherRider = tl.Leader();   // (the leader its tick saw: the rider)
 	}
-	if ((g.p2Joined || IndivActive()) && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
+	if (LocksTracked() && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
 		if ((event & 0xFFFF) == 0x4803) {
 			// Its sequence goes on only while the locked hero still waits (AI order 3):
@@ -2826,7 +2840,7 @@ static void RegroupForCutscene(Trio t, Hero h1, Hero h2) {
 static void WarpToPartner(int whoIdx, Hero who, int toIdx, Hero to) {
 	Vector3 dst = CoopJoinSpot(toIdx);
 	SetHeroPosition(who, dst);
-	Log("coop: %s warped to %s (Back + A) at (%.1f %.1f %.1f)", HeroName(whoIdx), HeroName(toIdx), dst.x, dst.y,
+	Log("coop: %s warped to %s (R3 + A) at (%.1f %.1f %.1f)", HeroName(whoIdx), HeroName(toIdx), dst.x, dst.y,
 	    dst.z);
 }
 
@@ -2869,6 +2883,23 @@ static void ShopInputFromP2(const PadState& p, InputManager im, int n) {
 			v[remap[a]] = 0xFF;
 			LogV("coop: merchant: player 2's action %d -> binding %u", a, remap[a]);
 		}
+}
+
+// The cheats among the mod's buttons (Y, the D-pad) for hero `me`, by `player`.
+static void ModCheats(uint16_t pressed, int me, const char* player) {
+	if (pressed & PAD_Y) {
+		bool running = PotionGauge() > 0.01f;
+		SetPotionGauge(running ? 0.001f : 300.0f);   // nearly empty: the game's own countdown ends it
+		Log("coop: cheat: magic potion %s by %s", running ? "emptied" : "filled", player);
+	}
+	if (pressed & PAD_DPAD_UP) CoopTorchCheat(true);
+	if (pressed & PAD_DPAD_DOWN) CoopTorchCheat(false);
+	if (pressed & PAD_DPAD_LEFT) {
+		int prevStats = IndivEnter(me);   // individual heroes: this hero's own combo bar
+		if (CombosCheat(true)) { g.comboHitsHero = me; g.comboHitsAt = GetTickCount(); }
+		IndivLeave(prevStats);
+		Log("coop: cheat: every combo learned and %s's combo bar filled by %s", HeroName(me), player);
+	}
 }
 
 void CoopFrame() {
@@ -3001,7 +3032,11 @@ void CoopFrame() {
 		}
 		SoloPotionDash(t);
 		SoloWatchLock(t);
+		SoloModButtons(t);
 		SoloHeroSwitch(t);
+		SoloSwitchLockWatch(t);
+		WatchPendingLead(t);   // (an undone lock's lead back: R3 + B, second chance)
+		GuardFrame();          // (second chance: romans_guard_downed)
 		ShowJoinHint(t);
 		TryJoin(t);
 		return;
@@ -3046,19 +3081,20 @@ void CoopFrame() {
 		return;
 	}
 
-	// The mod's combos: hold the right stick button (player 2 also Back) and
+	// The mod's buttons ([debug] cheats -- all of them, user): hold the right
+	// stick button (player 2 also Back) and
 	//   A  your hero joins your partner's (lost, stuck, fell behind)
 	//   B  take your hero back from the game ("wait here" orders that a sequence
 	//      played out of order never ends); locked by the level (a light pillar,
 	//      a cable car, the spinning platform), its sequence undone as for a fallen
 	//      partner and the hero put on its last solid ground
-	//   Y  [cheats] the magic potion: filled, or emptied when it runs
-	//   X  [cheats] your hero becomes the leader
-	//   D-pad up / down  [cheats] Asterix gets the nearest torch, lit / throws it away
-	//   D-pad left  [cheats] every combo learned, your combo bar full
+	//   Y  the magic potion: filled, or emptied when it runs
+	//   X  your hero becomes the leader
+	//   D-pad up / down  Asterix gets the nearest torch, lit / throws it away
+	//   D-pad left  every combo learned, your combo bar full
 	// Player 1's controller is the one the game reads (pad identification) --
 	// until that is known (it can take a while), any other connected pad.
-	{
+	if (g_config.cheats) {
 		int p1pad = Player1Pad();
 		for (int i = 0; p1pad < 0 && i < kMaxPads; i++)
 			if (i != g.p2Pad && i != kKeyboardPad && PadGet(i).connected) p1pad = i;
@@ -3080,20 +3116,8 @@ void CoopFrame() {
 			} else if ((pressed & PAD_B) && !g.suspended) {
 				StartAiCycle(me, "R3 + B");
 			}
-			if ((pressed & PAD_Y) && g_config.cheats) {
-				bool running = PotionGauge() > 0.01f;
-				SetPotionGauge(running ? 0.001f : 300.0f);   // nearly empty: the game's own countdown ends it
-				Log("coop: cheat: magic potion %s by %s", running ? "emptied" : "filled", player);
-			}
-			if ((pressed & PAD_DPAD_UP) && g_config.cheats) CoopTorchCheat(true);
-			if ((pressed & PAD_DPAD_DOWN) && g_config.cheats) CoopTorchCheat(false);
-			if ((pressed & PAD_DPAD_LEFT) && g_config.cheats) {
-				int prevStats = IndivEnter(me);   // individual heroes: this hero's own combo bar
-				if (CombosCheat(true)) { g.comboHitsHero = me; g.comboHitsAt = GetTickCount(); }
-				IndivLeave(prevStats);
-				Log("coop: cheat: every combo learned and %s's combo bar filled by %s", HeroName(me), player);
-			}
-			if ((pressed & PAD_X) && g_config.cheats && t.Leader() != me && !g.suspended) {
+			ModCheats(pressed, me, player);
+			if ((pressed & PAD_X) && t.Leader() != me && !g.suspended) {
 				typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 				int ev = me == HERO_ASTERIX ? 0x4800 : 0x4801;
 				Log("coop: cheat: %s makes %s the leader (trio event %04X)", player, HeroName(me), ev);
@@ -3605,9 +3629,10 @@ static void __fastcall TakeHook(char* hero, void* edx, int arg) {
 // read -- only for a hero whose vtable slot 15 returns 0, which is Asterix
 // (Obelix's returns his class id): single player never lets Obelix drink.
 // A player's Obelix gets the bit too while the gauge (game manager +0x40 ->
-// +0x9C) is above zero ([coop] obelix_potion). Single player: Obelix leading
-// ([single_player] sp_obelix_potion) -- he is in a player state only then; the
-// flask is still Asterix's to drink (the potion pool takes it only from him).
+// +0x9C) is above zero ([coop] obelix_potion). Single player (the same option,
+// [single_player] sp_isolation off): Obelix leading -- he is in a player state
+// only then; the flask is still Asterix's to drink (the potion pool takes it only
+// from him).
 typedef void(__fastcall* ReadCmdFn)(char* hero, void* edx);
 const uintptr_t kReadCommandBlock = 0x49A350;
 const uint8_t   kReadCmdPrologue[6] = { 0x51, 0x56, 0x8B, 0xF1, 0x8B, 0x06 };
@@ -3615,7 +3640,7 @@ ReadCmdFn g_origReadCmd = nullptr;
 
 static void __fastcall ReadCmdHook(char* hero, void* edx) {
 	g_origReadCmd(hero, edx);
-	if (g.p2Joined ? !g_config.obelixPotion : !g_config.spObelixPotion) return;
+	if (!g_config.obelixPotion || (!g.p2Joined && !g_config.SoloMod())) return;
 	Trio t = GetTrio();
 	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero();
 	if (!o || hero != o.raw()) return;
@@ -4230,6 +4255,47 @@ static void PlaySound(Hero h, uint32_t bankOffset) {
 // (proximity.cpp).
 static int g_soloSwitchAsk = 0;   // autotests: presses to serve
 void CoopSoloSwitchRequest() { g_soloSwitchAsk++; }
+static const char* const kSwitchTooFar = "the other hero is too far";
+
+// [single_player] sp_hero_switch_lock (with sp_hero_switch; single player
+// only): the hero you play is yours, the level only borrows it. A level's lead
+// switch (an event group's "Obelix leads", from the event service's dispatch,
+// 0x46B180..0x46B331) is dropped unless that group also holds the hero losing
+// the lead -- a wait (0x4802, 0x4849: a light pillar's circle), a walk or run
+// to a marker (0x4813..0x4876), a teleport to one (0x48BB..0x48EC) -- or plays
+// a cutscene, or sends the trio anything but switches and "the sidekick may
+// move" (0x4803) (ProximityDispatchOnlySwitches); a switch the game makes from
+// its own code (a cable car's boarding, the belly slide) stays too. Such a
+// lock is the switch to the other hero; a lock with no switch (the automatic
+// cable car, user: its camera follows the car) switches nothing. Once the hero
+// you played (`choice`: the leader at the level's start, then your own
+// switches) is free again -- following, on its feet, the switch's own checks
+// met (SoloSwitchRefusal) for 0.3 s -- it leads again. Refused only for its
+// distance for 3 s, the lead stays where it is and is your choice from then.
+// Nothing while a hero is down (second chance leads then).
+struct SoloLock {
+	int   choice = -1;       // the hero you play
+	int   level = -1;        // ... in this level
+	DWORD freeSince = 0, farSince = 0;
+} g_solo;
+
+static bool SoloSwitchLockOn() { return !g.p2Joined && g_config.spSwitchLock; }
+
+static bool SoloDropsSwitch(int ev) {
+	if (!SoloSwitchLockOn() || !IsLeaderSwitch(ev)) return false;
+	extern void* g_trioEventCaller;
+	uintptr_t from = (uintptr_t)g_trioEventCaller;
+	Trio t = GetTrio();
+	unsigned group = 0;
+	int to = (ev & 0xFFFF) == 0x4800 || (ev & 0xFFFF) == 0x48B7 ? HERO_ASTERIX : HERO_OBELIX;
+	if (from < 0x46B180 || from >= 0x46B331 || !t || t.Leader() == to || !ProximityDispatchOnlySwitches(ev & 0xFFFF, &group))
+		return false;
+	static int s_told = 0;
+	if (s_told++ < 40)
+		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: no lock) ignored -- %s keeps the lead",
+		    ev & 0xFFFF, group, HeroName(t.Leader()));
+	return true;
+}
 
 static const char* SoloSwitchRefusal(Trio t) {
 	CKYellowPages* yp = YellowPages();
@@ -4253,7 +4319,7 @@ static const char* SoloSwitchRefusal(Trio t) {
 		char* sh = (char*)GetLvlObject(2, 172, i);
 		if (sh && (*(uint8_t*)(sh + 8) & 7) != 0) return "at the merchant";
 	}
-	if ((lh.Pos() - ch.Pos()).len2() > 25.0f * 25.0f) return "the other hero is too far";
+	if ((lh.Pos() - ch.Pos()).len2() > 25.0f * 25.0f) return kSwitchTooFar;
 	return nullptr;
 }
 
@@ -4277,6 +4343,113 @@ static void SoloHeroSwitch(Trio t) {
 	}
 	if (s_logs++ < 60) Log("coop: hero switch: %s -> %s", HeroName(l), HeroName(OtherHero(l)));
 	CoopGiveLead(OtherHero(l), "the hero switch button");
+	g_solo.choice = t.Leader();
+}
+
+static void SoloSwitchLockWatch(Trio t) {
+	SoloLock& s = g_solo;
+	if (!SoloSwitchLockOn() || !t || s.level != g.lastLevel) {
+		s.choice = -1;
+		s.level = g.lastLevel;
+		s.freeSince = s.farSince = 0;
+		return;
+	}
+	if (!CoopGameplayLive()) { s.freeSince = s.farSince = 0; return; }   // (a cutscene's: your hero stays yours)
+	int l = t.Leader();
+	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
+	if (s.choice < 0) {
+		s.choice = l;
+		Log("coop: sp_hero_switch_lock: you play %s", HeroName(l));
+	}
+	if (l == s.choice || IndivFallenHero() >= 0) { s.freeSince = s.farSince = 0; return; }
+	// Freed while its lock's sequence goes on (LV2-1: zone 03C8 frees Asterix,
+	// then the turnstile's box 0528 walks "the companion" onto the spinning
+	// platform -- given the lead back, Obelix was sent there): its end gives the
+	// lead (the platform's top, 0058).
+	if (g_seqHero == s.choice && SequenceUnderWay()) {
+		static int s_told = 0;
+		if (!s.freeSince && s_told++ < 20)
+			Log("coop: sp_hero_switch_lock: %s is free, its sequence under way -- %s leads till it ends", HeroName(s.choice),
+			    HeroName(l));
+		s.freeSince = 1;   // (logged)
+		s.farSince = 0;
+		return;
+	}
+	if (s.freeSince == 1) s.freeSince = 0;
+	const char* no = SoloSwitchRefusal(t);
+	DWORD now = GetTickCount();
+	if (no) {
+		s.freeSince = 0;
+		if (no != kSwitchTooFar) { s.farSince = 0; return; }
+		if (!s.farSince) s.farSince = now;
+		if (now - s.farSince < 3000) return;
+		Log("coop: sp_hero_switch_lock: %s is free again but %.0f units away -- %s keeps the lead (now the hero you play)",
+		    HeroName(s.choice), sqrtf((t.GetHero(l).Pos() - t.GetHero(s.choice).Pos()).len2()), HeroName(l));
+		s.choice = l;
+		s.farSince = 0;
+		return;
+	}
+	s.farSince = 0;
+	if (!s.freeSince) s.freeSince = now;
+	if (now - s.freeSince < 300) return;
+	s.freeSince = 0;
+	CoopGiveLead(s.choice, "sp_hero_switch_lock: the hero you play, free again");
+}
+
+// Single player ([debug] cheats, [single_player] sp_isolation off): the mod's
+// buttons on player 1's controller, R3 held, the other hero the partner --
+//   A  the other hero brought beside you (CoopJoinSpot) -- down, you to it
+//   B  the other hero freed when the level holds it (a light pillar's wait, a
+//      cable car: its sequence undone, as in co-op), or from a scripted order
+//      that never ends (trio 0x4803: the sidekick may move)
+//   X  the lead to the other hero, no checks (a last resort)
+//   Y, D-pad up / down / left: the potion, the torch, the combos (ModCheats)
+static int g_soloModAsk = 0;   // autotests: buttons to press
+void CoopSoloModRequest(int buttons) { g_soloModAsk |= buttons; }
+
+static void SoloModButtons(Trio t) {
+	uint16_t pressed = (uint16_t)g_soloModAsk;
+	g_soloModAsk = 0;
+	if (!t || !g_config.cheats || !g_config.SoloMod() || CutsceneBars() || g.cutsceneHold > 0) return;
+	int p1pad = Player1Pad();
+	for (int i = 0; p1pad < 0 && i < kXInputPads; i++) if (PadGet(i).connected) p1pad = i;
+	if (p1pad >= 0 && p1pad < kXInputPads) {
+		const PadState& q = PadGet(p1pad);
+		if (q.connected && (q.buttons & PAD_RTHUMB)) pressed |= q.pressed;
+	}
+	pressed &= PAD_A | PAD_B | PAD_X | PAD_Y | PAD_DPAD_UP | PAD_DPAD_DOWN | PAD_DPAD_LEFT;
+	int l = t.Leader();
+	if (!pressed || (l != HERO_ASTERIX && l != HERO_OBELIX)) return;
+	int c = OtherHero(l);
+	Hero hl = t.GetHero(l), hc = t.GetHero(c);
+	if (!hl || !hc) return;
+	if (pressed & PAD_A) {
+		if (IndivFallen(c)) WarpToPartner(l, hl, c, hc);
+		else if (LockedByLevel(c, hc) || IsScriptedOrder((int)hc.Order()) || !HeroModePlayable(hc.Flags18()) ||
+		         *(uint8_t*)(hc.raw() + 0x1A))
+			Log("coop: R3 + A: %s is the level's now (AI order %d, f18 %02X) -- not brought", HeroName(c), (int)hc.Order(),
+			    hc.Flags18());
+		else WarpToPartner(c, hc, l, hl);
+	}
+	if (pressed & PAD_B) {
+		if (IndivFallen(c)) {
+			Log("coop: R3 + B: %s is down", HeroName(c));
+		} else if (LockedByLevel(c, hc) || (g_seqHero == c && SequenceUnderWay())) {
+			UnlockByPlayer(t, c, "player 1");
+		} else if (IsScriptedOrder((int)hc.Order())) {
+			Log("coop: player 1 freed %s (R3 + B) from its AI order %d -- trio 4803", HeroName(c), (int)hc.Order());
+			typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+			((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
+		} else {
+			Log("coop: R3 + B: %s is not held (AI order %d)", HeroName(c), (int)hc.Order());
+		}
+	}
+	if (pressed & PAD_X) {
+		Log("coop: cheat: player 1 gives the lead to %s (R3 + X)", HeroName(c));
+		CoopGiveLead(c, "R3 + X");
+		g_solo.choice = t.Leader();
+	}
+	ModCheats(pressed, t.Leader(), "player 1");
 }
 
 static void WatchLbPass(int idx, Hero h) {
@@ -4497,9 +4670,13 @@ int __fastcall HeroSendEventHook(char* hero, void* edx, int event, void* param) 
 	// dodging sidekick's part: the "automatic jump". For the length of the
 	// handler the other hero passes for a waiting sidekick (+0x18 bit 0, AI
 	// state +0x561 = 3), so each is blocked by the other and neither hops.
+	// Single player's second chance: the fallen hero is kept a player's, and
+	// the leader walking up to revive it hopped over it -- the same there (the
+	// AI sidekick's hop out of the leader's way stays: user).
 	Hero bumped;
 	uint8_t bumpedF18 = 0, bumpedAi = 0;
-	if ((event & 0xFFFF) == 0x0300 && g.p2Joined && idx >= 0 && param && HeroIsPlayerVariant(*F18(t.GetHero(idx)))) {
+	if ((event & 0xFFFF) == 0x0300 && (g.p2Joined || IndivFallenHero() >= 0) && idx >= 0 && param &&
+	    HeroIsPlayerVariant(*F18(t.GetHero(idx)))) {
 		Hero other = t.GetHero(OtherHero(idx));
 		int n = 0;
 		bool touching = false;

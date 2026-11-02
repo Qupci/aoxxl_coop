@@ -42,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7551,7 +7551,7 @@ const Step kObelixGun33[] = { MGUN33_SETUP, OBELIXGUN33_STEPS };
 const Step kObelixGun33L[] = { MGUN33_SETUP, { 4500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" }, OBELIXGUN33_STEPS };
 #undef OBELIXGUN33_STEPS
 
-// ---- single player ([single_player], each switched on by its env aid) ----
+// ---- single player ([single_player]; XXL_SPISOLATION=0 and each one's env aid) ----
 // spswitch2 (level 2, XXL_SPSWITCH=1): the hero switch button: Obelix leads and
 // walks (Asterix follows); back to Asterix; refused while Obelix is told to wait
 // (trio 0x4802) and while Asterix is in the air; Obelix again once free.
@@ -7658,7 +7658,7 @@ const Step kSpIcons33[] = {
 	{ 8000, S_POKE8, -3, 1, 0, 0, 0, "unpause" },
 	END(9000),
 };
-// sppotion2 (level 2, XXL_SPPOTION=1 / 0): single player, Obelix leading runs
+// sppotion2 (level 2, XXL_SPISOLATION=0, XXL_OBELIXPOTION=1 / 0): single player, Obelix leading runs
 // without, then with the magic potion; with it, by a Roman for a while (hits).
 const Step kSpPotion2[] = {
 	MARK(0, "sppotion2"),
@@ -7761,6 +7761,120 @@ const Step kSpCork21E[] = {
 #undef SPCORK21D_START
 #undef SPCORK21D_END
 
+// spbump2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:3000): second
+// chance -- Asterix down, player 1's Obelix runs into him (user: the hero
+// walking up to revive hopped over the downed one). spbump2b (no XXL_DOWNAT):
+// the same with Asterix leading into the AI companion Obelix -- its hop out of
+// the way stays (user).
+const Step kSpBump2[] = {
+	MARK(0, "spbump2"),
+	{ 1500, S_WATCHRW, HERO_OBELIX, 0, 0, 7, 0, "obelix vertical speed (armed on the watchdog's next tick)" },
+	P1(5000, 0, 0, 1.0f, "p1 forward"),
+	{ 5500, S_NEXTTO, HERO_ASTERIX, HERO_OBELIX, 0, 2.5f, 0, "downed asterix 2.5 ahead of running obelix" },
+	SHOT(5800, "bump"), SHOT(6100, "bump_2"),
+	P1(7500, 0, 0, 0, "p1 stop"),
+	{ 7600, S_HEROFIELDS, HERO_OBELIX, 0, 0, 0, 0, "obelix" },
+	SHOT(8000, "after"),
+	END(8500),
+};
+const Step kSpBump2B[] = {
+	MARK(0, "spbump2b"),
+	{ 1500, S_WATCHRW, HERO_OBELIX, 0, 0, 7, 0, "obelix vertical speed (armed on the watchdog's next tick)" },
+	P1(5000, 0, 0, 1.0f, "p1 forward"),
+	{ 5500, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 2.5f, 0, "obelix 2.5 ahead of running asterix" },
+	SHOT(5800, "bump"), SHOT(6100, "bump_2"),
+	P1(7500, 0, 0, 0, "p1 stop"),
+	END(8500),
+};
+// splock21 (level 2, XXL_SPISOLATION=0 XXL_SPSWITCH=1; sp_hero_switch_lock on):
+// Asterix leading onto LV2-1's spinning platform -- its event (4801 + 4802)
+// locks him: kept, Obelix leads; Obelix walks through zone 03C8 (4803: Asterix
+// free, the platform off till its turn ends) -- Obelix keeps the lead; at the
+// turnstile (zone 0528) Asterix, still the companion, walks onto the platform.
+const Step kSpLock21[] = {
+	MARK(0, "splock21"),
+	FORCE(800, HERO_OBELIX, 1), PLACEAT(1000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f), PLACEAT(1000, HERO_OBELIX, -763.0f, 516.5f, -980.5f), FORCE(1400, HERO_OBELIX, 0),
+	GLIDEAT(1800, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(3500, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	PLACEAT(5000, HERO_OBELIX, -762.0f, 516.5f, -979.2f),
+	SHOT(6000, "asterix_waits"),
+	P1(6500, 0, 0, 1.0f, "p1 forward (obelix)"), P1(7500, 0, 0, 0, "p1 stop"),
+	SHOT(8500, "asterix_freed"),
+	GLIDEAT(9500, HERO_OBELIX, -775.9f, 515.6f, -983.6f, 1500),   // to the turnstile: zone 0528 walks the companion onto the platform
+	SHOT(12000, "at_turnstile"), SHOT(15000, "after"),
+	END(16000),
+};
+// sptele36 (-Level 3, XXL_SPISOLATION=0 XXL_SPSWITCH=1): Asterix leading takes
+// LV3-6's automatic cable car (CKHkTelepher): no switch (user: its camera follows
+// the car) -- he keeps the lead through the ride; the switch refused on it.
+const Step kSpTele36[] = {
+	MARK(0, "sptele36"), LOADSECTOR(200, 6),
+	PLACEAT(2500, HERO_ASTERIX, -185.961f, 2.554f, -227.849f),
+	FORCE(2300, HERO_OBELIX, 1), PLACEAT(2500, HERO_OBELIX, -186.961f, 2.554f, -228.849f), FORCE(2900, HERO_OBELIX, 0),
+	PLACEAT(4000, HERO_ASTERIX, -159.605f, 11.772f, -209.331f),   // the cable car
+	SHOT(7000, "riding"),
+	{ 8000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: riding)" },
+	SHOT(14000, "riding_2"), SHOT(22000, "landed"),
+	END(24000),
+};
+// spguard41 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:13000
+// XXL_OBELIXPOTION=0): guard41a in single player -- Asterix down among LV4-1's
+// lock fight Romans at 13 s; Obelix (now leading, healed every 2.5 s) 12 units
+// off: the Romans stay round Asterix as his guards (romans_guard_downed), go for
+// Obelix 3 units off, and back to their spots when he goes 14 units off.
+#define HEALO(t) { t, S_GIVE, HERO_OBELIX, 0, 0, 10.0f, 0, "heal obelix" }
+const Step kSpGuard41[] = {
+	MARK(0, "spguard41"),
+	{ 1500, S_WATCHENEMIES, 0, 0, 0, -288.15f, 0.5f, "watch romans", 117.27f },
+	FORCE(2300, HERO_OBELIX, 1), PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	HEALO(4500), HEALO(7000),
+	PLACEAT(8000, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), PLACEAT(8100, HERO_OBELIX, -294.0f, 0.5f, 90.0f), FORCE(8300, HERO_OBELIX, 0),
+	HEALO(9500), HEALO(12000), PLACEAT(13300, HERO_OBELIX, -306.0f, 0.5f, 92.0f),
+	HEALO(14500), HEALO(17000), SHOT(17500, "spguard41_0"),
+	GLIDEBY(18000, HERO_OBELIX, -3.0f, 0.0f, 1500), HEALO(19500), SHOT(21000, "spguard41_1"),
+	HEALO(22000), HEALO(24500), SHOT(25000, "spguard41_2"),
+	GLIDEBY(25500, HERO_OBELIX, -14.0f, 0.0f, 1500), HEALO(27000),
+	HEALO(29500), SHOT(30000, "spguard41_3"), END(31000),
+};
+#undef HEALO
+// spmod2 (level 2, XXL_SPISOLATION=0; [debug] cheats on): single player's mod
+// buttons -- Obelix told to wait (4802): R3 + B frees him; R3 + A brings him over
+// from 25 units away; R3 + X gives him the lead; R3 + Y fills the potion.
+const Step kSpMod2[] = {
+	MARK(0, "spmod2"),
+	{ 1000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix told to wait" },
+	P1(1500, 0, 0, 1.0f, "p1 forward"), P1(3000, 0, 0, 0, "p1 stop"),
+	SHOT(3200, "obelix_waits"),
+	{ 3500, S_SPMOD, PAD_B, 0, 0, 0, 0, "R3 + B" },
+	SHOT(4500, "obelix_freed"),
+	FORCE(5400, HERO_OBELIX, 1), PLACEAT(5500, HERO_OBELIX, -830.0f, 508.0f, -1060.0f),
+	{ 6000, S_SPMOD, PAD_A, 0, 0, 0, 0, "R3 + A" }, FORCE(6200, HERO_OBELIX, 0),
+	SHOT(6500, "obelix_brought"),
+	{ 7000, S_SPMOD, PAD_X, 0, 0, 0, 0, "R3 + X" },
+	SHOT(8000, "obelix_leads"),
+	{ 8500, S_SPMOD, PAD_Y, 0, 0, 0, 0, "R3 + Y" },
+	END(9500),
+};
+// sphud2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1): second
+// chance's two health rows -- Asterix's (red) first, Obelix's (blue) under it:
+// shown by a hit on Obelix, then one on Asterix; the switch to Obelix (the rows
+// stay where they are, the combo bar Obelix's), a hit on Asterix, a shield for
+// Obelix.
+const Step kSpHud2[] = {
+	MARK(0, "sphud2"),
+	{ 2000, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "a hit on obelix" },
+	SHOT(2600, "rows"), SHOT(3200, "rows_2"),
+	{ 4000, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "a hit on asterix" },
+	SHOT(4600, "rows_3"),
+	{ 9000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 9800, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "a hit on asterix" },
+	SHOT(10400, "rows_obelix_leads"), SHOT(11000, "rows_obelix_leads_2"),
+	{ 11500, S_GIVE, HERO_OBELIX, 1, 0, 0, 0, "a shield for obelix" },
+	SHOT(12100, "rows_shield"),
+	END(16000),
+};
+
 struct Scenario { const char* name; const Step* steps; int count; };
 #define SCENARIO(n, arr) { n, arr, (int)(sizeof(arr) / sizeof(arr[0])) }
 const Scenario kScenarios[] = {
@@ -7777,6 +7891,13 @@ const Scenario kScenarios[] = {
 	SCENARIO("spsecond2h", kSpSecond2H),
 	SCENARIO("spcork21d", kSpCork21D),
 	SCENARIO("spcork21e", kSpCork21E),
+	SCENARIO("spbump2", kSpBump2),
+	SCENARIO("spbump2b", kSpBump2B),
+	SCENARIO("splock21", kSpLock21),
+	SCENARIO("sptele36", kSpTele36),
+	SCENARIO("spguard41", kSpGuard41),
+	SCENARIO("spmod2", kSpMod2),
+	SCENARIO("sphud2", kSpHud2),
 	SCENARIO("hudhints", kHudHints),
 	SCENARIO("combohint2", kComboHint2),
 	SCENARIO("combohint2b", kComboHint2B),
@@ -10708,6 +10829,10 @@ void RunStep(const Step& s) {
 	case S_SPSWITCH:   // single player: the hero switch button pressed ([single_player] sp_hero_switch)
 		Log("autotest: the hero switch button");
 		CoopSoloSwitchRequest();
+		break;
+	case S_SPMOD:   // single player: the mod's buttons a (PAD_* bits) with R3 held ([debug] cheats)
+		Log("autotest: R3 + buttons %04X", s.a);
+		CoopSoloModRequest(s.a);
 		break;
 	case S_HUDDIFF:
 		HudDiffStart();

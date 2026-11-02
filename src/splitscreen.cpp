@@ -1210,7 +1210,8 @@ ThisArgFn g_origDrawHud = nullptr;
 const uint8_t kDrawHudPrologue[7] = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4E, 0x5C };
 
 void __fastcall DrawHudHook(char* view, void* edx, void* dt) {
-	if (g_splitActive || !CoopP2Joined()) { g_origDrawHud(view, edx, dt); return; }
+	// (Single player's second chance: the other hero's health row the same way.)
+	if (g_splitActive || (!CoopP2Joined() && !Hud2SoloRows())) { g_origDrawHud(view, edx, dt); return; }
 	char* renderer = *(char**)(view + 0x08);
 	RwCamera* hud = renderer ? *(RwCamera**)(renderer + 0x14) : nullptr;
 	Hud2BeginP1(hud);

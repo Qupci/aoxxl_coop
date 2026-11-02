@@ -969,7 +969,9 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	wchar_t text[160];
 	if (g.solo) swprintf(text, 160, L"Revive %s\n%d s left", HintHeroName(down), SecondsLeft(down));
 	else swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
-	HintShow(HINT_REVIVE, PlayerOf(down), text, 600);
+	// (Single player: in the left box -- in player 1's, with the revive's own
+	// hints and bar there, the two took turns every 250 ms: user.)
+	HintShow(HINT_REVIVE, g.solo ? HINT_LEFT_BOX : PlayerOf(down), text, 600);
 	return false;
 }
 

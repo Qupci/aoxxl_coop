@@ -117,10 +117,11 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_NOLOCKROMANSANY")) noLockRomansAnyMarkers = atoi(getenv("XXL_NOLOCKROMANSANY")) != 0;
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
 	if (getenv("XXL_OBELIXPOTION")) obelixPotion = atoi(getenv("XXL_OBELIXPOTION")) != 0;
+	spIsolation    = ReadBool("single_player", "sp_isolation", spIsolation, full);
 	spComboHints   = ReadBool("single_player", "sp_combo_hints", spComboHints, full);
 	spCoopIcons    = ReadBool("single_player", "sp_coop_icons", spCoopIcons, full);
-	spObelixPotion = ReadBool("single_player", "sp_obelix_potion", spObelixPotion, full);
 	spHeroSwitch   = ReadBool("single_player", "sp_hero_switch", spHeroSwitch, full);
+	spSwitchLock   = ReadBool("single_player", "sp_hero_switch_lock", spSwitchLock, full);
 	spSecondChance = ReadBool("single_player", "sp_second_chance", spSecondChance, full);
 	{
 		char sb[32] = {};
@@ -133,11 +134,18 @@ void CoopConfig::Load(const char* iniPath) {
 		GetPrivateProfileStringA("single_player", "sp_hero_switch_key", "", sb, sizeof(sb), full);
 		if (sb[0]) spSwitchKey = ParseKey(sb);
 	}
-	if (getenv("XXL_SPCOMBOHINTS")) spComboHints = atoi(getenv("XXL_SPCOMBOHINTS")) != 0;   // autotests
+	if (getenv("XXL_SPISOLATION")) spIsolation = atoi(getenv("XXL_SPISOLATION")) != 0;   // autotests
+	if (getenv("XXL_SPCOMBOHINTS")) spComboHints = atoi(getenv("XXL_SPCOMBOHINTS")) != 0;
 	if (getenv("XXL_SPICONS")) spCoopIcons = atoi(getenv("XXL_SPICONS")) != 0;
-	if (getenv("XXL_SPPOTION")) spObelixPotion = atoi(getenv("XXL_SPPOTION")) != 0;
 	if (getenv("XXL_SPSWITCH")) spHeroSwitch = atoi(getenv("XXL_SPSWITCH")) != 0;
+	if (getenv("XXL_SPSWITCHLOCK")) spSwitchLock = atoi(getenv("XXL_SPSWITCHLOCK")) != 0;
 	if (getenv("XXL_SPSECOND")) spSecondChance = atoi(getenv("XXL_SPSECOND")) != 0;
+	// Isolated: single player is the game's own -- no sp_ feature, whatever the
+	// ini says (the general options' single player parts ask SoloMod()).
+	const bool spComboHintsIni = spComboHints, spCoopIconsIni = spCoopIcons, spHeroSwitchIni = spHeroSwitch,
+	           spSwitchLockIni = spSwitchLock, spSecondChanceIni = spSecondChance;
+	if (spIsolation) spComboHints = spCoopIcons = spHeroSwitch = spSwitchLock = spSecondChance = false;
+	if (!spHeroSwitch) spSwitchLock = false;   // (only with the switch)
 	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
 	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
 
@@ -191,6 +199,8 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_STATIC")) rulesStatic = atoi(getenv("XXL_STATIC")) != 0;
 	if (getenv("XXL_APARTPATH")) apartByPath = atoi(getenv("XXL_APARTPATH")) != 0;
 	if (getenv("XXL_DEFEATSTAYS")) toDefeatStays = atoi(getenv("XXL_DEFEATSTAYS")) != 0;
+	const bool coopOnlyIni = coopOnly;
+	if (spIsolation) coopOnly = true;   // (single player isolated: the game's squads and combo bar)
 
 	GetPrivateProfileStringA("coop", "deadzone", "0.24", buf, sizeof(buf), full);
 	deadzone = (float)atof(buf);
@@ -213,7 +223,13 @@ void CoopConfig::Load(const char* iniPath) {
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);
 	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
 	    hintMachineGun);
-	Log("config: single player: combo hints %d, co-op icons %d, Obelix's potion %d, hero switch %d (pad %04X, key %02X), "
-	    "second chance %d", spComboHints, spCoopIcons, spObelixPotion, spHeroSwitch, spSwitchButton, spSwitchKey,
-	    spSecondChance);
+	if (spIsolation)
+		Log("config: single player: isolated -- the game's own (the ini's combo hints %d, co-op icons %d, hero switch %d, "
+		    "switch lock %d, second chance %d off; obelix_potion and cheats co-op only%s)", spComboHintsIni, spCoopIconsIni,
+		    spHeroSwitchIni, spSwitchLockIni, spSecondChanceIni,
+		    coopOnlyIni ? "" : "; difficulty_coop_only taken as on");
+	else
+		Log("config: single player: combo hints %d, co-op icons %d, hero switch %d (pad %04X, key %02X, switch lock %d), "
+		    "second chance %d, Obelix's potion %d, cheats %d", spComboHints, spCoopIcons, spHeroSwitch, spSwitchButton,
+		    spSwitchKey, spSwitchLock, spSecondChance, obelixPotion, cheats);
 }

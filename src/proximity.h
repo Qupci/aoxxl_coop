@@ -30,6 +30,10 @@ void ProximityForgetMove(void* heroNode, const float at[3]);
 bool ProximityGroupCommandsTrio(unsigned ev);
 // Event `ev`'s group: up to `max` targets and the message each gets; the count.
 int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max);
+// The event groups under way (the event service's dispatch) that send the trio
+// `msg`: do they all only switch the lead (and free the sidekick, no cutscene)?
+// The first one's event id in `ev`.
+bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev);
 // A Roman passed to hero `receiver` (LB): it ticks with that hero as the trio
 // leader while it flies (state 4).
 void ProximityPassTo(char* roman, int receiver);

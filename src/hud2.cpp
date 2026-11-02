@@ -8,6 +8,7 @@
 #include "log.h"
 #include "render.h"
 #include "splitscreen.h"
+#include "tint.h"
 #include "trio.h"
 
 #include <cmath>
@@ -86,6 +87,10 @@ struct State {
 	int      nScaled = 0;
 	int      nFlipped = 0;
 	bool     loggedP2 = false;
+	// Single player's two health rows (SoloRows): whose copy is in the interface
+	// (the leader's when it was last ticked), whose is s2, a tinted pass on.
+	int      soloLeader = -1, soloOther = -1;
+	bool     soloTint = false;
 } g;
 
 char* GM() {
@@ -97,6 +102,29 @@ bool On() {
 	return IndivActive() && g_config.splitScreen && CoopP2Joined() && !CoopOneScreen() &&
 	       CoopShopper() < 0 && CoopP2Hero() >= 0;
 }
+
+// Single player's second chance (user): a health row for each hero, at the top
+// left -- Asterix's first, Obelix's kRowGap under it, each in its hero's
+// colours (tint.cpp) -- and the combo bar the leading hero's. The game's own
+// HUD is the leading hero's (its health part and combo bar ticked with that
+// hero's stats, HudOwner); the other hero's health is a copy of the
+// interface's pieces ticked with its own stats, as player 2's (s2), drawn in a
+// pass of its own. When the lead changes hands the copies go with it. Not at
+// the merchant (the shop's HUD is the game's).
+bool MerchantOpen() {
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
+		char* s = (char*)GetLvlObject(2, 172, i);
+		if (s && (*(uint8_t*)(s + 8) & 7) != 0) return true;
+	}
+	return false;
+}
+bool SoloRows() { return IndivActive() && !CoopP2Joined() && !MerchantOpen(); }
+int SoloLeader() {
+	Trio t = GetTrio();
+	int l = t ? t.Leader() : -1;
+	return l == HERO_ASTERIX || l == HERO_OBELIX ? l : -1;
+}
+const float kRowGap = 0.085f;   // the second row under the first (a shield's height and a little)
 
 char* ElemPtr(char* itf, int i) {
 	char* n = *(char**)(itf + kP2Elems[i]);
@@ -378,10 +406,13 @@ void LayoutFlask(char* itf, const float* cl) {
 	char* n = NodeAt(itf, 0xAC);
 	float* fr = n ? FrameOf(n) : nullptr;
 	if (!fr) return;
-	int p = CoopP1Hero() == HERO_ASTERIX ? 0 : 1;
-	bool stacked = SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL;
+	// (Single player's second chance: at the game's own place, out of the way of
+	// the left box -- the revive countdown.)
+	bool solo = !CoopP2Joined();
+	int p = solo || CoopP1Hero() == HERO_ASTERIX ? 0 : 1;
+	bool stacked = !solo && SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL;
 	const float px = 0.08f, py = 0.1f;   // where the game shows it (16:9)
-	float corner = 0.08f * (16.0f / 9.0f) / Aspect2d();
+	float corner = solo ? px : 0.08f * (16.0f / 9.0f) / Aspect2d();
 	float s = stacked ? 0.75f : 1.0f;
 	float tx = stacked ? corner + 0.07f : p == 0 ? corner : 1.0f - corner;
 	float ty = stacked ? (p == 0 ? 0.5f : 0.0f) + py * s : py;
@@ -433,9 +464,10 @@ void PlaceGateSparkle(char* itf, bool middle) {
 // interface's vf15 -- where the health in the game's place is the standing
 // hero's. The HUD's owner's instead.
 int HudOwner() {
-	if (g.inP2Tick) return CoopP2Hero();
+	if (g.inP2Tick) return CoopP2Joined() ? CoopP2Hero() : g.soloOther;
 	int shopper = CoopShopper();
-	return shopper >= 0 ? shopper : CoopP1Hero();
+	if (shopper >= 0) return shopper;
+	return CoopP2Joined() ? CoopP1Hero() : SoloLeader();
 }
 // The health's place among the 6 x 5 shield models (+0x274 row, +0x275 in it):
 // FUN_0051B550 sets it from the health, row health / 5 - 1 on a whole shield --
@@ -561,8 +593,45 @@ bool Hud2InstallHooks() {
 	return ok;
 }
 
+// Single player's two rows, before the game's tick: the lead changed hands --
+// the new leader's copy into the interface, the old leader's kept as the
+// other row (with the "changed" bookkeeping); either hero's health changing
+// shows both rows (they slide in and out together).
+void SoloBeforeTick(char* itf) {
+	char* gm = GM();
+	int l = SoloLeader();
+	if (!gm || l < 0) return;
+	if (itf != g.itf) {   // another level's interface
+		g.itf = itf;
+		g.s2.valid = false;
+		g.lastHp[0] = g.lastHp[1] = g.lastShields[0] = g.lastShields[1] = -1;
+		g.pending[0] = g.pending[1] = false;
+		g.soloLeader = -1;
+		TintForget();
+	}
+	if (g.soloLeader >= 0 && l != g.soloLeader && g.s2.valid) {
+		static HudState tmp;
+		Capture(itf, g.s1);
+		tmp = g.s2;
+		g.s2 = g.s1;
+		g.s1 = tmp;
+		Apply(itf, g.s1);
+		int hp = g.lastHp[0], sh = g.lastShields[0];
+		bool pd = g.pending[0];
+		g.lastHp[0] = g.lastHp[1]; g.lastShields[0] = g.lastShields[1]; g.pending[0] = g.pending[1];
+		g.lastHp[1] = hp; g.lastShields[1] = sh; g.pending[1] = pd;
+		static int s_told = 0;
+		if (s_told++ < 20) Log("hud2: %s leads -- the game's HUD is its row now, %s's the other", HeroName(l), HeroName(1 - l));
+	}
+	g.soloLeader = l;
+	g.soloOther = 1 - l;
+	bool a = StatsChanged(0, l), b = StatsChanged(1, 1 - l);
+	if (a || b) g.pending[0] = g.pending[1] = true;
+	*(uint32_t*)(gm + 0x5C) = (*(uint32_t*)(gm + 0x5C) & ~0x4000u) | (g.pending[0] ? 0x4000u : 0u);
+}
+
 void Hud2BeforeInterfaceTick(char* itf) {
-	(void)itf;
+	if (SoloRows() && itf) { SoloBeforeTick(itf); return; }
 	if (!On()) return;
 	// Player 1's HUD shows for player 1's own health changes (the game's flag
 	// goes up for either hero's).
@@ -574,7 +643,8 @@ void Hud2BeforeInterfaceTick(char* itf) {
 
 void Hud2AfterInterfaceTick(char* itf, void* time) {
 	if (itf) PlaceGateSparkle(itf, On() && SplitActive());
-	if (!On() || !itf) return;
+	bool solo = SoloRows() && g.soloLeader >= 0 && itf == g.itf;
+	if ((!On() && !solo) || !itf) return;
 	char* gm = GM();
 	if (!gm) return;
 	if (itf != g.itf) {   // another level's interface
@@ -610,20 +680,22 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 	}
 	if (!g.s2.valid) {
 		g.s2 = g.s1;
-		Log("hud2: player 2's HUD (health, combo bar) set up from the interface %p", itf);
+		Log("hud2: %s HUD (health%s) set up from the interface %p", solo ? "the other hero's" : "player 2's",
+		    solo ? "" : ", combo bar", itf);
 	}
 	Apply(itf, g.s2);
 	uint32_t& f = *(uint32_t*)(gm + 0x5C);
 	uint32_t saved = f;
 	f &= ~kShowFlags;
-	if (StatsChanged(1, CoopP2Hero())) g.pending[1] = true;
+	if (!solo && StatsChanged(1, CoopP2Hero())) g.pending[1] = true;
 	if (g.pending[1]) f |= 0x4000;
-	if (CoopP2ShowsHud()) f |= 0x1000000;
-	int prev = IndivEnter(CoopP2Hero());
+	// (single player: the HUD button shows both rows; the combo bar is the leader's alone)
+	if (solo ? (saved & 0x1000000) != 0 : CoopP2ShowsHud()) f |= 0x1000000;
+	int prev = IndivEnter(solo ? g.soloOther : CoopP2Hero());
 	g.inP2Tick = true;
 	if (!(f & 0x100000)) {
 		kHealthPart(itf, nullptr, time);
-		if (!(f & 0x10000000)) {
+		if (!solo && !(f & 0x10000000)) {
 			kComboPart(itf, nullptr, time);
 			kComboGlowPart(itf, nullptr, time);
 		}
@@ -641,9 +713,25 @@ void Hud2BeginP1(RwCamera* hud) {
 	g.nSaved2d = 0;
 	g.nScaled = 0;
 	char* lvlItf = (char*)GetLvlObject(2, 132, 0);
-	if (hud && lvlItf && CoopP2Joined() && CoopShopper() < 0)   // co-op, split or one screen
+	bool solo = SoloRows() && g.soloLeader >= 0;
+	if (hud && lvlItf && (CoopP2Joined() || solo) && CoopShopper() < 0)   // co-op, split or one screen; second chance's left box
 		LayoutFlask(lvlItf, (float*)((char*)*(void**)((char*)hud + 4) + 0x50));
 	char* itf = g.itf;
+	if (solo) {
+		// The leading hero's row (the game's pass): Obelix's under Asterix's, in
+		// its colours (the shields' textures as learned in the other row's pass).
+		if (!hud || !itf || itf != lvlItf) return;
+		float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);
+		int hp = 0, shields = 3;
+		if (IndivStats(g.soloLeader, &hp, &shields)) ScaleHealth(itf, cl, shields, true);
+		if (g.soloLeader == HERO_OBELIX) {
+			Xform t = { 0.0f, 0.0f, 1.0f, 0.0f, -kRowGap };
+			for (int i = 0; i < 31; i++) Xf3d(ElemPtr(itf, i), cl, t, true);
+		}
+		TintBegin(g.soloLeader, false);
+		g.soloTint = true;
+		return;
+	}
 	if (!On() || !hud || !itf || itf != lvlItf) return;
 	float* cl = (float*)((char*)*(void**)((char*)hud + 4) + 0x50);   // right +0, up +4
 	bool stacked = Stacked();
@@ -760,6 +848,7 @@ void Hud2ShopSides(RwCamera* hud) {
 }
 
 void Hud2EndP1() {
+	if (g.soloTint) { TintEnd(); g.soloTint = false; }
 	for (int i = g.nScaled - 1; i >= 0; i--) memcpy((char*)g.scaled[i].f + 0x50, g.scaled[i].m, sizeof(g.scaled[i].m));
 	g.nScaled = 0;
 	Restore2d();
@@ -769,7 +858,8 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	g.p2Pass = false;
 	g.nHidden = 0;
 	char* itf = g.itf;
-	if (!On() || !hud || !itf || !g.s2.valid || itf != (char*)GetLvlObject(2, 132, 0)) return false;
+	bool solo = SoloRows() && g.soloLeader >= 0;   // single player's other row: the health only
+	if ((!On() && !(solo && part == 0)) || !hud || !itf || !g.s2.valid || itf != (char*)GetLvlObject(2, 132, 0)) return false;
 	// The game's HUD hidden: a menu's interface in the game manager's place
 	// for the current one (+0xF8: the pause menu's -- the in-game interface,
 	// type +0x28 == 9, is the one the HUD's pieces run for), or its HUD hidden
@@ -819,7 +909,22 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 	float* cm = (float*)((char*)*(void**)((char*)hud + 4) + 0x10);
 	if (part == 0) {   // as many shields as player 1's row fits (before the mirror; Apply puts them back)
 		int hp = 0, shields = 3;
-		if (IndivStats(CoopP2Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, false);
+		if (IndivStats(solo ? g.soloOther : CoopP2Hero(), &hp, &shields)) ScaleHealth(itf, cl, shields, false);
+	}
+	if (solo) {   // not mirrored: Obelix's row under Asterix's, in its colours (its textures learned)
+		if (g.soloOther == HERO_OBELIX) {
+			Xform t = { 0.0f, 0.0f, 1.0f, 0.0f, -kRowGap };
+			for (int i = 0; i < 31; i++) Xf3d(ElemPtr(itf, i), cl, t, false);
+		}
+		TintBegin(g.soloOther, true);
+		g.soloTint = true;
+		g.p2Pass = true;
+		if (!g.loggedP2) {
+			g.loggedP2 = true;
+			Log("hud2: %s's health row drawn (%s; %d other models hidden for it)", HeroName(g.soloOther),
+			    g.soloOther == HERO_OBELIX ? "under Asterix's" : "over Obelix's", g.nHidden);
+		}
+		return true;
 	}
 	if (Stacked()) {   // stacked split: player 1's layout in the bottom half, not mirrored (Apply puts them back)
 		if (part == 0) {
@@ -881,6 +986,7 @@ bool Hud2BeginP2(RwCamera* hud, int part) {
 
 void Hud2EndP2() {
 	if (!g.p2Pass) return;
+	if (g.soloTint) { TintEnd(); g.soloTint = false; }
 	for (int i = 0; i < g.nFlipped; i++) {
 		float* lt = (float*)((char*)g.flipped[i] + 0x50);
 		float* md = (float*)((char*)g.flipped[i] + 0x10);
@@ -904,3 +1010,6 @@ void Hud2EndP2() {
 	Apply(g.itf, g.s1);
 	g.p2Pass = false;
 }
+
+bool Hud2SoloRows() { return SoloRows() && g.soloLeader >= 0; }
+int Hud2HudHero() { return HudOwner(); }

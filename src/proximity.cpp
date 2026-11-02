@@ -620,7 +620,11 @@ void __fastcall BundleTickHook(char* bundle, void* edx, void* dt) {
 				char* hook = *(char**)((char*)life + 0x10);
 				if (hook && IndivHoldsBack(hook)) continue;
 				if (solo && hook && SoloTick(life, dt, hook, t)) continue;
+				// (second chance: a catapult's blow on its hitter's combo bar, as in co-op)
+				int by = t && hook && IndivActive() && *(uintptr_t*)hook == kCatapultVtbl ? CatapultHitter(hook, t) : -1;
+				int prev = by >= 0 ? IndivEnter(by) : -1;
 				((TickFn)(*(void***)life)[17])(life, nullptr, dt);
+				if (by >= 0) IndivLeave(prev);
 			}
 			return;
 		}
@@ -1721,6 +1725,72 @@ bool GroupOnlyLeadsTo(unsigned ev, int up) {
 	return true;
 }
 
+// Does event `ev`'s group only switch the lead (sp_hero_switch_lock, coop.cpp):
+// to the trio nothing but switches (0x4800 / 0x48B7 Asterix, 0x4801 / 0x48B8
+// Obelix), "the sidekick may move" (0x4803) and the fight mode's timer (0x2000),
+// no cutscene? Its switches into `out` (their count; 0 for any other group).
+int GroupOnlySwitches(unsigned ev, uint16_t* out, int max) {
+	char* objs[32];
+	uint16_t msgs[32];
+	int n = GroupTargets(ev, objs, msgs, 32), k = 0;
+	if (n == 32 || GroupPlaysCutscene(ev)) return 0;
+	for (int i = 0; i < n; i++) {
+		if (!objs[i] || *(uintptr_t*)objs[i] != 0x6256A0) continue;
+		unsigned m = msgs[i];
+		if (m == 0x4803 || m == 0x2000) continue;
+		if (m != 0x4800 && m != 0x4801 && m != 0x48B7 && m != 0x48B8) return 0;
+		if (k < max) out[k++] = (uint16_t)m;
+	}
+	return k;
+}
+
+// The event service's dispatch (CKSrvEvent::vf17, 0x46B180, thiscall(this,
+// arg), ret 4): each flagged group's messages in turn -- of the first set of
+// groups (+0x1C of them) any with a flag up (table +2), of the next two (+0x1E,
+// +0x20) those with all their flags up (+2 == the mask +1). Groups are flagged
+// by inlined code in many places (an activator's lever, ...), not only through
+// FUN_00460C20 (FlagEventHook): the groups about to run are noted here, for
+// sp_hero_switch_lock (a level's switch from a group that only switches is
+// dropped, coop.cpp).
+typedef void(__fastcall* EventDispatchFn)(char* es, void* edx, void* arg);
+const uintptr_t kSrvEventVtbl = 0x624FF0, kEventDispatch = 0x46B180;
+EventDispatchFn g_origEventDispatch = nullptr;
+uint16_t g_dispatching[32];   // the groups being dispatched, as their first event ids
+int      g_nDispatching = 0;
+
+void __fastcall EventDispatchHook(char* es, void* edx, void* arg) {
+	g_nDispatching = 0;
+	if (*(uint8_t*)(es + 0x22) && !CoopP2Joined() && g_config.spSwitchLock) {
+		uint8_t* tab = *(uint8_t**)(es + 0xC);
+		unsigned n1 = *(uint16_t*)(es + 0x1C), n = n1 + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+		for (unsigned g = 0; tab && g < n && g < 0x1FFF && g_nDispatching < 32; g++) {
+			uint8_t f = tab[g * 3 + 2];
+			if (f && (g < n1 || f == tab[g * 3 + 1])) g_dispatching[g_nDispatching++] = (uint16_t)(g << 3);
+		}
+	}
+	g_origEventDispatch(es, edx, arg);
+	g_nDispatching = 0;
+}
+
+// The groups under way that send the trio `msg`: all of them only switch (and
+// free the sidekick)? The first such group's event id in `ev`.
+bool DispatchOnlySwitches(unsigned msg, unsigned* ev) {
+	bool found = false;
+	for (int i = 0; i < g_nDispatching; i++) {
+		char* objs[32];
+		uint16_t msgs[32];
+		int n = GroupTargets(g_dispatching[i], objs, msgs, 32);
+		bool sends = false;
+		for (int k = 0; k < n && !sends; k++) sends = objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] == msg;
+		if (!sends) continue;
+		uint16_t sw[4];
+		if (GroupOnlySwitches(g_dispatching[i], sw, 4) <= 0) return false;   // (a group holding a hero sends it: kept)
+		if (!found) *ev = g_dispatching[i];
+		found = true;
+	}
+	return found;
+}
+
 // Does event `ev`'s group need both heroes: command the trio (above; not only
 // a switch of the lead to `up`, the standing hero), or start a ride / scripted
 // mode for both (trio 0x4806, 0x4807, 0x480B..0x480F: the belly slide's cross
@@ -2325,6 +2395,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 long ProximityP2Contacts() { return g_p2Contacts; }
 int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max) { return GroupTargets(ev, objs, msgs, max); }
 bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
+bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev) { return DispatchOnlySwitches(msg, ev); }
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;
 	int a = GroupSwitchTarget(*(uint16_t*)(l + 0x28));
@@ -2395,6 +2466,8 @@ bool ProximityInstallHooks() {
 			PatchVtableSlot(kRomanVtbls[i], 5, kRomanSends[i], (void*)RomanSendHook, (void**)&g_origRomanSend[i], "Roman::sendEvent (pass log)");
 	bool ok = PatchVtableSlot(kBundleVtbl, kBundleTickSlot, kBundleTick,
 	                          (void*)BundleTickHook, (void**)&g_origBundleTick, "CKBundle::tick");
+	ok &= PatchVtableSlot(kSrvEventVtbl, 17, kEventDispatch, (void*)EventDispatchHook, (void**)&g_origEventDispatch,
+	                      "CKSrvEvent::vf17 (the groups dispatched: sp_hero_switch_lock)");
 	ok &= PatchVtableSlot(kBonusPoolVtbl, kPoolUpdateSlot, kBonusPoolUpdate,
 	                      (void*)PoolUpdateHook, (void**)&g_origPoolUpdate, "CKGrpBonusPool::update");
 	ok &= PatchVtableSlot(kAsterixBonusPoolVtbl, kPoolUpdateSlot, kAsterixBonusPoolUpdate,

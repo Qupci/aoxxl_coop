@@ -15,14 +15,14 @@ struct CoopConfig {
 	bool  renderProbe   = false;  // find the scene-render call via RwCamera.beginUpdate
 	bool  splitTest     = false;
 	bool  showLeader    = false;  // the trio's leader written on the screen
-	bool  cheats        = false;  // test helpers: Back + Y fills the magic potion  // render the scene twice, to prove re-entrancy
+	bool  cheats        = false;  // test helpers and the mod buttons (R3 + A / B / X / Y / D-pad); single player too with SoloMod()
 	int   splitMode     = SPLIT_VERTICAL;
 	bool  splitScreen   = true;   // off = shared camera on the leader
 	bool  gameCamera    = true;   // split screen: each player gets a copy of the game's camera (off = the mod's follow camera)
 	float splitFov      = 15.0f;  // split screen: degrees added to each half's field of view
 	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect
 	int   dropHoldMs    = 1500;
-	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix
+	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix (single player: Obelix leading, SoloMod())
 	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)
 	bool  individual    = true;   // each hero its own health, shields and combo bar; a fallen hero can be revived
 	bool  romansGuardDowned = true; // ... the basic Romans near a fallen hero stay round it, shielded, until it is revived
@@ -58,14 +58,20 @@ struct CoopConfig {
 	bool  noLockRomans     = true;  // no-lock mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
 	bool  noLockRomansAnyMarkers = false; // ... at any squad's spawn markers near it, not only its own squad's
 
-	// Single player ([single_player]; co-op features without player 2, each off by default)
-	bool  spComboHints   = false;  // sp_combo_hints: the combo hints in player 1's box
-	bool  spCoopIcons    = false;  // sp_coop_icons: the mod's button icons (pad or keyboard) in the game's texts
-	bool  spObelixPotion = false;  // sp_obelix_potion: Obelix leading runs and is invincible on Asterix's potion
-	bool  spHeroSwitch   = false;  // sp_hero_switch: a button gives the lead to the other hero
+	// Single player ([single_player]; co-op features without player 2). sp_isolation
+	// (on) keeps single player the game's own: every sp_ option below is then off
+	// whatever the ini says (Load clears them), and so are the general options'
+	// single player parts (obelix_potion, cheats) -- SoloMod().
+	bool  spIsolation    = true;   // sp_isolation: single player as the game's (only player 2's join hint)
+	bool  spComboHints   = true;   // sp_combo_hints: the combo hints in player 1's box
+	bool  spCoopIcons    = true;   // sp_coop_icons: the mod's button icons (pad or keyboard) in the game's texts
+	bool  spHeroSwitch   = true;   // sp_hero_switch: a button gives the lead to the other hero
 	uint16_t spSwitchButton = 0x0001;   // ... its pad button (PAD_*: D-pad up)
 	int   spSwitchKey    = 0x09;   // ... its key with player 1 on the keyboard (TAB)
+	bool  spSwitchLock   = true;   // sp_hero_switch_lock: the level's lead switches ignored, a lock's switch undone at its end
 	bool  spSecondChance = false;  // sp_second_chance: each hero its own health; a fallen one waits to be revived
+	// The mod's features in single player at all (sp_isolation off).
+	bool  SoloMod() const { return !spIsolation; }
 
 	// Keyboard as player 2's controller ("pad" slot kKeyboardPad): virtual-key
 	// codes, [keyboard] section of the ini.

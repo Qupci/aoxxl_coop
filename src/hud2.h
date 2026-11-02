@@ -32,3 +32,11 @@ void Hud2EndP1();
 void Hud2ShopSides(RwCamera* hud);   // the shop's HUD in a stacked half: models out to its edges
 bool Hud2BeginP2(RwCamera* hud, int part);   // part 0: health, 1: combo bar
 void Hud2EndP2();
+
+// Single player's second chance: a health row for each hero (Asterix's, Obelix's
+// under it, each in its hero's colours) -- the game's HUD is the leading hero's,
+// the other hero's row a copy as player 2's, drawn in the same second pass.
+bool Hud2SoloRows();
+// The hero whose stats the game's HUD shows (player 1's, a shopper's, single
+// player's leader).
+int Hud2HudHero();

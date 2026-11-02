@@ -114,13 +114,15 @@ void LogKinds(char* self) {
 	}
 }
 
-// The newest live hint for player `p`'s box (both players' hints included).
+// The newest live hint for player `p`'s box (both players' hints included --
+// not in single player's left box: only its own).
 const Hint* NewestFor(int p) {
 	DWORD now = GetTickCount();
 	const Hint* best = nullptr;
+	bool own = p == HINT_LEFT_BOX && !CoopP2Joined();
 	for (int i = 0; i < g_nHints; i++) {
 		const Hint& h = g_hints[i];
-		if ((int)(h.until - now) <= 0 || (h.player != p && h.player != HINT_BOTH)) continue;
+		if ((int)(h.until - now) <= 0 || (h.player != p && (h.player != HINT_BOTH || own))) continue;
 		if (!best || (int)(h.since - best->since) > 0 || (h.since == best->since && h.key > best->key)) best = &h;
 	}
 	return best;
@@ -294,10 +296,11 @@ void LayOutGlyphs(const char* game) {
 }
 
 // Where a box is: its side (true: the left edge) and how far up (the stacked
-// split's top half).
+// split's top half). Single player: player 1's at the game's place, the left
+// box (HINT_LEFT_BOX) where player 1's is side by side.
 struct Place { bool left; float up; };
 Place PlaceOf(int p) {
-	if (!CoopP2Joined()) return { false, 0.0f };
+	if (!CoopP2Joined()) return { p == HINT_LEFT_BOX, 0.0f };
 	if (SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL) return { false, p == 0 ? 0.5f : 0.0f };
 	return { p == 0, 0.0f };
 }
@@ -322,8 +325,8 @@ void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text) 
 				return;
 			}
 		}
-	} else if (p != 0 || gameKind != kPromptNone) {
-		return;   // player 1 alone: the game's own prompt comes first
+	} else if (p == 0 && gameKind != kPromptNone) {
+		return;   // player 1 alone: the game's own prompt comes first (the left box has no prompt)
 	}
 	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; }
 }
@@ -335,8 +338,7 @@ void UpdateSlot(int p, char* itf, float dt) {
 	int kind;
 	uint32_t ident;
 	const wchar_t* text;
-	if (p == 0 || CoopP2Joined()) Choose(p, itf, &kind, &ident, &text);
-	else { kind = 0; ident = 0; text = L""; }
+	Choose(p, itf, &kind, &ident, &text);
 	Place pl = PlaceOf(p);
 	bool right = false;   // every box's lines left-aligned (the left box's right-aligned lines read oddly: user)
 	DWORD now = GetTickCount();
@@ -561,10 +563,10 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	}
 	{
 		// Individual heroes: the HUD (top left, player 1's half) is player 1's
-		// hero's health, shields and combo bar.
+		// hero's health, shields and combo bar (at the merchant: the shopper's own
+		// shields; single player's second chance: the leading hero's).
 		Hud2BeforeInterfaceTick(self);
-		int shopper = CoopShopper();   // at the merchant: the shopper's own shields
-		int prev = IndivEnter(shopper >= 0 ? shopper : CoopP1Hero());
+		int prev = IndivEnter(Hud2HudHero());
 		g_origInterfaceTick(self, edx, time);
 		IndivLeave(prev);
 		Hud2AfterInterfaceTick(self, time);   // player 2's own health and combo bar

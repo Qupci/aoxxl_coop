@@ -21,6 +21,11 @@ bool HintsInstallHooks();
 void HintsFrame();
 
 const int HINT_BOTH = -1;
+// Without player 2, player 2's box is a second box at the bottom left (where
+// player 1's is side by side), for hints shown to it by name only (not
+// HINT_BOTH): second chance's revive countdown, apart from the revive's own
+// hints in player 1's box.
+const int HINT_LEFT_BOX = 1;
 // Shows `text` on player `player`'s box (0 / 1, HINT_BOTH: each) for `ms`
 // milliseconds. (`key`, `player`) identifies the hint: showing it again replaces
 // its text and time. Each box shows its newest hint (by when it was first

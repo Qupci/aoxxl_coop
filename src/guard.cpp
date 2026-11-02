@@ -90,9 +90,9 @@ bool Valid(const Guard& g) {
 	return false;
 }
 
-// Its hero still down, in co-op.
+// Its hero still down, in co-op or single player's second chance.
 bool OnDuty(const Guard& g) {
-	return g_config.romansGuardDowned && CoopP2Joined() && !CoopSuspended() && IndivFallen(g.hero) && Valid(g);
+	return g_config.romansGuardDowned && (CoopP2Joined() || IndivActive()) && !CoopSuspended() && IndivFallen(g.hero) && Valid(g);
 }
 
 bool RomanPos(char* m, Vector3* out) {
@@ -436,7 +436,7 @@ void GuardFrame() {
 		Drop(i);
 	}
 	Trio t = GetTrio();
-	bool on = t && g_config.romansGuardDowned && CoopP2Joined() && !CoopSuspended() && KalLevelIsLoaded();
+	bool on = t && g_config.romansGuardDowned && (CoopP2Joined() || IndivActive()) && !CoopSuspended() && KalLevelIsLoaded();
 	for (int hero = HERO_ASTERIX; hero <= HERO_OBELIX; hero++) {
 		Hero h = on ? t.GetHero(hero) : Hero();
 		bool down = h && IndivFallen(hero);
