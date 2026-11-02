@@ -1337,14 +1337,20 @@ bool IndivHeroDown(int hero, const char* how) {
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(hero) : Hero();
 	if (!h) return false;
-	if (CoopSuspended() || g.fallen[other] || Current(other).hp == 0) {
+	// Single player's second chance: a fall on the belly slide or the boat (either
+	// hero in mode 3 / 1 -- a ride both are on) is the game over at once, as in
+	// co-op's scripted modes (user: the slide's death started a revive).
+	Hero o = t.GetHero(other);
+	bool soloRide = g.solo && o && (HeroMode(h.Flags18()) == 1 || HeroMode(h.Flags18()) == 3 ||
+	                                HeroMode(o.Flags18()) == 1 || HeroMode(o.Flags18()) == 3);
+	if (CoopSuspended() || soloRide || g.fallen[other] || Current(other).hp == 0) {
 		// Both down (or a fall on a ride): the game over of single player, with
 		// the game manager seeing no health whoever leads.
 		g.gameOver = true;
 		g.st[other].hp = 0;
 		Commit(other);
 		Log("indiv: %s is down too (%s)%s -- game over", HeroName(hero), how,
-		    CoopSuspended() ? " during a scripted mode" : "");
+		    CoopSuspended() || soloRide ? " during a scripted mode" : "");
 		HintHide(HINT_REVIVE);
 		return false;
 	}

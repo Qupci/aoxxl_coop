@@ -1728,13 +1728,16 @@ bool GroupOnlyLeadsTo(unsigned ev, int up) {
 // Does event `ev`'s group only switch the lead (sp_hero_switch_lock, coop.cpp):
 // to the trio nothing but switches (0x4800 / 0x48B7 Asterix, 0x4801 / 0x48B8
 // Obelix), "the sidekick may move" (0x4803), the fight mode's timer (0x2000) and
-// Idefix's orders, no cutscene? Its switches into `out` (their count; 0 for any
-// other group).
+// Idefix's orders? Its switches into `out` (their count; 0 for any other group).
+// Whatever else it does outside the trio does not count -- a cinematic bloc
+// included (LV3-5's 0850: 0501 to a CKManageEventCinematicBloc, a music stream;
+// kept, the lead came back 0.3 s later): a later order for "the sidekick" the
+// level meant for the other hero gets its switch then (coop.cpp SoloOrderNeedsLead).
 int GroupOnlySwitches(unsigned ev, uint16_t* out, int max) {
-	char* objs[32];
-	uint16_t msgs[32];
-	int n = GroupTargets(ev, objs, msgs, 32), k = 0;
-	if (n == 32 || GroupPlaysCutscene(ev)) return 0;
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = GroupTargets(ev, objs, msgs, 64), k = 0;
+	if (n == 64) return 0;
 	for (int i = 0; i < n; i++) {
 		if (!objs[i] || *(uintptr_t*)objs[i] != 0x6256A0) continue;
 		unsigned m = msgs[i];
@@ -1781,9 +1784,9 @@ void __fastcall EventDispatchHook(char* es, void* edx, void* arg) {
 bool DispatchOnlySwitches(unsigned msg, unsigned* ev) {
 	bool found = false;
 	for (int i = 0; i < g_nDispatching; i++) {
-		char* objs[32];
-		uint16_t msgs[32];
-		int n = GroupTargets(g_dispatching[i], objs, msgs, 32);
+		char* objs[64];
+		uint16_t msgs[64];
+		int n = GroupTargets(g_dispatching[i], objs, msgs, 64);
 		bool sends = false;
 		for (int k = 0; k < n && !sends; k++) sends = objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] == msg;
 		if (!sends) continue;

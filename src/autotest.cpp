@@ -42,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7904,6 +7904,84 @@ const Step kSpLockEv2[] = {
 	SHOT(9500, "after_keg"),
 	END(10500),
 };
+// sptwist2 / sptwist2j (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0): single
+// player, Asterix's Twister by a Roman -- its camera (pulled back: a wider field
+// of view, a shake); j: player 2 joins and leaves first (the user's LV3-5: the
+// Twister's camera looked normal after a join).
+#define SPTWIST_STEPS \
+	{ 4500, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" }, \
+	{ 4700, S_P1COMBO, -1, 0, 0, 0, 0, "every combo learned" }, \
+	{ 4900, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "combo bar full" }, \
+	{ 5000, S_CAMFOV, 0, 0, 0, 0, 0, "camera before" }, SHOT(5000, "before"), \
+	{ 5500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" }, \
+	{ 6000, S_CAMFOV, 0, 0, 0, 0, 0, "camera 0.5 s in" }, SHOT(6000, "twister_1"), \
+	{ 6600, S_CAMFOV, 0, 0, 0, 0, 0, "camera 1.1 s in" }, SHOT(6600, "twister_2"), \
+	{ 7500, S_CAMFOV, 0, 0, 0, 0, 0, "camera 2 s in" }, SHOT(7500, "twister_3"), \
+	{ 9500, S_CAMFOV, 0, 0, 0, 0, 0, "camera after" }, \
+	END(10000)
+const Step kSpTwist2[] = { MARK(0, "sptwist2"), SPTWIST_STEPS };
+const Step kSpTwist2J[] = {
+	MARK(0, "sptwist2j"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start (joins)"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	VPAD(3000, 1, PAD_START, 0, 0, "p2 start (leaves)"), VPAD(3200, 1, 0, 0, 0, "p2 release"),
+	SPTWIST_STEPS,
+};
+#undef SPTWIST_STEPS
+// spslide2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:9000): second
+// chance, LV2-2's belly slide (slidecross: Asterix past its cross detector, z
+// -903.82) -- Asterix down on it: the game over at once, as in co-op (user: a
+// revive began).
+const Step kSpSlide2[] = {
+	MARK(0, "spslide2"), LOADSECTOR(200, 2),
+	PLACEAT(3000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(3000, HERO_OBELIX, -903.96f, 528.2f, -938.49f),
+	GLIDEAT(4500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
+	SHOT(8500, "sliding"), SHOT(10000, "down"), SHOT(14000, "after"),
+	END(18000),
+};
+// spslidemode2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:3000): the
+// rule alone (the slide itself needs LV2-2's opening): Obelix's flags in the belly
+// slide's mode (3, f18 0x0D) as Asterix goes down -- the game over, no revive.
+const Step kSpSlideMode2[] = {
+	MARK(0, "spslidemode2"),
+	{ 2950, S_SETF18, HERO_OBELIX, 0x0D, 0, 0, 0, "obelix in the slide's mode" },
+	{ 3100, S_SETF18, HERO_OBELIX, 0x23, 0, 0, 0, "obelix back" },
+	SHOT(4000, "after"),
+	END(12000),
+};
+// splockord2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
+// you play Obelix (the switch); zone 0020's group ("Asterix leads" + "the
+// sidekick may move") flagged: dropped; then LV2-1's turnstile box 0528 ("the
+// sidekick walks to markers" -- for Obelix, the level's sidekick): Asterix leads
+// for it first, Obelix walks there; free again, Obelix is yours.
+const Step kSpLockOrd2[] = {
+	MARK(0, "splockord2"),
+	{ 2000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 3000, S_FLAGEV, 0x0020, 0, 0, 0, 0, "zone 0020: switch to asterix + the sidekick may move" },
+	SHOT(4000, "obelix_kept"),
+	{ 5000, S_FLAGEV, 0x0528, 0, 0, 0, 0, "box 0528: the sidekick walks to markers" },
+	SHOT(6000, "order"), SHOT(12000, "after"), SHOT(20000, "later"),
+	END(24000),
+};
+// sptwist34 (-Level 3, XXL_SPISOLATION=1 / 0, XXL_SPSECOND=0): the user's LV3-4
+// arena (104.6 -1.3 -318.5): Asterix's Twister by its Romans -- does the camera
+// pull back and shake there (vanilla: isolated)?
+const Step kSpTwist34[] = {
+	MARK(0, "sptwist34"), LOADSECTOR(200, 4),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, 104.1f, -0.8f, -310.0f), PLACEAT(3000, HERO_OBELIX, 106.1f, -0.8f, -310.0f),
+	FORCE(3400, HERO_OBELIX, 0),
+	{ 4000, S_FLAGEV, 0x0578, 0, 0, 0, 0, "zone 0578: the arena's fight" },
+	{ 6000, S_CAMDUMP, 0, 0, 0, 0, 0, "camera" },
+	{ 14000, S_ENEMY, HERO_ASTERIX, 2, 0, 0, 0, "asterix 6 from a roman" },
+	{ 14200, S_P1COMBO, -1, 0, 0, 0, 0, "every combo learned" },
+	{ 14400, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "combo bar full" },
+	{ 14500, S_CAMFOV, 0, 0, 0, 0, 0, "camera before" }, SHOT(14500, "before"),
+	{ 15000, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	{ 15500, S_CAMFOV, 0, 0, 0, 0, 0, "camera 0.5 s in" }, SHOT(15500, "twister_1"),
+	{ 16500, S_CAMFOV, 0, 0, 0, 0, 0, "camera 1.5 s in" }, SHOT(16500, "twister_2"),
+	{ 18000, S_CAMFOV, 0, 0, 0, 0, 0, "camera 3 s in" },
+	END(19000),
+};
 // spgun33 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=0): single player, Obelix
 // leading takes LV3-3's machine gun (X): he turns it, nobody fires; Asterix, the
 // AI companion 13 units off, runs to it and joins as its gunner (the lead his,
@@ -7971,6 +8049,12 @@ const Scenario kScenarios[] = {
 	SCENARIO("spmod2", kSpMod2),
 	SCENARIO("sphud2", kSpHud2),
 	SCENARIO("spgun33", kSpGun33),
+	SCENARIO("spslide2", kSpSlide2),
+	SCENARIO("spslidemode2", kSpSlideMode2),
+	SCENARIO("splockord2", kSpLockOrd2),
+	SCENARIO("sptwist34", kSpTwist34),
+	SCENARIO("sptwist2", kSpTwist2),
+	SCENARIO("sptwist2j", kSpTwist2J),
 	SCENARIO("splockev2", kSpLockEv2),
 	SCENARIO("spfindkeg2", kSpFindKeg2),
 	SCENARIO("splockcar21", kSpLockCar21),
@@ -10906,6 +10990,17 @@ void RunStep(const Step& s) {
 		Log("autotest: the hero switch button");
 		CoopSoloSwitchRequest();
 		break;
+	case S_CAMFOV: {   // the camera's field of view and shake: the renderer's last fov (camera service +0x18 -> +0x28), the main camera's view window, the shake
+		CKYellowPages* yp = YellowPages();
+		char* cs = yp ? *(char**)((char*)yp + 0x68) : nullptr;
+		char* r = cs ? *(char**)(cs + 0x18) : nullptr;
+		const float* w = *(float**)0x662EB8 ? (const float*)(*(char**)0x662EB8 + 0x68) : nullptr;
+		Log("autotest: camera: renderer fov %.2f, view window %.3f %.3f, service flags %08X, shake %u (length %.2f, strength %.2f, count %u)",
+		    r ? *(float*)(r + 0x28) : -1.0f, w ? w[0] : -1.0f, w ? w[1] : -1.0f, cs ? *(uint32_t*)(cs + 0xC) : 0,
+		    cs && (*(uint32_t*)(cs + 0xC) & 0x1000) ? 1 : 0, cs ? *(float*)(cs + 0x668) : 0.0f, cs ? *(float*)(cs + 0x670) : 0.0f,
+		    cs ? *(uint32_t*)(cs + 0x680) : 0);
+		break;
+	}
 	case S_SPMOD:   // single player: the mod's buttons a (PAD_* bits) with R3 held ([debug] cheats)
 		Log("autotest: R3 + buttons %04X", s.a);
 		CoopSoloModRequest(s.a);

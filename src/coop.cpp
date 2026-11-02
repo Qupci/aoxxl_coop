@@ -52,6 +52,7 @@ static void SoloPotionDash(Trio t);
 static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
 static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
 static bool SoloDropsSwitch(int ev);
+static void SoloOrderNeedsLead(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
 static void SoloGunFrame(Trio t);                        // below: Obelix's machine gun in single player
 static void PlaySound(Hero h, uint32_t bankOffset);
@@ -1809,8 +1810,10 @@ static char* NearestTowedCar(Hero h);
 static int KeptOffCars();
 
 bool CoopDeferTrioEvent(void* trio, int ev) {
-	// Single player, sp_hero_switch_lock: a level's switch that holds nobody.
+	// Single player, sp_hero_switch_lock: a level's switch that holds nobody, and
+	// the switch a later order for the sidekick needs.
 	if (SoloDropsSwitch(ev)) return true;
+	SoloOrderNeedsLead(ev);
 	// Individual heroes: a cable car takes the hero who steps on it from the
 	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
 	// AI order 9) -- with the partner down the ride is not started: the hero
@@ -4432,6 +4435,7 @@ struct SoloLock {
 	int   choice = -1;       // the hero you play
 	int   level = -1;        // ... in this level
 	DWORD freeSince = 0, farSince = 0;
+	int   levelLeader = -1;  // the hero the level's last switch (an event group's) means to lead
 } g_solo;
 
 static bool SoloSwitchLockOn() { return !g.p2Joined && g_config.spSwitchLock; }
@@ -4443,18 +4447,40 @@ static bool SoloDropsSwitch(int ev) {
 	Trio t = GetTrio();
 	unsigned group = 0;
 	int to = (ev & 0xFFFF) == 0x4800 || (ev & 0xFFFF) == 0x48B7 ? HERO_ASTERIX : HERO_OBELIX;
+	if (from < 0x46B180 || from >= 0x46B331 || !t) return false;
+	g_solo.levelLeader = to;   // (the leader the level means from now, given or not: SoloOrderNeedsLead)
 	// (A switch to the hero you play is kept: the level ends a lock of it that
 	// way -- a rope cable car's end, zone 0020 on LV2-1's landing: "Asterix
 	// leads" + "the sidekick may move". Dropped, Asterix stayed the companion with
 	// the ride's wait order, never free, never given the lead back.)
-	if (from < 0x46B180 || from >= 0x46B331 || !t || t.Leader() == to || to == g_solo.choice ||
-	    !ProximityDispatchOnlySwitches(ev & 0xFFFF, &group))
+	if (t.Leader() == to || to == g_solo.choice || !ProximityDispatchOnlySwitches(ev & 0xFFFF, &group))
 		return false;
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: no lock) ignored -- %s keeps the lead",
 		    ev & 0xFFFF, group, HeroName(t.Leader()));
 	return true;
+}
+
+// A level's order for "the sidekick" (wait here, walk / run / be put at a
+// marker), from an event group, while the hero it means leads -- the level's
+// last switch, to the other one, was dropped (or undone since): that switch
+// first, so that the order reaches the hero the level meant (LV2-10's boss: zone
+// #34 "Asterix leads", then #4 "the sidekick walks to marker 22" -- for Obelix).
+// That is a lock of the hero you played: the lock option gives it back once free.
+static void SoloOrderNeedsLead(int ev) {
+	int e = ev & 0xFFFF, lead = g_solo.levelLeader;
+	if (!SoloSwitchLockOn() || lead < 0) return;
+	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return;
+	extern void* g_trioEventCaller;
+	uintptr_t from = (uintptr_t)g_trioEventCaller;
+	Trio t = GetTrio();
+	if (from < 0x46B180 || from >= 0x46B331 || !t || t.Leader() == lead) return;
+	static int s_told = 0;
+	if (s_told++ < 40)
+		Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) meaning %s -- %s leads for it first", e,
+		    HeroName(OtherHero(lead)), HeroName(lead));
+	CoopGiveLead(lead, "the level's order for the sidekick");
 }
 
 static const char* SoloSwitchRefusal(Trio t) {
@@ -4510,6 +4536,7 @@ static void SoloSwitchLockWatch(Trio t) {
 	SoloLock& s = g_solo;
 	if (!SoloSwitchLockOn() || !t || s.level != g.lastLevel) {
 		s.choice = -1;
+		s.levelLeader = -1;
 		s.level = g.lastLevel;
 		s.freeSince = s.farSince = 0;
 		return;
