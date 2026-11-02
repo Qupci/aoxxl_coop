@@ -3810,3 +3810,35 @@ both halves).
   shake 24 s / 0.05 -- the round-200 Twister push change (contact handler, push vector only) leaves it alone.
   sptwist34 (-Level 3, the arena via S_FLAGEV 0578: an activator, the squad, 4821, a music bloc): no Roman came to
   Asterix in 20 s (S_ENEMY found none visible), no Twister -- not reproduced; isolated and not the same.
+- Round 203 (user: round 202's launcher landing fixed; the LV3-4 arena's Twister has no camera pull-back in the
+  game itself either -- sp_isolation on and without the asi, only the shake; userlogs
+  20261102-xxl_coop.twister_fusion.log, 20261102-xxl_coop.lv3-5_softlock.log).
+  (1) Single player with second chance: no Twister Fusion. The attack table (hero +0x130, built by FUN_0048CA00,
+  shared by every hero): 9 = 0x493DD0 the plain Twister, 10 = 0x493F70 the Fusion-ready one. FUN_004963D0 gives 10
+  only with the combo bar full (stats +0x10 bit 0x4000) and the Fusion learned (bit 8). The chooser (FUN_00494DB0)
+  runs every tick; its AI branch copies the leader's Twister (+0x135 9 / 10) by calling FUN_004963D0 itself -- with
+  individual heroes that reads the companion's own bar (Use() swaps it in for its tick): empty, 9. Attack 9 never
+  runs FUN_00498560 (the companion's spin step in 0x493F70 case 0x23, which marks both heroes' "partner near" +0x189
+  within trio +0x3D8), so the leader's X (Hero_ProcessPlayerInput 0x49971A: +0x135 == 10, +0x3EC bit 0x10,
+  +0x189 -> request +0x188) found +0x189 0 (S_WATCHRW: read at 0x49972E, never written). ChooseAttackHook: single
+  player, IndivActive, an AI hero whose chooser returns 9 while the leader is in 10 and it is not already in 9 ->
+  10, every frame (a first-frame-only 10 was put back to 9 on the next tick: no access to Obelix's +0x189 at all).
+  The companion's own entry spends nothing (f18 & 0x1E), the fusion's spend (FUN_00493810(3)) is the leader's.
+  spfuse2 (XXL_SPSECOND=1): +0x189 written at 0x498692, "Asterix did the Twister Fusion (combo 3)"; XXL_SPSECOND=0
+  fuses as before (the game's own path).
+  (2) LV3-5's corkscrew softlock (sp_hero_switch_lock, you play Asterix): the cable car's end (zone 0C38: 4800,
+  48C8 the sidekick put on a marker, 4802, camera 0701, 4891) puts Obelix on the corkscrew, waiting; Asterix's
+  turnstile hits raise it; at the top 0C08's 484C jumps him off (AI order 2, AI_JUMP_TO_POS) into box 0340 (the
+  user's screenshot: group 068 = 4801 "switch to Obelix" + 4803 "enable sidekick movement" + detectors + camera
+  sector 0700). 4801 was dropped (switch-only group, to the other hero); the group's 4803 then reached Obelix
+  mid-jump: the trio's 48xx handler (CKGrpTrio_OnEvent48xx 0x482BB0, cases 2 / 3 = 4802 / 4803) changes the
+  companion's order only when FUN_00481810 allows it -- not while it is 2 (a jump) -- and the jump ended in order 3:
+  held for good. In the game the switch made him the player's hero, so no wait was meant for him. Now SoloDropsSwitch
+  notes a dropped switch's hero with an order other than follow (g_solo.release), and SoloReleaseWatch (from
+  SoloSwitchLockWatch) sends trio 4803 once it waits (order 3), not after 10 s, once it leads, or after a later group
+  order for the sidekick (SoloOrderNeedsLead clears it). splockcork35 (-Level 3, S_FLAGEV 0C38, Asterix at the user's
+  turnstile spot -143.4 5.5 -257.7 hitting X): 0C08, 0340 dropped, "Obelix ... waits where the level held it --
+  trio 4803", order 0, he follows (before: order 3 to the end). LV2-1's mirror (splockcork21, you play Obelix,
+  S_FLAGEV 0050 with Asterix on the circle, Obelix through 03C8 to the turnstile): the top box 0058 (4800 + 4828
+  "the sidekick walks to a marker") holds Obelix, so its switch is kept -- Asterix leads, Obelix waits at the
+  marker as in the game; no softlock there. splockord2, splock21, splockev2 unchanged.
