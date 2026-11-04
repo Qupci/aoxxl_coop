@@ -2023,16 +2023,16 @@ bool DispatchInBossRun(unsigned msg) {
 	return false;
 }
 
-// Single player, sp_hero_switch_lock: which hero does the sidekick's walk to a
-// marker (trio `msg`, from the group being dispatched) mean? The hero the zone
-// sending it is bound to (ZoneMeansItsHero: an order for the companion, set off
-// by the other, orders that hero itself). LV4-7's plane #17 by the cable car's
-// top, bound to Obelix (event 0448: 4818 "the sidekick walks to marker 5" + 1616
-// "plane #22 on"); the car is Obelix's (plane #20, his: 0480 "Obelix leads" +
-// the CKHkTelepher). The hero, or -1 (no zone's group, or zones of both).
+// Single player, sp_hero_switch_lock: the hero bound to the zones whose group,
+// being dispatched, sends the trio `msg` (a level's order for the sidekick: a
+// zone bound to one hero orders the other -- SoloOrderNeedsLead). LV4-7's plane
+// #17, Obelix's (event 0448: 4818 "the sidekick walks to marker 5", Asterix to
+// the automatic car's foot). The hero, or -1 (no zone's group, or zones of both).
+// `withSwitch`: such a group also switches the leader (4800 / 4801 / 48B7 / 48B8).
 int NodeIndex(char* det, Hero h);
 
-int DispatchWalkMeans(unsigned msg) {
+int DispatchZoneHero(unsigned msg, bool* withSwitch) {
+	if (withSwitch) *withSwitch = false;
 	EventTable et;
 	Trio t = GetTrio();
 	CKYellowPages* yp = YellowPages();
@@ -2047,6 +2047,9 @@ int DispatchWalkMeans(unsigned msg) {
 		bool sends = false;
 		for (unsigned k = et.First(g), e = k + et.tab[g * 3]; k < e && !sends; k++) sends = et.IsTrio(k) && et.msgs[k] == msg;
 		if (!sends) continue;
+		for (unsigned k = et.First(g), e = k + et.tab[g * 3]; withSwitch && k < e; k++)
+			if (et.IsTrio(k) && (et.msgs[k] == 0x4800 || et.msgs[k] == 0x4801 || et.msgs[k] == 0x48B7 || et.msgs[k] == 0x48B8))
+				*withSwitch = true;
 		for (int li = 0; li < 5; li++) {
 			char* tl = *(char**)(det + bases[li]);
 			for (unsigned j = 0, c = *(uint16_t*)(det + bases[li] + 4); tl && j < c; j++) {
@@ -2578,7 +2581,7 @@ void ProximityPassTo(char* roman, int receiver) {
 }
 bool ProximityBossRunDropsWalk(int ev) { return BossRunDropsWalk(ev); }
 bool ProximityDispatchInBossRun(unsigned msg) { return DispatchInBossRun(msg); }
-int ProximityDispatchWalkMeans(unsigned msg) { return DispatchWalkMeans(msg); }
+int ProximityDispatchZoneHero(unsigned msg, bool* withSwitch) { return DispatchZoneHero(msg, withSwitch); }
 void ProximityForgetMove(void* heroNode, const float at[3]) { ForgetMove(heroNode, at); }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
 

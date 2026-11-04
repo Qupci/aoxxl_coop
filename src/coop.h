@@ -49,6 +49,9 @@ bool CoopFusionAllowed(int lead);
 // sp_hero_switch_lock: the hero the level means to lead (its last switch) when
 // that is the AI companion -- you play the hero it means as the sidekick; else -1.
 int  CoopSoloLevelLeaderAway();
+// Single player, sp_hero_switch_lock: -2 off (or player 2 in), else the hero you
+// play (-1 not chosen yet). For the show_leader tag.
+int  CoopSoloLockedHero();
 int  CoopShopper();      // the hero at the merchant while co-op goes on around it (-1: none)
 // The hero at the merchant from its X until it is out of the shop's situation
 // (-1: none): the merchant ticks as its and the game's camera is its.

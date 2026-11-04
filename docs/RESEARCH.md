@@ -3973,3 +3973,27 @@ both halves).
   was not found (Obelix on its seat -924.9 227.6 -1019.5 did not ride). splockcork21 unchanged (0528 walks
   Asterix, 0530, 0058 at the same times as Nov 2); splockord2 (no circle, no sequence) now drops 0528's walk
   instead of round 202's "Asterix leads first"; splock21, spboss210 unchanged.
+- Round 209 (user, LV4-7 with sp_hero_switch_lock: no switch to Asterix now, but Asterix not at his marker
+  by the automatic car, no camera, and the lead given back to Obelix at the ride's end; lock off
+  (xxl_coop.lv4-7_switch_lock_off.log): Obelix keeps the lead at 0448, Asterix walked, Asterix keeps it after
+  the ride). Round 208 misread 0448: zone 0448 (plane #17, Obelix's) sends 4818 "the sidekick walks to marker
+  5" -- with Obelix leading that is Asterix, walked to the car's foot (-930.5 227.6 -1021.0); round 208 dropped
+  it. The earlier "switch to Asterix" came from SoloOrderNeedsLead: the level's leader was Asterix (level start;
+  the user's manual switch to Obelix does not change it -- it must not: LV2-10's boss gate, bound to Asterix,
+  answers Obelix through it, spboss210). A zone bound to one hero orders the other (LV2-1's 0528, Obelix's,
+  walks Asterix too): SoloOrderNeedsLead now lets an order from a zone bound to the leader through as sent
+  (ProximityDispatchZoneHero: the hero bound to the tests carrying the dispatched group's event). The lever
+  (-941.7 254.9 -1067.2, CKHkActivator, fight-locked; event 0230: CKHkSlideDoor 0900 + plane test 2C on): the
+  car drops for Asterix ("Obelix locked by the level", kept). Ride's end: Asterix drops off the top through
+  #147 (-934.6 256.6 -1019.6, horizontal, off at start, on with 0468; event 0AF0 = sequence #350: 4803 + itself
+  off) -- Obelix freed, the lock gave him the lead back. Now SoloFreedByLeadersZone: 4803 alone (no switch in
+  the group) from a zone bound to the leader while the hero you play is held -> handedTo; SoloSwitchLockWatch,
+  past a lock sequence still going on (LV2-1's 03C8, Obelix's, frees the circle's Asterix for the turnstile:
+  SequenceUnderWay only after its group), makes the leader the hero you play. show_leader tag: "LOCK: ON (hero)"
+  / "LOCK: OFF" in single player (CoopSoloLockedHero; glyphs C K N). Autotests: XXL_SPSWITCH=1 turns the lock
+  off (sp_hero_switch_lock defaults off with it) -- use XXL_SPSWITCHLOCK=1; the user's ini may have it off.
+  splock47 (-Level 4): 4818 "as sent", Asterix at the marker, Obelix punches the lever himself (PLACEAT the
+  user's -941.576 254.837 -1068.224, S_NEAROBJ class 52 to face it, P1 X -- S_PULLLEVER fires 0230 but the car
+  did not drop), Asterix on the car (-932.601 229.270 -1021.889), rides, down through #147: "now the hero you
+  play" Asterix, Obelix follows. splock43, splockcar44, spboss210, splockcork21, splock21 as before; splockord2:
+  0528's walk as sent (Asterix).

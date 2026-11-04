@@ -52,7 +52,8 @@ static void SoloPotionDash(Trio t);
 static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
 static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
 static bool SoloDropsSwitch(int ev);
-static bool SoloOrderNeedsLead(int ev);
+static void SoloOrderNeedsLead(int ev);
+static void SoloFreedByLeadersZone(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
 static void SoloGunFrame(Trio t);                        // below: Obelix's machine gun in single player
 static void PlaySound(Hero h, uint32_t bankOffset);
@@ -1812,7 +1813,9 @@ static int KeptOffCars();
 bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Single player, sp_hero_switch_lock: a level's switch that holds nobody, and
 	// the switch a later order for the sidekick needs.
-	if (SoloDropsSwitch(ev) || SoloOrderNeedsLead(ev)) return true;
+	if (SoloDropsSwitch(ev)) return true;
+	SoloOrderNeedsLead(ev);
+	SoloFreedByLeadersZone(ev);
 	// Individual heroes: a cable car takes the hero who steps on it from the
 	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
 	// AI order 9) -- with the partner down the ride is not started: the hero
@@ -4536,6 +4539,7 @@ struct SoloLock {
 	DWORD freeSince = 0, farSince = 0;
 	int   levelLeader = -1;  // the hero the level's last switch (an event group's) means to lead
 	int   release = -1;      // a dropped switch's hero, held by the level then: freed once it waits (SoloReleaseWatch)
+	int   handedTo = -1;     // the leader whose zone freed the hero you play (SoloFreedByLeadersZone)
 	DWORD releaseAt = 0;
 } g_solo;
 
@@ -4552,6 +4556,11 @@ int CoopSoloLevelLeaderAway() {
 	// fight. Answering Obelix, it never fired.)
 	if (l != g_solo.choice) return -1;
 	return ll;
+}
+
+int CoopSoloLockedHero() {
+	if (!SoloSwitchLockOn()) return -2;
+	return g_solo.level == g.lastLevel ? g_solo.choice : -1;
 }
 
 static bool SoloDropsSwitch(int ev) {
@@ -4615,37 +4624,30 @@ static void SoloReleaseWatch(Trio t) {
 // first, so that the order reaches the hero the level meant (LV2-10's boss: zone
 // #34 "Asterix leads", then #4 "the sidekick walks to marker 22" -- for Obelix).
 // That is a lock of the hero you played: the lock option gives it back once free.
-// True: the order is dropped.
-static bool SoloOrderNeedsLead(int ev) {
+static void SoloOrderNeedsLead(int ev) {
 	int e = ev & 0xFFFF, lead = g_solo.levelLeader;
-	if (!SoloSwitchLockOn() || lead < 0) return false;
-	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return false;
+	if (!SoloSwitchLockOn() || lead < 0) return;
+	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return;
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	Trio t = GetTrio();
-	if (from < 0x46B180 || from >= 0x46B331 || !t) return false;
+	if (from < 0x46B180 || from >= 0x46B331 || !t) return;
 	g_solo.release = -1;   // (the level's own order for the sidekick from now)
-	// A walk from a zone bound to the hero you play, leading (it means that hero:
-	// ProximityDispatchWalkMeans): you walk there yourself -- the walk is
-	// dropped, no switch (LV4-7's #137, event 0448: "the sidekick walks to marker
-	// 5", the cable car's foot, Obelix's car -- you play Obelix: the level's last
-	// switch meant Asterix, he led for it and Obelix was walked; or it meant
-	// Obelix, from 20 minutes earlier: Asterix was walked there, then locked into
-	// the car).
-	// Not while the other hero's lock sequence goes on: the walk is its next step
-	// (LV2-1: 0528 at the turnstile, bound to Obelix, walks the freed Asterix onto
-	// the spinning platform).
-	int to = e >= 0x4813 && e <= 0x4876 ? ProximityDispatchWalkMeans(e) : -1;
-	bool seq = g_seqHero == OtherHero(t.Leader()) && SequenceUnderWay();
-	if (to >= 0 && to == t.Leader() && to == g_solo.choice && !seq && !ProximityDispatchInBossRun(e)) {
-		g_solo.levelLeader = to;   // (its zones there are its own, not answering for the other's)
-		static int s_walk = 0;
-		if (s_walk++ < 20)
-			Log("coop: sp_hero_switch_lock: the level walks the sidekick (%04X) meaning %s -- the hero you play, leading: "
-			    "it walks there itself, the walk dropped", e, HeroName(to));
-		return true;
+	if (t.Leader() == lead) return;
+	// From a zone bound to the hero leading (set off by it): the order is for the
+	// companion, as the game sends it -- a zone bound to one hero orders the other
+	// (LV4-7's #137, event 0448, Obelix's: "the sidekick walks to marker 5" walks
+	// Asterix to the automatic car's foot, with the lock off too; LV2-1's 0528,
+	// Obelix's, walks Asterix onto the spinning platform). The level's leader
+	// (Asterix from the level start, you switched to Obelix) is not asked.
+	int z = ProximityDispatchZoneHero(e);
+	if (z >= 0 && z == t.Leader()) {
+		static int s_own = 0;
+		if (s_own++ < 20)
+			Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) from %s's zone -- %s, as sent", e,
+			    HeroName(z), HeroName(OtherHero(z)));
+		return;
 	}
-	if (t.Leader() == lead) return false;
 	// A boss run's (LV2-10, LV3-6: the boss woken, the sidekick walked to a
 	// marker in the arena, where it waits): the hero you play woke it and fights
 	// it, the companion goes to the marker in the other's place (user: lent to
@@ -4655,14 +4657,34 @@ static bool SoloOrderNeedsLead(int ev) {
 		if (s_boss++ < 20)
 			Log("coop: sp_hero_switch_lock: a boss run's order for the sidekick (%04X) -- %s goes, %s keeps the lead", e,
 			    HeroName(OtherHero(t.Leader())), HeroName(t.Leader()));
-		return false;
+		return;
 	}
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) meaning %s -- %s leads for it first", e,
 		    HeroName(OtherHero(lead)), HeroName(lead));
 	CoopGiveLead(lead, "the level's order for the sidekick");
-	return false;
+}
+
+// The hero you play, held by a level's lock (its switch kept: the other leads),
+// freed by "the sidekick may move" alone from a zone bound to the leader: the
+// level goes on with the leader -- it is the hero you play from now, as with the
+// lock off (LV4-7: Obelix's lever drops the automatic car for Asterix, Obelix
+// waits up top; Asterix steps off at the top through #147, event 0AF0: 4803 --
+// Obelix follows, Asterix's stretch with the torch ahead. The lead went back to
+// Obelix 0.5 s later). With a switch in the group the level says who leads itself.
+static void SoloFreedByLeadersZone(int ev) {
+	if (!SoloSwitchLockOn() || (ev & 0xFFFF) != 0x4803) return;
+	extern void* g_trioEventCaller;
+	uintptr_t from = (uintptr_t)g_trioEventCaller;
+	Trio t = GetTrio();
+	if (from < 0x46B180 || from >= 0x46B331 || !t) return;
+	int l = t.Leader();
+	if ((l != HERO_ASTERIX && l != HERO_OBELIX) || g_solo.choice < 0 || l == g_solo.choice) return;
+	Hero h = t.GetHero(g_solo.choice);
+	bool sw = false;
+	if (!h || h.Order() == AI_FOLLOW_LEADER || ProximityDispatchZoneHero(0x4803, &sw) != l || sw) return;
+	g_solo.handedTo = l;   // (taken up by SoloSwitchLockWatch, past a lock sequence still going on)
 }
 
 static const char* SoloSwitchRefusal(Trio t) {
@@ -4720,6 +4742,7 @@ static void SoloSwitchLockWatch(Trio t) {
 		s.choice = -1;
 		s.levelLeader = -1;
 		s.release = -1;
+		s.handedTo = -1;
 		s.level = g.lastLevel;
 		s.freeSince = s.farSince = 0;
 		return;
@@ -4733,7 +4756,7 @@ static void SoloSwitchLockWatch(Trio t) {
 		if (s.levelLeader < 0) s.levelLeader = l;   // (the level's leader as it begins: its zones are that hero's)
 		Log("coop: sp_hero_switch_lock: you play %s", HeroName(l));
 	}
-	if (l == s.choice || IndivFallenHero() >= 0) { s.freeSince = s.farSince = 0; return; }
+	if (l == s.choice || IndivFallenHero() >= 0) { s.freeSince = s.farSince = 0; s.handedTo = -1; return; }
 	// Freed while its lock's sequence goes on (LV2-1: zone 03C8 frees Asterix,
 	// then the turnstile's box 0528 walks "the companion" onto the spinning
 	// platform -- given the lead back, Obelix was sent there): its end gives the
@@ -4745,6 +4768,17 @@ static void SoloSwitchLockWatch(Trio t) {
 			    HeroName(l));
 		s.freeSince = 1;   // (logged)
 		s.farSince = 0;
+		s.handedTo = -1;   // (LV2-1's 03C8, Obelix's, frees the circle's Asterix for the turnstile: its end gives the lead)
+		return;
+	}
+	if (s.handedTo == l) {
+		static int s_told = 0;
+		if (s_told++ < 20)
+			Log("coop: sp_hero_switch_lock: %s, held, freed from %s's zone (4803 alone) -- the level goes on with %s: now the hero you play",
+			    HeroName(s.choice), HeroName(l), HeroName(l));
+		s.choice = s.levelLeader = l;
+		s.handedTo = -1;
+		s.freeSince = s.farSince = 0;
 		return;
 	}
 	if (s.freeSince == 1) s.freeSince = 0;

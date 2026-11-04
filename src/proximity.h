@@ -26,9 +26,10 @@ bool ProximityBossRunDropsWalk(int ev);
 // The event group being dispatched that sends trio message `msg` is a boss
 // run's (LV2-10, LV3-6: the boss woken, the sidekick walked on to markers).
 bool ProximityDispatchInBossRun(unsigned msg);
-// The hero the sidekick walk `msg` from the group being dispatched means: the
-// hero the zone sending it is bound to (ZoneMeansItsHero), or -1.
-int  ProximityDispatchWalkMeans(unsigned msg);
+// The hero bound to the zones whose group, being dispatched, sends the trio
+// `msg` (a level's order for the sidekick), or -1 (none, or zones of both);
+// `withSwitch`: such a group also switches the leader.
+int  ProximityDispatchZoneHero(unsigned msg, bool* withSwitch = nullptr);
 // A hero was put somewhere else: the detection service's last position for it
 // becomes `at`, so the jump does not cross any zone on the way.
 void ProximityForgetMove(void* heroNode, const float at[3]);

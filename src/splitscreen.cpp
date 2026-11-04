@@ -1250,6 +1250,8 @@ ThisFn g_origPresent = nullptr;
 const uint8_t* Glyph(char c) {
 	static const struct { char c; uint8_t rows[7]; } kFont[] = {
 		{ 'A', { 14, 17, 17, 31, 17, 17, 17 } }, { 'B', { 30, 17, 17, 30, 17, 17, 30 } },
+		{ 'C', { 14, 17, 16, 16, 16, 17, 14 } }, { 'K', { 17, 18, 20, 24, 20, 18, 17 } },
+		{ 'N', { 17, 25, 21, 19, 17, 17, 17 } },
 		{ 'D', { 30, 17, 17, 17, 17, 17, 30 } }, { 'E', { 31, 16, 16, 30, 16, 16, 31 } },
 		{ 'F', { 31, 16, 16, 30, 16, 16, 16 } }, { 'I', { 14, 4, 4, 4, 4, 4, 14 } },
 		{ 'L', { 16, 16, 16, 16, 16, 16, 31 } }, { 'O', { 14, 17, 17, 17, 17, 17, 14 } },
@@ -1281,12 +1283,21 @@ void DrawLeaderTag(char* renderer) {
 	int lead = t.Leader();
 	if (!w || !h || lead < 0 || lead >= HERO_COUNT) return;
 	bool p2 = CoopP2Joined() && lead == CoopP2Hero();
-	char text[40];
+	char text[56];
 	const char* name = HeroName(lead);
 	int n = sprintf(text, "LEADER: ");
 	for (const char* c = name; *c && n < 30; c++) text[n++] = (char)toupper((unsigned char)*c);
 	text[n] = 0;
 	if (CoopP2Joined()) sprintf(text + n, " (P%d)", p2 ? 2 : 1);
+	else if (g_config.spHeroSwitch) {   // (single player: the switch lock's state -- autotest shots tell it)
+		int you = CoopSoloLockedHero();
+		n += sprintf(text + n, you == -2 ? "  LOCK: OFF" : "  LOCK: ON");
+		if (you >= 0) {
+			n += sprintf(text + n, " (");
+			for (const char* c = HeroName(you); *c && n < 44; c++) text[n++] = (char)toupper((unsigned char)*c);
+			sprintf(text + n, ")");
+		}
+	}
 	// Where: the leader's half (split: player 2's is the right / bottom one).
 	unsigned x0 = 0, y0 = 0;
 	if (g_splitActive && p2) {
@@ -1296,7 +1307,7 @@ void DrawLeaderTag(char* renderer) {
 	unsigned len = (unsigned)strlen(text);
 	x0 += px * 6;
 	y0 += h / 16;
-	static long rects[40 * 7 * 4 * 4];
+	static long rects[56 * 7 * 4 * 4];
 	unsigned nr = 0;
 	for (unsigned i = 0; i < len; i++) {
 		const uint8_t* g = Glyph(text[i]);

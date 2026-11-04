@@ -8040,11 +8040,14 @@ const Step kSpLockCar44[] = {
 };
 // splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
 // the user's LV4-7 (#137 at -972.8 247.5 -1069.1, plane #17 bound to Obelix),
-// you play Obelix: event 0448 ("the sidekick walks to marker 5") -- Asterix was
-// given the lead for it and Obelix walked (or, the level's last switch meaning
-// Obelix, Asterix walked). Now dropped: Obelix keeps the lead, walks along the
-// top himself and crosses his plane #20 (0480: "Obelix leads" + the cable car),
-// then #21 (0488: the companion, Asterix, waits there).
+// Asterix leads from the level start, you switch to Obelix: event 0448 ("the
+// sidekick walks to marker 5", from Obelix's zone) walks Asterix to the automatic
+// car's foot, as with the lock off. Was: the level's leader (Asterix) was given
+// the lead for it and Obelix walked; round 208 dropped the walk (no Asterix at
+// the marker, no camera). Then Obelix punches his lever (-941.7 254.9 -1067.2,
+// fight-locked: won first) -- the car drops for Asterix (the lock's switch,
+// kept); he rides up and steps off through #147 (0AF0: 4803 alone, Asterix's):
+// Obelix follows, Asterix keeps the lead (was: Obelix given it back).
 const Step kSpLock47[] = {
 	MARK(0, "splock47"), LOADSECTOR(200, 7),
 	FORCE(2800, HERO_OBELIX, 1),
@@ -8052,19 +8055,25 @@ const Step kSpLock47[] = {
 	FORCE(3400, HERO_OBELIX, 0),
 	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
 	{ 6000, S_FLAGEV, 0x0448, 0, 0, 0, 0, "zone 0448: the sidekick walks to marker 5" },
-	SHOT(7000, "after_0448"), SHOT(10000, "after_0448_2"),
-	// Obelix walks to the car's foot himself (the AI walk's path): plane #20, his,
-	// 0480 -- "Obelix leads" (already) + the car
-	FORCE(10300, HERO_ASTERIX, 1),
-	PLACEAT(10500, HERO_OBELIX, -966.97f, 251.05f, -1027.78f), PLACEAT(10500, HERO_ASTERIX, -968.0f, 251.05f, -1031.0f),
-	FORCE(10900, HERO_ASTERIX, 0),
-	GLIDEAT(11500, HERO_OBELIX, -950.63f, 251.05f, -1018.97f, 1500),
-	GLIDEAT(13100, HERO_OBELIX, -932.45f, 253.32f, -1025.28f, 1500),
-	GLIDEAT(14700, HERO_OBELIX, -927.0f, 250.0f, -1022.0f, 800),
-	SHOT(16000, "cable_car_foot"),
-	GLIDEAT(18000, HERO_OBELIX, -924.87f, 227.55f, -1019.54f, 800),   // (the car's seat: the walked Obelix's spot, user's log)
-	SHOT(20000, "on_the_car"), SHOT(26000, "later"), SHOT(34000, "later_2"),
-	END(38000),
+	SHOT(8000, "walking"), SHOT(14000, "walking_2"), SHOT(22000, "at_marker"),
+	PLACEAT(24000, HERO_OBELIX, -940.5f, 254.9f, -1064.5f),
+	SHOT(25000, "obelix_by_lever"),
+	{ 26000, S_PULLLEVER, -1, 0, 0, -941.712f, 254.853f, "the lever (fight-locked: its fight starts)", -1067.21f },
+	ENDFIGHTWON(29000),
+	// (after the fight's unlock: Obelix punches it himself, from the user's spot)
+	PLACEAT(32000, HERO_OBELIX, -941.576f, 254.837f, -1068.224f),
+	{ 32300, S_NEAROBJ, HERO_OBELIX, 52, 0, 1.0f, 0, "obelix faces the lever" },
+	P1(32600, PAD_X, 0, 0, "p1 X"), P1(32720, 0, 0, 0, "r"),
+	P1(33200, PAD_X, 0, 0, "p1 X"), P1(33320, 0, 0, 0, "r"),
+	SHOT(37500, "car_drops"),
+	PLACEAT(39000, HERO_ASTERIX, -932.601f, 229.270f, -1021.889f),   // (onto the dropped car: the user's spot)
+	SHOT(40000, "on_car"), SHOT(45000, "ride"), SHOT(58000, "ride_end"),
+	// (down off the top through #147 -- -934.6 256.6 -1019.6, Asterix's: event 0AF0, 4803 -- Obelix follows)
+	GLIDEAT(60000, HERO_ASTERIX, -930.0f, 258.4f, -1018.3f, 500),   // (#147 on with 0468, as he leaves the car)
+	GLIDEAT(62000, HERO_ASTERIX, -931.1f, 258.7f, -1021.4f, 500),
+	GLIDEAT(63000, HERO_ASTERIX, -931.7f, 255.5f, -1026.5f, 800),   // (down off the top, the user's jump: #147 at y 256.6)
+	SHOT(65000, "off_the_car"), SHOT(68000, "after"), SHOT(75000, "after_2"),
+	END(78000),
 };
 // sptwist34 (-Level 3, XXL_SPISOLATION=1 / 0, XXL_SPSECOND=0): the user's LV3-4
 // arena (104.6 -1.3 -318.5): Asterix's Twister by its Romans -- does the camera
