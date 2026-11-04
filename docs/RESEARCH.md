@@ -4082,3 +4082,19 @@ both halves).
   "hands the lead back to the hero it parked" at 0340, Obelix leads, Asterix follows (order 0). splockcar21 (+ S_FLAGEV
   0020 at 13 s): boarding -> Obelix, 0020 -> Asterix (on the car, order 9). splockcar44: boarding -> Obelix, no
   "zones for Asterix answer Obelix". splock26, splock47, splock21, splockcork21, splockord2, spboss210 as round 213.
+- Round 215 (user: rope cars and LV3-5 fine; LV2-2's belly slide (xxl_coop.lv2-2_belly_slide_lock_switch_fix.log):
+  Asterix into the start zone, the game switches to Obelix -- right -- but at the slide's end the lock gave the lead
+  back to Asterix (104.3 s, after the end's Roman dialogue); in the game Obelix keeps it after every belly slide. The
+  boat: only Asterix starts it and keeps the lead). The slide's start zone 0028 sends 480B to the trio;
+  CKGrpTrio_OnEvent48xx (0x482BB0, 3991 bytes) cases 0x0B..0x0F (480B..480F, every hero's f18 mode 3) send their
+  own switch through the trio's vf5: 480B / 480D / 480E -> 4801 (480B's from 0x48349A), 480C / 480F -> 4800. Case 7
+  (4807, the boat: mode 1) sends no switch. The end zone 0030: 4806 (normal mode) + 48BA (from 0x49BA1D), no switch.
+  SoloDropsSwitch: a switch from inside that handler is a hand-over (both heroes in the ride, the new leader yours and
+  the level's leader). Every give-back in the user's saved logs was checked: launcher landings, LV4-7 0AF0, LV2-1's
+  light pillar 0008 / 0010, LV5-5's keg lending (stale levelLeader), the LV2-2 slide x3 -- all fixed by rounds
+  210-215; none left. The pending stays only for the mod's lending (SoloOrderNeedsLead, logged "leads for it
+  first"), a kept dispatch switch whose group sends other trio orders with nobody held, and a game switch from code
+  not known yet -- both now logged ("... gets the lead back once free (pending)", the latter with its caller).
+  splockslide22 (new; XXL_SPSWITCHLOCK=1 XXL_LOGTRIO=1; the slide is steered by hand -- the user did): before,
+  "free again" at 87.7 s; after, "the trio's ride mode ... Obelix is the hero you play now" at the start, 0030 at
+  61.2 s, Obelix leads to the end (96 s).

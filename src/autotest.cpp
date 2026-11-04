@@ -7983,6 +7983,21 @@ const Step kSpSlideMode2[] = {
 	SHOT(4000, "after"),
 	END(12000),
 };
+// splockslide22 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
+// XXL_LOGTRIO=1): the user's LV2-2 belly slide (xxl_coop.lv2-2_belly_slide_lock_
+// switch_fix.log): you play Asterix; the slide's start zone 0028 (480B to the trio,
+// whose handler sends 4801 from 0x48349A) -- Obelix leads the slide and keeps the
+// lead at its end, as in the game (was: given back to Asterix once free).
+// The slide is not automatic: someone at the pad steers it to the end (the user did).
+const Step kSpLockSlide22[] = {
+	MARK(0, "splockslide22"), LOADSECTOR(200, 2),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, -905.96f, 528.2f, -912.0f), PLACEAT(3000, HERO_OBELIX, -903.96f, 528.2f, -912.0f),
+	FORCE(3400, HERO_OBELIX, 0),
+	{ 4000, S_FLAGEV, 0x0028, 0, 0, 0, 0, "the slide's start zone 0028" },
+	SHOT(8000, "sliding"), SHOT(30000, "sliding_2"), SHOT(60000, "end"), SHOT(80000, "after"),
+	END(90000),
+};
 // splockord2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
 // you play Obelix (the switch); zone 0020's group ("Asterix leads" + "the
 // sidekick may move") flagged: dropped; then LV2-1's turnstile box 0528 ("the
@@ -8453,6 +8468,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spslide2", kSpSlide2),
 	SCENARIO("spslidemode2", kSpSlideMode2),
 	SCENARIO("splockord2", kSpLockOrd2),
+	SCENARIO("splockslide22", kSpLockSlide22),
 	SCENARIO("splock43", kSpLock43),
 	SCENARIO("splockcar44", kSpLockCar44),
 	SCENARIO("splock47", kSpLock47),

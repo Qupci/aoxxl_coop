@@ -4657,12 +4657,25 @@ static bool SoloDropsSwitch(int ev) {
 		// end), until the ride's end hands it back (LV2-1's zone 0020: "Asterix
 		// leads" + 4803, Asterix still on the car). Was: kept as a lock of yours,
 		// the lead given back once free (the end's switch did it first anyway).
-		if (from == 0x49ACB9 && t.Leader() != to) {
+		// The trio's own ride modes (CKGrpTrio_OnEvent48xx 0x482BB0: 480B..480F,
+		// both heroes into mode 3 -- 480B the belly slide, its 4801 from 0x48349A;
+		// 480C / 480F to Asterix, 480D / 480E to Obelix): the heroes go together,
+		// the new leader stays yours at the ride's end (LV2-2: the slide's end zone
+		// 0030 sends no switch back; user: "every belly-slide section keeps Obelix").
+		// Was: given back to Asterix once free after the end's dialogue.
+		bool rideMode = from >= 0x482BB0 && from < 0x482BB0 + 3991;
+		if ((from == 0x49ACB9 || rideMode) && t.Leader() != to) {
 			g_solo.levelLeader = to;
-			SoloHandOver(to, "a rope cable car's boarding, the rider on it");
+			SoloHandOver(to, rideMode ? "the trio's ride mode (480B..480F: the belly slide), both heroes in it"
+			                          : "a rope cable car's boarding, the rider on it");
 		} else if (to == g_solo.handedFrom && t.Leader() != to) {
 			SoloHandOver(to, "the game hands the lead back to the hero it parked");
 			g_solo.handedFrom = -1;
+		} else if (t.Leader() != to && to != g_solo.choice) {
+			static int s_game = 0;
+			if (s_game++ < 20)
+				Log("coop: sp_hero_switch_lock: the game's own switch %04X (from %p) kept -- %s gets the lead back once free (pending)",
+				    ev & 0xFFFF, (void*)from, HeroName(g_solo.choice));
 		}
 		return false;
 	}
@@ -4703,7 +4716,14 @@ static bool SoloDropsSwitch(int ev) {
 		g_solo.handedFrom = -1;
 		return false;
 	}
-	if (!ProximityDispatchOnlySwitches(ev & 0xFFFF, &group)) return false;
+	if (!ProximityDispatchOnlySwitches(ev & 0xFFFF, &group)) {
+		static int s_other = 0;
+		if (s_other++ < 20)
+			Log("coop: sp_hero_switch_lock: the level's switch %04X kept (its group sends the trio other orders, nobody held: "
+			    "the group's line above) -- %s gets the lead back once free (pending)",
+			    ev & 0xFFFF, HeroName(g_solo.choice));
+		return false;
+	}
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: no lock) ignored -- %s keeps the lead",
