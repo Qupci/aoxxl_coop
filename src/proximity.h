@@ -42,6 +42,7 @@ int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max);
 // The first one's event id in `ev`.
 bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev);
 bool ProximityDispatchHoldsLoser(unsigned msg);
+bool ProximityHeldAtDispatch(int hero);
 // A Roman passed to hero `receiver` (LB): it ticks with that hero as the trio
 // leader while it flies (state 4).
 void ProximityPassTo(char* roman, int receiver);

@@ -4112,3 +4112,12 @@ both halves).
   X, Asterix put in the water -62.0 -1.5 -551.5): before, "meaning Obelix -- Asterix leads for it first", the 4800
   deferred to the landing; after, "with Obelix on a launcher -- Asterix, as sent", the landing's 4800 ignored, Obelix
   leads to the end. splockcar21 unchanged (boarding / 0020 hand-over and back).
+- Round 217 (user, LV2-6 big blocks, the other block pulled last: Asterix's walk into the end detector did not
+  switch to him, a strange switch later; xxl_coop.lv2-6_switch_miss.log). The blocks have two end detectors: 01E8
+  (group 03D: 4800 then 4803) and 0D29 (group 1A5: 4803 then 48B7, + 1B07). The group's own 4803 ran first and set the
+  walked Asterix (order 1) following, so round 213's hand-back ("to handedFrom while the level holds it") found him
+  free: 48B7 dropped, levelLeader Asterix; 0CA8 (48CF + 4803) then lent him the lead and the watch took it back
+  0.6 s later. EventDispatchHook (single player, the lock on) now notes each hero's held state (AI order not follow)
+  as the dispatch begins (g_heldAtDispatch, ProximityHeldAtDispatch); the hand-back takes either. splock26d (new: as
+  splock26, ending with 4802 then S_FLAGEV 0D29): before, "48B7 (event 0D28's group: no lock) ignored"; after,
+  "hands the lead back to the hero it parked", Asterix leads, Obelix follows.

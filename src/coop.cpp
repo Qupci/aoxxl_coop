@@ -4721,7 +4721,9 @@ static bool SoloDropsSwitch(int ev) {
 	// 4803, Obelix jumping off it, parked by 0C38). A switch-only group to a hero
 	// the level did not park is still dropped.
 	Hero th = t.GetHero(to);
-	if (to == g_solo.handedFrom && th && th.Order() != AI_FOLLOW_LEADER && !IndivFallen(to)) {
+	// (Held as the dispatch began: LV2-6's other end detector 0D29 sends 4803
+	// before its 48B7 -- Asterix already following when the switch came.)
+	if (to == g_solo.handedFrom && th && (th.Order() != AI_FOLLOW_LEADER || ProximityHeldAtDispatch(to)) && !IndivFallen(to)) {
 		SoloHandOver(to, "the level hands the lead back to the hero it parked");
 		g_solo.handedFrom = -1;
 		return false;

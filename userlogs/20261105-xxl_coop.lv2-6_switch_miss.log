@@ -1,0 +1,1791 @@
+=== XXL co-op mod log, 2026-11-05 00:00:24 ===
+[   0.016] config: enabled=1 p1Pad=-1 split=1 mode=vertical deadzone=0.24 forceLevel=2 watchdog=1 splitTest=0 verbose=1 keyboard=1 cheats=1 skipCutscenes=1 safeSequence=1 sectorCatchUpMs=1000 individual=1 (guards 1, revive hold 5.0 s / 0.40 of a catapult's gap, time limit auto: the walk + 30 s) nolock=1 (except corkscrews 1, rotary beams 1) riderLeads=0 romansInView=0 co-op difficulty: squad at once x2.00, to defeat x2.00, prices x2.00, combo bar x0.80 drain x1.20 / x1.20 (squads and combo bar in co-op only, dynamic, pathfinding 1, to defeat stays 0), nolock romans 1 (any markers 1)
+[   0.016] config: hints: join 1, pass the Roman 1, combos 1, machine gun 1
+[   0.016] config: single player: combo hints 1, co-op icons 1, hero switch 1 (pad 0001, key 09, switch lock 1), second chance 1, Obelix's potion 1, cheats 1
+[   1.516] hooks: CKInput::update 00436360 -> 66E3BF40
+[   1.516] hooks: CKHkAsterixLife::tick 004AA9C0 -> 66E4F1F0
+[   1.516] hooks: CKHkObelixLife::tick 004AB7E0 -> 66E4F5A0
+[   1.516] hooks: CKHkIdefixLife::tick 004AC560 -> 66E4F210
+[   1.516] hooks: CKGrpTrio::sendEvent 0047AC10 -> 66E3C090
+[   1.516] hooks: CKPathFindingCinematicBloc tick 00467660 -> 66E3C030
+[   1.516] hooks: CKGraphic::render 00431A40 -> 66E6ABB0
+[   1.516] hooks: CKDynamicBoundingSphere::walk 00416440 -> 66E6A520
+[   1.516] hooks: CParticlesNodeFx::walk 0041A510 -> 66E6B1D0
+[   1.516] hooks: CSkyNodeFx::walk 0041AF50 -> 66E6D5A0
+[   1.516] hooks: CKSrvShadow::update 0046F980 -> 66E6CC60
+[   1.516] hooks: CAnimatedNode::walk 0041DA30 -> 66E69A60
+[   1.516] hooks: CAnimatedClone::walk 0041D270 -> 66E69A40
+[   1.516] hooks: CFogBoxNodeFx::walk 00416D10 -> 66E6A540
+[   1.516] detour: HUD draw (player 2's HUD on one screen) 00414070 -> 66E69D30 (trampoline 11950000)
+[   1.516] detour: frame present (show_leader) 00414780 -> 66E6B3B0 (trampoline 11960000)
+[   1.516] hooks: CKDynBSphereProjectile::walk 00416440 -> 66E6A520
+[   1.516] hooks: CKSrvCamera::tick 00454620 -> 66E37480
+[   1.516] detour: CKSrvCamera::SetTarget 00459050 -> 66E36920 (trampoline 11970000)
+[   1.516] hooks: CKBundle::tick 0043DFE0 -> 66E5F370
+[   1.516] hooks: CKSrvEvent::vf17 (the groups dispatched: sp_hero_switch_lock) 0046B180 -> 66E612B0
+[   1.516] hooks: CKGrpBonusPool::update 0054C380 -> 66E63E00
+[   1.516] hooks: CKGrpAsterixBonusPool::update 005072C0 -> 66E5EFE0
+[   1.516] hooks: CKGrpBonusPool::spawn 0054C790 -> 66E63D20
+[   1.516] hooks: CKGrpAsterixBonusPool::spawn 0054C790 -> 66E63D20
+[   1.516] detour: collision contacts (0x300) call site 00447FD1 -> 66E639B0
+[   1.516] detour: projectile hits, targets (0x301) call site 004483C5 -> 66E63EA0
+[   1.516] proximity: projectile hits, owners (0x301) call site 00448405 -> 66E63EA0
+[   1.516] proximity: beacon bonus check 0054C6C6 -> 66E5F350
+[   1.516] hooks: CKGrpAsterixCheckpoint::update 00536DD0 -> 66E5F7D0
+[   1.516] hooks: CKGrpEnemyLife::tick 00530930 -> 66E60980
+[   1.516] hooks: CKHkClueMan::sendEvent (far spies) 004B82F0 -> 66E5F860
+[   1.516] hooks: CKSrvDetection::tick 0046BE90 -> 66E5FBD0
+[   1.516] hooks: squad marker spawn (both players' views) 0052FB80 -> 66E629F0
+[   1.516] hooks: squad marker spawn (both players' views) 0052FB80 -> 66E629F0
+[   1.516] hooks: squad marker spawn (both players' views) 0052FB80 -> 66E629F0
+[   1.516] hooks: squads freed for Romans (both players' squads kept) 0052F850 -> 66E65EA0
+[   1.516] hooks: squads freed for Romans (both players' squads kept) 0052F850 -> 66E65EA0
+[   1.516] hooks: squads freed for Romans (both players' squads kept) 0052F850 -> 66E65EA0
+[   1.516] detour: Roman reinforcement point (both players' cameras) 00530060 -> 66E654C0 (trampoline 11980000)
+[   1.516] detour: trio fight mode (music) for the non-leader 00481950 -> 66E61360 (trampoline 11990000)
+[   1.516] detour: event flag (zones) 00460C20 -> 66E61600 (trampoline 119A0000)
+[   1.516] hooks: Bumper 004BB4C0 -> 66E6F650
+[   1.516] hooks: PushPull 004B4630 -> 66E6F650
+[   1.516] hooks: HkCrate 00544060 -> 66E6F650
+[   1.516] hooks: CrateCpnt 005424D0 -> 66E6F650
+[   1.516] hooks: Roman 004E3F00 -> 66E6F650
+[   1.516] hooks: SoundManager 0043C400 -> 66E6F650
+[   1.516] hooks: LightPillar 0053F980 -> 66E6F650
+[   1.516] detour: beacon kluster query 0046DED0 -> 66E4E190 (trampoline 11BC0000)
+[   1.516] hooks: CKCrateCpnt::update 00542AB0 -> 66E4D8E0
+[   1.516] detour: sound start (diagnostics) 0043B730 -> 66E68B90 (trampoline 11BD0000)
+[   1.516] detour: stream start (diagnostics) 0043CC20 -> 66E69170 (trampoline 11BE0000)
+[   1.516] hooks: CKSoundManager::tick 0043ADD0 -> 66E68EA0
+[   1.516] detour: sound range, playing voices call site 0043B0D5 -> 66E69350
+[   1.516] detour: sound range, deferred sounds call site 0043B512 -> 66E69310
+[   1.516] detour: sound range, start (1) call site 0043B9B9 -> 66E69330
+[   1.516] detour: sound range, start (2) call site 0043BCBF -> 66E69330
+[   1.516] detour: 3D voice update 005F06B0 -> 66E69370 (trampoline 11BF0000)
+[   1.516] detour: InputView_GetAction (shared modes, dialogues) 004358B0 -> 66E67580 (trampoline 11C00000)
+[   1.516] detour: localised strings (co-op hints) 00411780 -> 66E3B810 (trampoline 11C10000)
+[   1.516] hooks: CKHkInterfaceInGame::tick (co-op hints) 005180E0 -> 66E3B130
+[   1.516] detour: the HUD's 2D layer (the players' prompt boxes) call site 004140F4 -> 66E39DE0
+[   1.516] detour: the HUD's 2D lists (the game's prompt box left out in co-op) call site 004140B3 -> 66E3A070
+[   1.516] detour: combo bar spent (a combo done: combo hints) 00493810 -> 66E1FBA0 (trampoline 11C20000)
+[   1.516] detour: Rt2dFontStreamRead (co-op icons) 005FC970 -> 66E437A0 (trampoline 11C30000)
+[   1.516] detour: heal (individual heroes) 004BB260 -> 66E485F0 (trampoline 11C40000)
+[   1.516] hooks: CKGrpAsterixBonusPool::vf39 (only a hero the health bonus is of use to) 00507320 -> 66E4B1C0
+[   1.516] hooks: CKGrpAsterixBonusPool::vf40 (a bonus collected: the collector's stats) 00506E90 -> 66E48240
+[   1.516] detour: add a shield (individual heroes) 00507210 -> 66E47A90 (trampoline 11C50000)
+[   1.516] detour: HUD shields shown (the HUD owner's health) 0051B550 -> 66E3FF00 (trampoline 11C60000)
+[   1.516] hooks: CKHkInterfaceInGame::vf15 (the HUD owner's health) 005162A0 -> 66E3F5F0
+[   1.516] hooks: CKHkInterfaceInGame::vf16 (a reset: player 2's HUD too) 00517870 -> 66E3F690
+[   1.516] experimental: squad and combo bar rules dynamic (the game's own while the heroes are apart); the heroes' path looked up every 0.5 s in co-op
+[   1.516] detour: squad load (experimental: Romans at once / to defeat) 0052DE80 -> 66E355E0 (trampoline 11C70000)
+[   1.516] hooks: CKGrpSquadEnemy::vf25 (squad script numbers) 004C7F80 -> 66E355C0
+[   1.516] hooks: CKGrpSquadJetPack::vf25 (squad script numbers) 004C7F80 -> 66E34620
+[   1.516] detour: merchant load (experimental: prices) 004C0C50 -> 66E35030 (trampoline 11C80000)
+[   1.516] hooks: squad events (a squad's end again, no-lock Romans) 004C7E70 -> 66E53C60
+[   1.516] hooks: squads put away out of view (not with Romans by a downed or waiting hero) 0052F6D0 -> 66E391E0
+[   1.516] detour: hero take press (fire cheat) 00499CF0 -> 66E2E630 (trampoline 11C90000)
+[   1.516] detour: hero potion flag (Obelix's potion) 0049A350 -> 66E2A770 (trampoline 11CA0000)
+[   1.516] detour: HUD action prompt (either player's) 0049A1A0 -> 66E2A350 (trampoline 11CB0000)
+[   1.516] detour: Twister Fusion step 0x25 (partner as companion) 00498800 -> 66E28400 (trampoline 11CC0000)
+[   1.516] detour: Twister Fusion step 0x26 (partner as companion) 00498A30 -> 66E28420 (trampoline 11CD0000)
+[   1.516] detour: Twister Fusion check (both players) 004984F0 -> 66E28020 (trampoline 11CE0000)
+[   1.516] detour: hero attack chooser (Twister for both players) 00494DB0 -> 66E21580 (trampoline 11CF0000)
+[   1.516] detour: world pause (not for the merchant in co-op) 004FFCD0 -> 66E27F50 (trampoline 11D00000)
+[   1.516] detour: cutscene skip (its later events still flagged) 00461A80 -> 66E2C760 (trampoline 11D10000)
+[   1.516] detour: merchant's menu input (player 1's controls on while player 2 shops) call site 004BFB1B -> 66E2C6F0
+[   1.516] detour: level's Sas check (the hero whose Sas box asked for the sector) call site 0040FD9A -> 66E2BF20
+[   1.516] detour: controller preset (picked without a pad) 00438950 -> 66E2C260 (trampoline 11D20000)
+[   1.516] hooks: CKHkAsterix::sendEvent (who died) 0048BC70 -> 66E28840
+[   1.516] hooks: CKHkObelix::sendEvent (who died) 0048BC70 -> 66E28840
+[   1.516] detour: hero hit (the hit hero's own health: the trio's area hits) 00495FA0 -> 66E28BE0 (trampoline 11D30000)
+[   1.516] pads: using xinput1_4.dll
+[   1.516] coop: init (player 1 pad: auto-detect)
+[   1.516] watch: started
+[   1.516] startup: ready
+[   1.516] forceLevel: waiting for the menu...
+[   1.516] forceLevel: menu is up (gameManager=03C9FB70), requesting level 2
+[   1.719] input: the game sets controller preset 3 (from 00503AED; it sees a pad)
+[   1.719] input: the pad's layout from the title screen kept (48 bindings, xxl_coop_padlayout.txt)
+[   1.719] coop: first frame
+[   1.719] pads: pad 1 connected
+[   1.719] pads: keyboard filter installed on window 00D90EF2
+[   1.719] pads: keyboard available as a controller (slot 4)
+[   1.719] pads: XXL Inspector found (apd3d9.dll): its text fields keep the keyboard
+[   1.719] experimental: combo bar levels 0/7/16, full at 30 -> 0/7/16, full at 30; a hit lost every 0.65 -> 0.65 s, full for 30.00 -> 30.00 s (rules single player, the game's own)
+[   1.719] coop: level -2 -> 0
+[   1.719] coop: skip_cutscenes: 3 of 5 cutscenes now end on Enter
+[   1.719] input: level 0, controller preset 3
+[   1.750] icons: 41 icons from coop_icons
+[   1.781] icons: 6 of the merchant's 6 combo icons from the level files
+[   1.781] icons: font 03421E24 takes the icons (page 2, 56 glyphs)
+[   1.875] experimental: merchant 03CD0430 prices 75->150 75->150 75->150 500->1000 500->1000 500->1000 9000->18000 3500->7000 75000->150000 150000->300000 30000->60000 17500->35000
+[   1.891] experimental: squad 03CD4BA8: [at once 0/0 -> 0/0, 1 -> 2] total 1 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD4D0C: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 3 -> 3 (while the rules are on)
+[   1.891] experimental: squad 03CD4E70: [at once 1/1 -> 2/2, 4 -> 8] [at once 6/6 -> 12/12, 25 -> 50] total 29 -> 58 (while the rules are on)
+[   1.891] experimental: squad 03CD4FD4: [at once 4/4 -> 8/8, 36 -> 72] [at once 1/1 -> 2/2, 4 -> 8] total 40 -> 80 (while the rules are on)
+[   1.891] experimental: squad 03CD5138: [kept (type), at once 1/1 -> 1/1, 1 -> 1] [at once 0/0 -> 0/0, 0 -> 0] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD529C: [at once 0/0 -> 0/0, 2 -> 4] total 2 -> 4 (while the rules are on)
+[   1.891] experimental: squad 03CD5400: [at once 0/0 -> 0/0, 1 -> 2] [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 2 -> 3 (while the rules are on)
+[   1.891] experimental: squad 03CD5564: [at once 0/0 -> 0/0, 8 -> 16] total 8 -> 16 (while the rules are on)
+[   1.891] experimental: squad 03CD56C8: [kept (type), at once 0/0 -> 0/0, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD582C: [at once 0/0 -> 0/0, 40 -> 80] total 40 -> 80 (while the rules are on)
+[   1.891] experimental: squad 03CD5990: [kept (type), at once 0/0 -> 0/0, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD5AF4: [at once 0/0 -> 0/0, 30 -> 60] total 30 -> 60 (while the rules are on)
+[   1.891] experimental: squad 03CD5C58: [at once 0/0 -> 0/0, 4 -> 8] total 4 -> 8 (while the rules are on)
+[   1.891] experimental: squad 03CD5DBC: [at once 0/0 -> 0/0, 1 -> 2] total 1 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD5F20: [at once 0/0 -> 0/0, 3 -> 6] total 3 -> 6 (while the rules are on)
+[   1.891] experimental: squad 03CD6084: [at once 3/3 -> 6/6, 15 -> 30] [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 16 -> 31 (while the rules are on)
+[   1.891] experimental: squad 03CD61E8: [at once 0/0 -> 0/0, 3 -> 6] total 3 -> 6 (while the rules are on)
+[   1.891] experimental: squad 03CD634C: [at once 0/0 -> 0/0, 1 -> 2] total 1 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD64B0: [at once 0/0 -> 0/0, 1 -> 2] total 1 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD6614: [kept (type), at once 1/1 -> 1/1, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD6778: [kept (type), at once 0/0 -> 0/0, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD68DC: [at once 8/8 -> 16/16, 47 -> 94] [at once 2/2 -> 4/4, 8 -> 16] total 55 -> 110 (while the rules are on)
+[   1.891] experimental: squad 03CD6A40: [kept (type), at once 1/1 -> 1/1, 1 -> 1] [at once 0/0 -> 0/0, 4 -> 8] total 5 -> 9 (while the rules are on)
+[   1.891] experimental: squad 03CD6BA4: [at once 6/6 -> 12/12, 200 -> 400] [at once 2/2 -> 4/4, 75 -> 150] [kept (type), at once 1/1 -> 1/1, 20 -> 20] total 295 -> 570 (while the rules are on)
+[   1.891] experimental: squad 03CD6D08: [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD6E6C: [kept (placed), at once 4/4 -> 4/4, 4 -> 4] total 4 -> 4 (while the rules are on)
+[   1.891] experimental: squad 03CD6FD0: [at once 0/0 -> 0/0, 8 -> 16] total 8 -> 16 (while the rules are on)
+[   1.891] experimental: squad 03CD7134: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD7298: [at once 0/0 -> 0/0, 15 -> 30] total 15 -> 30 (while the rules are on)
+[   1.891] experimental: squad 03CD73FC: [kept (placed), at once 5/5 -> 5/5, 5 -> 5] total 5 -> 5 (while the rules are on)
+[   1.891] experimental: squad 03CD7560: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD76C4: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 3 -> 3 (while the rules are on)
+[   1.891] experimental: squad 03CD7828: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD798C: [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD7AF0: [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD7C54: [kept (placed), at once 5/5 -> 5/5, 5 -> 5] total 5 -> 5 (while the rules are on)
+[   1.891] experimental: squad 03CD7DB8: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD7F1C: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD8080: [at once 4/4 -> 8/8, 12 -> 24] [at once 1/1 -> 2/2, 5 -> 10] total 17 -> 34 (while the rules are on)
+[   1.891] experimental: squad 03CD81E4: [at once 4/4 -> 8/8, 12 -> 24] [at once 1/1 -> 2/2, 5 -> 10] total 17 -> 34 (while the rules are on)
+[   1.891] experimental: squad 03CD8348: [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 2 -> 2 (while the rules are on)
+[   1.891] experimental: squad 03CD84AC: [at once 3/3 -> 6/6, 12 -> 24] [at once 1/1 -> 2/2, 5 -> 10] total 17 -> 34 (while the rules are on)
+[   1.891] experimental: squad 03CD8610: [at once 3/3 -> 6/6, 25 -> 50] total 25 -> 50 (while the rules are on)
+[   1.891] experimental: squad 03CD8774: [kept (placed), at once 1/1 -> 1/1, 1 -> 1] [kept (placed), at once 2/2 -> 2/2, 2 -> 2] total 3 -> 3 (while the rules are on)
+[   1.891] experimental: squad 03CD88D8: [at once 4/4 -> 8/8, 8 -> 16] [at once 1/1 -> 2/2, 2 -> 4] total 10 -> 20 (while the rules are on)
+[   1.891] experimental: squad 03CD8A3C: [at once 4/4 -> 8/8, 15 -> 30] [at once 1/1 -> 2/2, 2 -> 4] total 17 -> 34 (while the rules are on)
+[   1.891] experimental: squad 03CD8BA0: [at once 5/5 -> 10/10, 10 -> 20] total 10 -> 20 (while the rules are on)
+[   1.891] experimental: squad 03CD8D04: [at once 8/8 -> 16/16, 40 -> 80] [at once 1/1 -> 2/2, 5 -> 10] total 45 -> 90 (while the rules are on)
+[   1.891] experimental: squad 03CD8E68: [kept (type), at once 1/1 -> 1/1, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.891] experimental: squad 03CD8FCC: [kept (placed), at once 1/1 -> 1/1, 1 -> 1] total 1 -> 1 (while the rules are on)
+[   1.984] icons: "# Back" -> "# Back" (for player 1)
+[   1.984] icons: "# Confirm" -> "# Confirm" (for player 1)
+[   1.984] icons: "#,#,#,#" -> "#,#,#,#" (for player 1)
+[   1.984] icons: "# # Selection" -> "# Selection" (for player 1)
+[   1.984] icons: "Up #" -> "Up #" (for player 1)
+[   1.984] icons: "Down #" -> "Down #" (for player 1)
+[   1.984] icons: "Left #" -> "Left #" (for player 1)
+[   1.984] icons: "Right #" -> "Right #" (for player 1)
+[   1.984] icons: "Action #" -> "Action #" (for player 1)
+[   1.984] icons: "Jump #" -> "Jump #" (for player 1)
+[   1.984] icons: "Pause #" -> "Pause #" (for player 1)
+[   1.984] icons: "Grab Enemy #" -> "Grab Enemy #" (for player 1)
+[   1.984] icons: "Targeted attack #" -> "Targeted attack #" (for player 1)
+[   1.984] icons: "# Page %CtrlPage_Cur%/%CtrlPage_Nb% #" -> "# Page %CtrlPage_Cur%/%CtrlPage_Nb% #" (for player 1)
+[   1.984] icons: "Launch Obelix #" -> "Launch Obelix #" (for player 1)
+[   1.984] icons: "Launch Dogmatix #" -> "Launch Dogmatix #" (for player 1)
+[   1.984] icons: "Interface up #" -> "Interface up #" (for player 1)
+[   1.984] icons: "Interface down #" -> "Interface down #" (for player 1)
+[   1.984] icons: "Interface left #" -> "Interface left #" (for player 1)
+[   1.984] icons: "Interface right #" -> "Interface right #" (for player 1)
+[   1.984] icons: "Confirm #" -> "Confirm #" (for player 1)
+[   1.984] icons: "Cancel #" -> "Cancel #" (for player 1)
+[   1.984] icons: "Camera up #" -> "Camera up #" (for player 1)
+[   1.984] icons: "Camera down #" -> "Camera down #" (for player 1)
+[   1.984] icons: "Camera left #" -> "Camera left #" (for player 1)
+[   1.984] icons: "Camera right #" -> "Camera right #" (for player 1)
+[   1.984] sound: first start of sound 00000041 (instance 03DCAE84 at -760 506 -1035) from 0043AB38; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   1.984] sound: first start of sound 00000007 (instance 03DCB304 at 111 2 -536) from 0043AB38; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   1.984] sound: first start of sound 00000089 (instance 03DCC244 at -237 40 -522) from 0043AB38; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   1.984] sound: first start of sound 00000040 (instance 03DD4C28 at -745 514 -978) from 004AEF61; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   1.984] indiv: individual heroes on (single player: second chance) -- each starts with health 15, 3 shields, combo hits 0
+[   1.984] experimental: squad 03CD4E70 pool 0: starting Romans 1/1 as the level has them (their pool 03CD91D4 also feeds squad 03CD5F20 pool 0 here)
+[   1.984] experimental: squad 03CD4E70 pool 1: starting Romans 6/6 as the level has them (their pool 03CD9258 also feeds squad 03CD6084 pool 0 here)
+[   1.984] experimental: squad 03CD6084 pool 0: starting Romans 3/3 as the level has them (their pool 03CD9258 also feeds squad 03CD4E70 pool 1 here)
+[   1.984] experimental: squad 03CD68DC pool 0: starting Romans 8/8 as the level has them (their pool 03CD9258 also feeds squad 03CD6A40 pool 1 here)
+[   1.984] experimental: squad 03CD68DC pool 1: starting Romans 2/2 as the level has them (their pool 03CD91D4 also feeds squad 03CD6BA4 pool 1 here)
+[   1.984] experimental: squad 03CD6BA4 pool 0: starting Romans 6/6 as the level has them (their pool 03CD9258 also feeds squad 03CD68DC pool 0 here)
+[   1.984] experimental: squad 03CD6BA4 pool 1: starting Romans 2/2 as the level has them (their pool 03CD91D4 also feeds squad 03CD68DC pool 1 here)
+[   1.984] experimental: squad 03CD8080 pool 0: starting Romans 4/4 as the level has them (their pool 03CD922C also feeds squad 03CD81E4 pool 0 here)
+[   1.984] experimental: squad 03CD8080 pool 1: starting Romans 1/1 as the level has them (their pool 03CD9200 also feeds squad 03CD81E4 pool 1 here)
+[   1.984] experimental: squad 03CD81E4 pool 0: starting Romans 4/4 as the level has them (their pool 03CD922C also feeds squad 03CD8080 pool 0 here)
+[   1.984] experimental: squad 03CD81E4 pool 1: starting Romans 1/1 as the level has them (their pool 03CD9200 also feeds squad 03CD8080 pool 1 here)
+[   1.984] experimental: squad 03CD84AC pool 0: starting Romans 3/3 as the level has them (their pool 03CD922C also feeds squad 03CD8080 pool 0 here)
+[   1.984] experimental: squad 03CD84AC pool 1: starting Romans 1/1 as the level has them (their pool 03CD9200 also feeds squad 03CD8080 pool 1 here)
+[   1.984] experimental: squad 03CD8610 pool 0: starting Romans 3/3 as the level has them (their pool 03CD922C also feeds squad 03CD61E8 pool 0 here)
+[   1.984] experimental: squad 03CD88D8 pool 0: starting Romans 4/4 as the level has them (their pool 03CD9258 also feeds squad 03CD8A3C pool 0 here)
+[   1.984] experimental: squad 03CD88D8 pool 1: starting Romans 1/1 as the level has them (their pool 03CD9284 also feeds squad 03CD8A3C pool 1 here)
+[   1.984] experimental: squad 03CD8A3C pool 0: starting Romans 4/4 as the level has them (their pool 03CD9258 also feeds squad 03CD68DC pool 0 here)
+[   1.984] experimental: squad 03CD8A3C pool 1: starting Romans 1/1 as the level has them (their pool 03CD9284 also feeds squad 03CD88D8 pool 1 here)
+[   1.984] experimental: squad 03CD8D04 pool 0: starting Romans 8/8 as the level has them (their pool 03CD9258 also feeds squad 03CD7298 pool 0 here)
+[   1.984] coop: level 0 -> 2
+[   1.984] coop: skip_cutscenes: 6 of 7 cutscenes now end on Enter
+[   1.984] coop: sector 0 -> 1 (next -2); leader Asterix; Asterix (-855 508 -1072) Obelix (-854 508 -1073)
+[   1.984] input: level 2, controller preset 3
+[   2.016] forceLevel: level 2 is loading
+[   2.031] proximity: bonus pool 03CD9584: handler 8, beacons per frame 3, free 4
+[   2.031] proximity: bonus pool 03CD9454: handler 7, beacons per frame 4, free 10
+[   2.031] proximity: bonus pool 03CD9538: handler 12, beacons per frame 3, free 8
+[   2.031] proximity: bonus pool 03CD94EC: handler 11, beacons per frame 4, free 10
+[   2.031] proximity: bonus pool 03CD94A0: handler 9, beacons per frame 4, free 3
+[   2.031] proximity: bonus pool 03CD95D0: handler 10, beacons per frame 5, free 10
+[   2.031] proximity: bonus pool 03CD961C: handler 13, beacons per frame 2, free 2
+[   2.031] proximity: bonus pool 03CD9408: handler 6, beacons per frame 30, free 50
+[   2.031] sound: first start of sound 01000000 (instance 03DCAD84 at -869 504 -1078) from 0043B6E6; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   2.031] sound: first start of sound 01000001 (instance 03DCADC4 at -844 507 -1071) from 0043B6E6; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   2.031] sound: first start of sound 01000002 (instance 03DCAE44 at -815 518 -1081) from 0043B6E6; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   2.125] hud2: bars p1 18000000 p2 00000000, gm+5C 00000012
+[   2.125] hud2: the other hero's HUD (health) set up from the interface 03CCCEE8
+[   2.125] hints: player 1's box (right): hint "Second pad: # joins co-op|(keyboard: #), again to leave"
+[   2.125] coop: sp_hero_switch_lock: you play Asterix
+[   2.125] sound: first start of sound 01000000 (instance 03DCAD84 at -869 504 -1078) from 0043B611; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   2.125] sound: first start of sound 01000001 (instance 03DCADC4 at -844 507 -1071) from 0043B611; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   2.125] sound: first start of sound 01000002 (instance 03DCAE44 at -815 518 -1081) from 0043B611; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.1 508.0 -1073.2)
+[   2.141] tint: the device's SetTexture wrapped (vtable 677DE000, was 677C1BC0) -- the health rows' colours
+[   2.141] hints: xxl_widescreen2d.asi takes the boxes' plates out of its plates
+[   2.141] hud2: the game's interface is now 03CCCEE8 (vt 006285F0, type 9) -- the in-game one
+[   2.141] hud2: Obelix's health row drawn (under Asterix's; 23 other models hidden for it)
+[   2.141] tint: Obelix's copy of texture 0BA6C920 (64x64, format 00000016, 1 levels) made
+[   2.141] tint: Obelix's copy of texture 0BBF5F40 (32x32, format 00000016, 1 levels) made
+[   2.141] hud2: bars p1 18000000 p2 18000000, gm+5C 00000012
+[   2.156] tint: Asterix's copy of texture 0BA6C920 (64x64, format 00000016, 1 levels) made
+[   2.156] tint: Asterix's copy of texture 0BBF5F40 (32x32, format 00000016, 1 levels) made
+[   2.984] sound: range checks verified (0 mismatches in 2000)
+[   3.516] watch: level=2 next=-1 | per 2s: frames=91 lifeTicks A=88 O=88 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[   3.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[   3.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[   3.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[   5.516] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[   5.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[   5.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[   5.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[   7.516] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[   7.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[   7.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[   7.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[   9.516] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[   9.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[   9.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[   9.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  11.516] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  11.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  11.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  11.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  11.719] coop: 60.6 fps
+[  12.281] hints: player 1's box (right): empty
+[  13.516] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  13.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  13.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  13.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  15.516] watch: level=2 next=-1 | per 2s: frames=127 lifeTicks A=127 O=127 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  15.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  15.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  15.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  17.516] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  17.516] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  17.516] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  17.516] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  19.531] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  19.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  19.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  19.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  21.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  21.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  21.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  21.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  21.719] coop: 62.9 fps
+[  23.531] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  23.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  23.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  23.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  25.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  25.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  25.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  25.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  26.313] coop: sector 1 -> 0 (next 5); leader Asterix; Asterix (-855 508 -1072) Obelix (-854 508 -1073)
+[  26.344] coop: sector 1 -> 5 (unknown, everyone moved along); Asterix's sector 5, Obelix's 5
+[  26.344] coop: sector 0 -> 5 (next -2); leader Asterix; Asterix (-855 508 -1072) Obelix (-854 508 -1073)
+[  26.344] sound: first start of sound 05000001 (instance 03DCB3C4 at 163 -2 -569) from 0043B6E6; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.0 508.0 -1073.2)
+[  26.344] sound: first start of sound 05000000 (instance 03DCB504 at 158 3 -437) from 0043B6E6; leader Asterix; Asterix (-854.9 508.0 -1072.2) Obelix (-854.0 508.0 -1073.2)
+[  27.531] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  27.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  27.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  27.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  29.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  29.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1072.16) LEADER
+[  29.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  29.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  30.828] coop: hero switch refused: the other hero is too far
+[  30.828] sound: first start of sound 0000001A (instance 03DC956C at 0 0 0) from 66E2D69E; leader Asterix; Asterix (107.8 508.0 -1072.2) Obelix (-854.0 508.0 -1073.2)
+[  31.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  31.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(107.75 7.19 -1072.16) LEADER
+[  31.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  31.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  31.641] coop: hero switch refused: the other hero is too far
+[  31.719] coop: 62.6 fps
+[  32.500] sound: first start of sound 00000041 (instance 03DCB284 at 110 6 -521) from 0043B611; leader Asterix; Asterix (107.8 7.2 -524.3) Obelix (-854.0 508.0 -1073.2)
+[  32.563] sound: first start of sound 00000007 (instance 03DCB304 at 111 2 -536) from 0043B611; leader Asterix; Asterix (107.8 7.2 -524.3) Obelix (-854.0 508.0 -1073.2)
+[  33.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=0/0 sound=0/0 region=0/0 | enforced=0 trioEvents=0 | p2=-
+[  33.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(107.75 7.19 -524.30) LEADER
+[  33.531] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  33.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  33.656] coop: player 2 joined on the keyboard as Obelix (player 1 keeps Asterix)
+[  33.656] state[join]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(107.75 7.19 -524.30) LEADER
+[  33.656] state[join]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  33.656] state[join]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  33.672] hints: texts refreshed for whose buttons are due (11)
+[  33.672] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  33.672] coop: Obelix -> player (f18 23 -> 20)
+[  33.672] gamecam: each player has a game camera
+[  33.672] gamecam: Obelix gets a copy of the game's camera
+[  33.672] gamecam: the game's field of view 0.0 -> 70.0 (window 0.934 0.525)
+[  33.672] gamecam: Obelix's camera (copy) now uses track 03CE19A8 (vt 00624418), sector 03D739B8
+[  33.672] gamecam: the game's camera (Asterix) now uses track 03CE2240 (vt 00624418), sector 03D73960
+[  33.672] gamecam: copy view ok: right (-0.49 0.00 0.87) up (0.36 0.91 0.20) at (-0.79 0.41 -0.45) pos (-121.55 127.58 -659.60) window 0.934 0.525; svc+1C 0342EFA0 frame 0341F340, main camera 03421758 frame 0341F340
+[  33.672] split: on
+[  33.672] split: wrapped beginUpdate of camera 03421758 (was 005ACDC0)
+[  33.672] split: 1920x1080 side by side, view window 0.9336 0.5252 -> 0.6857 0.7731; camera frame 0341F340 root 0341F340
+[  33.672] split: p2 stamp     view.pos=(-597.42 -262.09 -444.40) view.at=(-0.86 -0.36 -0.45) plane0=(-0.793 0.413 -0.448 504.40)
+[  33.672] split: p1 walk      view.pos=(134.87 370.95 478.37) view.at=(0.08 0.63 0.82) plane0=(-0.422 0.379 0.824 -378.36)
+[  33.672] split: p2 walk      view.pos=(-597.42 -262.09 -444.40) view.at=(-0.86 -0.36 -0.45) plane0=(-0.793 0.413 -0.448 504.40)
+[  33.672] hud2: gate counter's sparkle to the middle (0.500 0.494)
+[  33.672] pads: player 2's keys now drive only player 2 (kept from the game)
+[  33.672] indiv: individual heroes off (Asterix's stats are the game's)
+[  33.672] indiv: individual heroes on -- each starts with health 15, 3 shields, combo hits 0
+[  33.672] experimental: the heroes' path looked up in 1.29 ms
+[  33.672] experimental: the heroes are apart: neither can walk to the other (Asterix 107.8 7.2 -524.3, Obelix -854.0 508.0 -1073.2)
+[  33.672] experimental: squad and combo bar rules: single player, the game's own -> the heroes apart
+[  33.672] coop: player 1's gameplay bindings on
+[  33.672] coop: cutscene signals: bars=0 gm5C.20=0 camera vt 00624418
+[  33.672] klusters: crates (handler 3): 0 klusters past the 36 objects passed as outside
+[  33.672] klusters: crates (handler 4): 0 klusters past the 20 objects passed as outside
+[  33.672] p2cam: hero tick basis from own camera: fwd (-0.87 -0.49) angle 3.66 (trio had 2.04 / 2.04)
+[  33.672] gamecam: copy view ok: right (0.99 0.00 -0.16) up (0.02 0.99 0.10) at (0.15 -0.10 0.98) pos (-854.66 509.93 -1077.14) window 0.934 0.525; svc+1C 0342EFA0 frame 0341F340, main camera 03421758 frame 0341F340
+[  33.672] split: p2 stamp     view.pos=(127.65 871.13 1242.31) view.at=(0.60 0.43 0.98) plane0=(0.155 -0.101 0.983 -1182.30)
+[  33.672] split: p1 walk      view.pos=(134.88 370.97 478.40) view.at=(0.08 0.63 0.82) plane0=(-0.422 0.379 0.824 -378.38)
+[  33.672] split: p2 walk      view.pos=(127.65 871.13 1242.31) view.at=(0.60 0.43 0.98) plane0=(0.155 -0.101 0.983 -1182.30)
+[  33.688] gamecam: copy view ok: right (0.99 0.00 -0.16) up (0.02 0.99 0.10) at (0.15 -0.10 0.98) pos (-854.66 509.93 -1077.14) window 0.934 0.525; svc+1C 0342EFA0 frame 0341F340, main camera 03421758 frame 0341F340
+[  33.688] split: p2 stamp     view.pos=(127.44 871.13 1242.21) view.at=(0.60 0.43 0.98) plane0=(0.154 -0.101 0.983 -1182.20)
+[  33.688] split: p1 walk      view.pos=(134.85 370.89 478.35) view.at=(0.08 0.63 0.82) plane0=(-0.422 0.379 0.824 -378.36)
+[  33.688] split: p2 walk      view.pos=(127.44 871.13 1242.21) view.at=(0.60 0.43 0.98) plane0=(0.154 -0.101 0.983 -1182.20)
+[  33.703] gamecam: copy view ok: right (0.99 0.00 -0.15) up (0.02 0.99 0.10) at (0.15 -0.10 0.98) pos (-854.66 509.93 -1077.14) window 0.934 0.525; svc+1C 0342EFA0 frame 0341F340, main camera 03421758 frame 0341F340
+[  33.703] split: p2 stamp     view.pos=(127.01 870.96 1241.81) view.at=(0.60 0.43 0.98) plane0=(0.154 -0.101 0.983 -1181.82)
+[  33.703] split: p1 walk      view.pos=(134.85 370.88 478.34) view.at=(0.08 0.63 0.82) plane0=(-0.422 0.379 0.824 -378.36)
+[  33.703] split: p2 walk      view.pos=(127.01 870.96 1241.81) view.at=(0.60 0.43 0.98) plane0=(0.154 -0.101 0.983 -1181.82)
+[  33.719] gamecam: copy view ok: right (0.99 0.00 -0.15) up (0.02 0.99 0.10) at (0.15 -0.10 0.98) pos (-854.66 509.93 -1077.14) window 0.934 0.525; svc+1C 0342EFA0 frame 0341F340, main camera 03421758 frame 0341F340
+[  33.734] gamecam: copy view ok: right (0.99 0.00 -0.15) up (0.02 0.99 0.10) at (0.15 -0.10 0.98) pos (-854.66 509.93 -1077.14) window 0.934 0.525; svc+1C 0342EFA0 frame 0341F340, main camera 03421758 frame 0341F340
+[  34.172] experimental: the heroes' path looked up in 1.21 ms
+[  34.672] experimental: the heroes' path looked up in 1.31 ms
+[  34.688] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 2.04 / 2.04)
+[  35.047] klusters: crates (handler 3): 2 objects handed to another crate in the last second
+[  35.047] klusters: crates (handler 3): 0 in view without an object, 34 of 36 objects free
+[  35.188] sound: first start of sound 000000A3 (instance 03DCA200 at 0 0 0) from 004A5FB0; leader Asterix; Asterix (106.7 7.1 -525.4) Obelix (-854.0 508.0 -1073.2)
+[  35.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=117 split=118 nearestHero=3766 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=1294/0 sound=237/0 region=0/0 | enforced=1 trioEvents=0 | p2=Obelix
+[  35.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(107.20 7.12 -526.46) LEADER
+[  35.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  35.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  35.719] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 2.83 / 2.83)
+[  35.750] sound: first start of sound 0000003D (instance 03DDD668 at 0 0 0) from 004DC46E; leader Asterix; Asterix (107.1 7.1 -525.7) Obelix (-854.0 508.0 -1073.2)
+[  36.047] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  36.734] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.06 / 3.06)
+[  37.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=125 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=2678/0 sound=487/0 region=0/0 | enforced=1 trioEvents=0 | p2=Obelix
+[  37.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(96.56 7.30 -527.02) LEADER
+[  37.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  37.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  37.750] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.21 / 3.21)
+[  38.438] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  38.766] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.12 / 3.12)
+[  39.531] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=126 split=125 nearestHero=4032 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=4072/0 sound=739/0 region=0/0 | enforced=1 trioEvents=0 | p2=Obelix
+[  39.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(98.49 7.28 -526.73) LEADER
+[  39.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  39.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  39.781] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.12 / 3.12)
+[  40.688] sound: first start of sound 00000057 (instance 03DCA240 at 0 0 0) from 004A56EA; leader Asterix; Asterix (98.5 2.3 -526.7) Obelix (-854.0 508.0 -1073.2)
+[  40.797] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.12 / 3.12)
+[  40.844] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  41.125] proximity: squad 03CD5400 kept: out of the game camera's view, in the other player's
+[  41.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=126 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=5455/0 sound=989/0 region=0/0 | enforced=1 trioEvents=0 | p2=Obelix
+[  41.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(98.49 21.61 -526.73) LEADER
+[  41.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  41.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  41.719] coop: 62.6 fps
+[  41.813] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.12 / 3.12)
+[  42.484] pads: pad 1 is player 1's -- the game reads it (its input shows up in the game's input; matched 10, unmatched 0)
+[  42.828] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.12 / 3.12)
+[  43.219] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  43.531] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=126 split=126 nearestHero=4032 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=6850/0 sound=1241/0 region=0/0 | enforced=1 trioEvents=0 | p2=Obelix
+[  43.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(105.78 7.08 -526.89) LEADER
+[  43.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  43.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  43.844] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.12 / 3.12)
+[  44.453] coop: trio event 48EE from 0046B1F3
+[  44.453] coop: Obelix -> player (f18 23 -> 20)
+[  44.469] coop: Obelix -> player (f18 23 -> 20)
+[  44.484] coop: Obelix -> player (f18 23 -> 20)
+[  44.500] coop: Obelix -> player (f18 23 -> 20)
+[  44.516] coop: Obelix -> player (f18 23 -> 20)
+[  44.531] coop: Obelix -> player (f18 23 -> 20)
+[  44.547] coop: Obelix -> player (f18 23 -> 20)
+[  44.563] coop: Obelix -> player (f18 23 -> 20)
+[  44.578] coop: Obelix -> player (f18 23 -> 20)
+[  44.594] coop: Obelix -> player (f18 23 -> 20)
+[  44.609] coop: Obelix -> player (f18 23 -> 20)
+[  44.625] coop: Obelix -> player (f18 23 -> 20)
+[  44.641] coop: Obelix -> player (f18 23 -> 20)
+[  44.656] coop: Obelix -> player (f18 23 -> 20)
+[  44.672] coop: Obelix -> player (f18 23 -> 20)
+[  44.688] coop: Obelix -> player (f18 23 -> 20)
+[  44.703] coop: Obelix -> player (f18 23 -> 20)
+[  44.719] coop: Obelix -> player (f18 23 -> 20)
+[  44.859] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.14 / 3.14)
+[  45.219] proximity: zone event 0851
+[  45.219] coop: trio event 2000 from 0046694A
+[  45.219] coop: trio event 48ED from 0046B1F3
+[  45.219] coop: Obelix -> player (f18 23 -> 20)
+[  45.219] coop: trio event 487D from 0046B1F3
+[  45.219] coop: Obelix -> player (f18 23 -> 20)
+[  45.219] coop: trio event 487E from 0046B1F3
+[  45.219] coop: Obelix -> player (f18 23 -> 20)
+[  45.328] sound: first start of sound 05000001 (instance 03DCB444 at 156 5 -499) from 0043B611; leader Asterix; Asterix (118.4 6.7 -527.0) Obelix (-854.0 508.0 -1073.2)
+[  45.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=125 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=8233/0 sound=1491/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  45.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(119.75 6.78 -527.01) LEADER
+[  45.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  45.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  45.625] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  45.688] sound: first start of sound 05000000 (instance 03DCB544 at 154 2 -509) from 0043B611; leader Asterix; Asterix (120.9 6.7 -527.0) Obelix (-854.0 508.0 -1073.2)
+[  45.875] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.15 / 3.15)
+[  46.891] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 3.15 / 3.15)
+[  47.047] klusters: crates (handler 4): 4 objects handed to another crate in the last second
+[  47.047] klusters: crates (handler 4): 0 in view without an object, 16 of 20 objects free
+[  47.063] klusters: handler 4 (flags 7): kluster (134 5 -568 r7) in the game camera's half only, not its full-screen frustum (1)
+[  47.063] klusters: handler 4 (flags 7): kluster (130 5 -566 r6) in the game camera's half only, not its full-screen frustum (2)
+[  47.078] klusters: handler 4 (flags 7): kluster (134 5 -568 r7) in the game camera's half only, not its full-screen frustum (3)
+[  47.078] klusters: handler 4 (flags 7): kluster (130 5 -566 r6) in the game camera's half only, not its full-screen frustum (4)
+[  47.094] klusters: handler 4 (flags 7): kluster (134 5 -568 r7) in the game camera's half only, not its full-screen frustum (5)
+[  47.094] klusters: handler 4 (flags 7): kluster (130 5 -566 r6) in the game camera's half only, not its full-screen frustum (6)
+[  47.109] klusters: handler 4 (flags 7): kluster (130 5 -566 r6) in the game camera's half only, not its full-screen frustum (7)
+[  47.125] klusters: handler 4 (flags 7): kluster (130 5 -566 r6) in the game camera's half only, not its full-screen frustum (8)
+[  47.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=125 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=9616/0 sound=1741/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  47.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(129.50 7.51 -531.06) LEADER
+[  47.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  47.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  47.906] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.16 / 5.16)
+[  48.016] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  48.047] klusters: crates (handler 4): 2 objects handed to another crate in the last second
+[  48.922] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.32 / 5.32)
+[  49.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=125 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=11000/0 sound=1991/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  49.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(134.87 7.14 -539.01) LEADER
+[  49.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  49.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  49.563] sound: first start of sound 00000095 (instance 03DCA440 at 0 0 0) from 004A56EA; leader Asterix; Asterix (134.9 7.3 -539.0) Obelix (-854.0 508.0 -1073.2)
+[  49.938] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.48 / 5.48)
+[  50.047] sound: first start of sound 00000096 (instance 03DCA480 at 0 0 0) from 004A56EA; leader Asterix; Asterix (134.7 8.3 -539.5) Obelix (-854.0 508.0 -1073.2)
+[  50.422] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  50.953] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.23 / 5.23)
+[  51.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=124 O=124 p2Routed=124 split=124 nearestHero=3990 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=12383/0 sound=2239/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  51.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(133.47 7.39 -542.22) LEADER
+[  51.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19) LEADER
+[  51.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  51.719] coop: 62.6 fps
+[  51.969] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 4.84 / 4.84)
+[  52.828] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  52.984] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 4.66 / 4.66)
+[  53.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=126 O=126 p2Routed=126 split=126 nearestHero=4010 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=13766/0 sound=2491/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  53.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(131.77 10.70 -543.20) LEADER
+[  53.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  53.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  54.000] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 4.54 / 4.54)
+[  55.016] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.52 / 5.52)
+[  55.219] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  55.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=125 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=15150/0 sound=2741/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  55.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0F ai=FF order=0 f1A=00 busy=0 pos=(134.66 6.86 -538.75) LEADER
+[  55.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  55.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  55.891] proximity: squad 03CD5400 kept: out of the game camera's view, in the other player's
+[  56.031] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.53 / 5.53)
+[  57.047] klusters: crates (handler 4): 12 objects handed to another crate in the last second
+[  57.047] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.53 / 5.53)
+[  57.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=125 split=125 nearestHero=4000 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=16533/0 sound=2991/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  57.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0F ai=FF order=0 f1A=00 busy=0 pos=(134.66 7.16 -538.75) LEADER
+[  57.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  57.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  57.625] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  58.063] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.53 / 5.53)
+[  58.266] sound: first start of sound 00000084 (instance 03DDA0E4 at 0 0 0) from 00537CF6; leader Asterix; Asterix (134.7 2.1 -538.8) Obelix (-854.0 508.0 -1073.2)
+[  59.094] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.12 / 5.12)
+[  59.531] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=126 split=126 nearestHero=4032 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=17928/0 sound=3243/0 region=0/0 | enforced=22 trioEvents=22 | p2=Obelix
+[  59.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(133.35 2.47 -540.54) LEADER
+[  59.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(-854.05 508.03 -1073.19)
+[  59.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  60.016] proximity: squad 03CD8D04 active for Obelix (not leading)
+[  60.109] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.04 / 5.04)
+[  61.125] p2cam: hero tick basis from own camera: fwd (0.15 0.99) angle 1.42 (trio had 5.04 / 5.04)
+[  61.234] coop: Obelix reset through the AI (R3 + B, situation 00)
+[  61.266] coop: Obelix -> player (f18 23 -> 20)
+[  61.375] coop: joining Asterix: on its own solid ground at (134.7 2.6 -538.8), 2.2 units from it
+[  61.375] coop: Obelix warped to Asterix (R3 + A) at (134.7 2.6 -538.8)
+[  61.375] gamecam: Obelix's camera (copy) now uses track 03CE2240 (vt 00624418), sector 03D73960
+[  61.516] sound: first start of sound 00000057 (instance 03DC99AC at 0 0 0) from 004A8A8C; leader Obelix; Asterix (133.4 2.5 -540.5) Obelix (134.3 2.2 -539.1)
+[  61.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=123 split=125 nearestHero=4099 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19311/1 sound=3493/0 region=0/0 | enforced=23 trioEvents=22 | p2=Obelix
+[  61.531] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(133.35 2.47 -540.54) LEADER
+[  61.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0C ai=FF order=0 f1A=00 busy=0 pos=(134.27 2.25 -539.05)
+[  61.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  61.703] experimental: the heroes can walk to each other again (Asterix 133.4 2.5 -540.5, Obelix 134.3 2.2 -539.1)
+[  61.703] experimental: squad and combo bar rules: the heroes apart -> on
+[  61.703] experimental: Romans to defeat scaled for 50 squad(s) whose fight has not begun (rules on)
+[  61.703] experimental: combo bar full at 30 -> 38, a hit lost every 0.65 -> 0.54 s, full for 30.00 -> 25.00 s (rules on); the leader's hits 0 -> 0
+[  61.719] coop: 62.6 fps
+[  61.875] proximity: squad 03CD634C active for Obelix (not leading)
+[  62.141] p2cam: hero tick basis from own camera: fwd (0.87 0.49) angle 0.51 (trio had 5.04 / 5.04)
+[  62.359] coop: player 2 left (pressed Start); Obelix is AI again, leader=Asterix (player 1's now)
+[  62.359] hints: texts refreshed for whose buttons are due (0)
+[  62.359] gamecam: one game camera
+[  62.359] split: off
+[  62.375] hud2: gate counter's sparkle back (0.879 0.500)
+[  62.375] pads: player 2's keys go to the game again
+[  62.375] indiv: Obelix's stats kept for player 2's return: health 15, 3 shields
+[  62.375] indiv: individual heroes off (Asterix's stats are the game's)
+[  62.375] indiv: individual heroes on (single player: second chance) -- each starts with health 15, 3 shields, combo hits 0
+[  62.375] experimental: squad and combo bar rules: on -> single player, the game's own
+[  62.375] experimental: Romans to defeat as the level has them for 50 squad(s) whose fight has not begun (rules single player, the game's own)
+[  62.375] experimental: combo bar full at 38 -> 30, a hit lost every 0.54 -> 0.65 s, full for 25.00 -> 30.00 s (rules single player, the game's own); the leader's hits 0 -> 0
+[  63.469] coop: hero switch: Asterix -> Obelix
+[  63.469] coop: Obelix takes the lead from Asterix (the hero switch button) -- leader now Obelix
+[  63.469] proximity: sp_hero_switch_lock: zones for Asterix (the level's leader) answer Obelix, the hero you play
+[  63.469] proximity: corkscrew 03C38D18 is Asterix's (its landing makes that hero wait) -- shut while Obelix leads
+[  63.469] proximity: corkscrew 03C38C08 is Asterix's (its landing makes that hero wait) -- shut while Obelix leads
+[  63.469] proximity: corkscrew 03C38C4C is Asterix's (its landing makes that hero wait) -- shut while Obelix leads
+[  63.469] proximity: spitter 03CD1A94's next is the magic potion -- ticks with Asterix as the leader (Obelix leads)
+[  63.469] sound: first start of sound 000000A2 (instance 03DCA280 at 0 0 0) from 004A5DD9; leader Obelix; Asterix (133.4 2.5 -540.6) Obelix (132.5 2.6 -539.6)
+[  63.484] hud2: Obelix leads -- the game's HUD is its row now, Asterix's the other
+[  63.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=51 split=51 nearestHero=2091 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=24 | p2=-
+[  63.531] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=13 ai=00 order=0 f1A=00 busy=0 pos=(133.38 2.46 -540.57)
+[  63.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(132.47 2.63 -539.64) LEADER
+[  63.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  64.094] sound: first start of sound 000000A3 (instance 03DC996C at 0 0 0) from 004A9384; leader Obelix; Asterix (132.8 2.5 -541.4) Obelix (134.0 2.3 -539.4)
+[  64.203] proximity: event 0570's group 0AE: 03C9F320(vt 62504C)<-1632 03C9F320(vt 62504C)<-1633 03C9F320(vt 62504C)<-1634 03CD4474(vt 6256A0)<-4800 03CD4474(vt 6256A0)<-4803 03CD1C50(vt 629588)<-0999 03C36058(vt 625E98)<-519B 03CD64B0(vt 6266B0)<-0D23 03CD634C(vt 6266B0)<-0D23 03CD61E8(vt 6266B0)<-0D23 03CD1C90(vt 629588)<-0999 03CD1C90(vt 629588)<-099B 03CE8928(vt 624C2C)<-0501
+[  64.219] coop: sp_hero_switch_lock: the level's switch 4800 (event 0570's group: no lock) ignored -- Obelix keeps the lead
+[  64.219] sound: stream 7 started (00000001, 255, 0, 0) -> channel 0, from 00469744; leader Obelix; Asterix (132.8 2.5 -541.4) Obelix (134.6 2.2 -539.9)
+[  64.219] sound: stream start stack: 469744 4664D3 4663D3 46B1F3 40A58C 409AE1 409B76 47A784 44005C 610048 5C0039 580058
+[  65.531] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=25 | p2=-
+[  65.531] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(137.18 2.21 -545.21)
+[  65.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(137.33 2.31 -548.20) LEADER
+[  65.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  65.594] sound: first start of sound 00000040 (instance 03DCAB88 at 143 2 -568) from 0043B611; leader Obelix; Asterix (137.1 2.2 -545.7) Obelix (137.3 2.4 -548.6)
+[  65.734] proximity: zone event 0DB8 (single player, the heroes' roles swapped: set off by Obelix)
+[  65.984] proximity: zone event 0D80 (single player, the heroes' roles swapped: set off by Obelix)
+[  66.156] proximity: zone event 0CF0 (single player, the heroes' roles swapped: set off by Obelix)
+[  66.672] sound: first start of sound 000000AD (instance 03DC9A6C at 0 0 0) from 004A8A8C; leader Obelix; Asterix (137.3 2.4 -552.2) Obelix (137.6 2.3 -556.1)
+[  67.531] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=25 | p2=-
+[  67.531] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(137.91 2.10 -558.67)
+[  67.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(137.61 2.17 -562.05) LEADER
+[  67.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  68.172] sound: first start of sound 000000A5 (instance 03DC936C at 0 0 0) from 004A8BD6; leader Obelix; Asterix (137.7 2.6 -565.4) Obelix (135.8 2.5 -565.6)
+[  68.281] sound: first start of sound 0000001C (instance 03DD504C at 134 4 -567) from 0054312B; leader Obelix; Asterix (137.6 2.4 -566.6) Obelix (135.5 2.5 -565.7)
+[  68.281] sound: first start of sound 0000000C (instance 03DD508C at 134 6 -567) from 005446D2; leader Obelix; Asterix (137.6 2.4 -566.6) Obelix (135.5 2.5 -565.7)
+[  68.281] sound: first start of sound 000000A1 (instance 03DC94EC at 0 0 0) from 004A8F58; leader Obelix; Asterix (137.6 2.4 -566.6) Obelix (135.5 2.5 -565.7)
+[  69.094] sound: first start of sound 00000061 (instance 03DCD460 at 135 3 -566) from 0054D628; leader Obelix; Asterix (137.5 2.2 -568.2) Obelix (135.4 2.5 -565.7)
+[  69.531] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=27 | p2=-
+[  69.531] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(137.48 2.18 -568.23)
+[  69.531] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(135.24 2.50 -565.63) LEADER
+[  69.531] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  69.906] sound: first start of sound 00000010 (instance 03DCD3B8 at 135 3 -565) from 0054D628; leader Obelix; Asterix (135.7 2.5 -565.8) Obelix (134.6 2.5 -565.3)
+[  70.719] sound: first start of sound 0000005F (instance 03DD02AC at 131 3 -566) from 0054D628; leader Obelix; Asterix (131.0 3.0 -564.6) Obelix (131.0 2.2 -565.8)
+[  71.141] sound: first start of sound 000000AE (instance 03DC9AAC at 0 0 0) from 004A8A8C; leader Obelix; Asterix (133.3 2.9 -565.3) Obelix (131.2 3.7 -565.7)
+[  71.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=27 | p2=-
+[  71.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(133.98 2.38 -565.95)
+[  71.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=0 f1A=00 busy=0 pos=(133.11 5.05 -565.09) LEADER
+[  71.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  71.719] coop: 62.4 fps
+[  72.859] sound: first start of sound 0000002E (instance 03DD4000 at 132 2 -568) from 004C20FB; leader Obelix; Asterix (133.6 2.2 -567.5) Obelix (132.5 3.5 -568.6)
+[  72.906] sound: first start of sound 0000008F (instance 03DC9A2C at 0 0 0) from 004A8AC8; leader Obelix; Asterix (133.6 2.2 -567.5) Obelix (132.2 4.0 -568.4)
+[  73.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=29 | p2=-
+[  73.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(133.56 2.20 -567.53)
+[  73.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=0 f1A=00 busy=0 pos=(133.41 16.44 -570.98) LEADER
+[  73.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  74.516] proximity: safe sequence: lever 03C4366C ignores Obelix -- it gives the lead to Asterix, who is not held by the level (its lever for later)
+[  75.547] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=29 | p2=-
+[  75.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=15 ai=00 order=0 f1A=00 busy=0 pos=(133.56 2.20 -567.53)
+[  75.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=FF order=0 f1A=00 busy=0 pos=(134.29 12.07 -572.66) LEADER
+[  75.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  77.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=29 | p2=-
+[  77.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(133.56 2.20 -567.53)
+[  77.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=0 f1A=00 busy=0 pos=(134.18 11.11 -569.05) LEADER
+[  77.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  79.547] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=31 | p2=-
+[  79.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(134.49 2.35 -566.40)
+[  79.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=0 f1A=00 busy=0 pos=(132.62 7.29 -568.82) LEADER
+[  79.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  81.281] sound: first start of sound 000000A7 (instance 03DC93AC at 0 0 0) from 004A8BD6; leader Obelix; Asterix (134.5 2.3 -566.4) Obelix (133.1 12.1 -574.0)
+[  81.547] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=31 | p2=-
+[  81.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(134.49 2.35 -566.40)
+[  81.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(133.14 12.07 -574.07) LEADER
+[  81.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  81.719] coop: 62.1 fps
+[  83.359] coop: hero switch: Obelix -> Asterix
+[  83.359] coop: Asterix takes the lead from Obelix (the hero switch button) -- leader now Asterix
+[  83.359] sound: first start of sound 000000A2 (instance 03DC99EC at 0 0 0) from 004A90C4; leader Asterix; Asterix (133.7 2.4 -566.1) Obelix (134.9 2.5 -565.6)
+[  83.375] hud2: Asterix leads -- the game's HUD is its row now, Obelix's the other
+[  83.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=32 | p2=-
+[  83.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(133.68 2.36 -566.06) LEADER
+[  83.547] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(134.89 2.48 -565.55)
+[  83.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  85.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=32 | p2=-
+[  85.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(143.02 2.47 -566.67) LEADER
+[  85.547] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(143.66 2.62 -565.29)
+[  85.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  86.031] coop: cheat: Asterix has no torch
+[  86.281] coop: cheat: torch 03C38B34 for Asterix
+[  86.297] icons: "Grab #" -> "Grab #" (for player 1)
+[  86.406] sound: first start of sound 00000012 (instance 03DD4684 at 0 0 0) from 004AF35B; leader Asterix; Asterix (142.6 2.4 -566.9) Obelix (143.6 2.5 -565.9)
+[  86.406] sound: first start of sound 00000022 (instance 03DD46C4 at 0 0 0) from 004AF37C; leader Asterix; Asterix (142.6 2.4 -566.9) Obelix (143.6 2.5 -565.9)
+[  86.406] coop: cheat: Asterix took the torch after 7 frames (state 11)
+[  86.438] icons: "Light #" -> "Light #" (for player 1)
+[  87.422] proximity: event 0D60's group 1AC: 03CD4474(vt 6256A0)<-4801 03CD4474(vt 6256A0)<-4813 03C9F320(vt 62504C)<-161C 03C360A0(vt 625E98)<-5196 03C9F320(vt 62504C)<-140B 03C9F320(vt 62504C)<-162B
+[  87.438] coop: sp_hero_switch_lock: the level hands the lead to Obelix (its group holds the other hero) -- Obelix is the hero you play now
+[  87.453] hud2: Obelix leads -- the game's HUD is its row now, Asterix's the other
+[  87.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=99 | p2=-
+[  87.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0E ai=0F order=1 f1A=00 busy=0 pos=(142.71 2.63 -566.69)
+[  87.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(143.18 2.60 -565.67) LEADER
+[  87.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  89.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=99 | p2=-
+[  89.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(147.83 2.04 -566.73)
+[  89.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=0 f1A=00 busy=0 pos=(132.56 5.24 -567.99) LEADER
+[  89.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  91.266] sound: first start of sound 00000021 (instance 03DD4190 at 134 12 -574) from 0053B682; leader Obelix; Asterix (147.8 2.0 -566.7) Obelix (132.7 12.1 -572.3)
+[  91.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=102 | p2=-
+[  91.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(147.83 2.04 -566.73)
+[  91.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(132.94 12.07 -572.51) LEADER
+[  91.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  91.672] coop: sp_hero_switch_lock: the level hands the lead to Asterix (the level hands the lead back to the hero it parked) -- Asterix is the hero you play now
+[  91.672] trace: light pillar 03C43820 at (153 2 -484) event 3E00900 from 0046B1F3; leader Asterix
+[  91.672] sound: first start of sound 00000050 (instance 03DD51F4 at 153 2 -484) from 0053AEC6; leader Asterix; Asterix (147.8 2.0 -566.7) Obelix (132.9 12.1 -572.5)
+[  91.688] hud2: Asterix leads -- the game's HUD is its row now, Obelix's the other
+[  91.719] coop: 62.5 fps
+[  91.859] sound: first start of sound 0000001F (instance 03DD09EC at 148 2 -540) from 00541D91; leader Asterix; Asterix (147.8 3.0 -565.7) Obelix (132.3 12.1 -571.9)
+[  93.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[  93.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=3 f1A=00 busy=0 pos=(147.35 2.12 -564.78) LEADER
+[  93.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(156.03 -2.09 -572.36)
+[  93.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  95.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[  95.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(147.51 3.03 -550.78) LEADER
+[  95.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(166.10 -2.10 -571.81)
+[  95.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  97.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[  97.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0F ai=FF order=3 f1A=00 busy=0 pos=(147.67 3.26 -537.86) LEADER
+[  97.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(167.12 -2.10 -566.35)
+[  97.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[  99.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[  99.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=3 f1A=00 busy=0 pos=(149.09 3.76 -523.96) LEADER
+[  99.547] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(154.92 0.87 -565.73)
+[  99.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 101.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[ 101.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=3 f1A=00 busy=0 pos=(150.77 1.37 -510.48) LEADER
+[ 101.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(164.91 -2.13 -565.74)
+[ 101.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 101.719] coop: 62.9 fps
+[ 101.906] coop: cheat: magic potion filled by player 1
+[ 101.906] sound: first start of sound FDFFFFFF (instance 03DCA654 at 0 0 0) from 00480923; leader Asterix; Asterix (150.8 1.4 -510.5) Obelix (166.9 -2.1 -565.7)
+[ 101.922] potion: gauge 0.0 -> 300.0
+[ 101.922] potion: gauge filled (300), leader Asterix; probing the heroes for a minute
+[ 102.219] sound: first start of sound 00000064 (instance 03DCA554 at 0 0 0) from 00480923; leader Asterix; Asterix (150.9 1.4 -507.6) Obelix (168.3 -2.1 -565.4)
+[ 102.219] sound: first start of sound 00000068 (instance 03DCA5D4 at 0 0 0) from 00480923; leader Asterix; Asterix (150.9 1.4 -507.6) Obelix (168.3 -2.1 -565.4)
+[ 103.172] coop: hero switch refused: a scripted mode (a ride, the slide, a machine)
+[ 103.422] potion: +1.5 s since the offer
+[ 103.422] potion:   Asterix+028 42C709F6 -> 42CA7800 (99.5195 -> 101.234)
+[ 103.422] potion:   Asterix+02C C47A0000 -> 42C8F90A (-1000 -> 100.486)
+[ 103.422] potion:   Asterix+06C 4316C56E -> 431757AE (150.771 -> 151.342)
+[ 103.422] potion:   Asterix+070 3FAF08EF -> 402B8AF7 (1.36746 -> 2.68036)
+[ 103.422] potion:   Asterix+074 C3FF3C0C -> C3F98AA8 (-510.469 -> -499.083)
+[ 103.422] potion:   Asterix+084 41700000 -> 00000000 (15 -> 0)
+[ 103.422] potion:   Asterix+08C 3F6CCF4A -> 00000000 (0.925038 -> 0)
+[ 103.422] potion:   Asterix+090 3A351399 -> 00000000 (0.000690752 -> 0)
+[ 103.422] potion:   Asterix+098 3C69633C -> 00000000 (0.0142449 -> 0)
+[ 103.422] potion:   Asterix+0B4 3D466334 -> 3D4D1EFB (0.0484345 -> 0.0500784)
+[ 103.422] potion:   Asterix+0BC 3F7FB316 -> 3F7FADC5 (0.998826 -> 0.998745)
+[ 103.422] potion:   Asterix+0C0 3D466334 -> 3D4D1EFB (0.0484345 -> 0.0500784)
+[ 103.422] potion:   Asterix+0C8 3F7FB316 -> 3F7FADC5 (0.998826 -> 0.998745)
+[ 103.422] potion:   Asterix+0CC 3FC2DC22 -> 3FC2A633 (1.52234 -> 1.5207)
+[ 103.422] potion:   Asterix+0D4 3FC2DC22 -> 3FC2A633 (1.52234 -> 1.5207)
+[ 103.422] potion:   Asterix+0E4 47C30827 -> 47C31627 (99856.3 -> 99884.3)
+[ 103.422] potion:   Asterix+0E8 00000037 -> 00000065 (7.70714e-44 -> 1.41531e-43)
+[ 103.422] potion:   Asterix+134 06000411 -> 06000011 (2.40771e-35 -> 2.40742e-35)
+[ 103.422] potion:   Asterix+284 04985370 -> 049854C0 (3.58117e-36 -> 3.58129e-36)
+[ 103.422] potion:   Asterix+288 B2982A05 -> 3AC5CB41 (-1.77142e-08 -> 0.00150905)
+[ 103.422] potion:   Asterix+28C 3F8001A8 -> 3F7FFB84 (1.00005 -> 0.999932)
+[ 103.422] potion:   Asterix+290 B657F4D3 -> BACE2788 (-3.218e-06 -> -0.00157283)
+[ 103.422] potion:   Asterix+294 00000001 -> 00000000 (1.4013e-45 -> 0)
+[ 103.422] potion:   Asterix+298 4316C56E -> 431757AE (150.771 -> 151.342)
+[ 103.422] potion:   Asterix+29C 3FAF08EF -> 402B8AF7 (1.36746 -> 2.68036)
+[ 103.422] potion:   Asterix+2A0 C3FF3C0C -> C3F98AA8 (-510.469 -> -499.083)
+[ 103.422] potion:   Asterix+2A4 34000000 -> 80000000 (1.19209e-07 -> -0)
+[ 103.422] potion:   Asterix+2B0 04985370 -> 049854C0 (3.58117e-36 -> 3.58129e-36)
+[ 103.422] potion:   Asterix+2B4 B2982A05 -> 3AC5CB41 (-1.77142e-08 -> 0.00150905)
+[ 103.422] potion:   Asterix+2B8 3F8001A8 -> 3F7FFB84 (1.00005 -> 0.999932)
+[ 103.422] potion:   Asterix+2BC B657F4D3 -> BACE2788 (-3.218e-06 -> -0.00157283)
+[ 103.422] potion:   Asterix+2C4 4316C541 -> 431757AE (150.771 -> 151.342)
+[ 103.422] potion:   Asterix+2C8 3FAF08EE -> 402B8AF7 (1.36746 -> 2.68036)
+[ 103.422] potion:   Asterix+2CC C3FF3DDF -> C3F98AA8 (-510.483 -> -499.083)
+[ 103.422] potion:   Asterix+2D8 4316C56E -> 431757AE (150.771 -> 151.342)
+[ 103.422] potion:   Asterix+2DC 3FAF08EF -> 402B8AF7 (1.36746 -> 2.68036)
+[ 103.422] potion:   Asterix+2E0 C3FF3C0C -> C3F98AA8 (-510.469 -> -499.083)
+[ 103.422] potion:   Asterix+2E4 B2982A05 -> 3AC5CB41 (-1.77142e-08 -> 0.00150905)
+[ 103.422] potion:   Asterix+2E8 3F8001A8 -> 3F7FFB84 (1.00005 -> 0.999932)
+[ 103.422] potion:   Asterix+2EC B657F4D3 -> BACE2788 (-3.218e-06 -> -0.00157283)
+[ 103.422] potion:   Asterix+384 00201200 -> 00000000 (2.94519e-39 -> 0)
+[ 103.422] potion:   Asterix+388 00000004 -> 00001004 (5.60519e-45 -> 5.74532e-42)
+[ 103.422] potion:   Asterix+38C 00088000 -> 00000000 (7.80602e-40 -> 0)
+[ 103.422] potion:   Asterix+390 00000020 -> 00000000 (4.48416e-44 -> 0)
+[ 103.422] potion:   Asterix+3B4 4316C56E -> 431757AE (150.771 -> 151.342)
+[ 103.422] potion:   Asterix+3B8 3FAF08EF -> 402B8AF7 (1.36746 -> 2.68036)
+[ 103.422] potion:   Asterix+3BC C3FF3C0C -> C3F98AA8 (-510.469 -> -499.083)
+[ 103.422] potion:   Asterix+3C0 B2982A05 -> 3AC5CB41 (-1.77142e-08 -> 0.00150905)
+[ 103.422] potion:   Asterix+3C4 3F8001A8 -> 3F7FFB84 (1.00005 -> 0.999932)
+[ 103.422] potion:   Asterix+3C8 B657F4D3 -> BACE2788 (-3.218e-06 -> -0.00157283)
+[ 103.422] potion:   Asterix+3CC 34000000 -> 80000000 (1.19209e-07 -> -0)
+[ 103.422] potion:   Asterix+3EC 00000040 -> 00000000 (8.96831e-44 -> 0)
+[ 103.422] potion:   Asterix+7CC 4316C541 -> 431757AE (150.771 -> 151.342)
+[ 103.422] potion:   Asterix+7D0 3FAF08EE -> 402B8AF7 (1.36746 -> 2.68036)
+[ 103.422] potion:   Asterix+7D4 C3FF3DDF -> C3F98AA8 (-510.483 -> -499.083)
+[ 103.422] potion:   Asterix+C0C 19B50001 -> 19B50000 (1.8715e-23 -> 1.8715e-23)
+[ 103.422] potion:   Asterix+CF8 4326FCB0 -> 4329F45C (166.987 -> 169.955)
+[ 103.422] potion:   Asterix+CFC C006340E -> C00665CD (-2.09693 -> -2.09996)
+[ 103.422] potion:   Asterix+D00 C40D6F44 -> C40C1396 (-565.739 -> -560.306)
+[ 103.422] potion:   Asterix+D10 40B028B5 -> 40A1451C (5.50497 -> 5.03969)
+[ 103.422] potion:   Asterix+D18 40B028B5 -> 40A1451C (5.50497 -> 5.03969)
+[ 103.422] potion:   Asterix+D1C 3DADD360 -> 3BF210F9 (0.0848758 -> 0.00738728)
+[ 103.422] potion:   Asterix+D20 B8950000 -> B6000000 (-7.10487e-05 -> -1.90735e-06)
+[ 103.422] potion:   Asterix+D24 B88F7ECF -> 3DA46B0B (-6.84239e-05 -> 0.0802823)
+[ 103.422] potion:   Asterix+D40 3F800000 -> 3DBBAB6C (1 -> 0.0916356)
+[ 103.422] potion:   Asterix+D48 00000000 -> 3F7EEC44 (0 -> 0.995793)
+[ 103.422] potion:   Asterix+D4C 3F800000 -> 3DBFA666 (1 -> 0.0935791)
+[ 103.422] potion:   Asterix+D54 00000000 -> 3F7EE06B (0 -> 0.995612)
+[ 103.422] potion:   Asterix+D58 00000000 -> 3FBD50EC (0 -> 1.47903)
+[ 103.422] potion:   Asterix+D60 00000000 -> 3FBD50EC (0 -> 1.47903)
+[ 103.422] potion:   Asterix+F00 3E4CDF6D -> 3E4CCD4D (0.200071 -> 0.200002)
+[ 103.422] potion:   Asterix+F04 3FE668BA -> 3FE66676 (1.80007 -> 1.8)
+[ 103.422] potion:   Asterix+F10 0498B7B6 -> 0498B72C (3.59037e-36 -> 3.59032e-36)
+[ 103.422] potion:   Asterix+F14 B62D296E -> B6020C6D (-2.58031e-06 -> -1.93787e-06)
+[ 103.422] potion:   Asterix+F18 3F7FFD6F -> 3F8001DA (0.999961 -> 1.00006)
+[ 103.422] potion:   Asterix+F1C 00000000 -> B5E8A245 (0 -> -1.73326e-06)
+[ 103.422] potion:   Asterix+F24 4326FCB0 -> 4329F45C (166.987 -> 169.955)
+[ 103.422] potion:   Asterix+F28 C07FFFE9 -> C07FFF8E (-3.99999 -> -3.99997)
+[ 103.422] potion:   Asterix+F2C C40D6F44 -> C40C1396 (-565.739 -> -560.306)
+[ 103.422] potion:   Asterix+F30 3FF397B6 -> 3FF33382 (1.90307 -> 1.90001)
+[ 103.422] potion:   Asterix+F64 4326FCB0 -> 4329F45C (166.987 -> 169.955)
+[ 103.422] potion:   Asterix+F68 C07FFFE9 -> C07FFF8E (-3.99999 -> -3.99997)
+[ 103.422] potion:   Asterix+F6C C40D6F44 -> C40C1396 (-565.739 -> -560.306)
+[ 103.422] potion:   Asterix+F70 B62D296E -> B6020C6D (-2.58031e-06 -> -1.93787e-06)
+[ 103.422] potion:   Asterix+F74 3F7FFD6F -> 3F8001DA (0.999961 -> 1.00006)
+[ 103.422] potion:   Asterix+F78 00000000 -> B5E8A245 (0 -> -1.73326e-06)
+[ 103.422] potion:   Asterix+FB4 3F18D038 -> 3F199734 (0.596927 -> 0.599963)
+[ 103.422] potion:   Asterix+FB8 40B02ADD -> 3EEC72F3 (5.50523 -> 0.461814)
+[ 103.422] potion:   Asterix+FBC BB96DA9A -> B90273F2 (-0.0046037 -> -0.00012441)
+[ 103.422] potion:   Asterix+FC0 BB916DB2 -> 40A09A4C (-0.00443813 -> 5.01884)
+[ 103.422] potion:   Obelix+06C 4326FCB0 -> 4329F45C (166.987 -> 169.955)
+[ 103.422] potion:   Obelix+070 C006340E -> C00665CD (-2.09693 -> -2.09996)
+[ 103.422] potion:   Obelix+074 C40D6F44 -> C40C1396 (-565.739 -> -560.306)
+[ 103.422] potion:   Obelix+084 40B028B5 -> 40A1451C (5.50497 -> 5.03969)
+[ 103.422] potion:   Obelix+08C 40B028B5 -> 40A1451C (5.50497 -> 5.03969)
+[ 103.422] potion:   Obelix+090 3DADD360 -> 3BF210F9 (0.0848758 -> 0.00738728)
+[ 103.422] potion:   Obelix+094 B8950000 -> B6000000 (-7.10487e-05 -> -1.90735e-06)
+[ 103.422] potion:   Obelix+098 B88F7ECF -> 3DA46B0B (-6.84239e-05 -> 0.0802823)
+[ 103.422] potion:   Obelix+0B4 3F800000 -> 3DBBAB6C (1 -> 0.0916356)
+[ 103.422] potion:   Obelix+0BC 00000000 -> 3F7EEC44 (0 -> 0.995793)
+[ 103.422] potion:   Obelix+0C0 3F800000 -> 3DBFA666 (1 -> 0.0935791)
+[ 103.422] potion:   Obelix+0C8 00000000 -> 3F7EE06B (0 -> 0.995612)
+[ 103.422] potion:   Obelix+0CC 00000000 -> 3FBD50EC (0 -> 1.47903)
+[ 103.422] potion:   Obelix+0D4 00000000 -> 3FBD50EC (0 -> 1.47903)
+[ 103.422] potion:   Obelix+274 3E4CDF6D -> 3E4CCD4D (0.200071 -> 0.200002)
+[ 103.422] potion:   Obelix+278 3FE668BA -> 3FE66676 (1.80007 -> 1.8)
+[ 103.422] potion:   Obelix+284 0498B7B6 -> 0498B72C (3.59037e-36 -> 3.59032e-36)
+[ 103.422] potion:   Obelix+288 B62D296E -> B6020C6D (-2.58031e-06 -> -1.93787e-06)
+[ 103.422] potion:   Obelix+28C 3F7FFD6F -> 3F8001DA (0.999961 -> 1.00006)
+[ 103.422] potion:   Obelix+290 00000000 -> B5E8A245 (0 -> -1.73326e-06)
+[ 103.422] potion:   Obelix+298 4326FCB0 -> 4329F45C (166.987 -> 169.955)
+[ 103.422] potion:   Obelix+29C C07FFFE9 -> C07FFF8E (-3.99999 -> -3.99997)
+[ 103.422] potion:   Obelix+2A0 C40D6F44 -> C40C1396 (-565.739 -> -560.306)
+[ 103.422] potion:   Obelix+2A4 3FF397B6 -> 3FF33382 (1.90307 -> 1.90001)
+[ 103.422] potion:   Obelix+2D8 4326FCB0 -> 4329F45C (166.987 -> 169.955)
+[ 103.422] potion:   Obelix+2DC C07FFFE9 -> C07FFF8E (-3.99999 -> -3.99997)
+[ 103.422] potion:   Obelix+2E0 C40D6F44 -> C40C1396 (-565.739 -> -560.306)
+[ 103.422] potion:   Obelix+2E4 B62D296E -> B6020C6D (-2.58031e-06 -> -1.93787e-06)
+[ 103.422] potion:   Obelix+2E8 3F7FFD6F -> 3F8001DA (0.999961 -> 1.00006)
+[ 103.422] potion:   Obelix+2EC 00000000 -> B5E8A245 (0 -> -1.73326e-06)
+[ 103.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[ 103.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=3 f1A=00 busy=0 pos=(151.34 2.68 -499.08) LEADER
+[ 103.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(170.01 -2.10 -559.66)
+[ 103.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 104.234] sound: first start of sound 00000066 (instance 03DCA614 at 0 0 0) from 00480923; leader Asterix; Asterix (151.9 4.8 -490.8) Obelix (170.2 -2.1 -556.1)
+[ 104.313] proximity: zone event 03A8
+[ 104.313] trace: light pillar 03C43820 at (153 2 -484) event 3E00901 from 0046B1F3; leader Asterix
+[ 104.313] sound: first start of sound 00000042 (instance 03DD5174 at 0 0 0) from 0053AB9D; leader Asterix; Asterix (152.1 4.2 -489.9) Obelix (170.2 -2.1 -555.7)
+[ 104.313] sound: stream 3 started (00000001, 255, 0, 0) -> channel 1, from 00469744; leader Asterix; Asterix (152.1 4.2 -489.9) Obelix (170.2 -2.1 -555.7)
+[ 104.313] sound: stream start stack: 469744 4664D3 4663D3 46B1F3 40A58C 409AE1 409B76 47A784 44005C 610048 5C0039 580058
+[ 104.328] sound: first start of sound 00000058 (instance 03DDDD60 at 152 4 -490) from 0051545A; leader Asterix; Asterix (152.1 4.0 -489.7) Obelix (170.2 -2.1 -555.6)
+[ 104.328] experimental: fight gate: 3 squad(s), 5 Romans left (rules single player, the game's own)
+[ 105.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[ 105.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(154.29 4.53 -489.29) LEADER
+[ 105.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(170.39 -2.10 -548.74)
+[ 105.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 106.828] experimental: fight gate: its fight begins (rules single player, the game's own)
+[ 106.828] sound: first start of sound 000000A5 (instance 03DC9C00 at 0 0 0) from 004A5897; leader Asterix; Asterix (150.6 1.4 -506.2) Obelix (170.5 -2.1 -541.4)
+[ 106.891] sound: first start of sound 00000048 (instance 03DD95A8 at 0 0 0) from 004E3D91; leader Asterix; Asterix (150.6 1.4 -506.3) Obelix (170.5 -2.1 -541.1)
+[ 106.891] sound: first start of sound 0000003C (instance 03DD9728 at 0 0 0) from 004E3DE4; leader Asterix; Asterix (150.6 1.4 -506.3) Obelix (170.5 -2.1 -541.1)
+[ 106.891] sound: first start of sound 000000A4 (instance 03DC9CC0 at 0 0 0) from 004A59EC; leader Asterix; Asterix (150.6 1.4 -506.3) Obelix (170.5 -2.1 -541.0)
+[ 106.906] hud2: bars p1 18001000 p2 18000000, gm+5C 00000013
+[ 106.922] potion: +5.0 s since the offer
+[ 106.922] potion:   Asterix+028 42C709F6 -> 42CDB35D (99.5195 -> 102.85)
+[ 106.922] potion:   Asterix+02C C47A0000 -> 42C8F90A (-1000 -> 100.486)
+[ 106.922] potion:   Asterix+030 00000000 -> BC4F4489 (0 -> -0.0126506)
+[ 106.922] potion:   Asterix+038 00000000 -> BF7FFAC1 (0 -> -0.99992)
+[ 106.922] potion:   Asterix+040 00000000 -> 41200000 (0 -> 10)
+[ 106.922] potion:   Asterix+044 00000000 -> 400275E7 (0 -> 2.03845)
+[ 106.922] potion:   Asterix+06C 4316C56E -> 4316A50B (150.771 -> 150.645)
+[ 106.922] potion:   Asterix+070 3FAF08EF -> 3FAF08E6 (1.36746 -> 1.36746)
+[ 106.922] potion:   Asterix+074 C3FF3C0C -> C3FD2E98 (-510.469 -> -506.364)
+[ 106.922] potion:   Asterix+088 42700000 -> 426F8470 (60 -> 59.8793)
+[ 106.922] potion:   Asterix+08C 3F6CCF4A -> 3F79CECB (0.925038 -> 0.975812)
+[ 106.922] potion:   Asterix+090 3A351399 -> BAFF0B17 (0.000690752 -> -0.00194583)
+[ 106.922] potion:   Asterix+098 3C69633C -> BD48E3AA (0.0142449 -> -0.0490452)
+[ 106.922] potion:   Asterix+0B4 3D466334 -> BDC47A05 (0.0484345 -> -0.0959359)
+[ 106.922] potion:   Asterix+0BC 3F7FB316 -> BF7ED1B7 (0.998826 -> -0.995387)
+[ 106.922] potion:   Asterix+0C0 3D466334 -> BDD15A37 (0.0484345 -> -0.102223)
+[ 106.922] potion:   Asterix+0C8 3F7FB316 -> BF7EA8B1 (0.998826 -> -0.994762)
+[ 106.922] potion:   Asterix+0CC 3FC2DC22 -> 4093B8C6 (1.52234 -> 4.61631)
+[ 106.922] potion:   Asterix+0D0 41FB53CF -> 417B53CF (31.4159 -> 15.708)
+[ 106.922] potion:   Asterix+0D4 3FC2DC22 -> 4093B8C6 (1.52234 -> 4.61631)
+[ 106.922] potion:   Asterix+0E4 47C30827 -> 47C30C27 (99856.3 -> 99864.3)
+[ 106.922] potion:   Asterix+0E8 00000037 -> 0000002A (7.70714e-44 -> 5.88545e-44)
+[ 106.922] potion:   Asterix+0FC 00000000 -> 40266666 (0 -> 2.6)
+[ 106.922] potion:   Asterix+100 00000000 -> 03CC8168 (0 -> 1.20198e-36)
+[ 106.922] potion:   Asterix+104 00000000 -> BE975000 (0 -> -0.295532)
+[ 106.922] potion:   Asterix+10C 00000000 -> BF978500 (0 -> -1.18375)
+[ 106.922] potion:   Asterix+134 06000411 -> 06000111 (2.40771e-35 -> 2.40749e-35)
+[ 106.922] potion:   Asterix+150 3E378700 -> 3E378702 (0.179226 -> 0.179226)
+[ 106.922] potion:   Asterix+23C 00000000 -> BC61893E (0 -> -0.0137656)
+[ 106.922] potion:   Asterix+244 BD053C0C -> 3BB9AB3A (-0.032528 -> 0.00566616)
+[ 106.922] potion:   Asterix+248 00000000 -> BF6CBF96 (0 -> -0.924798)
+[ 106.922] potion:   Asterix+250 BF7FFF09 -> 3EC2E630 (-0.999985 -> 0.380662)
+[ 106.922] potion:   Asterix+254 3D73F680 -> 3CF6CD00 (0.0595613 -> 0.030127)
+[ 106.922] potion:   Asterix+258 405C3026 -> 400AF162 (3.44044 -> 2.17098)
+[ 106.922] potion:   Asterix+284 04985370 -> 04985466 (3.58117e-36 -> 3.58125e-36)
+[ 106.922] potion:   Asterix+288 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 106.922] potion:   Asterix+28C 3F8001A8 -> 3F7FFF33 (1.00005 -> 0.999988)
+[ 106.922] potion:   Asterix+290 B657F4D3 -> 00000000 (-3.218e-06 -> 0)
+[ 106.922] potion:   Asterix+294 00000001 -> 00000000 (1.4013e-45 -> 0)
+[ 106.922] potion:   Asterix+298 4316C56E -> 4316A50B (150.771 -> 150.645)
+[ 106.922] potion:   Asterix+29C 3FAF08EF -> 3FAF08E6 (1.36746 -> 1.36746)
+[ 106.922] potion:   Asterix+2A0 C3FF3C0C -> C3FD2E98 (-510.469 -> -506.364)
+[ 106.922] potion:   Asterix+2A4 34000000 -> 80000000 (1.19209e-07 -> -0)
+[ 106.922] potion:   Asterix+2B0 04985370 -> 04985448 (3.58117e-36 -> 3.58124e-36)
+[ 106.922] potion:   Asterix+2B4 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 106.922] potion:   Asterix+2B8 3F8001A8 -> 3F80012E (1.00005 -> 1.00004)
+[ 106.922] potion:   Asterix+2BC B657F4D3 -> 80000000 (-3.218e-06 -> -0)
+[ 106.922] potion:   Asterix+2C4 4316C541 -> 4316A58B (150.771 -> 150.647)
+[ 106.922] potion:   Asterix+2C8 3FAF08EE -> 3FAF08E6 (1.36746 -> 1.36746)
+[ 106.922] potion:   Asterix+2CC C3FF3DDF -> C3FD2851 (-510.483 -> -506.315)
+[ 106.922] potion:   Asterix+2D8 4316C56E -> 4316A50B (150.771 -> 150.645)
+[ 106.922] potion:   Asterix+2DC 3FAF08EF -> 3FAF08E6 (1.36746 -> 1.36746)
+[ 106.922] potion:   Asterix+2E0 C3FF3C0C -> C3FD2E98 (-510.469 -> -506.364)
+[ 106.922] potion:   Asterix+2E4 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 106.922] potion:   Asterix+2E8 3F8001A8 -> 3F7FFF33 (1.00005 -> 0.999988)
+[ 106.922] potion:   Asterix+2EC B657F4D3 -> 00000000 (-3.218e-06 -> 0)
+[ 106.922] potion:   Asterix+328 C101AAF7 -> C0EE0593 (-8.10424 -> -7.43818)
+[ 106.922] potion:   Asterix+384 00201200 -> 00211200 (2.94519e-39 -> 3.03703e-39)
+[ 106.922] potion:   Asterix+388 00000004 -> 00001004 (5.60519e-45 -> 5.74532e-42)
+[ 106.922] potion:   Asterix+38C 00088000 -> 00410000 (7.80602e-40 -> 5.96931e-39)
+[ 106.922] potion:   Asterix+390 00000020 -> 00000000 (4.48416e-44 -> 0)
+[ 106.922] potion:   Asterix+3B4 4316C56E -> 4316A50B (150.771 -> 150.645)
+[ 106.922] potion:   Asterix+3B8 3FAF08EF -> 3FAF08E6 (1.36746 -> 1.36746)
+[ 106.922] potion:   Asterix+3BC C3FF3C0C -> C3FD2E98 (-510.469 -> -506.364)
+[ 106.922] potion:   Asterix+3C0 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 106.922] potion:   Asterix+3C4 3F8001A8 -> 3F7FFF33 (1.00005 -> 0.999988)
+[ 106.922] potion:   Asterix+3C8 B657F4D3 -> 00000000 (-3.218e-06 -> 0)
+[ 106.922] potion:   Asterix+3CC 34000000 -> 80000000 (1.19209e-07 -> -0)
+[ 106.922] potion:   Asterix+3D4 00000000 -> BDC479FF (0 -> -0.0959358)
+[ 106.922] potion:   Asterix+3DC 00000000 -> BF7ED1B7 (0 -> -0.995387)
+[ 106.922] potion:   Asterix+3EC 00000040 -> 00000003 (8.96831e-44 -> 4.2039e-45)
+[ 106.922] potion:   Asterix+3F0 0C000000 -> 0C800000 (9.86076e-32 -> 1.97215e-31)
+[ 106.922] potion:   Asterix+7CC 4316C541 -> 4316A58B (150.771 -> 150.647)
+[ 106.922] potion:   Asterix+7D0 3FAF08EE -> 3FAF08E6 (1.36746 -> 1.36746)
+[ 106.922] potion:   Asterix+7D4 C3FF3DDF -> C3FD2851 (-510.483 -> -506.315)
+[ 106.922] potion:   Asterix+870 00000000 -> 03CC80CC (0 -> 1.20196e-36)
+[ 106.922] potion:   Asterix+8EC 43158A04 -> 4319DC07 (149.539 -> 153.859)
+[ 106.922] potion:   Asterix+8F0 409E8001 -> 40878535 (4.95313 -> 4.23501)
+[ 106.922] potion:   Asterix+8F4 C40236BB -> C3F55229 (-520.855 -> -490.642)
+[ 106.922] potion:   Asterix+930 42C57D76 -> 42D0A5CD (98.745 -> 104.324)
+[ 106.922] potion:   Asterix+C0C 19B50001 -> 19B50100 (1.8715e-23 -> 1.87154e-23)
+[ 106.922] potion:   Asterix+CF8 4326FCB0 -> 432A8753 (166.987 -> 170.529)
+[ 106.922] potion:   Asterix+CFC C006340E -> C0066660 (-2.09693 -> -2.1)
+[ 106.922] potion:   Asterix+D00 C40D6F44 -> C4073BA0 (-565.739 -> -540.932)
+[ 106.922] potion:   Asterix+D10 40B028B5 -> 40B8B1C0 (5.50497 -> 5.7717)
+[ 106.922] potion:   Asterix+D18 40B028B5 -> 40B8B1C0 (5.50497 -> 5.7717)
+[ 106.922] potion:   Asterix+D1C 3DADD360 -> 3AD51C60 (0.0848758 -> 0.00162591)
+[ 106.922] potion:   Asterix+D20 B8950000 -> 00000000 (-7.10487e-05 -> 0)
+[ 106.922] potion:   Asterix+D24 B88F7ECF -> 3DC0996B (-6.84239e-05 -> 0.0940426)
+[ 106.922] potion:   Asterix+D40 3F800000 -> 3C8D9C1A (1 -> 0.0172863)
+[ 106.922] potion:   Asterix+D48 00000000 -> 3F7FF635 (0 -> 0.999851)
+[ 106.922] potion:   Asterix+D4C 3F800000 -> 3C8DA59A (1 -> 0.0172909)
+[ 106.922] potion:   Asterix+D54 00000000 -> 3F7FF634 (0 -> 0.999851)
+[ 106.922] potion:   Asterix+D58 00000000 -> 3FC6D963 (0 -> 1.55351)
+[ 106.922] potion:   Asterix+D60 00000000 -> 3FC6D963 (0 -> 1.55351)
+[ 106.922] potion:   Asterix+D84 00000000 -> 03CC7BDC (0 -> 1.20185e-36)
+[ 106.922] potion:   Asterix+D88 00000000 -> 40266666 (0 -> 2.6)
+[ 106.922] potion:   Asterix+D8C 00000000 -> 03CC7C78 (0 -> 1.20186e-36)
+[ 106.922] potion:   Asterix+D90 00000000 -> C1646FE0 (0 -> -14.2773)
+[ 106.922] potion:   Asterix+D94 00000000 -> 405DEAD3 (0 -> 3.46746)
+[ 106.922] potion:   Asterix+D98 00000000 -> 420B25D8 (0 -> 34.787)
+[ 106.922] potion:   Asterix+F00 3E4CDF6D -> 3E4CCCDD (0.200071 -> 0.2)
+[ 106.922] potion:   Asterix+F04 3FE668BA -> 3FE66666 (1.80007 -> 1.8)
+[ 106.922] potion:   Asterix+F10 0498B7B6 -> 0498B5E2 (3.59037e-36 -> 3.59021e-36)
+[ 106.922] potion:   Asterix+F14 B62D296E -> 354E99AE (-2.58031e-06 -> 7.69646e-07)
+[ 106.922] potion:   Asterix+F18 3F7FFD6F -> 3F7FFFF3 (0.999961 -> 0.999999)
+[ 106.922] potion:   Asterix+F1C 00000000 -> B4CCC5DB (0 -> -3.81419e-07)
+[ 106.922] potion:   Asterix+F24 4326FCB0 -> 432A8753 (166.987 -> 170.529)
+[ 106.922] potion:   Asterix+F28 C07FFFE9 -> C07FFFF6 (-3.99999 -> -4)
+[ 106.922] potion:   Asterix+F2C C40D6F44 -> C4073BA0 (-565.739 -> -540.932)
+[ 106.922] potion:   Asterix+F30 3FF397B6 -> 3FF3332C (1.90307 -> 1.9)
+[ 106.922] potion:   Asterix+F64 4326FCB0 -> 432A8753 (166.987 -> 170.529)
+[ 106.922] potion:   Asterix+F68 C07FFFE9 -> C07FFFF6 (-3.99999 -> -4)
+[ 106.922] potion:   Asterix+F6C C40D6F44 -> C4073BA0 (-565.739 -> -540.932)
+[ 106.922] potion:   Asterix+F70 B62D296E -> 354E99AE (-2.58031e-06 -> 7.69646e-07)
+[ 106.922] potion:   Asterix+F74 3F7FFD6F -> 3F7FFFF3 (0.999961 -> 0.999999)
+[ 106.922] potion:   Asterix+F78 00000000 -> B4CCC5DB (0 -> -3.81419e-07)
+[ 106.922] potion:   Asterix+FB4 3F18D038 -> 3F199980 (0.596927 -> 0.599998)
+[ 106.922] potion:   Asterix+FB8 40B02ADD -> 3DCC5502 (5.50523 -> 0.0997715)
+[ 106.922] potion:   Asterix+FBC BB96DA9A -> B65B105F (-0.0046037 -> -3.26431e-06)
+[ 107.000] hud2: bars p1 00002000 p2 18000000, gm+5C 00000013
+[ 107.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[ 107.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=3 f1A=00 busy=0 pos=(150.69 1.37 -508.47) LEADER
+[ 107.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=04 order=4 f1A=00 busy=0 pos=(170.59 -2.10 -537.46)
+[ 107.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=05 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 108.156] sound: first start of sound 0000008A (instance 03DDDDA0 at 154 1 -507) from 0051545A; leader Asterix; Asterix (153.6 1.4 -506.8) Obelix (170.6 -2.1 -534.4)
+[ 109.328] sound: first start of sound 00000037 (instance 03DDD368 at 0 0 0) from 004DC300; leader Asterix; Asterix (162.5 2.6 -508.6) Obelix (170.7 -2.1 -528.1)
+[ 109.328] sound: first start of sound 0000003A (instance 03DDD4E8 at 0 0 0) from 004DC353; leader Asterix; Asterix (162.5 2.6 -508.6) Obelix (170.7 -2.1 -528.1)
+[ 109.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[ 109.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0C ai=FF order=3 f1A=00 busy=0 pos=(162.56 2.61 -508.33) LEADER
+[ 109.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(170.77 -2.10 -526.89)
+[ 109.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 111.125] sound: first start of sound 00000038 (instance 03DDD6FC at 0 0 0) from 004DC300; leader Asterix; Asterix (144.7 3.0 -507.9) Obelix (170.9 -2.1 -518.2)
+[ 111.125] sound: first start of sound 00000039 (instance 03DDD97C at 0 0 0) from 004DC353; leader Asterix; Asterix (144.7 3.0 -507.9) Obelix (170.9 -2.1 -518.2)
+[ 111.469] experimental: fight gate: 0 squad(s), -1 Romans left (rules single player, the game's own)
+[ 111.469] sound: first start of sound 00000058 (instance 03DD51B4 at 0 0 0) from 0053AAB6; leader Asterix; Asterix (144.3 2.6 -507.9) Obelix (171.0 -2.1 -516.3)
+[ 111.484] sound: first start of sound 00000042 (instance 03DDDD20 at 144 3 -508) from 0051545A; leader Asterix; Asterix (144.3 2.6 -507.9) Obelix (171.0 -2.1 -516.2)
+[ 111.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=104 | p2=-
+[ 111.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0F ai=FF order=3 f1A=00 busy=0 pos=(144.33 2.59 -507.87) LEADER
+[ 111.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(170.96 -2.10 -515.84)
+[ 111.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 111.719] coop: 62.6 fps
+[ 112.359] sound: first start of sound 00000040 (instance 03DD3DC4 at 143 2 -510) from 004AE6FE; leader Asterix; Asterix (143.4 2.5 -509.2) Obelix (171.0 -2.1 -511.6)
+[ 112.359] sound: first start of sound 0000003E (instance 03DD3E04 at 143 2 -510) from 004AE723; leader Asterix; Asterix (143.4 2.5 -509.2) Obelix (171.0 -2.1 -511.6)
+[ 113.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=172 | p2=-
+[ 113.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(150.32 5.65 -501.62) LEADER
+[ 113.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(171.14 -2.10 -505.36)
+[ 113.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 113.797] sound: first start of sound 00000097 (instance 03DCA4C0 at 0 0 0) from 004A56EA; leader Asterix; Asterix (151.3 5.1 -497.9) Obelix (171.2 -2.1 -503.9)
+[ 115.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=204 | p2=-
+[ 115.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=07 body=04 ai=FF order=3 f1A=00 busy=0 pos=(157.50 2.54 -483.91) LEADER
+[ 115.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(171.34 -2.10 -493.93)
+[ 115.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 115.891] trace: light pillar 03C43820 at (153 2 -484) event 3E00900 from 0046B1F3; leader Asterix
+[ 116.359] sound: first start of sound 000000B0 (instance 03DDDDE0 at 157 3 -484) from 0051545A; leader Asterix; Asterix (157.5 2.5 -483.9) Obelix (171.4 -2.1 -489.9)
+[ 116.922] potion: +15.0 s since the offer
+[ 116.922] potion:   Asterix+028 42C709F6 -> 42E54061 (99.5195 -> 114.626)
+[ 116.922] potion:   Asterix+02C C47A0000 -> 42D74D4F (-1000 -> 107.651)
+[ 116.922] potion:   Asterix+030 00000000 -> BF7D32C0 (0 -> -0.989056)
+[ 116.922] potion:   Asterix+038 00000000 -> BE17158D (0 -> -0.147543)
+[ 116.922] potion:   Asterix+040 00000000 -> 41200000 (0 -> 10)
+[ 116.922] potion:   Asterix+06C 4316C56E -> 431C4E35 (150.771 -> 156.305)
+[ 116.922] potion:   Asterix+070 3FAF08EF -> 403124B9 (1.36746 -> 2.76787)
+[ 116.922] potion:   Asterix+074 C3FF3C0C -> C3F227E5 (-510.469 -> -484.312)
+[ 116.922] potion:   Asterix+084 41700000 -> 00000000 (15 -> 0)
+[ 116.922] potion:   Asterix+08C 3F6CCF4A -> 00000000 (0.925038 -> 0)
+[ 116.922] potion:   Asterix+090 3A351399 -> 00000000 (0.000690752 -> 0)
+[ 116.922] potion:   Asterix+098 3C69633C -> 00000000 (0.0142449 -> 0)
+[ 116.922] potion:   Asterix+0B4 3D466334 -> BF63D95E (0.0484345 -> -0.890036)
+[ 116.922] potion:   Asterix+0BC 3F7FB316 -> BEE96A92 (0.998826 -> -0.455891)
+[ 116.922] potion:   Asterix+0C0 3D466334 -> BF63D95E (0.0484345 -> -0.890036)
+[ 116.922] potion:   Asterix+0C8 3F7FB316 -> BEE96A92 (0.998826 -> -0.455891)
+[ 116.922] potion:   Asterix+0CC 3FC2DC22 -> 40675B9A (1.52234 -> 3.61497)
+[ 116.922] potion:   Asterix+0D4 3FC2DC22 -> 40675B9A (1.52234 -> 3.61497)
+[ 116.922] potion:   Asterix+0E4 47C30827 -> 47C31627 (99856.3 -> 99884.3)
+[ 116.922] potion:   Asterix+0E8 00000037 -> 00000065 (7.70714e-44 -> 1.41531e-43)
+[ 116.922] potion:   Asterix+0FC 00000000 -> 400CCCCD (0 -> 2.2)
+[ 116.922] potion:   Asterix+100 00000000 -> 03C349D4 (0 -> 1.1478e-36)
+[ 116.922] potion:   Asterix+104 00000000 -> BF74F400 (0 -> -0.956848)
+[ 116.922] potion:   Asterix+108 00000000 -> BED41848 (0 -> -0.414248)
+[ 116.922] potion:   Asterix+10C 00000000 -> BD3EA000 (0 -> -0.0465393)
+[ 116.922] potion:   Asterix+134 06000411 -> 06000011 (2.40771e-35 -> 2.40742e-35)
+[ 116.922] potion:   Asterix+150 3E378700 -> 3E378702 (0.179226 -> 0.179226)
+[ 116.922] potion:   Asterix+244 BD053C0C -> BB678911 (-0.032528 -> -0.00353295)
+[ 116.922] potion:   Asterix+250 BF7FFF09 -> BF7FF9A3 (-0.999985 -> -0.999903)
+[ 116.922] potion:   Asterix+254 3D73F680 -> 3F74E484 (0.0595613 -> 0.956612)
+[ 116.922] potion:   Asterix+258 405C3026 -> BEE9C908 (3.44044 -> -0.456612)
+[ 116.922] potion:   Asterix+280 03D78F60 -> 03D78E50 (1.26695e-36 -> 1.26692e-36)
+[ 116.922] potion:   Asterix+284 04985370 -> 04983248 (3.58117e-36 -> 3.57812e-36)
+[ 116.922] potion:   Asterix+288 B2982A05 -> 3E368908 (-1.77142e-08 -> 0.178257)
+[ 116.922] potion:   Asterix+28C 3F8001A8 -> 3F7B9D84 (1.00005 -> 0.982872)
+[ 116.922] potion:   Asterix+290 B657F4D3 -> 3D401D74 (-3.218e-06 -> 0.0469031)
+[ 116.922] potion:   Asterix+294 00000001 -> 00000000 (1.4013e-45 -> 0)
+[ 116.922] potion:   Asterix+298 4316C56E -> 431C4E35 (150.771 -> 156.305)
+[ 116.922] potion:   Asterix+29C 3FAF08EF -> 403124B9 (1.36746 -> 2.76787)
+[ 116.922] potion:   Asterix+2A0 C3FF3C0C -> C3F227E5 (-510.469 -> -484.312)
+[ 116.922] potion:   Asterix+2A4 34000000 -> 80000000 (1.19209e-07 -> -0)
+[ 116.922] potion:   Asterix+2AC 03D78F60 -> 03D78E50 (1.26695e-36 -> 1.26692e-36)
+[ 116.922] potion:   Asterix+2B0 04985370 -> 04983248 (3.58117e-36 -> 3.57812e-36)
+[ 116.922] potion:   Asterix+2B4 B2982A05 -> 3E368908 (-1.77142e-08 -> 0.178257)
+[ 116.922] potion:   Asterix+2B8 3F8001A8 -> 3F7B9D84 (1.00005 -> 0.982872)
+[ 116.922] potion:   Asterix+2BC B657F4D3 -> 3D401D74 (-3.218e-06 -> 0.0469031)
+[ 116.922] potion:   Asterix+2C4 4316C541 -> 431C4E35 (150.771 -> 156.305)
+[ 116.922] potion:   Asterix+2C8 3FAF08EE -> 403124B9 (1.36746 -> 2.76787)
+[ 116.922] potion:   Asterix+2CC C3FF3DDF -> C3F227E5 (-510.483 -> -484.312)
+[ 116.922] potion:   Asterix+2D8 4316C56E -> 431C4E35 (150.771 -> 156.305)
+[ 116.922] potion:   Asterix+2DC 3FAF08EF -> 403124B9 (1.36746 -> 2.76787)
+[ 116.922] potion:   Asterix+2E0 C3FF3C0C -> C3F227E5 (-510.469 -> -484.312)
+[ 116.922] potion:   Asterix+2E4 B2982A05 -> 3E368908 (-1.77142e-08 -> 0.178257)
+[ 116.922] potion:   Asterix+2E8 3F8001A8 -> 3F7B9D84 (1.00005 -> 0.982872)
+[ 116.922] potion:   Asterix+2EC B657F4D3 -> 3D401D74 (-3.218e-06 -> 0.0469031)
+[ 116.922] potion:   Asterix+328 C101AAF7 -> C1163B6E (-8.10424 -> -9.38951)
+[ 116.922] potion:   Asterix+384 00201200 -> 00000000 (2.94519e-39 -> 0)
+[ 116.922] potion:   Asterix+388 00000004 -> 00001004 (5.60519e-45 -> 5.74532e-42)
+[ 116.922] potion:   Asterix+38C 00088000 -> 00000000 (7.80602e-40 -> 0)
+[ 116.922] potion:   Asterix+390 00000020 -> 00000000 (4.48416e-44 -> 0)
+[ 116.922] potion:   Asterix+3B4 4316C56E -> 431C4E35 (150.771 -> 156.305)
+[ 116.922] potion:   Asterix+3B8 3FAF08EF -> 403124B9 (1.36746 -> 2.76787)
+[ 116.922] potion:   Asterix+3BC C3FF3C0C -> C3F227E5 (-510.469 -> -484.312)
+[ 116.922] potion:   Asterix+3C0 B2982A05 -> 3E368908 (-1.77142e-08 -> 0.178257)
+[ 116.922] potion:   Asterix+3C4 3F8001A8 -> 3F7B9D84 (1.00005 -> 0.982872)
+[ 116.922] potion:   Asterix+3C8 B657F4D3 -> 3D401D74 (-3.218e-06 -> 0.0469031)
+[ 116.922] potion:   Asterix+3CC 34000000 -> 80000000 (1.19209e-07 -> -0)
+[ 116.922] potion:   Asterix+3EC 00000040 -> 00000000 (8.96831e-44 -> 0)
+[ 116.922] potion:   Asterix+3F0 0C000000 -> 0D000000 (9.86076e-32 -> 3.9443e-31)
+[ 116.922] potion:   Asterix+494 03C360A0 -> 03C360E8 (1.14833e-36 -> 1.14833e-36)
+[ 116.922] potion:   Asterix+7CC 4316C541 -> 431C4E35 (150.771 -> 156.305)
+[ 116.922] potion:   Asterix+7D0 3FAF08EE -> 403124B9 (1.36746 -> 2.76787)
+[ 116.922] potion:   Asterix+7D4 C3FF3DDF -> C3F227E5 (-510.483 -> -484.312)
+[ 116.922] potion:   Asterix+7D8 00630046 -> 00630030 (9.09181e-39 -> 9.09178e-39)
+[ 116.922] potion:   Asterix+870 00000000 -> 03C346D0 (0 -> 1.14773e-36)
+[ 116.922] potion:   Asterix+8EC 43158A04 -> 431745E6 (149.539 -> 151.273)
+[ 116.922] potion:   Asterix+8F0 409E8001 -> 409B24EE (4.95313 -> 4.84826)
+[ 116.922] potion:   Asterix+8F4 C40236BB -> C3F914FD (-520.855 -> -498.164)
+[ 116.922] potion:   Asterix+930 42C57D76 -> 42E15B48 (98.745 -> 112.678)
+[ 116.922] potion:   Asterix+C0C 19B50001 -> 19B50000 (1.8715e-23 -> 1.8715e-23)
+[ 116.922] potion:   Asterix+CF8 4326FCB0 -> 432B7403 (166.987 -> 171.453)
+[ 116.922] potion:   Asterix+CFC C006340E -> C0066660 (-2.09693 -> -2.1)
+[ 116.922] potion:   Asterix+D00 C40D6F44 -> C3F38A42 (-565.739 -> -487.08)
+[ 116.922] potion:   Asterix+D10 40B028B5 -> 40A06CA8 (5.50497 -> 5.01326)
+[ 116.922] potion:   Asterix+D18 40B028B5 -> 40A06CA8 (5.50497 -> 5.01326)
+[ 116.922] potion:   Asterix+D1C 3DADD360 -> 3AB42A2B (0.0848758 -> 0.00137455)
+[ 116.922] potion:   Asterix+D20 B8950000 -> 00000000 (-7.10487e-05 -> 0)
+[ 116.922] potion:   Asterix+D24 B88F7ECF -> 3DA41E36 (-6.84239e-05 -> 0.0801357)
+[ 116.922] potion:   Asterix+D40 3F800000 -> 3C8C7D25 (1 -> 0.0171495)
+[ 116.922] potion:   Asterix+D48 00000000 -> 3F7FF65D (0 -> 0.999853)
+[ 116.922] potion:   Asterix+D4C 3F800000 -> 3C8C80E5 (1 -> 0.0171513)
+[ 116.922] potion:   Asterix+D54 00000000 -> 3F7FF65C (0 -> 0.999853)
+[ 116.922] potion:   Asterix+D58 00000000 -> 3FC6DDDF (0 -> 1.55365)
+[ 116.922] potion:   Asterix+D60 00000000 -> 3FC6DDDF (0 -> 1.55365)
+[ 116.922] potion:   Asterix+D88 00000000 -> 40266666 (0 -> 2.6)
+[ 116.922] potion:   Asterix+D8C 00000000 -> 03CC7C78 (0 -> 1.20186e-36)
+[ 116.922] potion:   Asterix+D90 00000000 -> C17E5B30 (0 -> -15.8973)
+[ 116.922] potion:   Asterix+D94 00000000 -> 405DEAD2 (0 -> 3.46746)
+[ 116.922] potion:   Asterix+D98 00000000 -> 41DCD900 (0 -> 27.606)
+[ 116.922] potion:   Asterix+F00 3E4CDF6D -> 3E4CCCDD (0.200071 -> 0.2)
+[ 116.922] potion:   Asterix+F04 3FE668BA -> 3FE66666 (1.80007 -> 1.8)
+[ 116.922] potion:   Asterix+F0C 03D7935C -> 03D793A0 (1.26704e-36 -> 1.26705e-36)
+[ 116.922] potion:   Asterix+F10 0498B7B6 -> 0498CE52 (3.59037e-36 -> 3.59245e-36)
+[ 116.922] potion:   Asterix+F14 B62D296E -> 34001960 (-2.58031e-06 -> 1.19302e-07)
+[ 116.922] potion:   Asterix+F18 3F7FFD6F -> 3F800023 (0.999961 -> 1)
+[ 116.922] potion:   Asterix+F1C 00000000 -> 3312F0B6 (0 -> 3.42122e-08)
+[ 116.922] potion:   Asterix+F24 4326FCB0 -> 432B7403 (166.987 -> 171.453)
+[ 116.922] potion:   Asterix+F28 C07FFFE9 -> C07FFF9B (-3.99999 -> -3.99998)
+[ 116.922] potion:   Asterix+F2C C40D6F44 -> C3F38A42 (-565.739 -> -487.08)
+[ 116.922] potion:   Asterix+F30 3FF397B6 -> 3FF33276 (1.90307 -> 1.89998)
+[ 116.922] potion:   Asterix+F64 4326FCB0 -> 432B7403 (166.987 -> 171.453)
+[ 116.922] potion:   Asterix+F68 C07FFFE9 -> C07FFF9B (-3.99999 -> -3.99998)
+[ 116.922] potion:   Asterix+F6C C40D6F44 -> C3F38A42 (-565.739 -> -487.08)
+[ 116.922] potion:   Asterix+F70 B62D296E -> 34001960 (-2.58031e-06 -> 1.19302e-07)
+[ 116.922] potion:   Asterix+F74 3F7FFD6F -> 3F800023 (0.999961 -> 1)
+[ 116.922] potion:   Asterix+F78 00000000 -> 3312F0B6 (0 -> 3.42122e-08)
+[ 116.922] potion:   Asterix+FB4 3F18D038 -> 3F199980 (0.596927 -> 0.599998)
+[ 116.922] potion:   Asterix+FB8 40B02ADD -> 3DB013D5 (5.50523 -> 0.0859753)
+[ 116.922] potion:   Asterix+FBC BB96DA9A -> B65B105F (-0.0046037 -> -3.26431e-06)
+[ 116.922] potion:   Asterix+FC0 BB916DB2 -> 40A06512 (-0.00443813 -> 5.01234)
+[ 117.547] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=293 | p2=-
+[ 117.547] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=3 f1A=00 busy=0 pos=(154.19 2.86 -484.65) LEADER
+[ 117.547] state[watch]: Obelix  f18=33 mode=swim ai life=09 sit=FF body=1A ai=00 order=0 f1A=00 busy=0 pos=(171.49 -2.10 -483.90)
+[ 117.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 117.609] proximity: zone event 0178
+[ 117.609] proximity: event 0178's group 02F: 03CD4474(vt 6256A0)<-4801 03CD4474(vt 6256A0)<-4802 03C43820(vt 629030)<-0901 03C9F320(vt 62504C)<-1703 03C9F320(vt 62504C)<-1704 03C9F320(vt 62504C)<-1608 03C9F320(vt 62504C)<-1B06 03C9F320(vt 62504C)<-1607 03C9F320(vt 62504C)<-1621 03C9F320(vt 62504C)<-140B 03CD1C70(vt 629588)<-0996 03CE8990(vt 624C2C)<-0501 03CD4474(vt 6256A0)<-2000
+[ 117.609] coop: sp_hero_switch_lock: the level hands the lead to Obelix (its group holds the other hero) -- Obelix is the hero you play now
+[ 117.609] coop: Asterix locked by the level (the companion told to wait) -- 204 detectors, 12 circles kept (as before its event 0178)
+[ 117.609] coop: nolock: rotary beam 03C43794: the waiter 20.6 units from its pivot, 0.08 rad off its arm over the circle, 1.9 below -- its circle
+[ 117.609] trace: light pillar 03C43820 at (153 2 -484) event 3E00901 from 0046B1F3; leader Obelix
+[ 117.609] sound: stream 7 started (00000001, 255, 0, 0) -> channel 0, from 00469744; leader Obelix; Asterix (153.7 2.8 -484.7) Obelix (171.5 -2.1 -483.7)
+[ 117.609] sound: stream start stack: 469744 46658C 4663D3 46B1F3 40A58C 409AE1 409B76 47A784 44005C 610048 5C0039 580058
+[ 117.609] sound: first start of sound 00000018 (instance 03DC98EC at 0 0 0) from 004A9266; leader Obelix; Asterix (153.7 2.8 -484.7) Obelix (171.4 -2.1 -483.6)
+[ 117.625] hud2: Obelix leads -- the game's HUD is its row now, Asterix's the other
+[ 117.625] hud2: bars p1 18000000 p2 00002000, gm+5C 00000012
+[ 117.641] sound: first start of sound 00000018 (instance 03DC98EC at 0 0 0) from 004A92EE; leader Obelix; Asterix (153.7 2.8 -484.7) Obelix (171.4 -2.1 -483.5)
+[ 119.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=296 | p2=-
+[ 119.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(153.75 2.85 -484.65)
+[ 119.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0C ai=00 order=0 f1A=00 busy=0 pos=(163.85 0.18 -496.53) LEADER
+[ 119.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 121.547] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=296 | p2=-
+[ 121.547] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(153.75 2.85 -484.65)
+[ 121.547] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=00 order=0 f1A=00 busy=0 pos=(155.63 4.40 -488.24) LEADER
+[ 121.547] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 121.719] coop: 62.9 fps
+[ 123.281] proximity: zone event 0188
+[ 123.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=298 | p2=-
+[ 123.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=15 ai=03 order=3 f1A=00 busy=0 pos=(153.75 2.85 -484.65)
+[ 123.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=00 order=0 f1A=00 busy=0 pos=(129.20 2.65 -484.85) LEADER
+[ 123.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 123.891] sound: first start of sound 00000017 (instance 03DD413C at 133 2 -484) from 0053E9FC; leader Obelix; Asterix (153.7 2.8 -484.7) Obelix (130.3 2.6 -484.5)
+[ 123.891] sound: first start of sound 00000003 (instance 03DD0998 at 133 5 -481) from 0053EF0C; leader Obelix; Asterix (153.7 2.8 -484.7) Obelix (130.3 2.6 -484.5)
+[ 125.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=309 | p2=-
+[ 125.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=15 ai=03 order=3 f1A=00 busy=0 pos=(153.75 2.85 -484.65)
+[ 125.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=00 order=0 f1A=00 busy=0 pos=(130.81 2.53 -484.47) LEADER
+[ 125.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 127.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=321 | p2=-
+[ 127.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=15 ai=03 order=3 f1A=00 busy=0 pos=(153.75 2.85 -484.65)
+[ 127.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=00 order=0 f1A=00 busy=0 pos=(130.81 2.53 -484.47) LEADER
+[ 127.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 129.547] sound: first start of sound 00000003 (instance 03DD0998 at 133 5 -481) from 0053EDE0; leader Obelix; Asterix (153.4 5.4 -483.2) Obelix (130.8 2.5 -484.5)
+[ 129.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=335 | p2=-
+[ 129.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=02 ai=08 order=8 f1A=00 busy=0 pos=(153.38 5.36 -483.25)
+[ 129.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=00 order=0 f1A=00 busy=0 pos=(130.81 2.53 -484.47) LEADER
+[ 129.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 131.563] watch: level=2 next=-1 | per 2s: frames=127 lifeTicks A=127 O=127 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=347 | p2=-
+[ 131.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0F ai=01 order=1 f1A=00 busy=0 pos=(131.32 2.68 -459.09)
+[ 131.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=00 order=0 f1A=00 busy=0 pos=(130.68 2.58 -484.17) LEADER
+[ 131.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 131.719] coop: 63.0 fps
+[ 131.922] potion: +30.0 s since the offer
+[ 131.922] potion:   Asterix+018 00000000 -> 00000003 (0 -> 4.2039e-45)
+[ 131.922] potion:   Asterix+028 42C709F6 -> 42F4F511 (99.5195 -> 122.479)
+[ 131.922] potion:   Asterix+02C C47A0000 -> 42D74D4F (-1000 -> 107.651)
+[ 131.922] potion:   Asterix+030 00000000 -> BF7D32C0 (0 -> -0.989056)
+[ 131.922] potion:   Asterix+038 00000000 -> BE17158D (0 -> -0.147543)
+[ 131.922] potion:   Asterix+040 00000000 -> 41200000 (0 -> 10)
+[ 131.922] potion:   Asterix+06C 4316C56E -> 4303162C (150.771 -> 131.087)
+[ 131.922] potion:   Asterix+070 3FAF08EF -> 40276BAA (1.36746 -> 2.61595)
+[ 131.922] potion:   Asterix+074 C3FF3C0C -> C3E511C3 (-510.469 -> -458.139)
+[ 131.922] potion:   Asterix+084 41700000 -> 402CCCCD (15 -> 2.7)
+[ 131.922] potion:   Asterix+088 42700000 -> 426FFFC7 (60 -> 59.9998)
+[ 131.922] potion:   Asterix+08C 3F6CCF4A -> 402CCCCD (0.925038 -> 2.7)
+[ 131.922] potion:   Asterix+090 3A351399 -> BC27BC38 (0.000690752 -> -0.0102377)
+[ 131.922] potion:   Asterix+094 00000000 -> BB3EC400 (0 -> -0.00291085)
+[ 131.922] potion:   Asterix+098 3C69633C -> 3D2BFE86 (0.0142449 -> 0.0419908)
+[ 131.922] potion:   Asterix+0B0 425E354A -> 43010E4E (55.552 -> 129.056)
+[ 131.922] potion:   Asterix+0B4 3D466334 -> BE728E46 (0.0484345 -> -0.236871)
+[ 131.922] potion:   Asterix+0BC 3F7FB316 -> 3F78B6EC (0.998826 -> 0.971541)
+[ 131.922] potion:   Asterix+0C0 3D466334 -> BE729130 (0.0484345 -> -0.236882)
+[ 131.922] potion:   Asterix+0C8 3F7FB316 -> 3F78B6BE (0.998826 -> 0.971538)
+[ 131.922] potion:   Asterix+0CC 3FC2DC22 -> 3FE7AC1E (1.52234 -> 1.80994)
+[ 131.922] potion:   Asterix+0D0 41FB53CF -> 417B53CF (31.4159 -> 15.708)
+[ 131.922] potion:   Asterix+0D4 3FC2DC22 -> 3FE7AC1E (1.52234 -> 1.80994)
+[ 131.922] potion:   Asterix+0E4 47C30827 -> 47C31127 (99856.3 -> 99874.3)
+[ 131.922] potion:   Asterix+0E8 00000037 -> 00000067 (7.70714e-44 -> 1.44334e-43)
+[ 131.922] potion:   Asterix+0FC 00000000 -> 400CCCCD (0 -> 2.2)
+[ 131.922] potion:   Asterix+100 00000000 -> 03C349D4 (0 -> 1.1478e-36)
+[ 131.922] potion:   Asterix+104 00000000 -> BF74F400 (0 -> -0.956848)
+[ 131.922] potion:   Asterix+108 00000000 -> BED41848 (0 -> -0.414248)
+[ 131.922] potion:   Asterix+10C 00000000 -> BD3EA000 (0 -> -0.0465393)
+[ 131.922] potion:   Asterix+134 06000411 -> 06000011 (2.40771e-35 -> 2.40742e-35)
+[ 131.922] potion:   Asterix+150 3E378700 -> 3E378702 (0.179226 -> 0.179226)
+[ 131.922] potion:   Asterix+244 BD053C0C -> BB678911 (-0.032528 -> -0.00353295)
+[ 131.922] potion:   Asterix+250 BF7FFF09 -> BF7FF9A3 (-0.999985 -> -0.999903)
+[ 131.922] potion:   Asterix+254 3D73F680 -> 3F74E484 (0.0595613 -> 0.956612)
+[ 131.922] potion:   Asterix+258 405C3026 -> BEE9C908 (3.44044 -> -0.456612)
+[ 131.922] potion:   Asterix+274 3E4CCCCD -> 3E4FC7DD (0.2 -> 0.202911)
+[ 131.922] potion:   Asterix+278 3F8CCCCD -> 3F8D2C2F (1.1 -> 1.10291)
+[ 131.922] potion:   Asterix+280 03D78F60 -> 03D78D84 (1.26695e-36 -> 1.26691e-36)
+[ 131.922] potion:   Asterix+284 04985370 -> 049827F4 (3.58117e-36 -> 3.57717e-36)
+[ 131.922] potion:   Asterix+288 B2982A05 -> 3C8D0E9D (-1.77142e-08 -> 0.0172189)
+[ 131.922] potion:   Asterix+28C 3F8001A8 -> 3F7F40D7 (1.00005 -> 0.997083)
+[ 131.922] potion:   Asterix+290 B657F4D3 -> 3D96A63E (-3.218e-06 -> 0.0735593)
+[ 131.922] potion:   Asterix+294 00000001 -> 00000000 (1.4013e-45 -> 0)
+[ 131.922] potion:   Asterix+298 4316C56E -> 4303162C (150.771 -> 131.087)
+[ 131.922] potion:   Asterix+29C 3FAF08EF -> 40276BAA (1.36746 -> 2.61595)
+[ 131.922] potion:   Asterix+2A0 C3FF3C0C -> C3E511C3 (-510.469 -> -458.139)
+[ 131.922] potion:   Asterix+2A4 34000000 -> 372C0000 (1.19209e-07 -> 1.0252e-05)
+[ 131.922] potion:   Asterix+2AC 03D78F60 -> 03D78D84 (1.26695e-36 -> 1.26691e-36)
+[ 131.922] potion:   Asterix+2B0 04985370 -> 049827F4 (3.58117e-36 -> 3.57717e-36)
+[ 131.922] potion:   Asterix+2B4 B2982A05 -> 3C8D0E9D (-1.77142e-08 -> 0.0172189)
+[ 131.922] potion:   Asterix+2B8 3F8001A8 -> 3F7F40D7 (1.00005 -> 0.997083)
+[ 131.922] potion:   Asterix+2BC B657F4D3 -> 3D96A63E (-3.218e-06 -> 0.0735593)
+[ 131.922] potion:   Asterix+2C4 4316C541 -> 430318CB (150.771 -> 131.097)
+[ 131.922] potion:   Asterix+2C8 3FAF08EE -> 40279B86 (1.36746 -> 2.61887)
+[ 131.922] potion:   Asterix+2CC C3FF3DDF -> C3E51723 (-510.483 -> -458.181)
+[ 131.922] potion:   Asterix+2D0 80000000 -> 37380000 (-0 -> 1.09673e-05)
+[ 131.922] potion:   Asterix+2D8 4316C56E -> 4303162C (150.771 -> 131.087)
+[ 131.922] potion:   Asterix+2DC 3FAF08EF -> 40276BAA (1.36746 -> 2.61595)
+[ 131.922] potion:   Asterix+2E0 C3FF3C0C -> C3E511C3 (-510.469 -> -458.139)
+[ 131.922] potion:   Asterix+2E4 B2982A05 -> 3C8D0E9D (-1.77142e-08 -> 0.0172189)
+[ 131.922] potion:   Asterix+2E8 3F8001A8 -> 3F7F40D7 (1.00005 -> 0.997083)
+[ 131.922] potion:   Asterix+2EC B657F4D3 -> 3D96A63E (-3.218e-06 -> 0.0735593)
+[ 131.922] potion:   Asterix+328 C101AAF7 -> C0DB5EA9 (-8.10424 -> -6.85531)
+[ 131.922] potion:   Asterix+384 00201200 -> 00009200 (2.94519e-39 -> 5.23749e-41)
+[ 131.922] potion:   Asterix+388 00000004 -> 00001004 (5.60519e-45 -> 5.74532e-42)
+[ 131.922] potion:   Asterix+38C 00088000 -> 00000000 (7.80602e-40 -> 0)
+[ 131.922] potion:   Asterix+390 00000020 -> 00000000 (4.48416e-44 -> 0)
+[ 131.922] potion:   Asterix+3B4 4316C56E -> 4303162C (150.771 -> 131.087)
+[ 131.922] potion:   Asterix+3B8 3FAF08EF -> 40276BAA (1.36746 -> 2.61595)
+[ 131.922] potion:   Asterix+3BC C3FF3C0C -> C3E511C3 (-510.469 -> -458.139)
+[ 131.922] potion:   Asterix+3C0 B2982A05 -> 3C8D0E9D (-1.77142e-08 -> 0.0172189)
+[ 131.922] potion:   Asterix+3C4 3F8001A8 -> 3F7F40D7 (1.00005 -> 0.997083)
+[ 131.922] potion:   Asterix+3C8 B657F4D3 -> 3D96A63E (-3.218e-06 -> 0.0735593)
+[ 131.922] potion:   Asterix+3CC 34000000 -> 372C0000 (1.19209e-07 -> 1.0252e-05)
+[ 131.922] potion:   Asterix+3D4 00000000 -> BF7FFF07 (0 -> -0.999985)
+[ 131.922] potion:   Asterix+3DC 00000000 -> 3BB286AC (0 -> 0.00544818)
+[ 131.922] potion:   Asterix+3E8 43960012 -> 4396FF12 (300.001 -> 301.993)
+[ 131.922] potion:   Asterix+3EC 00000040 -> 00000001 (8.96831e-44 -> 1.4013e-45)
+[ 131.922] potion:   Asterix+3F0 0C000000 -> 0C800000 (9.86076e-32 -> 1.97215e-31)
+[ 131.922] potion:   Asterix+494 03C360A0 -> 03C360E8 (1.14833e-36 -> 1.14833e-36)
+[ 131.922] potion:   Asterix+560 0000FF10 -> 00000110 (9.14992e-41 -> 3.81153e-43)
+[ 131.922] potion:   Asterix+564 00000003 -> 00000001 (4.2039e-45 -> 1.4013e-45)
+[ 131.922] potion:   Asterix+568 4313F54C -> 4302EBA4 (147.958 -> 130.92)
+[ 131.922] potion:   Asterix+56C 4035FDF8 -> 4027DE94 (2.84363 -> 2.62296)
+[ 131.922] potion:   Asterix+570 C40DB107 -> C3E4BA8B (-566.766 -> -457.457)
+[ 131.922] potion:   Asterix+574 BD17F65E -> 3F800000 (-0.0371002 -> 1)
+[ 131.922] potion:   Asterix+57C 3F7FD2E2 -> 00000000 (0.999312 -> 0)
+[ 131.922] potion:   Asterix+6B0 4313F54C -> 4302EBA4 (147.958 -> 130.92)
+[ 131.922] potion:   Asterix+6B4 4035FDF8 -> 4027DE94 (2.84363 -> 2.62296)
+[ 131.922] potion:   Asterix+6B8 C40DB107 -> C3E4BA8B (-566.766 -> -457.457)
+[ 131.922] potion:   Asterix+6FC 00000503 -> 00000504 (1.79787e-42 -> 1.79927e-42)
+[ 131.922] potion:   Asterix+700 4304F05B -> 4300B0E3 (132.939 -> 128.691)
+[ 131.922] potion:   Asterix+704 4141103D -> 4047C35F (12.0665 -> 3.1213)
+[ 131.922] potion:   Asterix+708 C40F20B0 -> C3F0CB00 (-572.511 -> -481.586)
+[ 131.922] potion:   Asterix+70C 4304F05B -> 4300B6D9 (132.939 -> 128.714)
+[ 131.922] potion:   Asterix+710 4141103D -> 4047FCC4 (12.0665 -> 3.1248)
+[ 131.922] potion:   Asterix+714 C40F20B0 -> C3F0AC6A (-572.511 -> -481.347)
+[ 131.922] potion:   Asterix+718 4304F05B -> 4300C2EC (132.939 -> 128.761)
+[ 131.922] potion:   Asterix+71C 4141103D -> 4046CAAA (12.0665 -> 3.10612)
+[ 131.922] potion:   Asterix+720 C40F20B0 -> C3F08E48 (-572.511 -> -481.112)
+[ 131.922] potion:   Asterix+724 4304ED05 -> 4300C8E3 (132.926 -> 128.785)
+[ 131.922] potion:   Asterix+728 4141103D -> 40458874 (12.0665 -> 3.08645)
+[ 131.922] potion:   Asterix+72C C40F2058 -> C3F06FE6 (-572.505 -> -480.874)
+[ 131.922] potion:   Asterix+730 4304EEC0 -> 4301D209 (132.933 -> 129.82)
+[ 131.922] potion:   Asterix+734 4141103D -> 403585D3 (12.0665 -> 2.83629)
+[ 131.922] potion:   Asterix+738 C40F2086 -> C3F1DB83 (-572.508 -> -483.715)
+[ 131.922] potion:   Asterix+73C 4304EFDB -> 4301A73F (132.937 -> 129.653)
+[ 131.922] potion:   Asterix+740 4141103D -> 4038F734 (12.0665 -> 2.89009)
+[ 131.922] potion:   Asterix+744 C40F20A3 -> C3F1CDDF (-572.51 -> -483.608)
+[ 131.922] potion:   Asterix+748 4304F05B -> 43017CD9 (132.939 -> 129.488)
+[ 131.922] potion:   Asterix+74C 4141103D -> 403B5955 (12.0665 -> 2.92733)
+[ 131.922] potion:   Asterix+750 C40F20B0 -> C3F1BD24 (-572.511 -> -483.478)
+[ 131.922] potion:   Asterix+754 4304F05B -> 430153C8 (132.939 -> 129.327)
+[ 131.922] potion:   Asterix+758 4141103D -> 403E458C (12.0665 -> 2.97299)
+[ 131.922] potion:   Asterix+75C C40F20B0 -> C3F1A942 (-572.511 -> -483.322)
+[ 131.922] potion:   Asterix+760 4304F05B -> 43012D60 (132.939 -> 129.177)
+[ 131.922] potion:   Asterix+764 4141103D -> 403FF985 (12.0665 -> 2.9996)
+[ 131.922] potion:   Asterix+768 C40F20B0 -> C3F19283 (-572.511 -> -483.145)
+[ 131.922] potion:   Asterix+76C 4304F05B -> 43010B7F (132.939 -> 129.045)
+[ 132.969] proximity: zone event 04B8
+[ 133.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=347 | p2=-
+[ 133.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(130.96 2.60 -457.60)
+[ 133.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=00 order=0 f1A=00 busy=0 pos=(128.61 3.22 -463.69) LEADER
+[ 133.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 135.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=349 | p2=-
+[ 135.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(130.96 2.60 -457.60)
+[ 135.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=00 order=0 f1A=00 busy=0 pos=(174.67 11.44 -476.13) LEADER
+[ 135.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 137.063] sound: first start of sound 00000068 (instance 03DCA5D4 at 0 0 0) from 0043B611; leader Obelix; Asterix (131.0 2.6 -457.6) Obelix (162.5 10.7 -457.3)
+[ 137.063] sound: first start of sound 00000022 (instance 03DD46C4 at 0 0 0) from 0043B611; leader Obelix; Asterix (131.0 2.6 -457.6) Obelix (162.5 10.7 -457.3)
+[ 137.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=351 | p2=-
+[ 137.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(130.96 2.60 -457.60)
+[ 137.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=00 order=0 f1A=00 busy=0 pos=(159.30 11.17 -452.94) LEADER
+[ 137.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 139.141] coop: sp_hero_switch_lock: the level hands the lead to Asterix (the level hands the lead back to the hero it parked) -- Asterix is the hero you play now
+[ 139.141] trace: light pillar 03C43820 at (153 2 -484) event 3E00900 from 0046B276; leader Asterix
+[ 139.156] hud2: Asterix leads -- the game's HUD is its row now, Obelix's the other
+[ 139.156] hud2: bars p1 00002000 p2 18000000, gm+5C 00000012
+[ 139.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=354 | p2=-
+[ 139.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=3 f1A=00 busy=0 pos=(130.96 2.60 -457.60) LEADER
+[ 139.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=0F order=0 f1A=00 busy=0 pos=(159.88 3.08 -457.24)
+[ 139.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 141.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=354 | p2=-
+[ 141.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0F ai=FF order=3 f1A=00 busy=0 pos=(151.54 1.91 -457.43) LEADER
+[ 141.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0C ai=00 order=0 f1A=00 busy=0 pos=(141.28 1.19 -457.16)
+[ 141.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 141.719] coop: 62.8 fps
+[ 142.984] trace: light pillar 03C43820 at (153 2 -484) event 3E00901 from 0046B1F3; leader Asterix
+[ 143.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=127 O=127 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=435 | p2=-
+[ 143.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(159.46 4.56 -451.38) LEADER
+[ 143.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(159.98 3.10 -453.24)
+[ 143.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 144.484] hud2: bars p1 00003000 p2 18000000, gm+5C 00000012
+[ 144.813] hud2: bars p1 00000000 p2 18000000, gm+5C 00000012
+[ 145.563] watch: level=2 next=-1 | per 2s: frames=127 lifeTicks A=127 O=127 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=435 | p2=-
+[ 145.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(154.47 4.41 -425.57) LEADER
+[ 145.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(161.24 3.06 -452.96)
+[ 145.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 147.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=435 | p2=-
+[ 147.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(139.49 5.15 -401.25) LEADER
+[ 147.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=09 ai=00 order=0 f1A=00 busy=0 pos=(159.77 1.46 -440.34)
+[ 147.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 147.578] sound: first start of sound 000000A4 (instance 03DC942C at 0 0 0) from 004A8D10; leader Asterix; Asterix (139.4 4.9 -401.0) Obelix (159.8 1.5 -440.4)
+[ 147.594] sound: first start of sound 0000004A (instance 03DD8104 at 0 0 0) from 004E3D91; leader Asterix; Asterix (139.4 4.7 -400.8) Obelix (159.8 1.5 -440.4)
+[ 149.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=475 | p2=-
+[ 149.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=07 body=04 ai=FF order=3 f1A=00 busy=0 pos=(144.61 2.34 -391.39) LEADER
+[ 149.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(157.67 2.76 -427.15)
+[ 149.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 150.703] sound: first start of sound 00000037 (instance 03DDC358 at 0 0 0) from 004E3D91; leader Asterix; Asterix (134.9 3.0 -391.2) Obelix (157.5 2.7 -429.4)
+[ 150.719] hud2: bars p1 00001000 p2 18000000, gm+5C 00000012
+[ 151.063] hud2: bars p1 00002000 p2 18000000, gm+5C 00000012
+[ 151.563] watch: level=2 next=-1 | per 2s: frames=127 lifeTicks A=127 O=127 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=507 | p2=-
+[ 151.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=3 f1A=00 busy=0 pos=(130.23 2.13 -390.54) LEADER
+[ 151.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=04 order=4 f1A=00 busy=0 pos=(158.84 2.72 -429.30)
+[ 151.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 151.719] coop: 63.1 fps
+[ 152.000] sound: first start of sound 00000032 (instance 03DDA5B8 at 0 0 0) from 004E3EF3; leader Asterix; Asterix (125.3 2.5 -391.8) Obelix (159.9 2.8 -428.0)
+[ 152.453] sound: first start of sound 00000056 (instance 03DD3D70 at 125 2 -393) from 004B37C5; leader Asterix; Asterix (125.3 2.5 -391.8) Obelix (155.8 2.8 -425.3)
+[ 153.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=542 | p2=-
+[ 153.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=3 f1A=00 busy=0 pos=(129.96 2.06 -389.81) LEADER
+[ 153.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0C ai=00 order=0 f1A=00 busy=0 pos=(149.47 3.12 -419.08)
+[ 153.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 154.313] sound: first start of sound 0000003A (instance 03DDA4B8 at 0 0 0) from 004E3DE4; leader Asterix; Asterix (128.5 2.1 -389.6) Obelix (140.9 3.3 -416.5)
+[ 154.453] sound: first start of sound 0000008E (instance 03DD5120 at -64 0 -510) from 00477260; leader Asterix; Asterix (128.7 2.1 -389.5) Obelix (140.5 4.3 -415.4)
+[ 154.469] sound: first start of sound 00000029 (instance 03DD08B0 at 128 2 -397) from 004BEAAD; leader Asterix; Asterix (128.7 2.1 -389.5) Obelix (140.4 4.3 -415.2)
+[ 154.953] coop: hero switch refused: the leader is doing something (its situation)
+[ 155.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=543 | p2=-
+[ 155.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=3 f1A=00 busy=0 pos=(133.23 2.73 -390.04) LEADER
+[ 155.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(139.64 2.59 -397.47)
+[ 155.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 155.672] coop: hero switch: Asterix -> Obelix
+[ 155.672] coop: Obelix takes the lead from Asterix (the hero switch button) -- leader now Obelix
+[ 155.688] hud2: Obelix leads -- the game's HUD is its row now, Asterix's the other
+[ 155.688] hud2: bars p1 18000000 p2 00002000, gm+5C 00000012
+[ 157.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=544 | p2=-
+[ 157.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(134.62 2.92 -389.69)
+[ 157.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(127.12 2.12 -397.89) LEADER
+[ 157.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 158.438] proximity: zone event 0C31 (single player, the heroes' roles swapped: set off by Obelix)
+[ 159.500] sound: first start of sound 0000008C (instance 03DDDBE0 at 122 2 -420) from 0051545A; leader Obelix; Asterix (127.8 2.4 -417.2) Obelix (121.6 2.4 -420.1)
+[ 159.500] potion: gauge empty
+[ 159.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=551 | p2=-
+[ 159.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(127.60 2.48 -418.01)
+[ 159.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(121.19 2.34 -420.30) LEADER
+[ 159.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 161.250] sound: first start of sound 00000003 (instance 03DD0998 at 133 5 -481) from 0053F29C; leader Obelix; Asterix (113.1 2.7 -421.2) Obelix (112.4 2.2 -427.0)
+[ 161.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=676 | p2=-
+[ 161.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(112.07 2.63 -423.13)
+[ 161.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(112.15 1.97 -429.14) LEADER
+[ 161.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 161.719] coop: 63.0 fps
+[ 161.922] potion: +60.0 s since the offer
+[ 161.922] potion:   Asterix+018 00000000 -> 00000003 (0 -> 4.2039e-45)
+[ 161.922] potion:   Asterix+028 42C709F6 -> 431EC016 (99.5195 -> 158.75)
+[ 161.922] potion:   Asterix+02C C47A0000 -> 43186AA6 (-1000 -> 152.417)
+[ 161.922] potion:   Asterix+030 00000000 -> 3F79498D (0 -> 0.973779)
+[ 161.922] potion:   Asterix+038 00000000 -> 3E68F53D (0 -> 0.227498)
+[ 161.922] potion:   Asterix+040 00000000 -> 41200000 (0 -> 10)
+[ 161.922] potion:   Asterix+06C 4316C56E -> 42DF1F8E (150.771 -> 111.562)
+[ 161.922] potion:   Asterix+070 3FAF08EF -> 40144FFA (1.36746 -> 2.31738)
+[ 161.922] potion:   Asterix+074 C3FF3C0C -> C3D4EA50 (-510.469 -> -425.831)
+[ 161.922] potion:   Asterix+084 41700000 -> 41400000 (15 -> 12)
+[ 161.922] potion:   Asterix+088 42700000 -> 426F6C31 (60 -> 59.8557)
+[ 161.922] potion:   Asterix+08C 3F6CCF4A -> 41400000 (0.925038 -> 12)
+[ 161.922] potion:   Asterix+090 3A351399 -> BC70120B (0.000690752 -> -0.0146527)
+[ 161.922] potion:   Asterix+094 00000000 -> BCC05580 (0 -> -0.0234783)
+[ 161.922] potion:   Asterix+098 3C69633C -> BE3EACFC (0.0142449 -> -0.186207)
+[ 161.922] potion:   Asterix+0B0 425E354A -> 43010E4E (55.552 -> 129.056)
+[ 161.922] potion:   Asterix+0B4 3D466334 -> BDA0A971 (0.0484345 -> -0.0784482)
+[ 161.922] potion:   Asterix+0BC 3F7FB316 -> BF7F3608 (0.998826 -> -0.996918)
+[ 161.922] potion:   Asterix+0C0 3D466334 -> BD913A04 (0.0484345 -> -0.0709114)
+[ 161.922] potion:   Asterix+0C8 3F7FB316 -> BF7F5B05 (0.998826 -> -0.997483)
+[ 161.922] potion:   Asterix+0CC 3FC2DC22 -> 40944895 (1.52234 -> 4.63386)
+[ 161.922] potion:   Asterix+0D0 41FB53CF -> 40F02843 (31.4159 -> 7.50491)
+[ 161.922] potion:   Asterix+0D4 3FC2DC22 -> 40944895 (1.52234 -> 4.63386)
+[ 161.922] potion:   Asterix+0E4 47C30827 -> 47C31127 (99856.3 -> 99874.3)
+[ 161.922] potion:   Asterix+0E8 00000037 -> 00000003 (7.70714e-44 -> 4.2039e-45)
+[ 161.922] potion:   Asterix+0FC 00000000 -> 400CCCCD (0 -> 2.2)
+[ 161.922] potion:   Asterix+100 00000000 -> 03C349D4 (0 -> 1.1478e-36)
+[ 161.922] potion:   Asterix+104 00000000 -> BF4BE200 (0 -> -0.796417)
+[ 161.922] potion:   Asterix+108 00000000 -> BE212460 (0 -> -0.157365)
+[ 161.922] potion:   Asterix+10C 00000000 -> 3EF9D800 (0 -> 0.487976)
+[ 161.922] potion:   Asterix+134 06000411 -> 06000011 (2.40771e-35 -> 2.40742e-35)
+[ 161.922] potion:   Asterix+150 3E378700 -> 3E378702 (0.179226 -> 0.179226)
+[ 161.922] potion:   Asterix+23C 00000000 -> BA1B4B41 (0 -> -0.000592399)
+[ 161.922] potion:   Asterix+244 BD053C0C -> 3B09CDAC (-0.032528 -> 0.00210271)
+[ 161.922] potion:   Asterix+248 00000000 -> BE8AD97B (0 -> -0.27119)
+[ 161.922] potion:   Asterix+250 BF7FFF09 -> 3F766C13 (-0.999985 -> 0.962587)
+[ 161.922] potion:   Asterix+254 3D73F680 -> 3F3C4C6C (0.0595613 -> 0.735541)
+[ 161.922] potion:   Asterix+258 405C3026 -> 3E876728 (3.44044 -> 0.264459)
+[ 161.922] potion:   Asterix+274 3E4CCCCD -> 3E64D77D (0.2 -> 0.223478)
+[ 161.922] potion:   Asterix+278 3F8CCCCD -> 3F8FCE23 (1.1 -> 1.12348)
+[ 161.922] potion:   Asterix+280 03D78F60 -> 03D782A0 (1.26695e-36 -> 1.26666e-36)
+[ 161.922] potion:   Asterix+284 04985370 -> 042351FA (3.58117e-36 -> 1.91982e-36)
+[ 161.922] potion:   Asterix+288 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 161.922] potion:   Asterix+28C 3F8001A8 -> 3F7DF450 (1.00005 -> 0.992009)
+[ 161.922] potion:   Asterix+290 B657F4D3 -> BE010B12 (-3.218e-06 -> -0.126019)
+[ 161.922] potion:   Asterix+294 00000001 -> 00000000 (1.4013e-45 -> 0)
+[ 161.922] potion:   Asterix+298 4316C56E -> 42DF1F8E (150.771 -> 111.562)
+[ 161.922] potion:   Asterix+29C 3FAF08EF -> 40144FFA (1.36746 -> 2.31738)
+[ 161.922] potion:   Asterix+2A0 C3FF3C0C -> C3D4EA50 (-510.469 -> -425.831)
+[ 161.922] potion:   Asterix+2A4 34000000 -> 393A4000 (1.19209e-07 -> 0.000177622)
+[ 161.922] potion:   Asterix+2A8 41050000 -> 41000000 (8.3125 -> 8)
+[ 161.922] potion:   Asterix+2AC 03D78F60 -> 03D782A0 (1.26695e-36 -> 1.26666e-36)
+[ 161.922] potion:   Asterix+2B0 04985370 -> 042351FA (3.58117e-36 -> 1.91982e-36)
+[ 161.922] potion:   Asterix+2B4 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 161.922] potion:   Asterix+2B8 3F8001A8 -> 3F7DF450 (1.00005 -> 0.992009)
+[ 161.922] potion:   Asterix+2BC B657F4D3 -> BE010B12 (-3.218e-06 -> -0.126019)
+[ 161.922] potion:   Asterix+2C4 4316C541 -> 42DF270F (150.771 -> 111.576)
+[ 161.922] potion:   Asterix+2C8 3FAF08EE -> 4015D38E (1.36746 -> 2.34104)
+[ 161.922] potion:   Asterix+2CC C3FF3DDF -> C3D4D27A (-510.483 -> -425.644)
+[ 161.922] potion:   Asterix+2D0 80000000 -> 390B4000 (-0 -> 0.000132799)
+[ 161.922] potion:   Asterix+2D4 01050000 -> 01000000 (2.44282e-38 -> 2.35099e-38)
+[ 161.922] potion:   Asterix+2D8 4316C56E -> 42DF1F8E (150.771 -> 111.562)
+[ 161.922] potion:   Asterix+2DC 3FAF08EF -> 40144FFA (1.36746 -> 2.31738)
+[ 161.922] potion:   Asterix+2E0 C3FF3C0C -> C3D4EA50 (-510.469 -> -425.831)
+[ 161.922] potion:   Asterix+2E4 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 161.922] potion:   Asterix+2E8 3F8001A8 -> 3F7DF450 (1.00005 -> 0.992009)
+[ 161.922] potion:   Asterix+2EC B657F4D3 -> BE010B12 (-3.218e-06 -> -0.126019)
+[ 161.922] potion:   Asterix+2F4 40490FDB -> 3FC90FDB (3.14159 -> 1.5708)
+[ 161.922] potion:   Asterix+328 C101AAF7 -> C0C98A25 (-8.10424 -> -6.29811)
+[ 161.922] potion:   Asterix+384 00201200 -> 0000DB00 (2.94519e-39 -> 7.85624e-41)
+[ 161.922] potion:   Asterix+388 00000004 -> 00000000 (5.60519e-45 -> 0)
+[ 161.922] potion:   Asterix+38C 00088000 -> 00000000 (7.80602e-40 -> 0)
+[ 161.922] potion:   Asterix+390 00000020 -> 00000000 (4.48416e-44 -> 0)
+[ 161.922] potion:   Asterix+3B4 4316C56E -> 42DF1F8E (150.771 -> 111.562)
+[ 161.922] potion:   Asterix+3B8 3FAF08EF -> 40144FFA (1.36746 -> 2.31738)
+[ 161.922] potion:   Asterix+3BC C3FF3C0C -> C3D4EA50 (-510.469 -> -425.831)
+[ 161.922] potion:   Asterix+3C0 B2982A05 -> 00000000 (-1.77142e-08 -> 0)
+[ 161.922] potion:   Asterix+3C4 3F8001A8 -> 3F7DF450 (1.00005 -> 0.992009)
+[ 161.922] potion:   Asterix+3C8 B657F4D3 -> BE010B12 (-3.218e-06 -> -0.126019)
+[ 161.922] potion:   Asterix+3CC 34000000 -> 393A4000 (1.19209e-07 -> 0.000177622)
+[ 161.922] potion:   Asterix+3E8 43960012 -> 4396FF12 (300.001 -> 301.993)
+[ 161.922] potion:   Asterix+3EC 00000040 -> 00000000 (8.96831e-44 -> 0)
+[ 161.922] potion:   Asterix+3F0 0C000000 -> 04800000 (9.86076e-32 -> 3.00927e-36)
+[ 161.922] potion:   Asterix+464 03C38B34 -> 00000000 (1.1493e-36 -> 0)
+[ 161.922] potion:   Asterix+494 03C360A0 -> 03C345CC (1.14833e-36 -> 1.14771e-36)
+[ 161.922] potion:   Asterix+560 0000FF10 -> 00000010 (9.14992e-41 -> 2.24208e-44)
+[ 161.922] potion:   Asterix+564 00000003 -> 00000000 (4.2039e-45 -> 0)
+[ 161.922] potion:   Asterix+568 4313F54C -> 42DEA015 (147.958 -> 111.313)
+[ 161.922] potion:   Asterix+56C 4035FDF8 -> 40051932 (2.84363 -> 2.07966)
+[ 161.922] potion:   Asterix+570 C40DB107 -> C3D67F4B (-566.766 -> -428.994)
+[ 161.922] potion:   Asterix+574 BD17F65E -> 3F800000 (-0.0371002 -> 1)
+[ 161.922] potion:   Asterix+57C 3F7FD2E2 -> 00000000 (0.999312 -> 0)
+[ 161.922] potion:   Asterix+5B4 3FC90FDB -> 40490FDB (1.5708 -> 3.14159)
+[ 161.922] potion:   Asterix+5BC 03D79180 -> 03D782A0 (1.267e-36 -> 1.26666e-36)
+[ 161.922] potion:   Asterix+5C0 049884B0 -> 04234E46 (3.58569e-36 -> 1.91965e-36)
+[ 161.922] potion:   Asterix+5C4 BD97B761 -> 3DABDC64 (-0.0740802 -> 0.0839165)
+[ 161.922] potion:   Asterix+5C8 3F7EF32D -> 3F7F027D (0.995898 -> 0.996132)
+[ 161.922] potion:   Asterix+5CC 3D5D4B2A -> 3CB78966 (0.0540268 -> 0.0224044)
+[ 161.922] potion:   Asterix+5D0 00000000 -> 00000001 (0 -> 1.4013e-45)
+[ 161.922] potion:   Asterix+5D4 4304D29D -> 42DB7CE8 (132.823 -> 109.744)
+[ 161.922] potion:   Asterix+5D8 4017AD1F -> 400E2074 (2.36994 -> 2.22073)
+[ 161.922] potion:   Asterix+5DC C40D5458 -> C3D69FF3 (-565.318 -> -429.25)
+[ 161.922] potion:   Asterix+5E0 4025F459 -> 3E1C7230 (2.59304 -> 0.152779)
+[ 161.922] potion:   Asterix+5E4 5C056F00 -> 5C006F00 (1.50233e+17 -> 1.44603e+17)
+[ 161.922] potion:   Asterix+5E8 4304D29D -> 42DB7CE8 (132.823 -> 109.744)
+[ 161.922] potion:   Asterix+5EC 4017AD1F -> 400E2074 (2.36994 -> 2.22073)
+[ 161.922] potion:   Asterix+5F0 C40D5458 -> C3D69FF3 (-565.318 -> -429.25)
+[ 161.922] potion:   Asterix+5F4 0101003F -> 01010065 (2.36937e-38 -> 2.36938e-38)
+[ 161.922] potion:   Asterix+5F8 03D79180 -> 03D782A0 (1.267e-36 -> 1.26666e-36)
+[ 161.922] potion:   Asterix+5FC 049884B6 -> 04234E82 (3.58569e-36 -> 1.91966e-36)
+[ 161.922] potion:   Asterix+600 BD6C8E91 -> BE8C70A3 (-0.0577531 -> -0.274297)
+[ 161.922] potion:   Asterix+604 3F7EF32D -> 3F74A746 (0.995898 -> 0.955677)
+[ 161.922] potion:   Asterix+608 3D901624 -> 3DDC3048 (0.0703547 -> 0.107514)
+[ 161.922] potion:   Asterix+60C 00000000 -> 00000001 (0 -> 1.4013e-45)
+[ 161.922] potion:   Asterix+610 43052590 -> 42E24F6A (133.147 -> 113.155)
+[ 161.922] potion:   Asterix+614 4016F4E8 -> 4012A379 (2.3587 -> 2.29123)
+[ 161.922] potion:   Asterix+618 C40D2D60 -> C3D791FC (-564.709 -> -431.141)
+[ 161.922] potion:   Asterix+61C 3DE6ECA0 -> 3E410B70 (0.112756 -> 0.18852)
+[ 161.922] potion:   Asterix+620 00059400 -> 00009400 (5.1227e-40 -> 5.30924e-41)
+[ 161.922] potion:   Asterix+624 03D79180 -> 03D782A0 (1.267e-36 -> 1.26666e-36)
+[ 163.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=802 | p2=-
+[ 163.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(110.89 2.63 -440.90)
+[ 163.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(108.35 2.68 -441.75) LEADER
+[ 163.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 165.375] coop: sector 5 -> 0 (next 6); leader Obelix; Asterix (98 3 -442) Obelix (99 3 -440)
+[ 165.391] coop: sector 5 -> 6 (the leader's Sas); Asterix's sector 5, Obelix's 6
+[ 165.391] coop: sector 0 -> 6 (next -2); leader Obelix; Asterix (98 3 -442) Obelix (99 3 -439)
+[ 165.391] sound: first start of sound 06000003 (instance 03DCB6C4 at 106 -5 -390) from 0043B6E6; leader Obelix; Asterix (98.3 2.6 -441.6) Obelix (98.7 2.5 -439.3)
+[ 165.391] sound: first start of sound 06000002 (instance 03DCB704 at 19 15 -401) from 0043B6E6; leader Obelix; Asterix (98.3 2.6 -441.6) Obelix (98.7 2.5 -439.3)
+[ 165.391] sound: first start of sound 06000001 (instance 03DCB784 at -7 6 -385) from 0043B6E6; leader Obelix; Asterix (98.3 2.6 -441.6) Obelix (98.7 2.5 -439.3)
+[ 165.391] sound: first start of sound 06000004 (instance 03DCB7C4 at -21 13 -391) from 0043B6E6; leader Obelix; Asterix (98.3 2.6 -441.6) Obelix (98.7 2.5 -439.3)
+[ 165.391] sound: first start of sound 06000000 (instance 03DCB884 at -98 0 -314) from 0043B6E6; leader Obelix; Asterix (98.3 2.6 -441.6) Obelix (98.7 2.5 -439.3)
+[ 165.563] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=926 | p2=-
+[ 165.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(99.31 2.47 -440.21)
+[ 165.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(98.41 2.53 -438.24) LEADER
+[ 165.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 165.766] sound: first start of sound 06000002 (instance 03DCB804 at 93 19 -398) from 0043B611; leader Obelix; Asterix (100.5 2.4 -440.7) Obelix (98.1 2.4 -436.8)
+[ 167.563] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1052 | p2=-
+[ 167.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(96.85 2.16 -435.53)
+[ 167.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(97.28 2.60 -424.51) LEADER
+[ 167.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 169.563] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1132 | p2=-
+[ 169.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(99.18 2.54 -414.38)
+[ 169.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(101.99 2.57 -412.31) LEADER
+[ 169.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 170.766] proximity: zone event 0859 (single player, the heroes' roles swapped: set off by Obelix)
+[ 171.563] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1136 | p2=-
+[ 171.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(112.52 2.24 -411.17)
+[ 171.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(115.79 2.66 -410.67) LEADER
+[ 171.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 171.719] coop: 62.3 fps
+[ 172.453] proximity: event 0620's group 0C4: 03CD5DBC(vt 6266B0)<-0D23 03C9F320(vt 62504C)<-163A 03C9F320(vt 62504C)<-163B 03C9F320(vt 62504C)<-1B07 03C9F320(vt 62504C)<-163C 03CD1B90(vt 629588)<-0999 03CD1BB0(vt 629588)<-0999 03CD1BD0(vt 629588)<-0999 03CD5F20(vt 6266B0)<-0D23 03CD6084(vt 6266B0)<-0D23 03CD4474(vt 6256A0)<-4800 03CD4474(vt 6256A0)<-4803 03C9F320(vt 62504C)<-1B1B 03C9F320(vt 62504C)<-1E00 03C9F320(vt 62504C)<-1B17 03C38C08(vt 628E0C)<-0999 03CE8858(vt 624C2C)<-0501 03C9F320(vt 62504C)<-168F 03CD1B50(vt 629588)<-0999 03CD1B50(vt 629588)<-099B 03C9F320(vt 62504C)<-1690
+[ 172.469] coop: sp_hero_switch_lock: the level's switch 4800 (event 0620's group: no lock) ignored -- Obelix keeps the lead
+[ 172.469] sound: stream 13 started (00000001, 255, 0, 0) -> channel 0, from 00469744; leader Obelix; Asterix (117.8 2.7 -408.8) Obelix (119.6 2.3 -406.7)
+[ 172.469] sound: stream start stack: 469744 4664D3 4663D3 46B1F3 40A58C 409AE1 409B76 47A784 44005C 610048 5C0039 580058
+[ 173.172] sound: first start of sound 06000003 (instance 03DCB6C4 at 106 -5 -390) from 0043B611; leader Obelix; Asterix (118.4 2.6 -408.6) Obelix (120.5 2.1 -402.5)
+[ 173.563] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1137 | p2=-
+[ 173.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(119.07 2.26 -406.09)
+[ 173.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(120.19 2.11 -399.70) LEADER
+[ 173.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 174.156] sound: first start of sound 000000A6 (instance 03DC946C at 0 0 0) from 004A8D10; leader Obelix; Asterix (119.4 2.3 -399.6) Obelix (120.5 1.9 -399.0)
+[ 174.250] sound: first start of sound 000000A9 (instance 03DC93EC at 0 0 0) from 004A8BD6; leader Obelix; Asterix (119.2 2.4 -399.2) Obelix (120.4 1.9 -398.8)
+[ 174.250] hud2: bars p1 00002000 p2 00002000, gm+5C 00000012
+[ 174.344] sound: first start of sound 000000A8 (instance 03DC94AC at 0 0 0) from 004A8D10; leader Obelix; Asterix (119.0 2.3 -398.6) Obelix (120.4 2.0 -398.7)
+[ 174.828] sound: first start of sound 000000A7 (instance 03DC9C40 at 0 0 0) from 004A5897; leader Obelix; Asterix (119.0 2.5 -395.8) Obelix (120.2 2.2 -397.5)
+[ 174.969] sound: first start of sound 00000093 (instance 03DCA340 at 0 0 0) from 004A59EC; leader Obelix; Asterix (118.7 2.5 -395.5) Obelix (120.2 2.2 -397.6)
+[ 175.172] sound: first start of sound 000000A9 (instance 03DC9C80 at 0 0 0) from 004A5897; leader Obelix; Asterix (118.4 2.5 -395.3) Obelix (120.2 2.2 -397.4)
+[ 175.328] sound: first start of sound 00000094 (instance 03DCA380 at 0 0 0) from 004A59EC; leader Obelix; Asterix (117.8 2.5 -395.0) Obelix (120.2 2.2 -397.1)
+[ 175.563] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1137 | p2=-
+[ 175.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0C ai=04 order=4 f1A=00 busy=0 pos=(117.38 2.51 -394.87)
+[ 175.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=FF order=0 f1A=00 busy=0 pos=(120.13 2.17 -397.07) LEADER
+[ 175.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 175.656] sound: first start of sound 0000003B (instance 03DD92D4 at 0 0 0) from 004E3DE4; leader Obelix; Asterix (117.1 2.5 -394.8) Obelix (120.1 2.2 -397.0)
+[ 175.672] sound: first start of sound 00000092 (instance 03DCA300 at 0 0 0) from 004A59EC; leader Obelix; Asterix (117.0 2.5 -394.8) Obelix (120.1 2.2 -397.0)
+[ 177.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1137 | p2=-
+[ 177.563] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(118.49 2.60 -394.15)
+[ 177.563] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=10 ai=FF order=0 f1A=00 busy=0 pos=(119.86 2.64 -394.53) LEADER
+[ 177.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 178.484] coop: hero switch: Obelix -> Asterix
+[ 178.484] coop: Asterix takes the lead from Obelix (the hero switch button) -- leader now Asterix
+[ 178.500] hud2: Asterix leads -- the game's HUD is its row now, Obelix's the other
+[ 179.188] proximity: zone event 0D98
+[ 179.344] proximity: zone event 0DC8
+[ 179.438] proximity: zone event 0630
+[ 179.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1138 | p2=-
+[ 179.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=00 body=16 ai=FF order=0 f1A=00 busy=0 pos=(115.85 2.30 -394.84) LEADER
+[ 179.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=0B ai=00 order=0 f1A=00 busy=0 pos=(118.93 4.50 -394.54)
+[ 179.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 180.438] proximity: event 01B8's group 037: 03D73FE8(vt 624728)<-0701 03CD4474(vt 6256A0)<-4802
+[ 180.453] coop: Obelix locked by the level (the companion told to wait) -- 204 detectors, 12 circles kept (as before its event 01B8)
+[ 180.453] coop: nolock: rotary beam 03C43794: the waiter 88.5 units from its pivot, 1.84 rad off its arm over the circle, 2.2 below
+[ 180.453] sound: first start of sound 00000013 (instance 03DCA810 at 0 0 0) from 005487C3; leader Asterix; Asterix (115.9 3.2 -395.6) Obelix (117.1 2.6 -394.3)
+[ 181.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1163 | p2=-
+[ 181.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=02 body=24 ai=FF order=0 f1A=00 busy=0 pos=(115.92 3.22 -395.59) LEADER
+[ 181.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=03 order=3 f1A=00 busy=0 pos=(117.11 2.58 -394.33)
+[ 181.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(-854.86 508.03 -1073.72)
+[ 181.719] coop: 62.3 fps
+[ 183.563] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1166 | p2=-
+[ 183.563] state[watch]: Asterix f18=00 mode=normal PLAYER life=00 sit=0B body=0E ai=FF order=0 f1A=00 busy=0 pos=(96.09 2.63 -393.73) LEADER
+[ 183.563] state[watch]: Obelix  f18=23 mode=normal ai life=01 sit=FF body=13 ai=03 order=3 f1A=00 busy=0 pos=(117.82 2.65 -389.01)
+[ 183.563] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(115.23 2.42 -394.26)
+[ 184.094] hud2: bars p1 00000000 p2 00002000, gm+5C 00000012
+[ 185.125] sound: first start of sound 000000A1 (instance 03DC9D80 at 0 0 0) from 004A5C70; leader Asterix; Asterix (87.5 2.5 -395.0) Obelix (117.8 2.6 -389.0)
+[ 185.531] coop: sp_hero_switch_lock: the level hands the lead to Obelix (its group holds the other hero) -- Obelix is the hero you play now
+[ 185.531] coop: Asterix locked by the level (the companion told to wait) -- 204 detectors, 12 circles kept (as now FFFF)
+[ 185.531] coop: nolock: rotary beam 03C43794: the waiter 97.8 units from its pivot, 2.15 rad off its arm over the circle, 2.2 below
+[ 185.547] hud2: Obelix leads -- the game's HUD is its row now, Asterix's the other
+[ 185.547] hud2: bars p1 00002000 p2 00000000, gm+5C 00000012
+[ 185.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1169 | p2=-
+[ 185.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=14 ai=03 order=3 f1A=00 busy=0 pos=(87.20 2.53 -395.15)
+[ 185.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(117.82 2.65 -389.01) LEADER
+[ 185.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(92.06 2.24 -393.70)
+[ 187.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1169 | p2=-
+[ 187.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(87.20 2.53 -395.15)
+[ 187.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(111.46 4.43 -389.40) LEADER
+[ 187.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=00 ai=00 order=0 f1A=00 busy=0 pos=(96.94 3.34 -389.60)
+[ 189.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1169 | p2=-
+[ 189.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(87.20 2.53 -395.15)
+[ 189.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0C ai=FF order=3 f1A=00 busy=0 pos=(97.45 1.05 -389.57) LEADER
+[ 189.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(100.56 0.69 -389.53)
+[ 190.172] proximity: zone event 01D8
+[ 190.672] hud2: bars p1 00003000 p2 00000000, gm+5C 00000012
+[ 191.000] hud2: bars p1 00000000 p2 00000000, gm+5C 00000012
+[ 191.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1170 | p2=-
+[ 191.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(84.47 2.08 -386.93)
+[ 191.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(85.83 2.25 -385.50) LEADER
+[ 191.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(85.97 2.12 -387.68)
+[ 191.719] coop: 62.6 fps
+[ 192.484] hud2: bars p1 00001000 p2 00000000, gm+5C 00000012
+[ 192.813] hud2: bars p1 00002000 p2 00000000, gm+5C 00000012
+[ 193.063] sound: first start of sound 000000A0 (instance 03DC962C at 0 0 0) from 004A8BD6; leader Obelix; Asterix (79.5 3.1 -391.7) Obelix (82.0 2.3 -380.6)
+[ 193.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1171 | p2=-
+[ 193.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0F ai=01 order=1 f1A=00 busy=0 pos=(74.14 5.85 -391.35)
+[ 193.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(81.82 2.29 -380.47) LEADER
+[ 193.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(82.51 2.28 -382.32)
+[ 195.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1171 | p2=-
+[ 195.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 195.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(77.01 4.83 -390.65) LEADER
+[ 195.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(80.11 2.01 -388.29)
+[ 197.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1171 | p2=-
+[ 197.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 197.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(65.17 5.36 -394.20) LEADER
+[ 197.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(86.41 2.20 -391.07)
+[ 198.172] hud2: bars p1 00003000 p2 00000000, gm+5C 00000012
+[ 198.500] hud2: bars p1 00000000 p2 00000000, gm+5C 00000012
+[ 198.906] icons: "Pull #" -> "Pull #" (for player 1)
+[ 199.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1171 | p2=-
+[ 199.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 199.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(61.57 2.00 -385.96) LEADER
+[ 199.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(78.05 2.08 -395.79)
+[ 201.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1171 | p2=-
+[ 201.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 201.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=01 body=0E ai=FF order=3 f1A=00 busy=0 pos=(53.66 2.00 -386.34) LEADER
+[ 201.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(82.49 2.12 -386.93)
+[ 201.719] coop: 62.9 fps
+[ 202.047] sound: first start of sound 00000026 (instance 03DCFBBC at 0 0 0) from 004B69FC; leader Obelix; Asterix (67.5 9.2 -391.3) Obelix (53.5 2.0 -386.3)
+[ 203.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1172 | p2=-
+[ 203.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 203.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=01 body=00 ai=FF order=3 f1A=00 busy=0 pos=(53.50 2.01 -386.29) LEADER
+[ 203.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(72.12 2.19 -387.50)
+[ 205.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1172 | p2=-
+[ 205.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=03 order=3 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 205.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=01 body=00 ai=FF order=3 f1A=00 busy=0 pos=(53.50 2.01 -386.29) LEADER
+[ 205.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(82.58 2.23 -396.07)
+[ 206.609] sound: first start of sound 00000016 (instance 03DD0788 at 77 2 -379) from 0053FF92; leader Obelix; Asterix (67.5 9.2 -391.3) Obelix (53.5 2.0 -386.3)
+[ 207.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1174 | p2=-
+[ 207.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=01 order=1 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 207.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(54.10 2.09 -392.97) LEADER
+[ 207.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(58.78 2.08 -395.47)
+[ 209.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1174 | p2=-
+[ 209.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=01 order=1 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 209.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(62.48 2.00 -386.64) LEADER
+[ 209.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(59.79 2.01 -393.89)
+[ 211.578] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1174 | p2=-
+[ 211.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=01 order=1 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 211.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=01 body=00 ai=FF order=3 f1A=00 busy=0 pos=(61.60 2.00 -386.21) LEADER
+[ 211.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(81.73 2.16 -395.42)
+[ 211.719] coop: 62.5 fps
+[ 213.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1175 | p2=-
+[ 213.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=01 order=1 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 213.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=01 body=00 ai=FF order=3 f1A=00 busy=0 pos=(61.60 2.00 -386.21) LEADER
+[ 213.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(85.31 2.08 -389.05)
+[ 215.578] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1175 | p2=-
+[ 215.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=01 order=1 f1A=00 busy=0 pos=(67.46 9.24 -391.30)
+[ 215.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=01 body=00 ai=FF order=3 f1A=00 busy=0 pos=(61.60 2.00 -386.21) LEADER
+[ 215.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(66.69 2.29 -395.57)
+[ 216.813] proximity: zone event 0D29
+[ 216.813] proximity: event 0D29's group 1A5: 03CD4474(vt 6256A0)<-4803 03CD4474(vt 6256A0)<-48B7 03C9F320(vt 62504C)<-1B07
+[ 216.813] coop: sp_hero_switch_lock: the level's switch 48B7 (event 0D28's group: no lock) ignored -- Obelix keeps the lead
+[ 217.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1178 | p2=-
+[ 217.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(64.38 10.94 -390.73)
+[ 217.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(61.68 2.00 -393.17) LEADER
+[ 217.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=05 ai=00 order=0 f1A=00 busy=0 pos=(59.45 2.01 -393.54)
+[ 219.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1178 | p2=-
+[ 219.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(81.86 3.13 -391.33)
+[ 219.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(68.93 2.04 -395.78) LEADER
+[ 219.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(68.07 2.05 -395.01)
+[ 221.578] watch: level=2 next=-1 | per 2s: frames=124 lifeTicks A=124 O=124 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1178 | p2=-
+[ 221.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(78.88 2.02 -395.04)
+[ 221.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(82.41 2.20 -393.92) LEADER
+[ 221.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(80.21 2.02 -394.59)
+[ 221.719] coop: 62.6 fps
+[ 223.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1178 | p2=-
+[ 223.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(81.74 3.87 -388.33)
+[ 223.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(81.61 3.09 -390.58) LEADER
+[ 223.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(84.19 2.03 -387.92)
+[ 225.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1178 | p2=-
+[ 225.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(76.05 5.30 -391.37)
+[ 225.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(68.66 8.63 -390.56) LEADER
+[ 225.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(83.46 2.08 -390.68)
+[ 226.313] proximity: zone event 0D29 (single player, the heroes' roles swapped: set off by Obelix)
+[ 226.313] coop: sp_hero_switch_lock: the level's switch 48B7 (event 0D28's group: no lock) ignored -- Obelix keeps the lead
+[ 227.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1179 | p2=-
+[ 227.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0F ai=00 order=0 f1A=00 busy=0 pos=(58.20 10.00 -387.77)
+[ 227.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=3 f1A=00 busy=0 pos=(55.19 10.00 -389.56) LEADER
+[ 227.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=00 ai=00 order=0 f1A=00 busy=0 pos=(65.57 10.52 -390.90)
+[ 229.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1179 | p2=-
+[ 229.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(60.11 10.00 -389.34)
+[ 229.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(49.01 13.15 -389.12) LEADER
+[ 229.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(52.32 10.00 -389.85)
+[ 230.016] proximity: zone event 01E8
+[ 230.016] proximity: event 01E8's group 03D: 03D73D54(vt 624728)<-0700 03D73D28(vt 624728)<-0700 03CD4474(vt 6256A0)<-4800 03CD4474(vt 6256A0)<-4803 03C9F320(vt 62504C)<-1D0C 03C9F320(vt 62504C)<-1D0D 03C9F320(vt 62504C)<-1707 03C43884(vt 629030)<-0900 03C9F320(vt 62504C)<-1B07
+[ 230.016] coop: sp_hero_switch_lock: the level's switch 4800 (event 01E8's group: no lock) ignored -- Obelix keeps the lead
+[ 230.016] trace: light pillar 03C43884 at (30 3 -369) event 3E00900 from 0046B1F3; leader Obelix
+[ 231.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1180 | p2=-
+[ 231.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(47.90 12.97 -390.57)
+[ 231.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(49.01 13.15 -389.12) LEADER
+[ 231.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(47.90 12.99 -389.79)
+[ 231.719] coop: 62.8 fps
+[ 233.359] sound: first start of sound 06000004 (instance 03DCB7C4 at -21 13 -391) from 0043B611; leader Obelix; Asterix (47.9 13.0 -390.6) Obelix (49.0 13.1 -389.1)
+[ 233.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1180 | p2=-
+[ 233.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(47.90 12.97 -390.57)
+[ 233.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=3 f1A=00 busy=0 pos=(49.01 13.15 -389.12) LEADER
+[ 233.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(47.90 12.99 -389.79)
+[ 235.578] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1180 | p2=-
+[ 235.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(48.04 13.04 -390.06)
+[ 235.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(50.29 12.80 -389.33) LEADER
+[ 235.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(48.20 13.14 -389.14)
+[ 237.578] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1180 | p2=-
+[ 237.578] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(52.11 10.00 -388.06)
+[ 237.578] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(50.65 12.36 -390.08) LEADER
+[ 237.578] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(52.81 10.00 -388.71)
+[ 239.594] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1180 | p2=-
+[ 239.594] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(47.90 13.02 -388.86)
+[ 239.594] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=0B ai=FF order=3 f1A=00 busy=0 pos=(43.83 8.33 -390.16) LEADER
+[ 239.594] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=01 ai=00 order=0 f1A=00 busy=0 pos=(47.90 12.88 -393.51)
+[ 239.688] proximity: zone event 0C88 (single player, the heroes' roles swapped: set off by Obelix)
+[ 240.000] sound: first start of sound 0000005A (instance 03DD6200 at 0 0 0) from 004E5EB9; leader Obelix; Asterix (48.2 13.1 -390.4) Obelix (41.4 1.7 -390.4)
+[ 240.000] sound: stream 5 started (00000001, 255, 0, 0) -> channel 1, from 00469744; leader Obelix; Asterix (48.2 13.1 -390.4) Obelix (41.4 1.7 -390.4)
+[ 240.000] sound: stream start stack: 469744 4664D3 4663D3 46B1F3 40A58C 409AE1 409B76 47A784 44005C 610048 5C0039 580058
+[ 240.000] experimental: fight gate: 3 squad(s), 20 Romans left (rules single player, the game's own)
+[ 240.656] proximity: zone event 0CA8
+[ 240.656] proximity: event 0CA8's group 195: 03C9F320(vt 62504C)<-1D90 03CD4474(vt 6256A0)<-48CF 03CD4474(vt 6256A0)<-4803
+[ 240.656] coop: sp_hero_switch_lock: the level orders the sidekick (48CF) meaning Obelix -- Asterix leads for it first
+[ 240.656] coop: Asterix takes the lead from Obelix (the level's order for the sidekick) -- leader now Asterix
+[ 240.672] hud2: Asterix leads -- the game's HUD is its row now, Obelix's the other
+[ 241.250] coop: Obelix takes the lead from Asterix (sp_hero_switch_lock: the hero you play, free again) -- leader now Obelix
+[ 241.266] hud2: Obelix leads -- the game's HUD is its row now, Asterix's the other
+[ 241.594] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1184 | p2=-
+[ 241.594] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0E ai=00 order=0 f1A=00 busy=0 pos=(40.77 3.25 -391.93)
+[ 241.594] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(39.56 1.60 -391.53) LEADER
+[ 241.594] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(40.00 1.57 -391.71)
+[ 241.719] coop: 62.7 fps
+[ 242.500] experimental: fight gate: its fight begins (rules single player, the game's own)
+[ 242.828] sound: first start of sound 00000039 (instance 03DDAAA0 at 0 0 0) from 004E3D91; leader Obelix; Asterix (34.4 1.8 -390.8) Obelix (32.3 2.0 -389.8)
+[ 242.844] hud2: bars p1 00001000 p2 00000000, gm+5C 00000013
+[ 242.906] sound: first start of sound 00000038 (instance 03DDA2F8 at 0 0 0) from 004E3D91; leader Obelix; Asterix (33.7 1.8 -390.5) Obelix (32.4 2.0 -389.9)
+[ 243.188] hud2: bars p1 00002000 p2 00000000, gm+5C 00000013
+[ 243.594] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1184 | p2=-
+[ 243.594] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0C ai=00 order=0 f1A=00 busy=0 pos=(32.36 1.73 -391.51)
+[ 243.594] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=09 ai=FF order=0 f1A=00 busy=0 pos=(32.54 2.26 -389.02) LEADER
+[ 243.594] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(32.06 1.87 -390.53)
+[ 245.594] watch: level=2 next=-1 | per 2s: frames=126 lifeTicks A=126 O=126 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1184 | p2=-
+[ 245.594] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=11 ai=00 order=0 f1A=00 busy=0 pos=(32.86 1.85 -390.51)
+[ 245.594] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=07 ai=FF order=0 f1A=00 busy=0 pos=(33.11 2.29 -388.92) LEADER
+[ 245.594] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(34.47 1.85 -390.39)
+[ 246.156] sound: first start of sound 000000A0 (instance 03DC962C at 0 0 0) from 004A8C97; leader Obelix; Asterix (32.3 1.7 -392.8) Obelix (32.3 2.2 -389.1)
+[ 247.594] watch: level=2 next=-1 | per 2s: frames=125 lifeTicks A=125 O=125 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1184 | p2=-
+[ 247.594] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=0C ai=04 order=4 f1A=00 busy=0 pos=(25.23 2.18 -390.62)
+[ 247.594] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=11 ai=FF order=0 f1A=00 busy=0 pos=(30.36 1.99 -390.02) LEADER
+[ 247.594] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(31.15 1.68 -392.31)
+[ 249.266] sound: first start of sound 0000005B (instance 03DD616C at 0 0 0) from 004E3EF3; leader Obelix; Asterix (28.3 1.7 -392.6) Obelix (27.8 2.0 -391.2)
+[ 249.359] hud2: the game's interface is now 03C3E0E8 (vt 006287C0, type 4) -- player 2's HUD hidden
+[ 249.594] watch: level=2 next=-1 | per 2s: frames=129 lifeTicks A=110 O=110 p2Routed=0 split=0 nearestHero=0 p2Bonuses=0 p2Beacons=0 p2Contacts=0 klusters=19886/2 sound=3597/0 region=0/0 | enforced=23 trioEvents=1184 | p2=-
+[ 249.594] state[watch]: Asterix f18=03 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(28.34 1.69 -392.59)
+[ 249.594] state[watch]: Obelix  f18=20 mode=normal PLAYER life=00 sit=00 body=13 ai=FF order=0 f1A=00 busy=0 pos=(27.84 1.99 -391.20) LEADER
+[ 249.594] state[watch]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=06 ai=00 order=0 f1A=00 busy=0 pos=(29.31 1.73 -392.23)
+[ 249.781] coop: hero switch refused: paused
+[ 249.781] sound: first start of sound 0000007F (instance 03DDDE34 at 0 0 0) from 00510F53; leader Obelix; Asterix (28.3 1.7 -392.6) Obelix (27.8 2.0 -391.2)
+[ 249.938] sound: first start of sound 00000080 (instance 03DDDE74 at 0 0 0) from 00510F53; leader Obelix; Asterix (28.3 1.7 -392.6) Obelix (27.8 2.0 -391.2)
+[ 250.219] hud2: the game's interface is now 00000000 (vt 00000000, type -1) -- player 2's HUD hidden
+[ 250.250] experimental: fight gate: 3 squad(s), 20 Romans left (rules single player, the game's own)
+[ 250.250] experimental: gate 15 -> 20, squad 03CD5DBC (active 0): [0: 1 to defeat (level 1), sent 0, alive 0]
+[ 250.250] experimental: gate 15 -> 20, squad 03CD5F20 (active 0): [0: 3 to defeat (level 3), sent 0, alive 0]
+[ 250.250] experimental: gate 15 -> 20, squad 03CD6084 (active 0): [0: 15 to defeat (level 15), sent 0, alive 0] [1: 1 to defeat (level 1), sent 0, alive 0]
+[ 250.297] sound: first start of sound 0000000B (instance 049E6AC8 at 136 5 35) from 0043AB38; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)
+[ 250.297] sound: first start of sound 0000000C (instance 049E6B08 at 142 82 29) from 0043AB38; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)
+[ 250.297] sound: first start of sound 0000000D (instance 049E6B48 at -237 10 3) from 0043AB38; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)
+[ 250.297] icons: "# # Selection" -> "# Selection" (for player 1)
+[ 250.313] experimental: fight gate: 0 squad(s), -1 Romans left (rules single player, the game's own)
+[ 250.313] coop: level 2 -> 0
+[ 250.313] coop: skip_cutscenes: 3 of 5 cutscenes now end on Enter
+[ 250.313] input: level 0, controller preset 3
+[ 250.313] hooks: cutscene path block 04993ECC ticked with no path slot -- asks for one first
+[ 250.313] hooks: cutscene path block 04993DB0 ticked with no path slot -- asks for one first
+[ 250.313] hooks: cutscene path block 04993708 ticked with no path slot -- asks for one first
+[ 250.313] hooks: cutscene path block 049935EC ticked with no path slot -- asks for one first
+[ 250.328] sound: stream 1 started (00000001, 255, 0, 0) -> channel 0, from 00469744; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)
+[ 250.328] sound: stream start stack: 469744 4664D3 4663D3 46B1F3 40A58C 409AE1 409B76 47A784 44005C 610048 5C0039 580058
+[ 250.328] hooks: cutscene path block 04993C94 ticked with no path slot -- asks for one first
+[ 250.328] hooks: cutscene path block 04993940 ticked with no path slot -- asks for one first
+[ 250.328] sound: first start of sound 0000000C (instance 049E6B08 at 142 82 29) from 0043B611; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)
+[ 250.609] sound: first start of sound 00000008 (instance 049E6BF0 at 0 0 0) from 00510F53; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)
+[ 250.766] sound: first start of sound 00000009 (instance 049E6C30 at 0 0 0) from 00510F53; leader ?; Asterix (0.0 0.0 0.0) Obelix (0.0 0.0 0.0)

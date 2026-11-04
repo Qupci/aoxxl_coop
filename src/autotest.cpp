@@ -8090,6 +8090,24 @@ const Step kSpLock26[] = {
 	SHOT(23000, "lever_406"), SHOT(28000, "lever_406_2"),
 	END(29000),
 };
+// splock26d (as splock26, XXL_LOGTRIO=1): the blocks' other end detector, 0D29
+// (xxl_coop.lv2-6_switch_miss.log, the other block pulled last): its group 1A5
+// sends 4803 before 48B7 -- the walked Asterix already following when "Asterix
+// leads" came, dropped (was), Obelix kept the lead; later 0CA8's 48CF lent
+// Asterix the lead and took it back. Now held as the dispatch began: handed back.
+const Step kSpLock26d[] = {
+	MARK(0, "splock26d"), LOADSECTOR(200, 6),
+	{ 3000, S_FLAGEV, 0x01B8, 0, 0, 0, 0, "01B8: obelix waits" },
+	PLACEAT(3500, HERO_ASTERIX, 87.29f, 2.54f, -394.99f),
+	{ 3800, S_NEAROBJ, HERO_ASTERIX, 52, 0, 1.0f, 0, "asterix faces the lever" },
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4120, 0, 0, 0, "r"),
+	P1(4600, PAD_X, 0, 0, "p1 X"), P1(4720, 0, 0, 0, "r"),
+	{ 9000, S_FLAGEV, 0x01D8, 0, 0, 0, 0, "zone 01D8: 4803" },
+	{ 14000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix held (the last block's walk)" },
+	{ 15000, S_FLAGEV, 0x0D29, 0, 0, 0, 0, "zone 0D29: 4803 + 48B7" },
+	SHOT(17000, "last_block"),
+	END(20000),
+};
 // splock26w (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
 // XXL_LOGTRIO=1): the user's LV2-6 two-lever stretch past the blocks
 // (xxl_coop.lv2-6_walk_to_obelix_stuck.log): 0231 walks Obelix to his marker
@@ -8494,6 +8512,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("splaunch24", kSpLaunch24),
 	SCENARIO("splaunch53", kSpLaunch53),
 	SCENARIO("splock26", kSpLock26),
+	SCENARIO("splock26d", kSpLock26d),
 	SCENARIO("splock26w", kSpLock26w),
 	SCENARIO("sptorch26", kSpTorch26),
 	SCENARIO("sptwist34", kSpTwist34),

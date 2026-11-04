@@ -1770,9 +1770,18 @@ EventDispatchFn g_origEventDispatch = nullptr;
 uint16_t g_dispatching[32];   // the groups being dispatched, as their first event ids
 int      g_nDispatching = 0;
 
+bool g_heldAtDispatch[2];   // each hero held by the level (AI order not follow) as the dispatch began
+
 void __fastcall EventDispatchHook(char* es, void* edx, void* arg) {
 	g_nDispatching = 0;
 	if (*(uint8_t*)(es + 0x22) && !CoopP2Joined() && g_config.spSwitchLock) {
+		// (A group may free the hero before it hands it the lead: LV2-6's 0D29,
+		// 4803 then 48B7 -- the switch then found Asterix following.)
+		Trio t = GetTrio();
+		for (int h = 0; h < 2; h++) {
+			Hero hh = t ? t.GetHero(h) : Hero();
+			g_heldAtDispatch[h] = hh && hh.Order() != AI_FOLLOW_LEADER;
+		}
 		uint8_t* tab = *(uint8_t**)(es + 0xC);
 		unsigned n1 = *(uint16_t*)(es + 0x1C), n = n1 + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
 		for (unsigned g = 0; tab && g < n && g < 0x1FFF && g_nDispatching < 32; g++) {
@@ -2629,6 +2638,7 @@ int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max) { r
 bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
 bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev) { return DispatchOnlySwitches(msg, ev); }
 bool ProximityDispatchHoldsLoser(unsigned msg) { return DispatchHoldsLoser(msg); }
+bool ProximityHeldAtDispatch(int hero) { return hero >= 0 && hero < 2 && g_heldAtDispatch[hero]; }
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;
 	int a = GroupSwitchTarget(*(uint16_t*)(l + 0x28));
