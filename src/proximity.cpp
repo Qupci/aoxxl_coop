@@ -1803,6 +1803,28 @@ bool DispatchOnlySwitches(unsigned msg, unsigned* ev) {
 	return found;
 }
 
+// Does a group under way that sends the trio `msg` (a lead switch) also hold the
+// hero losing the lead -- "the sidekick" waits (0x4802), walks or runs to a marker
+// (0x4813..0x4876), is put on one (0x48BB..0x48EC)? The level's hand-over: the
+// hero at the lever is parked, the other plays on (LV4-7's lever #138: 4800 +
+// 4802; LV2-6's #406: 48B8 + 481B).
+bool DispatchHoldsLoser(unsigned msg) {
+	for (int i = 0; i < g_nDispatching; i++) {
+		char* objs[64];
+		uint16_t msgs[64];
+		int n = GroupTargets(g_dispatching[i], objs, msgs, 64);
+		bool sends = false, holds = false;
+		for (int k = 0; k < n; k++) {
+			if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
+			unsigned m = msgs[k];
+			sends |= m == msg;
+			holds |= m == 0x4802 || (m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC);
+		}
+		if (sends && holds) return true;
+	}
+	return false;
+}
+
 // Does event `ev`'s group need both heroes: command the trio (above; not only
 // a switch of the lead to `up`, the standing hero), or start a ride / scripted
 // mode for both (trio 0x4806, 0x4807, 0x480B..0x480F: the belly slide's cross
@@ -2103,7 +2125,19 @@ bool LeverHeldBack(char* receiver, Trio t) {
 // hero waits where the level put it -- the lever frees it (LV2-5: lever #419
 // behind the iron crates, 48B7 + 4803, for Asterix held by the hearth's 0D60
 // walk). Pulled early as Obelix (your switch), the push-once lever was spent and
-// the hearth's wait held Asterix for good.
+// the hearth's wait held Asterix for good. Only such a freeing lever (its group's
+// trio orders: switches and 4803, nobody held): one that hands the lead over and
+// parks the hero at it (LV2-6's #406: 48B8 + 481B; LV4-7's #138: 4800 + 4802) is
+// the game's whoever follows.
+static bool GroupSendsTrio(unsigned ev, unsigned msg) {
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = GroupTargets(ev, objs, msgs, 64);
+	for (int k = 0; k < n; k++)
+		if (objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] == msg) return true;
+	return false;
+}
+
 static bool SoloLeverEarly(char* receiver, Trio t) {
 	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
 	int l = t.Leader();
@@ -2111,6 +2145,8 @@ static bool SoloLeverEarly(char* receiver, Trio t) {
 	for (unsigned ev : evs) {
 		int to = GroupSwitchTarget(ev);
 		if (to < 0 || to == l || (to != HERO_ASTERIX && to != HERO_OBELIX)) continue;
+		uint16_t sw[4];
+		if (GroupOnlySwitches(ev, sw, 4) <= 0 || !GroupSendsTrio(ev, 0x4803)) continue;
 		Hero h = t.GetHero(to);
 		if (!h || IndivFallen(to) || h.Order() != AI_FOLLOW_LEADER) continue;   // (held by the level: the lever's)
 		if (g_heldBackLogged != receiver) {
@@ -2592,6 +2628,7 @@ long ProximityP2Contacts() { return g_p2Contacts; }
 int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max) { return GroupTargets(ev, objs, msgs, max); }
 bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
 bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev) { return DispatchOnlySwitches(msg, ev); }
+bool ProximityDispatchHoldsLoser(unsigned msg) { return DispatchHoldsLoser(msg); }
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;
 	int a = GroupSwitchTarget(*(uint16_t*)(l + 0x28));

@@ -8040,22 +8040,35 @@ const Step kSpLockCar44[] = {
 	SHOT(24500, "riding"), SHOT(28000, "top"), SHOT(34000, "top_2"),
 	END(38000),
 };
-// splock26 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1): the
-// user's LV2-6 blocks (xxl_coop.lv2-6_question.log). You play Asterix; Obelix
-// leads, Asterix waits (4801 + 4802, as the rotary beam's lock). Zone 01D8
-// (Obelix's: 4803 alone) frees Asterix -- Obelix keeps the lead; the last
-// block's 01E8 ("Asterix leads" + 4803) gives it back to Asterix (was: Obelix
-// made the hero you play at 01D8, 01E8's switch ignored).
+// splock26 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
+// XXL_LOGTRIO=1): the user's LV2-6 blocks (xxl_coop.lv2-6_question.log). You
+// play Asterix; 01B8 has Obelix wait (the rotary beam's), Asterix punches the
+// blocks lever (by 87.3 2.5 -395.0: Obelix leads, Asterix waits) -- the level's
+// hand-over, Obelix is the hero you play (was: pending back to Asterix). Zone
+// 01D8 (Obelix's: 4803 alone) frees Asterix, Obelix keeps the lead; the last
+// block walks Asterix (here 4802: held) into 01E8 ("Asterix leads" + 4803):
+// handed back, Asterix yours again. Then Asterix punches #406 (25.8 3.0 -348.4:
+// 48B8 + 481B) with Obelix following -- the lever's (round 212's early-lever
+// check ignored it), Obelix yours, Asterix walked to marker 8.
 const Step kSpLock26[] = {
 	MARK(0, "splock26"), LOADSECTOR(200, 6),
-	{ 3000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
-	{ 3300, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix waits" },
-	SHOT(4500, "held"),
-	{ 6000, S_FLAGEV, 0x01D8, 0, 0, 0, 0, "zone 01D8: 4803" },
-	SHOT(8000, "freed"),
-	{ 11000, S_FLAGEV, 0x01E8, 0, 0, 0, 0, "zone 01E8: asterix leads" },
-	SHOT(13000, "last_block"),
-	END(14000),
+	{ 3000, S_FLAGEV, 0x01B8, 0, 0, 0, 0, "01B8: obelix waits" },
+	PLACEAT(3500, HERO_ASTERIX, 87.29f, 2.54f, -394.99f),
+	{ 3800, S_NEAROBJ, HERO_ASTERIX, 52, 0, 1.0f, 0, "asterix faces the lever" },
+	P1(4000, PAD_X, 0, 0, "p1 X"), P1(4120, 0, 0, 0, "r"),
+	P1(4600, PAD_X, 0, 0, "p1 X"), P1(4720, 0, 0, 0, "r"),
+	SHOT(7000, "held"),
+	{ 9000, S_FLAGEV, 0x01D8, 0, 0, 0, 0, "zone 01D8: 4803" },
+	SHOT(11000, "freed"),
+	{ 14000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix held (the last block's walk)" },
+	{ 15000, S_FLAGEV, 0x01E8, 0, 0, 0, 0, "zone 01E8: asterix leads" },
+	SHOT(17000, "last_block"),
+	PLACEAT(19000, HERO_ASTERIX, 25.0f, 2.1f, -348.2f), PLACEAT(19000, HERO_OBELIX, 23.0f, 2.1f, -349.5f),
+	{ 19500, S_NEAROBJ, HERO_ASTERIX, 52, 0, 1.0f, 0, "asterix faces lever 406" },
+	P1(20000, PAD_X, 0, 0, "p1 X"), P1(20120, 0, 0, 0, "r"),
+	P1(20600, PAD_X, 0, 0, "p1 X"), P1(20720, 0, 0, 0, "r"),
+	SHOT(23000, "lever_406"), SHOT(28000, "lever_406_2"),
+	END(29000),
 };
 // splock26w (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
 // XXL_LOGTRIO=1): the user's LV2-6 two-lever stretch past the blocks

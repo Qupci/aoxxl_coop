@@ -4045,3 +4045,24 @@ both halves).
   0; was: the lead to Asterix). splock47: Obelix's lever with Asterix held at the car's foot works ("Obelix locked
   by the level", the car drops). Open: LV4-7's handedTo (xxl_coop.lv4-7_inf_lead_pend.log) -- choice stays Obelix
   after 0AF0 with nothing in the level handing it back (user calls it a pending that never ends).
+- Round 213 (user, sp_hero_switch_lock: no "pending" lead after a level's hand-over -- LV4-7's lever #138, Obelix's,
+  4800 + 4802 "disable sidekick movement": Asterix should simply lead, as with the lock off; LV2-6's blocks lever
+  the same for Asterix; the last block walks Asterix into 01E8 (4800 + 4803, XXL-Editor Snipaste_2026-11-04_21-56-17 /
+  21-57-20) -- the SP game's own switch back). SoloDropsSwitch: a kept switch whose dispatched group also holds the
+  hero losing the lead (ProximityDispatchHoldsLoser: trio 4802, 4813..4876 -- the circle's 4849 too --, 48BB..48EC)
+  is the level's hand-over: SoloHandOver makes `to` the hero you play (choice), the old one noted in
+  g_solo.handedFrom. A later switch-only group to handedFrom while the level holds it (AI order not follow, not
+  down) is kept and hands it back (LV2-6 01E8); to any other hero still dropped (LV3-5's corkscrew box 0340 for
+  Obelix -- never handed over). handedFrom cleared by your own switch / R3 + X / a new level. The handedTo branch
+  (SoloFreedByLeadersZone, a lock whose switch was not a hand-over) now hands over too, instead of round 211's
+  endless "keeps the lead until the level hands it back". The 0.3 s give-back ("pending") stays only after
+  switches that are not the level's hand-over: the game's own (a cable car's boarding, the belly slide), a group
+  with other trio orders, the mod's lending (SoloOrderNeedsLead). Also round 212's SoloLeverEarly now needs the
+  lever's group to free someone (GroupOnlySwitches + trio 4803): a hand-over lever (LV2-6's #406: 48B8 + 481B)
+  with the other hero following is the game's (it would have been ignored). splock26 rewritten (XXL_LOGTRIO=1): 01B8
+  (Obelix waits), Asterix punches the blocks lever (87.0 2.5 -396.2): "hands the lead to Obelix ... the hero you
+  play now"; 01D8 frees Asterix, Obelix keeps it; 4802 then 01E8: "hands the lead back to the hero it parked";
+  Asterix punches #406 (25.8 3.0 -348.4) with Obelix following: 48B8 + 481B, Obelix yours, Asterix walked (order 1
+  -> 3). splock47: 38.6 s "hands the lead to Asterix", at the end Asterix leads, Obelix follows. splock21 / splockcork21:
+  the circle's 0050 (4801 + 4802) and the top box 0058 (4800 + 4828) hand over. splever25, splockord2, splockev2,
+  spboss210, splock43, splockcork35 unchanged.

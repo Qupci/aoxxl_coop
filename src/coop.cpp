@@ -4575,10 +4575,16 @@ static const char* const kSwitchTooFar = "the other hero is too far";
 // move" (0x4803) (ProximityDispatchOnlySwitches); a switch the game makes from
 // its own code (a cable car's boarding, the belly slide) stays too. Such a
 // lock is the switch to the other hero; a lock with no switch (the automatic
-// cable car, user: its camera follows the car) switches nothing. Once the hero
-// you played (`choice`: the leader at the level's start, then your own
-// switches) is free again -- following, on its feet, the switch's own checks
-// met (SoloSwitchRefusal) for 0.3 s -- it leads again. Refused only for its
+// cable car, user: its camera follows the car) switches nothing. A switch
+// whose group holds the hero losing the lead is the level's hand-over (a lever
+// that parks the hero at it): the other hero is yours from then, as with the
+// lock off, and the level's own switch back to the parked hero is kept
+// (SoloHandOver). After any other kept switch -- the game's own (a cable car's
+// boarding, the belly slide), a group with other trio orders, the mod's lending
+// (SoloOrderNeedsLead) -- once the hero you played (`choice`: the leader at the
+// level's start, then your own switches) is free again -- following, on its
+// feet, the switch's own checks met (SoloSwitchRefusal) for 0.3 s -- it leads
+// again. Refused only for its
 // distance for 3 s, the lead stays where it is and is your choice from then.
 // Nothing while a hero is down (second chance leads then).
 struct SoloLock {
@@ -4588,6 +4594,7 @@ struct SoloLock {
 	int   levelLeader = -1;  // the hero the level's last switch (an event group's) means to lead
 	int   release = -1;      // a dropped switch's hero, held by the level then: freed once it waits (SoloReleaseWatch)
 	int   handedTo = -1;     // the leader whose zone freed the hero you play (SoloFreedByLeadersZone)
+	int   handedFrom = -1;   // the hero you played before a level's hand-over (SoloHandOver): its switch back is kept
 	DWORD releaseAt = 0;
 } g_solo;
 
@@ -4609,6 +4616,21 @@ int CoopSoloLevelLeaderAway() {
 int CoopSoloLockedHero() {
 	if (!SoloSwitchLockOn()) return -2;
 	return g_solo.level == g.lastLevel ? g_solo.choice : -1;
+}
+
+// The level's switch to `to` kept as the hero you play from now (the lock off's
+// way): the hero you played noted (handedFrom), the level's own hand back to it
+// kept. Logged on change.
+static void SoloHandOver(int to, const char* why) {
+	if (g_solo.choice == to) return;
+	static int s_told = 0;
+	if (s_told++ < 40)
+		Log("coop: sp_hero_switch_lock: the level hands the lead to %s (%s) -- %s is the hero you play now", HeroName(to), why,
+		    HeroName(to));
+	if (g_solo.choice == HERO_ASTERIX || g_solo.choice == HERO_OBELIX) g_solo.handedFrom = g_solo.choice;
+	g_solo.choice = to;
+	g_solo.handedTo = -1;
+	g_solo.freeSince = g_solo.farSince = 0;
 }
 
 static bool SoloDropsSwitch(int ev) {
@@ -4640,8 +4662,28 @@ static bool SoloDropsSwitch(int ev) {
 	// way -- a rope cable car's end, zone 0020 on LV2-1's landing: "Asterix
 	// leads" + "the sidekick may move". Dropped, Asterix stayed the companion with
 	// the ride's wait order, never free, never given the lead back.)
-	if (t.Leader() == to || to == g_solo.choice || !ProximityDispatchOnlySwitches(ev & 0xFFFF, &group))
+	if (t.Leader() == to || to == g_solo.choice) return false;
+	// The level's hand-over (the group also holds the hero losing the lead: a
+	// lever that parks the hero at it -- LV4-7's #138, Obelix's: 4800 + 4802;
+	// LV2-6's blocks lever, Asterix's: Obelix leads, Asterix waits): the other hero
+	// is the one you play from now, as with the lock off. A "pending" lead back to
+	// the parked hero once freed had no end where the level never hands back
+	// (LV4-7, user: "LOCK: ON (OBELIX)" with Asterix leading for good).
+	if (ProximityDispatchHoldsLoser(ev & 0xFFFF)) {
+		SoloHandOver(to, "its group holds the hero losing the lead");
 		return false;
+	}
+	// The level hands it back to the hero it parked: kept -- to that hero while
+	// the level holds it (LV2-6: the last block walks Asterix into 01E8, "Asterix
+	// leads" + 4803; user: the SP game's switch). A switch-only group to a hero you
+	// never handed over is still dropped (LV3-5's corkscrew box 0340 for Obelix).
+	Hero th = t.GetHero(to);
+	if (to == g_solo.handedFrom && th && th.Order() != AI_FOLLOW_LEADER && !IndivFallen(to)) {
+		SoloHandOver(to, "the level hands the lead back to the hero it parked");
+		g_solo.handedFrom = -1;
+		return false;
+	}
+	if (!ProximityDispatchOnlySwitches(ev & 0xFFFF, &group)) return false;
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: no lock) ignored -- %s keeps the lead",
@@ -4651,7 +4693,6 @@ static bool SoloDropsSwitch(int ev) {
 	// sidekick may move"). Dropped, the group's 4803 reaches him mid-jump, where
 	// the trio takes no new order (FUN_00481810), and the jump ends in a wait (3):
 	// held for good. SoloReleaseWatch frees him once he waits.
-	Hero th = t.GetHero(to);
 	if (th && th.Order() != AI_FOLLOW_LEADER) {
 		g_solo.release = to;
 		g_solo.releaseAt = GetTickCount();
@@ -4798,6 +4839,7 @@ static void SoloHeroSwitch(Trio t) {
 	if (s_logs++ < 60) Log("coop: hero switch: %s -> %s", HeroName(l), HeroName(OtherHero(l)));
 	CoopGiveLead(OtherHero(l), "the hero switch button");
 	g_solo.choice = t.Leader();
+	g_solo.handedFrom = -1;
 }
 
 static void SoloSwitchLockWatch(Trio t) {
@@ -4807,6 +4849,7 @@ static void SoloSwitchLockWatch(Trio t) {
 		s.levelLeader = -1;
 		s.release = -1;
 		s.handedTo = -1;
+		s.handedFrom = -1;
 		s.level = g.lastLevel;
 		s.freeSince = s.farSince = 0;
 		return;
@@ -4835,21 +4878,13 @@ static void SoloSwitchLockWatch(Trio t) {
 		s.handedTo = -1;   // (LV2-1's 03C8, Obelix's, frees the circle's Asterix for the turnstile: its end gives the lead)
 		return;
 	}
-	// Handed on (SoloFreedByLeadersZone): the leader keeps the lead, not given
-	// back -- but the hero you play stays yours, so the level's own later switch
-	// to it is kept, as with the lock off (LV2-6: zone 01D8, Obelix's, frees the
-	// waiting Asterix; Obelix pushes the blocks; the last one's 01E8 "Asterix
-	// leads" -- made Obelix "the hero you play" for good, it was ignored). Ends
-	// once your hero leads again (above), or with your own switch.
+	// Handed on (SoloFreedByLeadersZone; a lock whose switch was not the level's
+	// hand-over -- those make the other hero yours at once, SoloDropsSwitch): the
+	// level goes on with the leader, the hero you play from now, its own switch
+	// back kept (handedFrom), as with the lock off.
 	if (s.handedTo == l) {
-		static int s_told = 0;
-		if (!s.freeSince && s_told++ < 20)
-			Log("coop: sp_hero_switch_lock: %s, held, freed from %s's zone (4803 alone) -- the level goes on with %s: it keeps the lead "
-			    "until the level hands it back",
-			    HeroName(s.choice), HeroName(l), HeroName(l));
 		s.levelLeader = l;
-		s.freeSince = 1;   // (logged)
-		s.farSince = 0;
+		SoloHandOver(l, "freed from the leader's zone, 4803 alone");
 		return;
 	}
 	if (s.freeSince == 1) s.freeSince = 0;
@@ -4925,6 +4960,7 @@ static void SoloModButtons(Trio t) {
 		Log("coop: cheat: player 1 gives the lead to %s (R3 + X)", HeroName(c));
 		CoopGiveLead(c, "R3 + X");
 		g_solo.choice = t.Leader();
+		g_solo.handedFrom = -1;
 	}
 	ModCheats(pressed, t.Leader(), "player 1");
 }
