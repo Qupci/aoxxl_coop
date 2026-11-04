@@ -4098,3 +4098,17 @@ both halves).
   splockslide22 (new; XXL_SPSWITCHLOCK=1 XXL_LOGTRIO=1; the slide is steered by hand -- the user did): before,
   "free again" at 87.7 s; after, "the trio's ride mode ... Obelix is the hero you play now" at the start, 0030 at
   61.2 s, Obelix leads to the end (96 s).
+- Round 216 (user: the lock is good now; LV2-4 (level 2 sector 3) launcher at -38.80 6.52 -570.38 switched Obelix ->
+  Asterix, xxl_coop.lv2-4_launcher_switch.log). Obelix (yours since the belly slide's hand-over: handedFrom Asterix) on
+  the launcher (situation 0x0D, waiting) with Asterix swimming far off; the launcher's event 0AB0 (group 156: 48BD,
+  the sidekick put on a marker -- Asterix onto it). The level's leader was Asterix (dropped switches 0288 / 0568), so
+  SoloOrderNeedsLead lent Asterix the lead "for it"; that CoopGiveLead's 4800 (from the mod, 0x66E26056) went down
+  round 214's game-switch branch as "the game hands the lead back to the hero it parked" -> Asterix the hero you play;
+  deferred (flying) to the landing, where the launcher's own 4800 (0x4C2B2E) was then kept ("to == choice"). Two
+  fixes: SoloDropsSwitch ignores callers outside axxl.exe's image (GetModuleHandle(0) + SizeOfImage: the mod's own
+  switches -- yours, the give-back, a lending -- were never meant for it; round 215's "game's own switch ... (pending)"
+  log fired on them too). SoloOrderNeedsLead: with the leader in situation 0x0D (on a launcher) the order is for the
+  companion, as sent. splaunch24 (new, LOADSECTOR(200, 3): you play Obelix, 0568 dropped, Obelix on the launcher, P1
+  X, Asterix put in the water -62.0 -1.5 -551.5): before, "meaning Obelix -- Asterix leads for it first", the 4800
+  deferred to the landing; after, "with Obelix on a launcher -- Asterix, as sent", the landing's 4800 ignored, Obelix
+  leads to the end. splockcar21 unchanged (boarding / 0020 hand-over and back).

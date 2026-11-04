@@ -8128,6 +8128,25 @@ const Step kSpTorch26[] = {
 	SHOT(14000, "second_take"),
 	END(17000),
 };
+// splaunch24 (level 2, sector 3, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
+// XXL_LOGTRIO=1): the user's LV2-4 launcher (-38.80 6.52 -570.38,
+// xxl_coop.lv2-4_launcher_switch.log): you play Obelix; zone 0568 ("Asterix leads",
+// dropped) leaves the level's leader Asterix; Obelix takes the launcher with
+// Asterix swimming far off -- its event 0AB0 (48BD) puts Asterix on it. Was: the
+// mod lent Asterix the lead "for it", that lending taken for the game's hand-back
+// (Asterix "the hero you play"), and the landing's 4800 kept: Obelix -> Asterix.
+const Step kSpLaunch24[] = {
+	MARK(0, "splaunch24"), LOADSECTOR(200, 3),
+	{ 2500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 3200, S_FLAGEV, 0x0568, 0, 0, 0, 0, "zone 0568: asterix leads (dropped)" },
+	FORCE(3500, HERO_ASTERIX, 1),
+	PLACEAT(3700, HERO_OBELIX, -38.34f, 4.9f, -571.73f), PLACEAT(3700, HERO_ASTERIX, -61.99f, -1.5f, -551.48f),
+	FORCE(4100, HERO_ASTERIX, 0),
+	P1(5000, PAD_X, 0, 0, "p1 X (launcher)"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(9000, "waiting"), SHOT(14000, "flight"),
+	SHOT(22000, "landed"), SHOT(27000, "landed_2"),
+	END(28000),
+};
 // splaunch53 (-Level 5, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1): the
 // user's LV5-3 launcher (-341.16 14.08 151.54) in single player, the lock on:
 // Asterix leads from the level start, you switch to Obelix, he takes the launcher
@@ -8472,6 +8491,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("splock43", kSpLock43),
 	SCENARIO("splockcar44", kSpLockCar44),
 	SCENARIO("splock47", kSpLock47),
+	SCENARIO("splaunch24", kSpLaunch24),
 	SCENARIO("splaunch53", kSpLaunch53),
 	SCENARIO("splock26", kSpLock26),
 	SCENARIO("splock26w", kSpLock26w),

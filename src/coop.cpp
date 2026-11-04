@@ -4649,6 +4649,16 @@ static bool SoloDropsSwitch(int ev) {
 	// LV5-5's keg order for the sidekick (4815) gave Obelix the lead for it.
 	bool launcher = from >= 0x4C2AB0 && from < 0x4C2AB0 + 1416;
 	if (!t) return false;
+	// (The mod's own switches -- CoopGiveLead: your switch, the lock's give-back, a
+	// lending for a level's order -- are none of the game's: LV2-4's lending to
+	// Asterix was taken for "the game hands the lead back to the hero it parked".)
+	static uintptr_t s_exeLo = 0, s_exeHi = 0;
+	if (!s_exeLo) {
+		char* m = (char*)GetModuleHandleA(nullptr);
+		s_exeLo = (uintptr_t)m;
+		s_exeHi = s_exeLo + ((IMAGE_NT_HEADERS*)(m + ((IMAGE_DOS_HEADER*)m)->e_lfanew))->OptionalHeader.SizeOfImage;
+	}
+	if (from < s_exeLo || from >= s_exeHi) return false;
 	if (!launcher && (from < 0x46B180 || from >= 0x46B331)) {
 		// The game's own switches, kept. A rope cable car's boarding
 		// (CKHkTowedTelepher: the rider's tick, 0x49ACB9 4801 -- Asterix holds the
@@ -4802,6 +4812,19 @@ static void SoloOrderNeedsLead(int ev) {
 		if (s_boss++ < 20)
 			Log("coop: sp_hero_switch_lock: a boss run's order for the sidekick (%04X) -- %s goes, %s keeps the lead", e,
 			    HeroName(OtherHero(t.Leader())), HeroName(t.Leader()));
+		return;
+	}
+	// The leader on a trio launcher (situation 0x0D: waiting for the companion, or
+	// flying): the launcher's own event puts the companion on it (LV2-4's at -38.8
+	// 6.5 -570.4, event 0AB0: 48BD for the swimming Asterix while Obelix waited on
+	// it). Lent to Asterix "for it", deferred to the landing, the launcher's landing
+	// switch then kept: Obelix -> Asterix (user).
+	Hero lh = t.GetHero(t.Leader());
+	if (lh && Situation(lh) == kSituationGroupAction) {
+		static int s_launch = 0;
+		if (s_launch++ < 20)
+			Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) with %s on a launcher -- %s, as sent", e,
+			    HeroName(t.Leader()), HeroName(OtherHero(t.Leader())));
 		return;
 	}
 	static int s_told = 0;
