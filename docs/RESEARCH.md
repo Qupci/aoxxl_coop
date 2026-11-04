@@ -4066,3 +4066,19 @@ both halves).
   -> 3). splock47: 38.6 s "hands the lead to Asterix", at the end Asterix leads, Obelix follows. splock21 / splockcork21:
   the circle's 0050 (4801 + 4802) and the top box 0058 (4800 + 4828) hand over. splever25, splockord2, splockev2,
   spboss210, splock43, splockcork35 unchanged.
+- Round 214 (user: round 213 right, but LV3-5's corkscrew box 0340 -- 4801 + 4803, Obelix jumping off -- should
+  switch to Obelix under the new rule (the user's round-203 wish withdrawn); the rope cable car's (CKHkTowedTelepher)
+  switch is the game's own, Asterix on the bars, back at the dismount -- the pending looks like a hack there).
+  (1) A group that holds the other hero (ProximityDispatchHoldsLoser) is a hand-over even with its switch's hero
+  already leading: SoloHandOver now notes handedFrom = the other hero (the one parked), not the old choice, and is
+  checked before the "leads already / your hero" early return. LV3-5: the rope car's end 0C38 (4800 + 48C8 + 4802)
+  notes Obelix; 0340's 4801 while Obelix jumps (order 2) is the hand-back: kept, Obelix the hero you play.
+  (2) The game's own switches (outside the dispatch): the rope car's boarding (0x49ACB9 4801, the rider's tick;
+  then 0x49ACC7 4812 the ride order) is a hand-over -- Obelix yours and the level's leader (LV4-4's sphere #4 bound
+  to Asterix stays unswapped); a game switch back to handedFrom hands it back too. The car's end in each level is a
+  zone (LV2-1 0020, LV3-3 0830: 4800 + 4803) -- the hand-back with Asterix still on the car (order 9). The pending
+  give-back never fired for rope cars (Asterix held to the end zone); it remains for the belly slide / boat (not
+  looked at), groups with other trio orders, and SoloOrderNeedsLead's lending. splockcork35 (XXL_SPSECOND=1):
+  "hands the lead back to the hero it parked" at 0340, Obelix leads, Asterix follows (order 0). splockcar21 (+ S_FLAGEV
+  0020 at 13 s): boarding -> Obelix, 0020 -> Asterix (on the car, order 9). splockcar44: boarding -> Obelix, no
+  "zones for Asterix answer Obelix". splock26, splock47, splock21, splockcork21, splockord2, spboss210 as round 213.

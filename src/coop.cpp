@@ -4619,15 +4619,15 @@ int CoopSoloLockedHero() {
 }
 
 // The level's switch to `to` kept as the hero you play from now (the lock off's
-// way): the hero you played noted (handedFrom), the level's own hand back to it
-// kept. Logged on change.
+// way): the other hero, parked by the level, noted (handedFrom) -- the level's
+// own hand back to it is kept. Logged on change.
 static void SoloHandOver(int to, const char* why) {
+	g_solo.handedFrom = OtherHero(to);
 	if (g_solo.choice == to) return;
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level hands the lead to %s (%s) -- %s is the hero you play now", HeroName(to), why,
 		    HeroName(to));
-	if (g_solo.choice == HERO_ASTERIX || g_solo.choice == HERO_OBELIX) g_solo.handedFrom = g_solo.choice;
 	g_solo.choice = to;
 	g_solo.handedTo = -1;
 	g_solo.freeSince = g_solo.farSince = 0;
@@ -4648,7 +4648,24 @@ static bool SoloDropsSwitch(int ev) {
 	// level's leader, the one of a 4801 dropped in LV5-3 long before stayed, and
 	// LV5-5's keg order for the sidekick (4815) gave Obelix the lead for it.
 	bool launcher = from >= 0x4C2AB0 && from < 0x4C2AB0 + 1416;
-	if (!t || (!launcher && (from < 0x46B180 || from >= 0x46B331))) return false;
+	if (!t) return false;
+	if (!launcher && (from < 0x46B180 || from >= 0x46B331)) {
+		// The game's own switches, kept. A rope cable car's boarding
+		// (CKHkTowedTelepher: the rider's tick, 0x49ACB9 4801 -- Asterix holds the
+		// bars, Obelix leads) is a hand-over too: Obelix the hero you play, the
+		// level's leader with it (zones as sent: LV4-4's sphere #4 at the ride's
+		// end), until the ride's end hands it back (LV2-1's zone 0020: "Asterix
+		// leads" + 4803, Asterix still on the car). Was: kept as a lock of yours,
+		// the lead given back once free (the end's switch did it first anyway).
+		if (from == 0x49ACB9 && t.Leader() != to) {
+			g_solo.levelLeader = to;
+			SoloHandOver(to, "a rope cable car's boarding, the rider on it");
+		} else if (to == g_solo.handedFrom && t.Leader() != to) {
+			SoloHandOver(to, "the game hands the lead back to the hero it parked");
+			g_solo.handedFrom = -1;
+		}
+		return false;
+	}
 	g_solo.levelLeader = to;   // (the leader the level means from now, given or not: SoloOrderNeedsLead)
 	if (launcher) {
 		if (t.Leader() == to || to == g_solo.choice) return false;
@@ -4658,25 +4675,28 @@ static bool SoloDropsSwitch(int ev) {
 			    HeroName(t.Leader()));
 		return true;
 	}
+	// The level's hand-over (the group also holds the other hero: a lever that
+	// parks the hero at it -- LV4-7's #138, Obelix's: 4800 + 4802; LV2-6's blocks
+	// lever, Asterix's: Obelix leads, Asterix waits): the other hero is the one you
+	// play from now, as with the lock off. A "pending" lead back to the parked hero
+	// once freed had no end where the level never hands back (LV4-7, user: "LOCK:
+	// ON (OBELIX)" with Asterix leading for good). Also with the lead already
+	// there: the parked hero is noted (LV3-5's rope car end 0C38: "Asterix leads",
+	// Obelix put on the corkscrew, 4802 -- its top box 0340 hands it to him).
+	if (ProximityDispatchHoldsLoser(ev & 0xFFFF)) {
+		SoloHandOver(to, "its group holds the other hero");
+		return false;
+	}
 	// (A switch to the hero you play is kept: the level ends a lock of it that
 	// way -- a rope cable car's end, zone 0020 on LV2-1's landing: "Asterix
 	// leads" + "the sidekick may move". Dropped, Asterix stayed the companion with
 	// the ride's wait order, never free, never given the lead back.)
 	if (t.Leader() == to || to == g_solo.choice) return false;
-	// The level's hand-over (the group also holds the hero losing the lead: a
-	// lever that parks the hero at it -- LV4-7's #138, Obelix's: 4800 + 4802;
-	// LV2-6's blocks lever, Asterix's: Obelix leads, Asterix waits): the other hero
-	// is the one you play from now, as with the lock off. A "pending" lead back to
-	// the parked hero once freed had no end where the level never hands back
-	// (LV4-7, user: "LOCK: ON (OBELIX)" with Asterix leading for good).
-	if (ProximityDispatchHoldsLoser(ev & 0xFFFF)) {
-		SoloHandOver(to, "its group holds the hero losing the lead");
-		return false;
-	}
 	// The level hands it back to the hero it parked: kept -- to that hero while
 	// the level holds it (LV2-6: the last block walks Asterix into 01E8, "Asterix
-	// leads" + 4803; user: the SP game's switch). A switch-only group to a hero you
-	// never handed over is still dropped (LV3-5's corkscrew box 0340 for Obelix).
+	// leads" + 4803; user: the SP game's switch; LV3-5's corkscrew box 0340, 4801 +
+	// 4803, Obelix jumping off it, parked by 0C38). A switch-only group to a hero
+	// the level did not park is still dropped.
 	Hero th = t.GetHero(to);
 	if (to == g_solo.handedFrom && th && th.Order() != AI_FOLLOW_LEADER && !IndivFallen(to)) {
 		SoloHandOver(to, "the level hands the lead back to the hero it parked");

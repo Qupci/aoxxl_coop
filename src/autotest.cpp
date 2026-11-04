@@ -7891,6 +7891,9 @@ const Step kSpMod2[] = {
 // hands Obelix the lead: kept, Asterix locked); the car pulled to its rope's end,
 // Asterix lands through zone 0020 ("switch to Asterix" + "the sidekick may
 // move"): the switch is to the hero you play -- kept, Asterix leads again.
+// Since round 214 the boarding is a hand-over (Obelix the hero you play) and
+// 0020 (flagged here: S_CARPOS never ends the ride) hands it back to Asterix,
+// still on the car.
 const Step kSpLockCar21[] = {
 	MARK(0, "splockcar21"),
 	PLACEAT(1400, HERO_ASTERIX, -782.0f, 511.5f, -1059.9f),
@@ -7903,8 +7906,10 @@ const Step kSpLockCar21[] = {
 	{ 8000, S_CARPOS, HERO_ASTERIX, 0, 0, 18.0f, 0, "car along its rope" },
 	{ 9000, S_CARPOS, HERO_ASTERIX, 0, 0, 24.0f, 0, "car along its rope" },
 	{ 10000, S_CARPOS, HERO_ASTERIX, 0, 0, 30.0f, 0, "car along its rope" },
-	SHOT(12000, "end"), SHOT(15000, "after"),
-	END(16000),
+	SHOT(12000, "end"),
+	{ 13000, S_FLAGEV, 0x0020, 0, 0, 0, 0, "the landing's zone 0020: asterix leads + 4803" },
+	SHOT(15000, "after"),
+	END(17000),
 };
 // spfindkeg2 (level 2): the event groups sending the trio Idefix's follow (4878)
 // and "switch to Asterix" (4800) -- the keg's and the rope car's end.
@@ -8346,8 +8351,10 @@ const Step kSpSq24N[] = {
 // on): you play Asterix; LV3-5's cable car end -- zone 0C38 (flagged): Asterix
 // leads, Obelix put on the corkscrew, waits; Asterix hits the turnstile (user's
 // spot -143.4 5.5 -257.7), Obelix rises, jumps off at the top (0C08's 484C) into
-// box 0340 (4801 "Obelix leads" + 4803): the switch dropped -- Obelix must follow
-// after (user: held there for good).
+// box 0340 (4801 "Obelix leads" + 4803): since round 214 kept -- 0C38 parked
+// Obelix (the level's hand-over), 0340 hands him the lead, the hero you play from
+// then (user); Asterix follows. (Round 203: dropped, Obelix freed once he waits --
+// before that, held there for good.)
 const Step kSpLockCork35[] = {
 	MARK(0, "splockcork35"), LOADSECTOR(200, 5),
 	FORCE(2800, HERO_OBELIX, 1),
