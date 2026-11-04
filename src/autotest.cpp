@@ -8038,6 +8038,20 @@ const Step kSpLockCar44[] = {
 	SHOT(24500, "riding"), SHOT(28000, "top"), SHOT(34000, "top_2"),
 	END(38000),
 };
+// splaunch53 (-Level 5, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1): the
+// user's LV5-3 launcher (-341.16 14.08 151.54) in single player, the lock on:
+// Asterix leads from the level start, you switch to Obelix, he takes the launcher
+// (X). Was: "Asterix leads" in mid-flight, deferred to the landing, then handed
+// back to Obelix 0.3 s later (Obelix -> Asterix -> Obelix).
+const Step kSpLaunch53[] = {
+	MARK(0, "splaunch53"), LOADSECTOR(200, 3),
+	PLACEAT(3000, HERO_ASTERIX, -341.64f, 12.2f, 152.53f), PLACEAT(3000, HERO_OBELIX, -340.69f, 12.2f, 151.56f),
+	{ 3500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	P1(5000, PAD_X, 0, 0, "p1 X (launcher)"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(8000, "flight"),
+	SHOT(16000, "landed"), SHOT(20000, "landed_2"),
+	END(21000),
+};
 // splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
 // the user's LV4-7 (#137 at -972.8 247.5 -1069.1, plane #17 bound to Obelix),
 // Asterix leads from the level start, you switch to Obelix: event 0448 ("the
@@ -8365,6 +8379,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("splock43", kSpLock43),
 	SCENARIO("splockcar44", kSpLockCar44),
 	SCENARIO("splock47", kSpLock47),
+	SCENARIO("splaunch53", kSpLaunch53),
 	SCENARIO("sptwist34", kSpTwist34),
 	SCENARIO("sptwist2", kSpTwist2),
 	SCENARIO("sptwist2j", kSpTwist2J),

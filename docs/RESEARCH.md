@@ -3997,3 +3997,19 @@ both halves).
   did not drop), Asterix on the car (-932.601 229.270 -1021.889), rides, down through #147: "now the hero you
   play" Asterix, Obelix follows. splock43, splockcar44, spboss210, splockcork21, splock21 as before; splockord2:
   0528's walk as sent (Asterix).
+- Round 210 (user, sp_hero_switch_lock: LV5-3's launcher -341.2 14.1 151.5 as Obelix went Obelix -> Asterix ->
+  Obelix; LV5-5's keg order switched Asterix -> Obelix -> Asterix in a full play (xxl_coop.lv5-5_switch.log) but
+  not from a fresh level load (_didnt_repro.log)). One cause: the launcher's landing switch is the game's own code,
+  not an event group -- CKHkTrioCatapult tick (vf15 0x4C2AB0, send at 0x4C2B26): with its +0x15 bit 1 set it sends
+  4800 if its +0x14 bit 2 (Asterix's launcher) and Obelix leads, 4801 the other way, then FUN_00460c20(+0x1C) its
+  event. SoloDropsSwitch only took switches from the dispatch (0x46B180..0x46B331): the 4800 came mid-flight,
+  CoopDeferTrioEvent deferred it to the landing (the deferral log now names the caller), it was sent, and the
+  watch gave Obelix back 0.3 s later. And g_solo.levelLeader was never set by it: in the user's full play it
+  stayed Obelix from event 07E0's dropped 4801 (LV5-3, 218 s) to LV5-5 (989 s), where the keg's 4815 ("the
+  sidekick ...", not from a zone) made SoloOrderNeedsLead give Obelix the lead for it; a fresh LV5 load starts
+  with 05E8's 4800 (levelLeader Asterix): no switch. Now SoloDropsSwitch also takes the launcher's caller
+  range: levelLeader = its hero, the switch dropped unless it is to the hero you play / the leader. splaunch53
+  (-Level 5, XXL_SPSWITCHLOCK=1, S_SPSWITCH to Obelix, X on the launcher): "the launcher's landing switch 4800
+  ignored -- Obelix keeps the lead", landed at (360 12 42), Asterix order 0. Was (same test, before):
+  "trio event 4800 from 004C2B2E ... after the landing", then "Obelix takes the lead (... free again)". LV5-5's
+  keg not autotested (its levelLeader is now Asterix after the launcher, as on a fresh load).

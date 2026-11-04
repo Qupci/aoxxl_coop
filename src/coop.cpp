@@ -1915,7 +1915,8 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 	if (!shop && !HeroFlying(t)) return false;
 	g_deferredSwitch = ev & 0xFFFF;
 	g_deferredSince = GetTickCount();
-	Log("coop: trio event %04X %s", g_deferredSwitch,
+	extern void* g_trioEventCaller;
+	Log("coop: trio event %04X from %p %s", g_deferredSwitch, g_trioEventCaller,
 	    shop ? "while a player is at the merchant -- after the visit" : "while flying from a catapult -- after the landing");
 	return true;
 }
@@ -4570,8 +4571,24 @@ static bool SoloDropsSwitch(int ev) {
 	Trio t = GetTrio();
 	unsigned group = 0;
 	int to = (ev & 0xFFFF) == 0x4800 || (ev & 0xFFFF) == 0x48B7 ? HERO_ASTERIX : HERO_OBELIX;
-	if (from < 0x46B180 || from >= 0x46B331 || !t) return false;
+	// A trio launcher's landing (CKHkTrioCatapult tick 0x4C2AB0: its +0x15 bit 1,
+	// the launcher's own hero +0x14 bit 2 -- 4800 / 4801 if the other leads; LV5-3's
+	// at -341.2 14.1 151.5 is Asterix's): the level's switch too, sent by the game
+	// itself, not from an event group. Kept, it came mid-flight (deferred to the
+	// landing) and the lock handed the lead back 0.3 s later; never counted as the
+	// level's leader, the one of a 4801 dropped in LV5-3 long before stayed, and
+	// LV5-5's keg order for the sidekick (4815) gave Obelix the lead for it.
+	bool launcher = from >= 0x4C2AB0 && from < 0x4C2AB0 + 1416;
+	if (!t || (!launcher && (from < 0x46B180 || from >= 0x46B331))) return false;
 	g_solo.levelLeader = to;   // (the leader the level means from now, given or not: SoloOrderNeedsLead)
+	if (launcher) {
+		if (t.Leader() == to || to == g_solo.choice) return false;
+		static int s_launch = 0;
+		if (s_launch++ < 20)
+			Log("coop: sp_hero_switch_lock: the launcher's landing switch %04X ignored -- %s keeps the lead", ev & 0xFFFF,
+			    HeroName(t.Leader()));
+		return true;
+	}
 	// (A switch to the hero you play is kept: the level ends a lock of it that
 	// way -- a rope cable car's end, zone 0020 on LV2-1's landing: "Asterix
 	// leads" + "the sidekick may move". Dropped, Asterix stayed the companion with
