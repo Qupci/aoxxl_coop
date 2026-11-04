@@ -52,7 +52,7 @@ static void SoloPotionDash(Trio t);
 static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
 static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
 static bool SoloDropsSwitch(int ev);
-static void SoloOrderNeedsLead(int ev);
+static bool SoloOrderNeedsLead(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
 static void SoloGunFrame(Trio t);                        // below: Obelix's machine gun in single player
 static void PlaySound(Hero h, uint32_t bankOffset);
@@ -1812,8 +1812,7 @@ static int KeptOffCars();
 bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Single player, sp_hero_switch_lock: a level's switch that holds nobody, and
 	// the switch a later order for the sidekick needs.
-	if (SoloDropsSwitch(ev)) return true;
-	SoloOrderNeedsLead(ev);
+	if (SoloDropsSwitch(ev) || SoloOrderNeedsLead(ev)) return true;
 	// Individual heroes: a cable car takes the hero who steps on it from the
 	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
 	// AI order 9) -- with the partner down the ride is not started: the hero
@@ -4547,6 +4546,11 @@ int CoopSoloLevelLeaderAway() {
 	Trio t = GetTrio();
 	int l = t ? t.Leader() : -1, ll = g_solo.levelLeader;
 	if ((l != HERO_ASTERIX && l != HERO_OBELIX) || (ll != HERO_ASTERIX && ll != HERO_OBELIX) || ll == l) return -1;
+	// (Only while the hero you play leads: a lock's switch the level kept -- LV4-4's
+	// cable car, Obelix leads while Asterix rides -- is the level's own; the ride
+	// ends in sphere #4, bound to Asterix, that locks the lever at the top with a
+	// fight. Answering Obelix, it never fired.)
+	if (l != g_solo.choice) return -1;
 	return ll;
 }
 
@@ -4611,16 +4615,37 @@ static void SoloReleaseWatch(Trio t) {
 // first, so that the order reaches the hero the level meant (LV2-10's boss: zone
 // #34 "Asterix leads", then #4 "the sidekick walks to marker 22" -- for Obelix).
 // That is a lock of the hero you played: the lock option gives it back once free.
-static void SoloOrderNeedsLead(int ev) {
+// True: the order is dropped.
+static bool SoloOrderNeedsLead(int ev) {
 	int e = ev & 0xFFFF, lead = g_solo.levelLeader;
-	if (!SoloSwitchLockOn() || lead < 0) return;
-	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return;
+	if (!SoloSwitchLockOn() || lead < 0) return false;
+	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return false;
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	Trio t = GetTrio();
-	if (from < 0x46B180 || from >= 0x46B331 || !t) return;
+	if (from < 0x46B180 || from >= 0x46B331 || !t) return false;
 	g_solo.release = -1;   // (the level's own order for the sidekick from now)
-	if (t.Leader() == lead) return;
+	// A walk from a zone bound to the hero you play, leading (it means that hero:
+	// ProximityDispatchWalkMeans): you walk there yourself -- the walk is
+	// dropped, no switch (LV4-7's #137, event 0448: "the sidekick walks to marker
+	// 5", the cable car's foot, Obelix's car -- you play Obelix: the level's last
+	// switch meant Asterix, he led for it and Obelix was walked; or it meant
+	// Obelix, from 20 minutes earlier: Asterix was walked there, then locked into
+	// the car).
+	// Not while the other hero's lock sequence goes on: the walk is its next step
+	// (LV2-1: 0528 at the turnstile, bound to Obelix, walks the freed Asterix onto
+	// the spinning platform).
+	int to = e >= 0x4813 && e <= 0x4876 ? ProximityDispatchWalkMeans(e) : -1;
+	bool seq = g_seqHero == OtherHero(t.Leader()) && SequenceUnderWay();
+	if (to >= 0 && to == t.Leader() && to == g_solo.choice && !seq && !ProximityDispatchInBossRun(e)) {
+		g_solo.levelLeader = to;   // (its zones there are its own, not answering for the other's)
+		static int s_walk = 0;
+		if (s_walk++ < 20)
+			Log("coop: sp_hero_switch_lock: the level walks the sidekick (%04X) meaning %s -- the hero you play, leading: "
+			    "it walks there itself, the walk dropped", e, HeroName(to));
+		return true;
+	}
+	if (t.Leader() == lead) return false;
 	// A boss run's (LV2-10, LV3-6: the boss woken, the sidekick walked to a
 	// marker in the arena, where it waits): the hero you play woke it and fights
 	// it, the companion goes to the marker in the other's place (user: lent to
@@ -4630,13 +4655,14 @@ static void SoloOrderNeedsLead(int ev) {
 		if (s_boss++ < 20)
 			Log("coop: sp_hero_switch_lock: a boss run's order for the sidekick (%04X) -- %s goes, %s keeps the lead", e,
 			    HeroName(OtherHero(t.Leader())), HeroName(t.Leader()));
-		return;
+		return false;
 	}
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) meaning %s -- %s leads for it first", e,
 		    HeroName(OtherHero(lead)), HeroName(lead));
 	CoopGiveLead(lead, "the level's order for the sidekick");
+	return false;
 }
 
 static const char* SoloSwitchRefusal(Trio t) {

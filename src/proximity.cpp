@@ -1727,8 +1727,8 @@ bool GroupOnlyLeadsTo(unsigned ev, int up) {
 
 // Does event `ev`'s group only switch the lead (sp_hero_switch_lock, coop.cpp):
 // to the trio nothing but switches (0x4800 / 0x48B7 Asterix, 0x4801 / 0x48B8
-// Obelix), "the sidekick may move" (0x4803), the fight mode's timer (0x2000) and
-// Idefix's orders? Its switches into `out` (their count; 0 for any other group).
+// Obelix), "the sidekick may move" (0x4803), the fight mode's timer (0x2000),
+// Idefix's orders, Asterix's torch used, a catch-up hop? Its switches into `out` (their count; 0 for any other group).
 // Whatever else it does outside the trio does not count -- a cinematic bloc
 // included (LV3-5's 0850: 0501 to a CKManageEventCinematicBloc, a music stream;
 // kept, the lead came back 0.3 s later): a later order for "the sidekick" the
@@ -1745,6 +1745,11 @@ int GroupOnlySwitches(unsigned ev, uint16_t* out, int max) {
 		// Idefix's wait / follow and his teleports to markers (LV2-1's keg: 4801 +
 		// 4803 + 4878 -- the switch was kept, given back 0.3 s later: user)
 		if (m == 0x4877 || m == 0x4878 || (m >= 0x4885 && m <= 0x48B6)) continue;
+		// Asterix's torch used up (0x4811: +0x3EC 0x400000, whoever leads) and the
+		// sidekick's / Idefix's catch-up to the leader (0x487D / 0x487E: +0x884
+		// 0x400, a hop to a spot by the leader): nobody held (LV4-3's light pillar,
+		// group 0E7: 4800 + 4803 + 487D + 4811 -- kept, Asterix for 0.3 s: user)
+		if (m == 0x4811 || m == 0x487D || m == 0x487E) continue;
 		if (m != 0x4800 && m != 0x4801 && m != 0x48B7 && m != 0x48B8) return 0;
 		if (k < max) out[k++] = (uint16_t)m;
 	}
@@ -2016,6 +2021,45 @@ bool DispatchInBossRun(unsigned msg) {
 			if (r.groups[j] == g) return true;
 	}
 	return false;
+}
+
+// Single player, sp_hero_switch_lock: which hero does the sidekick's walk to a
+// marker (trio `msg`, from the group being dispatched) mean? The hero the zone
+// sending it is bound to (ZoneMeansItsHero: an order for the companion, set off
+// by the other, orders that hero itself). LV4-7's plane #17 by the cable car's
+// top, bound to Obelix (event 0448: 4818 "the sidekick walks to marker 5" + 1616
+// "plane #22 on"); the car is Obelix's (plane #20, his: 0480 "Obelix leads" +
+// the CKHkTelepher). The hero, or -1 (no zone's group, or zones of both).
+int NodeIndex(char* det, Hero h);
+
+int DispatchWalkMeans(unsigned msg) {
+	EventTable et;
+	Trio t = GetTrio();
+	CKYellowPages* yp = YellowPages();
+	char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+	if (!t || !det || *(uintptr_t*)det != 0x62504C || !et.Load()) return -1;
+	int ia = NodeIndex(det, t.GetHero(HERO_ASTERIX)), io = NodeIndex(det, t.GetHero(HERO_OBELIX));
+	static const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+	int means = -1;
+	for (int i = 0; i < g_nDispatching; i++) {
+		unsigned g = g_dispatching[i] >> 3;
+		if (g >= et.n) continue;
+		bool sends = false;
+		for (unsigned k = et.First(g), e = k + et.tab[g * 3]; k < e && !sends; k++) sends = et.IsTrio(k) && et.msgs[k] == msg;
+		if (!sends) continue;
+		for (int li = 0; li < 5; li++) {
+			char* tl = *(char**)(det + bases[li]);
+			for (unsigned j = 0, c = *(uint16_t*)(det + bases[li] + 4); tl && j < c; j++) {
+				if ((unsigned)(*(uint16_t*)(tl + j * 8 + 6) >> 3) != g) continue;
+				int obj = *(uint16_t*)(tl + j * 8 + 2);
+				int h = obj == ia ? HERO_ASTERIX : obj == io ? HERO_OBELIX : -1;
+				if (h < 0) continue;
+				if (means >= 0 && means != h) return -1;
+				means = h;
+			}
+		}
+	}
+	return means;
 }
 
 bool BossRunDropsWalk(int ev) {
@@ -2534,6 +2578,7 @@ void ProximityPassTo(char* roman, int receiver) {
 }
 bool ProximityBossRunDropsWalk(int ev) { return BossRunDropsWalk(ev); }
 bool ProximityDispatchInBossRun(unsigned msg) { return DispatchInBossRun(msg); }
+int ProximityDispatchWalkMeans(unsigned msg) { return DispatchWalkMeans(msg); }
 void ProximityForgetMove(void* heroNode, const float at[3]) { ForgetMove(heroNode, at); }
 long ProximityP2Bonuses() { return g_p2Bonuses; }
 

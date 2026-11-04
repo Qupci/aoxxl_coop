@@ -3945,3 +3945,31 @@ both halves).
   00E0 at 187.1 -189.0 gives Obelix the lead, X + right pulls, Obelix glides off the block and back while
   Asterix with a torch stands at the hearth 177.7 -147.9): before, "player 2's box (right): prompt Light"
   and it stayed after Asterix left; after, P2's box empties at the pull's end and never shows "Light".
+- Round 208 (user, sp_hero_switch_lock: four unintended switches). (1) LV4-3 light pillar as Obelix
+  (xxl_coop.sp_switch_lock_lv4-3.log): zone 00D9's group 01B (4800 + 4803) was dropped, but the second group
+  0E7 (event 0738: 4800 + 4803 + 487D + 4811, pillar 0900, camera, detection) was kept -- Asterix led 0.3 s.
+  Trio 0x4811 = Asterix +0x3EC |= 0x400000 (his torch used up: CKHkAsterixLife::InitOnce sends 0x513C to the
+  item at +0x464), 0x487D / 0x487E = the sidekick's / Idefix's +0x884 |= 0x400 (FUN_004A0xxx: a hop to a
+  pathfinding spot by the leader) -- nobody held; GroupOnlySwitches now skips them. splock43 (-Level 4): both
+  "ignored -- Obelix keeps the lead". (2) LV4-4 as Asterix: the rope cable car's boarding (game code, kept)
+  gives Obelix the lead; levelLeader stayed Asterix, so CoopSoloLevelLeaderAway said "you play the sidekick"
+  and Asterix-bound zones answered Obelix -- sphere #4 (-733.9 18.5 -237.9, event 0650: fight lock 090F on
+  the spitter's lever, 0D17 pools, disable itself) at the ride's end never fired (lock off: 0650 + the fight).
+  Now CoopSoloLevelLeaderAway needs the leader to be `choice`. splockcar44 (-Level 4: S_PULLLEVER the foot's
+  lever -681.8 9.4 -214.4 -- fight-locked: ENDFIGHTWON -- again, the car comes back, Asterix glides on, S_CARPOS
+  along the rope): after boarding no "zones for Asterix answer Obelix"; S_CARPOS doesn't end a rope ride, so
+  the sphere itself was not reached. (3)+(4) LV4-7 both logs: plane #17 (-972.8 247.5 -1069.1, event 0448,
+  bound to Obelix: 4818 "the sidekick walks to marker 5" + 1616 plane #22 on). Planes there (S_DETECT, list
+  +0x3C, obj 0 Asterix / 1 Obelix): #20 0480 Obelix (4801 + 4803 + 099A CKHkTelepher + 161B), #21 0488 Asterix
+  (4802 + 1D1B), #22 0490 Asterix, armed by 0448 (099A + 1701 + 48CD + 1D16). Playing Obelix: SoloOrderNeedsLead
+  gave Asterix the lead so Obelix walked (levelLeader Asterix from the level start), or, levelLeader Obelix
+  from a dropped 4801 20 min earlier (event 0318), walked Asterix -- who then waited at the car's foot and was
+  locked into it. Now a sidekick walk (4813..4876) whose zone is bound to the hero you play, leading
+  (DispatchWalkMeans: the tests carrying the dispatched group's event, by NodeIndex) is dropped and
+  levelLeader set to that hero -- unless the other hero's lock sequence goes on (g_seqHero, SequenceUnderWay):
+  LV2-1's 0528 (box #19, also bound to Obelix) walks the freed Asterix onto the spinning platform in the game.
+  The zones the group turns on did not tell (LV2-1's 0530 / 0058 are Asterix's own). splock47 (-Level 4):
+  "walk dropped", Obelix glides the walk's top path, 0480 then 0488 (Asterix waits) -- what starts this car
+  was not found (Obelix on its seat -924.9 227.6 -1019.5 did not ride). splockcork21 unchanged (0528 walks
+  Asterix, 0530, 0058 at the same times as Nov 2); splockord2 (no circle, no sequence) now drops 0528's walk
+  instead of round 202's "Asterix leads first"; splock21, spboss210 unchanged.

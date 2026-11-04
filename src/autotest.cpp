@@ -7979,8 +7979,10 @@ const Step kSpSlideMode2[] = {
 // splockord2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
 // you play Obelix (the switch); zone 0020's group ("Asterix leads" + "the
 // sidekick may move") flagged: dropped; then LV2-1's turnstile box 0528 ("the
-// sidekick walks to markers" -- for Obelix, the level's sidekick): Asterix leads
-// for it first, Obelix walks there; free again, Obelix is yours.
+// sidekick walks to markers"): round 202 had Asterix lead for it first and walked
+// Obelix; the box is bound to Obelix, and here no lock sequence of Asterix's goes
+// on (no circle: splockcork21 is the real one, 0528 walks Asterix there) -- the
+// walk means Obelix, leading: dropped, no switch.
 const Step kSpLockOrd2[] = {
 	MARK(0, "splockord2"),
 	{ 2000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
@@ -7989,6 +7991,80 @@ const Step kSpLockOrd2[] = {
 	{ 5000, S_FLAGEV, 0x0528, 0, 0, 0, 0, "box 0528: the sidekick walks to markers" },
 	SHOT(6000, "order"), SHOT(12000, "after"), SHOT(20000, "later"),
 	END(24000),
+};
+// splock43 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
+// the user's LV4-3 light pillar (-607 -1 -148), you play Obelix: zone 00D9's
+// group 01B ("Asterix leads" + "the sidekick may move": dropped), then group 0E7
+// (event 0738: the same + 487D the sidekick's catch-up + 4811 Asterix's torch
+// used) -- was kept, Asterix led for 0.3 s; now dropped too, Obelix keeps it.
+const Step kSpLock43[] = {
+	MARK(0, "splock43"), LOADSECTOR(200, 3),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, -593.8f, 4.8f, -142.1f), PLACEAT(3000, HERO_OBELIX, -593.4f, 4.8f, -144.5f),
+	FORCE(3400, HERO_OBELIX, 0),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 6000, S_FLAGEV, 0x00D9, 0, 0, 0, 0, "zone 00D9: the pillar's switch to asterix" },
+	{ 7500, S_FLAGEV, 0x0738, 0, 0, 0, 0, "event 0738: its second group (unless it followed)" },
+	SHOT(8000, "after"), SHOT(10000, "later"),
+	END(11000),
+};
+// splockcar44 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock
+// on): the user's LV4-4, you play Asterix: the lever (-681.8 9.4 -214.4), the
+// automatic cable car beside it (-684.9 8.6 -216.0: its boarding hands Obelix the
+// lead, kept) -- the ride ends in sphere #4 (-733.9 18.5 -237.9, bound to Asterix,
+// event 0650: the fight lock on the spitter's lever up there). It answered Obelix
+// while he led for the ride: no fight. Now it fires as Asterix arrives.
+const Step kSpLockCar44[] = {
+	MARK(0, "splockcar44"), LOADSECTOR(200, 4),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, -681.05f, 8.6f, -214.74f), PLACEAT(3000, HERO_OBELIX, -680.0f, 6.0f, -222.0f),
+	FORCE(3400, HERO_OBELIX, 0),
+	SHOT(4000, "by_the_lever"),
+	{ 4500, S_PULLLEVER, -1, 0, 0, -681.844f, 9.447f, "the lever (fight-locked: its fight starts)", -214.416f },
+	ENDFIGHTWON(7000),
+	{ 9000, S_PULLLEVER, -1, 0, 0, -681.844f, 9.447f, "the lever: the car comes back", -214.416f },
+	SHOT(13000, "car_back"),
+	GLIDEAT(15000, HERO_ASTERIX, -684.85f, 8.6f, -216.0f, 1000),
+	SHOT(17000, "in_the_car"),
+	// (a rope car: Obelix pulls it in the game -- moved along its rope here, as splockcar21)
+	{ 19000, S_CARPOS, HERO_ASTERIX, 0, 0, 8.0f, 0, "car along its rope" },
+	{ 20000, S_CARPOS, HERO_ASTERIX, 0, 0, 16.0f, 0, "car along its rope" },
+	{ 21000, S_CARPOS, HERO_ASTERIX, 0, 0, 24.0f, 0, "car along its rope" },
+	{ 22000, S_CARPOS, HERO_ASTERIX, 0, 0, 32.0f, 0, "car along its rope" },
+	{ 23000, S_CARPOS, HERO_ASTERIX, 0, 0, 40.0f, 0, "car along its rope" },
+	{ 24000, S_CARPOS, HERO_ASTERIX, 0, 0, 48.0f, 0, "car along its rope" },
+	{ 25000, S_CARPOS, HERO_ASTERIX, 0, 0, 56.0f, 0, "car along its rope" },
+	{ 26000, S_CARPOS, HERO_ASTERIX, 0, 0, 64.0f, 0, "car along its rope" },
+	SHOT(24500, "riding"), SHOT(28000, "top"), SHOT(34000, "top_2"),
+	END(38000),
+};
+// splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
+// the user's LV4-7 (#137 at -972.8 247.5 -1069.1, plane #17 bound to Obelix),
+// you play Obelix: event 0448 ("the sidekick walks to marker 5") -- Asterix was
+// given the lead for it and Obelix walked (or, the level's last switch meaning
+// Obelix, Asterix walked). Now dropped: Obelix keeps the lead, walks along the
+// top himself and crosses his plane #20 (0480: "Obelix leads" + the cable car),
+// then #21 (0488: the companion, Asterix, waits there).
+const Step kSpLock47[] = {
+	MARK(0, "splock47"), LOADSECTOR(200, 7),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, -956.57f, 229.82f, -1048.24f), PLACEAT(3000, HERO_OBELIX, -956.74f, 230.34f, -1051.1f),
+	FORCE(3400, HERO_OBELIX, 0),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 6000, S_FLAGEV, 0x0448, 0, 0, 0, 0, "zone 0448: the sidekick walks to marker 5" },
+	SHOT(7000, "after_0448"), SHOT(10000, "after_0448_2"),
+	// Obelix walks to the car's foot himself (the AI walk's path): plane #20, his,
+	// 0480 -- "Obelix leads" (already) + the car
+	FORCE(10300, HERO_ASTERIX, 1),
+	PLACEAT(10500, HERO_OBELIX, -966.97f, 251.05f, -1027.78f), PLACEAT(10500, HERO_ASTERIX, -968.0f, 251.05f, -1031.0f),
+	FORCE(10900, HERO_ASTERIX, 0),
+	GLIDEAT(11500, HERO_OBELIX, -950.63f, 251.05f, -1018.97f, 1500),
+	GLIDEAT(13100, HERO_OBELIX, -932.45f, 253.32f, -1025.28f, 1500),
+	GLIDEAT(14700, HERO_OBELIX, -927.0f, 250.0f, -1022.0f, 800),
+	SHOT(16000, "cable_car_foot"),
+	GLIDEAT(18000, HERO_OBELIX, -924.87f, 227.55f, -1019.54f, 800),   // (the car's seat: the walked Obelix's spot, user's log)
+	SHOT(20000, "on_the_car"), SHOT(26000, "later"), SHOT(34000, "later_2"),
+	END(38000),
 };
 // sptwist34 (-Level 3, XXL_SPISOLATION=1 / 0, XXL_SPSECOND=0): the user's LV3-4
 // arena (104.6 -1.3 -318.5): Asterix's Twister by its Romans -- does the camera
@@ -8277,6 +8353,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("spslide2", kSpSlide2),
 	SCENARIO("spslidemode2", kSpSlideMode2),
 	SCENARIO("splockord2", kSpLockOrd2),
+	SCENARIO("splock43", kSpLock43),
+	SCENARIO("splockcar44", kSpLockCar44),
+	SCENARIO("splock47", kSpLock47),
 	SCENARIO("sptwist34", kSpTwist34),
 	SCENARIO("sptwist2", kSpTwist2),
 	SCENARIO("sptwist2j", kSpTwist2J),
