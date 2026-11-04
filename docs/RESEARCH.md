@@ -4121,3 +4121,18 @@ both halves).
   as the dispatch begins (g_heldAtDispatch, ProximityHeldAtDispatch); the hand-back takes either. splock26d (new: as
   splock26, ending with 4802 then S_FLAGEV 0D29): before, "48B7 (event 0D28's group: no lock) ignored"; after,
   "hands the lead back to the hero it parked", Asterix leads, Obelix follows.
+- Round 218 (user: round 217's LV2-6 blocks fine; the jump down into the fight -- #144, On Cross Rectangle 36.48 7.68
+  -390.54 (11.67 x 17.5, flat), node index 1, event 0CA8 = group 195: 1D90 disable itself, 48CF "teleport the sidekick
+  to marker 20", 4803; XXL-Editor Snipaste_2026-11-05_00-16-48 -- puts Obelix at the marker when Asterix jumps, nothing
+  when Obelix does). #144 is Asterix's; playing Obelix with the level's leader Asterix, SoloZonesTick moves the
+  leader's zones to the hero you play, but skipped ZoneMeansItsHero groups (co-op's "a sidekick order set off by the
+  other hero means that hero itself") -- 0CA8 stayed Asterix's, never crossed. Solo pass now asks
+  SoloZoneMeansItsHero(ev, bound): only with the group's switch away from the bound hero (a circle: "Obelix leads" +
+  "the sidekick waits") or a light pillar lit (0x900); else moved. And SoloOrderNeedsLead lets an order through as sent
+  from a zone of CoopSoloLevelLeaderAway() (the level's leader's, answered by you) as well as the leader's own (it
+  would have lent Asterix the lead for 48CF). splock26f (new: you play Obelix, Asterix up on the blocks 60.1 10.5
+  -389.3, Obelix put at 36.48 11.0 -390.54 to drop): before, no 0CA8; after, "zone event 0CA8 (... set off by Obelix)",
+  "48CF from Asterix's zone -- Asterix, as sent", Asterix at 35.4 1.6 -391.4. spboss210: 4829 now "from Asterix's zone
+  -- as sent" (was the boss run's line; same: Asterix walks), splockcork21 / splockord2 unchanged; splock47's Asterix
+  (no input after his glide) slid off to y 220 this run through his own #21 (0488: 4802, the engine's pass) -- Obelix
+  waited at the end; the physics, not the change.

@@ -4797,12 +4797,15 @@ static void SoloOrderNeedsLead(int ev) {
 	// Asterix to the automatic car's foot, with the lock off too; LV2-1's 0528,
 	// Obelix's, walks Asterix onto the spinning platform). The level's leader
 	// (Asterix from the level start, you switched to Obelix) is not asked.
+	// (Also a zone of the level's leader answered by the hero you play --
+	// CoopSoloLevelLeaderAway, proximity's solo pass: LV2-6's #144, Asterix's, the
+	// jump down into the fight crossed by Obelix: 48CF puts Asterix at the marker.)
 	int z = ProximityDispatchZoneHero(e);
-	if (z >= 0 && z == t.Leader()) {
+	if (z >= 0 && (z == t.Leader() || z == CoopSoloLevelLeaderAway())) {
 		static int s_own = 0;
 		if (s_own++ < 20)
 			Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) from %s's zone -- %s, as sent", e,
-			    HeroName(z), HeroName(OtherHero(z)));
+			    HeroName(z), HeroName(OtherHero(t.Leader())));
 		return;
 	}
 	// A boss run's (LV2-10, LV3-6: the boss woken, the sidekick walked to a

@@ -2372,6 +2372,24 @@ int NodeIndex(char* det, Hero h) {
 // Asterix -- Obelix walked through both, the AI Asterix behind him set them off).
 bool g_inSoloPass = false;
 
+// ZoneMeansItsHero for the solo pass: an order for "the sidekick" from the level
+// leader's zone means that hero itself only with the group's switch away from it
+// (a circle: "Obelix leads" + "the sidekick waits") or a light pillar lit. Without
+// one the order is for the other hero, as when the leader crosses it (LV2-6's
+// #144, 0CA8: 48CF "teleport the sidekick" + 4803 on the jump down into the fight
+// -- Asterix's; crossed by the Obelix you play it was skipped: Asterix never put
+// at the marker).
+static bool SoloZoneMeansItsHero(unsigned ev, int bound) {
+	if (!ZoneMeansItsHero(ev)) return false;
+	if (GroupSwitchTarget(ev) == (bound ^ 1)) return true;
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = GroupTargets(ev, objs, msgs, 64);
+	for (int k = 0; k < n; k++)
+		if (objs[k] && *(uintptr_t*)objs[k] == 0x629030 && msgs[k] == 0x900) return true;
+	return false;
+}
+
 static bool SoloZonesTick(char* det, void* edx, int arg, Trio t, int away) {
 	int iw = NodeIndex(det, t.GetHero(away)), iy = NodeIndex(det, t.GetHero(away ^ 1));
 	if (iw < 0 || iy < 0) return false;
@@ -2398,7 +2416,7 @@ static bool SoloZonesTick(char* det, void* edx, int arg, Trio t, int away) {
 			saved[k] = (uint8_t)e[4];
 			unsigned obj = *(uint16_t*)(e + 2);
 			bool on = (e[4] & 1) && !(l.level && !(e[5] & 1));
-			moved[k] = on && obj == (unsigned)iw && !ZoneMeansItsHero(*(uint16_t*)(e + 6)) ? 1 : 0;
+			moved[k] = on && obj == (unsigned)iw && !SoloZoneMeansItsHero(*(uint16_t*)(e + 6), away) ? 1 : 0;
 			if (moved[k]) { any = true; e[4] &= ~1; }
 			for (int j = 0; run && on && obj == (unsigned)iy && j < r.nt; j++)
 				if (r.tests[j] == (uint16_t)(li << 8 | i)) { moved[k] = 2; any = true; }

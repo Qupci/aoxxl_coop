@@ -8108,6 +8108,22 @@ const Step kSpLock26d[] = {
 	SHOT(17000, "last_block"),
 	END(20000),
 };
+// splock26f (XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1 XXL_LOGTRIO=1):
+// LV2-6's jump down into the fight -- #144 (On Cross Rectangle 36.48 7.68
+// -390.54, flat; Asterix's; event 0CA8: 48CF "teleport the sidekick" + 4803). You
+// play Obelix (the level's leader Asterix): Obelix drops through it -- Asterix
+// put at the marker (was: skipped by the solo pass as "an order for the hero
+// itself", or lent the lead "for it").
+const Step kSpLock26f[] = {
+	MARK(0, "splock26f"), LOADSECTOR(200, 6),
+	{ 2500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(3000, HERO_ASTERIX, 1),
+	PLACEAT(3200, HERO_ASTERIX, 60.11f, 10.5f, -389.34f), PLACEAT(3200, HERO_OBELIX, 47.9f, 13.5f, -390.0f),
+	FORCE(3600, HERO_ASTERIX, 0),
+	PLACEAT(5000, HERO_OBELIX, 36.48f, 11.0f, -390.54f),
+	SHOT(6500, "dropped"), SHOT(10000, "after"),
+	END(12000),
+};
 // splock26w (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
 // XXL_LOGTRIO=1): the user's LV2-6 two-lever stretch past the blocks
 // (xxl_coop.lv2-6_walk_to_obelix_stuck.log): 0231 walks Obelix to his marker
@@ -8513,6 +8529,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("splaunch53", kSpLaunch53),
 	SCENARIO("splock26", kSpLock26),
 	SCENARIO("splock26d", kSpLock26d),
+	SCENARIO("splock26f", kSpLock26f),
 	SCENARIO("splock26w", kSpLock26w),
 	SCENARIO("sptorch26", kSpTorch26),
 	SCENARIO("sptwist34", kSpTwist34),
