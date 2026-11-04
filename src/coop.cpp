@@ -3884,6 +3884,19 @@ static bool ObelixAtGunHandles(Trio t) {
 }
 
 static void __fastcall PromptHook(char* hero, void* edx) {
+	// A hero at a push/pull block (+0x3E9 == 1 or +0x3F0 bit 0x20) whose step
+	// +0x488 is none of 1-3 (a block moved to its end) gets no write at all: the
+	// field kept the other hero's prompt, put back below -- Obelix by his finished
+	// LV3-2 block took Asterix's "Light" at a heart. A player hero's call starts
+	// from "nothing".
+	{
+		CKYellowPages* yp0 = YellowPages();
+		char* gm0 = yp0 ? (char*)yp0->gameManager : nullptr;
+		Trio t0 = GetTrio();
+		if (gm0 && t0 && g.p2Joined && !g.suspended &&
+		    (hero == t0.GetHero(g.p1Hero).raw() || hero == t0.GetHero(g.p2Hero).raw()))
+			*(uint32_t*)(gm0 + 0xCC) = (*(uint32_t*)(gm0 + 0xCC) & ~0xF0u) | (kPromptNone << 4);
+	}
 	g_origPrompt(hero, edx);
 	// Individual heroes: a launcher (hero +0x3F0 bit 0x4000, set in the hero's own
 	// tick: its "Activate") needs both heroes -- a fallen partner is revived next

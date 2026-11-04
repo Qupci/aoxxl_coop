@@ -3935,3 +3935,13 @@ both halves).
   XXL_NOLOCKPAUSE=4000 XXL_NOLOCKFIRST=2000 XXL_NOLOCKCORK=0): "key has attack 0 movement 0 -- made attack 3
   movement 1" for all 3; Obelix's health 15 -> 8 as he walks round (user watched: "behaves normal now").
   Not checked why squad #4 (also "Walk" keys) looked right -- likely its fight switches it to another key.
+- Round 207 (user, LV3-2: after Obelix finished pulling the big block / pushing a log, his prompt box mirrored
+  Asterix's "Light" at a hearth and kept it after Asterix walked off; xxl_coop.lv3-2_prompt_light.log). Cause:
+  FUN_0049A1A0 (the hero's HUD prompt) writes nothing for a hero in the push/pull situation (+0x3E9 == 1 or
+  +0x3F0 bit 0x20) whose block step +0x488 is none of 1 (Push B) / 2 (Pull C) / 3 (A) -- a block moved to its
+  end gives 0. Game manager +0xCC bits 4-7 is one field, and PromptHook puts the frame's prompt back into it
+  after each hero's call, so Obelix's call read Asterix's leftover kind 8 as his own ("both offered"). Fix:
+  PromptHook sets the field to 0xE (nothing) before a player hero's call in co-op. prompt32 (-Level 3; zone
+  00E0 at 187.1 -189.0 gives Obelix the lead, X + right pulls, Obelix glides off the block and back while
+  Asterix with a torch stands at the hearth 177.7 -147.9): before, "player 2's box (right): prompt Light"
+  and it stayed after Asterix left; after, P2's box empties at the pull's end and never shows "Light".

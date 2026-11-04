@@ -5239,6 +5239,34 @@ const Step kPull28[] = {
 	END(14000),
 };
 
+// prompt32 (-Level 3, sector 2): the user's LV3-2 (xxl_coop.lv3-2_prompt_light.log)
+// -- player 2's Obelix pulls the big block (handles by 187.01 12.07 -193.73;
+// X, then each stick direction in turn) to its end, Asterix away with a torch
+// (177.68 12.07 -147.94, the hearth's "Light"), then by the hearth again: his
+// "Light" must stay out of Obelix's box (a hero by a finished push/pull block
+// gets no prompt write).
+const Step kPrompt32[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, 180.21f, 12.5f, -188.79f),
+	PLACEAT(1500, HERO_OBELIX, 187.13f, 12.5f, -184.0f),
+	GLIDEAT(1700, HERO_OBELIX, 187.13f, 12.5f, -188.97f, 800),   // zone 00E0: Obelix leads
+	GLIDEAT(3000, HERO_OBELIX, 187.01f, 12.5f, -193.73f, 800),
+	{ 2500, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 2800, S_TORCH, 6, 0, 0, 0, 0, "cheat: give torch" },
+	SHOT(4000, "prompt32_1"),
+	VPAD(4500, 1, PAD_X, 0, 0, "p2 X"),
+	VPAD(5000, 1, PAD_X, 1.0f, 0, "p2 X + right (pull)"),
+	VPAD(8000, 1, 0, 0, 0, "p2 release"), SHOT(9000, "prompt32_2"),
+	PLACEAT(10000, HERO_ASTERIX, 177.68f, 12.5f, -147.94f),   // the hearth: "Light"
+	GLIDEAT(11000, HERO_OBELIX, 192.5f, 12.5f, -194.0f, 800),   // away from the block
+	GLIDEAT(12500, HERO_OBELIX, 188.41f, 12.5f, -194.0f, 800),  // back by it
+	SHOT(14000, "prompt32_3"),
+	PLACEAT(15000, HERO_ASTERIX, 179.5f, 12.5f, -165.0f),     // off the hearth
+	SHOT(17000, "prompt32_4"),
+	END(18000),
+};
+
 // camfall28 (level 2, sector 8; nolock on): the user's LV2-8 -- the platform's
 // pillar (Obelix leads), Obelix pulls the platform with Asterix on it, Asterix
 // jumps off it (29.4 57.7 -117.4: the platform's camera, zone 02E9) and falls to
@@ -8480,6 +8508,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("turnstile21", kTurnstile21),
 	SCENARIO("corklead21", kCorkLead21),
 	SCENARIO("pull28", kPull28),
+	SCENARIO("prompt32", kPrompt32),
 	SCENARIO("lead28", kLead28),
 	SCENARIO("camfall28", kCamFall28),
 	SCENARIO("tele28", kTele28),
