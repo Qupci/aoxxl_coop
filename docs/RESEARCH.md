@@ -4013,3 +4013,14 @@ both halves).
   ignored -- Obelix keeps the lead", landed at (360 12 42), Asterix order 0. Was (same test, before):
   "trio event 4800 from 004C2B2E ... after the landing", then "Obelix takes the lead (... free again)". LV5-5's
   keg not autotested (its levelLeader is now Asterix after the launcher, as on a fresh load).
+- Round 211 (user, sp_hero_switch_lock: LV2-6, xxl_coop.lv2-6_question.log). You play Asterix; his lever (98 s)
+  locks him (Obelix leads, Asterix waits); zone 01D8 (Obelix's, 4803 alone) frees him -- round 209's
+  SoloFreedByLeadersZone made Obelix "the hero you play" for good, so the last block's 01E8 (4800 + 4803, 130 s)
+  was a switch away from your hero: ignored, Obelix kept the lead (lock off: Asterix leads there). Now the handedTo
+  state keeps choice: the leader keeps the lead (no give-back, levelLeader = it) until your hero leads again --
+  the level's later switch to it is kept (SoloDropsSwitch: to == choice) -- or your own switch. LV4-7 unchanged
+  (no later switch to Obelix there). splock26 (-Level 2, sector 6: S_TRIOEV 4801 + 4802, S_FLAGEV 01D8, then
+  01E8): "it keeps the lead until the level hands it back", then Asterix leads after 01E8. splock47: Asterix keeps
+  the lead after 0AF0. LV2-5 (user question, xxl_coop.lv2-5_after_rotarybeam_trasport_sequence_switch.log): the
+  lever #419's 48B7 + 4803 after the rotary beam gives the lead to Asterix -- a switch to the hero you play ends
+  its lock, kept as designed (no change).

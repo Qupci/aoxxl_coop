@@ -4788,14 +4788,21 @@ static void SoloSwitchLockWatch(Trio t) {
 		s.handedTo = -1;   // (LV2-1's 03C8, Obelix's, frees the circle's Asterix for the turnstile: its end gives the lead)
 		return;
 	}
+	// Handed on (SoloFreedByLeadersZone): the leader keeps the lead, not given
+	// back -- but the hero you play stays yours, so the level's own later switch
+	// to it is kept, as with the lock off (LV2-6: zone 01D8, Obelix's, frees the
+	// waiting Asterix; Obelix pushes the blocks; the last one's 01E8 "Asterix
+	// leads" -- made Obelix "the hero you play" for good, it was ignored). Ends
+	// once your hero leads again (above), or with your own switch.
 	if (s.handedTo == l) {
 		static int s_told = 0;
-		if (s_told++ < 20)
-			Log("coop: sp_hero_switch_lock: %s, held, freed from %s's zone (4803 alone) -- the level goes on with %s: now the hero you play",
+		if (!s.freeSince && s_told++ < 20)
+			Log("coop: sp_hero_switch_lock: %s, held, freed from %s's zone (4803 alone) -- the level goes on with %s: it keeps the lead "
+			    "until the level hands it back",
 			    HeroName(s.choice), HeroName(l), HeroName(l));
-		s.choice = s.levelLeader = l;
-		s.handedTo = -1;
-		s.freeSince = s.farSince = 0;
+		s.levelLeader = l;
+		s.freeSince = 1;   // (logged)
+		s.farSince = 0;
 		return;
 	}
 	if (s.freeSince == 1) s.freeSince = 0;

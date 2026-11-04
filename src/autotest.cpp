@@ -8038,6 +8038,23 @@ const Step kSpLockCar44[] = {
 	SHOT(24500, "riding"), SHOT(28000, "top"), SHOT(34000, "top_2"),
 	END(38000),
 };
+// splock26 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1): the
+// user's LV2-6 blocks (xxl_coop.lv2-6_question.log). You play Asterix; Obelix
+// leads, Asterix waits (4801 + 4802, as the rotary beam's lock). Zone 01D8
+// (Obelix's: 4803 alone) frees Asterix -- Obelix keeps the lead; the last
+// block's 01E8 ("Asterix leads" + 4803) gives it back to Asterix (was: Obelix
+// made the hero you play at 01D8, 01E8's switch ignored).
+const Step kSpLock26[] = {
+	MARK(0, "splock26"), LOADSECTOR(200, 6),
+	{ 3000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 3300, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix waits" },
+	SHOT(4500, "held"),
+	{ 6000, S_FLAGEV, 0x01D8, 0, 0, 0, 0, "zone 01D8: 4803" },
+	SHOT(8000, "freed"),
+	{ 11000, S_FLAGEV, 0x01E8, 0, 0, 0, 0, "zone 01E8: asterix leads" },
+	SHOT(13000, "last_block"),
+	END(14000),
+};
 // splaunch53 (-Level 5, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1): the
 // user's LV5-3 launcher (-341.16 14.08 151.54) in single player, the lock on:
 // Asterix leads from the level start, you switch to Obelix, he takes the launcher
@@ -8380,6 +8397,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("splockcar44", kSpLockCar44),
 	SCENARIO("splock47", kSpLock47),
 	SCENARIO("splaunch53", kSpLaunch53),
+	SCENARIO("splock26", kSpLock26),
 	SCENARIO("sptwist34", kSpTwist34),
 	SCENARIO("sptwist2", kSpTwist2),
 	SCENARIO("sptwist2j", kSpTwist2J),
