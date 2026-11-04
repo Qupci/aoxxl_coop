@@ -2098,8 +2098,35 @@ bool LeverHeldBack(char* receiver, Trio t) {
 // other hero pull it and hand over) takes no hits while the other hero could
 // lead instead (following, standing: switch and pull it with that one). With
 // the other held by the level (a wait) or down, the lever is the game's.
+// And a lever whose event gives the lead to the companion while that one is free
+// (following you, not held by the level): the level has it pulled only while that
+// hero waits where the level put it -- the lever frees it (LV2-5: lever #419
+// behind the iron crates, 48B7 + 4803, for Asterix held by the hearth's 0D60
+// walk). Pulled early as Obelix (your switch), the push-once lever was spent and
+// the hearth's wait held Asterix for good.
+static bool SoloLeverEarly(char* receiver, Trio t) {
+	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
+	int l = t.Leader();
+	unsigned evs[2] = { *(uint16_t*)(receiver + 0x28), *(uint16_t*)(receiver + 0x2A) };
+	for (unsigned ev : evs) {
+		int to = GroupSwitchTarget(ev);
+		if (to < 0 || to == l || (to != HERO_ASTERIX && to != HERO_OBELIX)) continue;
+		Hero h = t.GetHero(to);
+		if (!h || IndivFallen(to) || h.Order() != AI_FOLLOW_LEADER) continue;   // (held by the level: the lever's)
+		if (g_heldBackLogged != receiver) {
+			g_heldBackLogged = receiver;
+			Log("proximity: safe sequence: lever %p ignores %s -- it gives the lead to %s, who is not held by the level (its lever "
+			    "for later)", receiver, HeroName(l), HeroName(to));
+		}
+		return true;
+	}
+	return false;
+}
+
 static bool SoloLeverHeldBack(char* receiver, Trio t) {
-	if (!SoloLeadFree() || !LeverHeldBack(receiver, t)) return false;
+	if (!SoloLeadFree()) return false;
+	if (SoloLeverEarly(receiver, t)) return true;
+	if (!LeverHeldBack(receiver, t)) return false;
 	int l = t.Leader();
 	int c = l == HERO_ASTERIX ? HERO_OBELIX : l == HERO_OBELIX ? HERO_ASTERIX : -1;
 	Hero h = c >= 0 ? t.GetHero(c) : Hero();

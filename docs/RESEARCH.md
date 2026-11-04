@@ -4024,3 +4024,24 @@ both halves).
   the lead after 0AF0. LV2-5 (user question, xxl_coop.lv2-5_after_rotarybeam_trasport_sequence_switch.log): the
   lever #419's 48B7 + 4803 after the rotary beam gives the lead to Asterix -- a switch to the hero you play ends
   its lock, kept as designed (no change).
+- Round 212 (user, single player). (1) LV2-6 Obelix walked back to his marker and waited for good
+  (xxl_coop.lv2-6_walk_to_obelix_stuck.log): the torch cheat. CKHkTorch::sendEvent 0x0C07 (taken) flags the
+  torch's +0x38 event on every take -- LV2-6's torch (14.9 2.5 -356.0): 0231, 481A "the sidekick walks to marker"
+  (Obelix to 6.3 2.0 -355.2, for Asterix's lever #406: 48B8 + 481B, push once). The cheat's take of that torch,
+  carried before, at 221.7 s set it off again (trio event count +1, no zone). FUN_00460C20 skips events
+  >= 0xFFF8: the cheat now mutes +0x38 (0xFFFF) for a torch already carried this level (g_torch.carried, per
+  level), back once taken or given up; a first take keeps its event. Also the cheat's take press (+0x3EC 0x10 at
+  FUN_00499CF0) is cleared again when the handler did not turn it into 0x2000 (no torch the take accepts): it
+  was an X, Asterix's three-hit attack for 60 frames (user: with every torch used up). Torch +0x3E bits 0-1: 0 on
+  the ground, 1 carried, 2 after 0x513C / 0x5127 (still re-takeable by the cheat). sptorch26 (-Level 2, XXL_LOGTRIO=1):
+  first cheat take -> 481A; thrown, given again -> "(carried before: its take's event muted)", no 481A.
+  (2) LV2-5 Asterix held for good (xxl_coop.lv2-5_asterix_softlock.log): the lever behind the iron crates
+  (lever 31 at 134.2 12.1 -573.7, +0x2A 0168: 48B7 + 4803 + pillar) punched by Obelix (your switch) while Asterix
+  followed -- the switch dropped by the lock, the push-once lever spent; the hearth's 0D60 (4801 + 4813) then held
+  Asterix at its marker with no lever left. The lock-off game softlocks the same way. Safe sequence
+  (SoloLeverHeldBack) only knew "switches to the hero leading"; SoloLeverEarly: a lever whose group switches to
+  the companion while it follows (AI_FOLLOW_LEADER, not held, not down) takes no hits either. splever25
+  (XXL_SPSWITCHLOCK=1): Asterix's punch ignored as before, Obelix's too now (no 48B7, Obelix leads, Asterix order
+  0; was: the lead to Asterix). splock47: Obelix's lever with Asterix held at the car's foot works ("Obelix locked
+  by the level", the car drops). Open: LV4-7's handedTo (xxl_coop.lv4-7_inf_lead_pend.log) -- choice stays Obelix
+  after 0AF0 with nothing in the level handing it back (user calls it a pending that never ends).

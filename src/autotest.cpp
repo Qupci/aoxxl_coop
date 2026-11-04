@@ -7623,7 +7623,9 @@ const Step kSpCork21[] = {
 };
 // splever25 (level 2, XXL_SPSWITCH=1): sector 5's lever behind the iron crates
 // ("switch to Asterix"): Asterix leading punches it -- safe sequence, nothing;
-// the switch to Obelix, who punches it: the lead goes to Asterix.
+// the switch to Obelix, who punches it: nothing either since round 212 (Asterix
+// follows, not held by the level -- the lever is for the hearth's wait; was: the
+// lead to Asterix, the push-once lever spent, the hearth held him for good).
 #define SPLEVER_PUNCHES(t, hero) \
 	{ t, S_NEAROBJ, hero, 52, 0, 1.2f, 0, "facing the lever" }, \
 	P1(t + 400, PAD_X, 0, 0, "p1 X"), P1(t + 600, 0, 0, 0, "p1 release"), \
@@ -8055,6 +8057,44 @@ const Step kSpLock26[] = {
 	SHOT(13000, "last_block"),
 	END(14000),
 };
+// splock26w (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
+// XXL_LOGTRIO=1): the user's LV2-6 two-lever stretch past the blocks
+// (xxl_coop.lv2-6_walk_to_obelix_stuck.log): 0231 walks Obelix to his marker
+// (6.3 2.0 -355.2), Asterix's lever (26 3 -348) hands Obelix the lead, Obelix's
+// lever (by 18.2 2.0 -336.4) hands it back; then you switch to Obelix and back
+// to Asterix -- Obelix must not walk back to the old marker and wait there.
+const Step kSpLock26w[] = {
+	MARK(0, "splock26w"), LOADSECTOR(200, 6),
+	PLACEAT(3000, HERO_ASTERIX, 15.22f, 2.4f, -356.48f), PLACEAT(3000, HERO_OBELIX, 13.26f, 2.5f, -357.0f),
+	{ 4000, S_FLAGEV, 0x0231, 0, 0, 0, 0, "0231: obelix walks to his marker" },
+	PLACEAT(8500, HERO_ASTERIX, 25.0f, 2.1f, -348.2f),
+	PULLLEVERAT(9000, 26.0f, 3.0f, -348.0f),
+	SHOT(11000, "asterix_lever"),
+	PLACEAT(13500, HERO_OBELIX, 18.24f, 2.1f, -336.36f),
+	PULLLEVERAT(14000, 18.24f, 2.0f, -336.36f),
+	SHOT(16000, "obelix_lever"),
+	PLACEAT(17000, HERO_ASTERIX, -18.77f, 2.8f, -345.63f), PLACEAT(17000, HERO_OBELIX, -18.58f, 2.9f, -344.28f),
+	{ 18000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 21000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	SHOT(24000, "after_switch"), SHOT(30000, "after_switch_2"),
+	END(31000),
+};
+// sptorch26 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_LOGTRIO=1): the torch
+// cheat by LV2-6's torch: the first take sets off its event (0231: Obelix walks to
+// his marker); thrown away and given again, its event is muted (was: Obelix
+// walked back to the marker and waited for a lever already spent).
+const Step kSpTorch26[] = {
+	MARK(0, "sptorch26"), LOADSECTOR(200, 6),
+	PLACEAT(3000, HERO_ASTERIX, 15.22f, 2.4f, -356.48f), PLACEAT(3000, HERO_OBELIX, 13.26f, 2.5f, -357.0f),
+	{ 3500, S_TORCH, 0, 0, 0, 0, 0, "torches" },
+	{ 4000, S_TORCH, 6, 0, 0, 0, 0, "cheat torch (first take)" },
+	SHOT(7000, "first_take"),
+	{ 9000, S_TRIOEV, 0x4803, 0, 0, 0, 0, "obelix follows" },
+	{ 9500, S_TORCH, 7, 0, 0, 0, 0, "throw it away" },
+	{ 11000, S_TORCH, 6, 0, 0, 0, 0, "cheat torch again" },
+	SHOT(14000, "second_take"),
+	END(17000),
+};
 // splaunch53 (-Level 5, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1): the
 // user's LV5-3 launcher (-341.16 14.08 151.54) in single player, the lock on:
 // Asterix leads from the level start, you switch to Obelix, he takes the launcher
@@ -8398,6 +8438,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("splock47", kSpLock47),
 	SCENARIO("splaunch53", kSpLaunch53),
 	SCENARIO("splock26", kSpLock26),
+	SCENARIO("splock26w", kSpLock26w),
+	SCENARIO("sptorch26", kSpTorch26),
 	SCENARIO("sptwist34", kSpTwist34),
 	SCENARIO("sptwist2", kSpTwist2),
 	SCENARIO("sptwist2j", kSpTwist2J),

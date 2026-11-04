@@ -3377,7 +3377,16 @@ void CoopFrame() {
 // state 1, fire level in bits 2-4). Given here by making that offer and that
 // press inside Asterix's own tick, from any distance, then lit (0x5128).
 // Thrown away with the torch's 0x513C, as a level restart does.
-struct TorchCheat { int want = 0; int frames = 0; char* torch = nullptr; } g_torch;
+// A torch's take (trio 0x0C07, CKHkTorch::sendEvent) flags its event at +0x38 every
+// time (LV2-6: 0231, "the sidekick walks to marker 8", by the torch's stand). The
+// cheat's take of a torch already carried this level would set it off again --
+// Obelix walked back to his marker for lever #406, already pushed, and waited
+// there for good. Muted (0xFFFF: no event) for such a take; a first take keeps it.
+struct TorchCheat {
+	int want = 0; int frames = 0; char* torch = nullptr;
+	int mutedEv = -1;               // the torch's +0x38 while muted
+	char* carried[16] = {}; int nCarried = 0; int level = -99;   // torches carried this level
+} g_torch;
 
 static char* NearestTorch(Hero a) {
 	char* best = nullptr;
@@ -3401,10 +3410,22 @@ void CoopTorchCheat(bool give) {
 	if (!a) return;
 	if (give) {
 		if (*(char**)(a.raw() + 0x464)) { Log("coop: cheat: Asterix already has a torch"); return; }
+		if (g_torch.want && g_torch.mutedEv >= 0 && g_torch.torch) {   // (a press again: the earlier one's event back)
+			*(uint16_t*)(g_torch.torch + 0x38) = (uint16_t)g_torch.mutedEv;
+			g_torch.mutedEv = -1;
+		}
 		g_torch.torch = NearestTorch(a);
 		g_torch.want = g_torch.torch ? 1 : 0;
 		g_torch.frames = 0;
-		Log("coop: cheat: torch %p for Asterix", g_torch.torch);
+		bool before = false;
+		for (int i = 0; i < g_torch.nCarried && g_torch.level == g.lastLevel; i++)
+			if (g_torch.carried[i] == g_torch.torch) before = true;
+		if (before && *(uint16_t*)(g_torch.torch + 0x38) < 0xFFF8) {
+			g_torch.mutedEv = *(uint16_t*)(g_torch.torch + 0x38);
+			*(uint16_t*)(g_torch.torch + 0x38) = 0xFFFF;
+		}
+		Log("coop: cheat: torch %p for Asterix%s", g_torch.torch,
+		    g_torch.mutedEv >= 0 ? " (carried before: its take's event muted)" : "");
 		return;
 	}
 	char* c = *(char**)(a.raw() + 0x464);
@@ -3772,13 +3793,20 @@ static void __fastcall FreezeWorldHook(char* gm, void* edx, int on) {
 }
 
 static void __fastcall TakeHook(char* hero, void* edx, int arg) {
+	bool pressed = false;   // (the cheat's press, not the player's own X)
 	if (g_torch.want) {
 		Trio t = GetTrio();
 		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
-		if (a && hero == a.raw()) *(uint32_t*)(hero + 0x3EC) |= 0x10;
+		if (a && hero == a.raw() && !(*(uint32_t*)(hero + 0x3EC) & 0x10)) {
+			*(uint32_t*)(hero + 0x3EC) |= 0x10;
+			pressed = true;
+		}
 	}
 	NoteMachineUse(hero);
 	g_origTake(hero, edx, arg);
+	// Not taken (no torch the take would accept -- every one used up): the press
+	// would be an X, Asterix's three-hit attack for the cheat's 60 frames (user).
+	if (pressed && !(*(uint32_t*)(hero + 0x3EC) & 0x2000)) *(uint32_t*)(hero + 0x3EC) &= ~0x10u;
 }
 
 // The magic potion. Hero_ReadCommandBlock (0x49A350, both heroes' player
@@ -4237,8 +4265,27 @@ extern "C" __declspec(dllexport) void __cdecl XXLCoopCombosCheat() {
 	Log("coop: cheat: every combo learned and the combo bar filled (Inspector)");
 }
 
+static void TorchUnmute() {
+	if (g_torch.mutedEv < 0) return;
+	if (g_torch.torch && g_torch.level == g.lastLevel) *(uint16_t*)(g_torch.torch + 0x38) = (uint16_t)g_torch.mutedEv;
+	g_torch.mutedEv = -1;
+}
+
 static void TorchBeforeTick(int heroIndex, Hero hero) {
-	if (heroIndex != HERO_ASTERIX || !g_torch.want) return;
+	if (heroIndex != HERO_ASTERIX) return;
+	if (g_torch.level != g.lastLevel) {
+		g_torch.level = g.lastLevel;
+		g_torch.nCarried = 0;
+		g_torch.mutedEv = -1;   // (the old level's torch is gone)
+		g_torch.want = 0;
+	}
+	if (char* held = *(char**)(hero.raw() + 0x464)) {
+		bool known = false;
+		for (int i = 0; i < g_torch.nCarried; i++)
+			if (g_torch.carried[i] == held) known = true;
+		if (!known && g_torch.nCarried < 16) g_torch.carried[g_torch.nCarried++] = held;
+	}
+	if (!g_torch.want) { TorchUnmute(); return; }
 	Trio t = GetTrio();
 	if (!t) return;
 	if (*(char**)(hero.raw() + 0x464) == g_torch.torch) {
