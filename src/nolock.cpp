@@ -87,7 +87,7 @@ struct Waiting {
 struct Out {
 	char* roman; char* sq; unsigned sqIdx; int pool; int hero; uint32_t boxBits; bool faced;
 	float nearest; DWORD since; float ax, az; bool stuck; float gx, gz; DWORD checked;
-	DWORD stuckAt; bool heldTold;
+	DWORD stuckAt; bool heldTold; bool modeTold;
 };
 Out g_out[2 * kMaxGroup];
 int g_nOut = 0;
@@ -1035,6 +1035,27 @@ void KeepInBox(const float* b, float& x, float& z) {
 	z = z < b[0x4C] + 0.5f ? b[0x4C] + 0.5f : z > b[0x49] - 0.5f ? b[0x49] - 0.5f : z;
 }
 
+// The squad's tick also copies its choreography key's flags into each slot
+// (FUN_0052B670: slot +0x24 bits 0-2 = the key's "enemy attack", bits 3-4 its
+// "enemy movement"). A squad's key can be a patrol's -- LV3-6's ledge squad #29
+// walks (movement 0) and only attacks in position (attack 0, never goes for the
+// hero) -- and its Romans out for a hero came on slowly and never hit it. Ours
+// approach and attack (3) and run (1); "attack when in range" (5) and sprint stay.
+void NoLockAttackMode(Out& o, float* slot) {
+	uint32_t& m = *(uint32_t*)(slot + 9);
+	uint32_t was = m, atk = m & 7, mv = (m >> 3) & 3;
+	if (atk != 3 && atk != 5) atk = 3;
+	if (mv == 0 || mv == 3) mv = 1;
+	m = (m & ~0x1Fu) | atk | (mv << 3);
+	static int s_told = 0;
+	if (m != was && !o.modeTold && s_told < 20) {
+		o.modeTold = true;
+		s_told++;
+		Log("nolock: Roman %p of squad #%u: its squad's key has attack %u movement %u -- made attack %u movement %u",
+		    o.roman, o.sqIdx, was & 7, (was >> 3) & 3, atk, mv);
+	}
+}
+
 void NoLockSteer(char* sq) {
 	if (!g_nOut) return;
 	Trio t = GetTrio();
@@ -1054,6 +1075,7 @@ void NoLockSteer(char* sq) {
 		char* fr = node ? *(char**)(node + 4) : nullptr;
 		float* slot = (float*)((CpntFn)(*(void***)o.roman)[12])(o.roman, nullptr, 0x46);
 		if (!fr || !slot) continue;
+		NoLockAttackMode(o, slot);
 		const float* rp = (const float*)(fr + 0x80);
 		static const char* s_angle = getenv("XXL_NOLOCKANGLE");   // autotests: one spot for all (crowding)
 		float a = s_angle ? (float)atof(s_angle) : 6.2831853f * place / n[o.hero] + 1.3f * o.hero;

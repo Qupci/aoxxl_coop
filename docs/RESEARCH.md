@@ -3923,3 +3923,15 @@ both halves).
   XXL_HUDPOS now logs the other row (bits, +0x270, +0x234, shown models): 0x10 -> 0x20 -> 0x00 within 15 ms on each
   hit. Now Hud2AfterInterfaceTick clears the show flags for a fallen other row (and its pending): it stays hidden;
   after the revive it shows again (spdownhud2, XXL_SPSECOND=1 XXL_DOWNAT=1:2000, and with XXL_UPAT=6000).
+- Round 206 (user, nolock_romans: LV3-6 squad #29's Romans, sent at the waiting hero, still walked slowly and
+  oddly and never attacked; maybe also LV3-1 #7 / LV3-2 #0). Cause: the squad's tick copies its current
+  choreography key's flags (CKChoreoKey +0x1C: bits 0-2 squad rotation, 3-5 enemy attack, 6-7 enemy movement;
+  key +4 slots 0x1C each, +0x10/+0x14 duration min/max, +0x18 share at position) into each Roman's slot
+  (FUN_0052B670: slot +0x24 bits 0-2 = attack, bits 3-4 = movement; slot = hook +0x1AC, vf12(0x46)). #29's key
+  (XXL-Editor: "only attack when in position", "Walk") gives attack 0 movement 0 -- a patrol: the Romans walked
+  after Obelix and never went for him. Fix: NoLockSteer (NoLockAttackMode) sets our Romans' slot to attack 3
+  (approach and attack) unless 3/5, movement 1 (run) if walk/static (sprint kept). Logged once a Roman on change.
+  nolock36f (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_NOLOCKROMANSANY=1 XXL_OBELIXPOTION=0
+  XXL_NOLOCKPAUSE=4000 XXL_NOLOCKFIRST=2000 XXL_NOLOCKCORK=0): "key has attack 0 movement 0 -- made attack 3
+  movement 1" for all 3; Obelix's health 15 -> 8 as he walks round (user watched: "behaves normal now").
+  Squad 4's keys walk too but its fight runs it as a hero-target squad, so it had looked right.
