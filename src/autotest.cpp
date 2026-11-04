@@ -8124,6 +8124,21 @@ const Step kSpLock26f[] = {
 	SHOT(6500, "dropped"), SHOT(10000, "after"),
 	END(12000),
 };
+// splock26c (XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1 XXL_LOGTRIO=1):
+// LV2-6's 0C50 by the jump down (xxl_coop.2.log of Nov 5 00:40: set off by the
+// Obelix you play at 15 4 -360; group 18A: 48CE "teleport the sidekick", 4800,
+// 4803, itself off) -- Obelix's own catch-up as the game's AI sidekick. Was:
+// Asterix teleported and, taken for a hand-over, given the lead. Now dropped.
+const Step kSpLock26c[] = {
+	MARK(0, "splock26c"), LOADSECTOR(200, 6),
+	{ 2500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(3000, HERO_ASTERIX, 1),
+	PLACEAT(3200, HERO_ASTERIX, 13.69f, 2.3f, -365.33f), PLACEAT(3200, HERO_OBELIX, 15.39f, 2.5f, -363.58f),
+	FORCE(3600, HERO_ASTERIX, 0),
+	{ 5000, S_FLAGEV, 0x0C50, 0, 0, 0, 0, "zone 0c50: 48ce + 4800 + 4803" },
+	SHOT(7000, "after"),
+	END(9000),
+};
 // splock26w (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
 // XXL_LOGTRIO=1): the user's LV2-6 two-lever stretch past the blocks
 // (xxl_coop.lv2-6_walk_to_obelix_stuck.log): 0231 walks Obelix to his marker
@@ -8530,6 +8545,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("splock26", kSpLock26),
 	SCENARIO("splock26d", kSpLock26d),
 	SCENARIO("splock26f", kSpLock26f),
+	SCENARIO("splock26c", kSpLock26c),
 	SCENARIO("splock26w", kSpLock26w),
 	SCENARIO("sptorch26", kSpTorch26),
 	SCENARIO("sptwist34", kSpTwist34),

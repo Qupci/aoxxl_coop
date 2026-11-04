@@ -52,7 +52,7 @@ static void SoloPotionDash(Trio t);
 static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
 static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
 static bool SoloDropsSwitch(int ev);
-static void SoloOrderNeedsLead(int ev);
+static bool SoloOrderNeedsLead(int ev);
 static void SoloFreedByLeadersZone(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
 static void SoloGunFrame(Trio t);                        // below: Obelix's machine gun in single player
@@ -1814,7 +1814,7 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Single player, sp_hero_switch_lock: a level's switch that holds nobody, and
 	// the switch a later order for the sidekick needs.
 	if (SoloDropsSwitch(ev)) return true;
-	SoloOrderNeedsLead(ev);
+	if (SoloOrderNeedsLead(ev)) return true;
 	SoloFreedByLeadersZone(ev);
 	// Individual heroes: a cable car takes the hero who steps on it from the
 	// hero's own tick (0x49ACB9: "Obelix leads", 0x49ACC7: "Asterix rides it",
@@ -4633,8 +4633,31 @@ static void SoloHandOver(int to, const char* why) {
 	g_solo.freeSince = g_solo.farSince = 0;
 }
 
+// A zone bound to the hero you play, leading, whose group orders "the sidekick"
+// before it switches to the other hero: in the game that hero crosses it as the AI
+// sidekick -- its own catch-up (LV2-6's 0C50 by the jump down: 48CE "teleport the
+// sidekick", 4800, 4803, itself off). Leading it yourself it means nothing: the
+// group's orders and switch are dropped (was: Asterix put at the marker and, the
+// group taken for a hand-over, given the lead -- user: an unexpected switch).
+static int SoloOwnCatchUp(Trio t, unsigned msg) {
+	extern void* g_trioEventCaller;
+	uintptr_t from = (uintptr_t)g_trioEventCaller;
+	if (!t || from < 0x46B180 || from >= 0x46B331) return -1;
+	int l = t.Leader();
+	if ((l != HERO_ASTERIX && l != HERO_OBELIX) || l != g_solo.choice || ProximityDispatchZoneHero(msg) != l) return -1;
+	int g = ProximityDispatchGroupOf(msg);
+	if (g < 0 || !ProximityGroupOrdersBeforeSwitchAway((unsigned)g, l)) return -1;
+	static int s_told = 0, s_last = -1;
+	if (g != s_last && s_told++ < 20)
+		Log("coop: sp_hero_switch_lock: event %04X, %s's zone, is that hero's own catch-up as the sidekick -- %s leads: "
+		    "its orders and switch dropped", g, HeroName(l), HeroName(l));
+	s_last = g;
+	return g;
+}
+
 static bool SoloDropsSwitch(int ev) {
 	if (!SoloSwitchLockOn() || !IsLeaderSwitch(ev)) return false;
+	if (SoloOwnCatchUp(GetTrio(), ev & 0xFFFF) >= 0) return true;
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	Trio t = GetTrio();
@@ -4781,16 +4804,18 @@ static void SoloReleaseWatch(Trio t) {
 // first, so that the order reaches the hero the level meant (LV2-10's boss: zone
 // #34 "Asterix leads", then #4 "the sidekick walks to marker 22" -- for Obelix).
 // That is a lock of the hero you played: the lock option gives it back once free.
-static void SoloOrderNeedsLead(int ev) {
+static bool SoloOrderNeedsLead(int ev) {
 	int e = ev & 0xFFFF, lead = g_solo.levelLeader;
-	if (!SoloSwitchLockOn() || lead < 0) return;
-	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return;
+	if (!SoloSwitchLockOn()) return false;
+	if (e != 0x4802 && !(e >= 0x4813 && e <= 0x4876) && !(e >= 0x48BB && e <= 0x48EC)) return false;
+	if (SoloOwnCatchUp(GetTrio(), e) >= 0) return true;
+	if (lead < 0) return false;
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	Trio t = GetTrio();
-	if (from < 0x46B180 || from >= 0x46B331 || !t) return;
+	if (from < 0x46B180 || from >= 0x46B331 || !t) return false;
 	g_solo.release = -1;   // (the level's own order for the sidekick from now)
-	if (t.Leader() == lead) return;
+	if (t.Leader() == lead) return false;
 	// From a zone bound to the hero leading (set off by it): the order is for the
 	// companion, as the game sends it -- a zone bound to one hero orders the other
 	// (LV4-7's #137, event 0448, Obelix's: "the sidekick walks to marker 5" walks
@@ -4806,7 +4831,7 @@ static void SoloOrderNeedsLead(int ev) {
 		if (s_own++ < 20)
 			Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) from %s's zone -- %s, as sent", e,
 			    HeroName(z), HeroName(OtherHero(t.Leader())));
-		return;
+		return false;
 	}
 	// A boss run's (LV2-10, LV3-6: the boss woken, the sidekick walked to a
 	// marker in the arena, where it waits): the hero you play woke it and fights
@@ -4817,7 +4842,7 @@ static void SoloOrderNeedsLead(int ev) {
 		if (s_boss++ < 20)
 			Log("coop: sp_hero_switch_lock: a boss run's order for the sidekick (%04X) -- %s goes, %s keeps the lead", e,
 			    HeroName(OtherHero(t.Leader())), HeroName(t.Leader()));
-		return;
+		return false;
 	}
 	// The leader on a trio launcher (situation 0x0D: waiting for the companion, or
 	// flying): the launcher's own event puts the companion on it (LV2-4's at -38.8
@@ -4830,13 +4855,14 @@ static void SoloOrderNeedsLead(int ev) {
 		if (s_launch++ < 20)
 			Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) with %s on a launcher -- %s, as sent", e,
 			    HeroName(t.Leader()), HeroName(OtherHero(t.Leader())));
-		return;
+		return false;
 	}
 	static int s_told = 0;
 	if (s_told++ < 40)
 		Log("coop: sp_hero_switch_lock: the level orders the sidekick (%04X) meaning %s -- %s leads for it first", e,
 		    HeroName(OtherHero(lead)), HeroName(lead));
 	CoopGiveLead(lead, "the level's order for the sidekick");
+	return false;
 }
 
 // The hero you play, held by a level's lock (its switch kept: the other leads),

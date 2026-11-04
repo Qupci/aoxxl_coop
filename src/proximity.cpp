@@ -2656,6 +2656,36 @@ int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max) { r
 bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
 bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev) { return DispatchOnlySwitches(msg, ev); }
 bool ProximityDispatchHoldsLoser(unsigned msg) { return DispatchHoldsLoser(msg); }
+// Does event `ev`'s group order "the sidekick" (wait, walk, teleport) before it
+// switches the lead away from `bound`? Set off by `bound` as the game's sidekick,
+// that order is the catch-up of that hero itself (LV2-6's 0C50, Obelix's: 48CE
+// "teleport the sidekick", then 4800, 4803). A circle switches first, then parks
+// the hero losing the lead (LV2-1's 0050: 4801, 4802) -- a hand-over.
+bool ProximityGroupOrdersBeforeSwitchAway(unsigned ev, int bound) {
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = GroupTargets(ev, objs, msgs, 64);
+	bool order = false;
+	for (int k = 0; k < n; k++) {
+		if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
+		unsigned m = msgs[k];
+		int to = m == 0x4800 || m == 0x48B7 ? HERO_ASTERIX : m == 0x4801 || m == 0x48B8 ? HERO_OBELIX : -1;
+		if (to >= 0) return order && to == (bound ^ 1);
+		order |= m == 0x4802 || (m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC);
+	}
+	return false;
+}
+// The first group under way that sends the trio `msg` (its event id), or -1.
+int ProximityDispatchGroupOf(unsigned msg) {
+	for (int i = 0; i < g_nDispatching; i++) {
+		char* objs[64];
+		uint16_t msgs[64];
+		int n = GroupTargets(g_dispatching[i], objs, msgs, 64);
+		for (int k = 0; k < n; k++)
+			if (objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] == msg) return g_dispatching[i];
+	}
+	return -1;
+}
 bool ProximityHeldAtDispatch(int hero) { return hero >= 0 && hero < 2 && g_heldAtDispatch[hero]; }
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;

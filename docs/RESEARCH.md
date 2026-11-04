@@ -4136,3 +4136,17 @@ both halves).
   -- as sent" (was the boss run's line; same: Asterix walks), splockcork21 / splockord2 unchanged; splock47's Asterix
   (no input after his glide) slid off to y 220 this run through his own #21 (0488: 4802, the engine's pass) -- Obelix
   waited at the end; the physics, not the change.
+- Round 219 (user: round 218's jump works; an unexpected Obelix -> Asterix switch further on, thought to be #284
+  (event 08E0 = group 11C: 4803, 1645, lights, 4800, 1D47 / 1D24 off, swing door, camera; rectangles #36 / #71 at 13.5
+  6.4 -364.5; XXL-Editor Snipaste_2026-11-05_00-40-11), not reproduced twice; userlogs 20261105-0040-xxl_coop{,.1,.2}.log).
+  08E0 fired only in xxl_coop.log, with Asterix leading. The switch (xxl_coop.2.log 136.4 s) was zone 0C50 (group
+  18A: 48CE "teleport the sidekick", 4800, 4803, 1D8D itself off), bound to Obelix, set off by the Obelix you play at
+  (15.4 5.0 -363.6): "48CE from Obelix's zone -- Asterix, as sent", then round 213 took the group for a hand-over
+  (48CE in it) -- Asterix led and was teleported. In the game Obelix crosses it as the AI sidekick: its own catch-up.
+  ProximityGroupOrdersBeforeSwitchAway(ev, bound): a sidekick order (4802, 4813..4876, 48BB..48EC) before the group's
+  switch, the switch away from `bound` -- a circle switches first then parks (LV2-1 0050: 4801, 4802), not this.
+  SoloOwnCatchUp (coop.cpp): from the dispatch, the zone bound to the leader = your hero, such a group -> its sidekick
+  orders (SoloOrderNeedsLead, now bool: true drops) and its switch (SoloDropsSwitch) dropped, logged "is that hero's
+  own catch-up as the sidekick". ProximityDispatchGroupOf(msg): the dispatched group sending msg. splock26c (new: you
+  play Obelix by 15.4 2.5 -363.6, S_FLAGEV 0C50): before, Asterix leads, put at 12.3 2.1 -368.0; after, dropped,
+  Obelix leads, nobody moved. splock21, splockcork21, splock26, splock26f, splock47, splockord2, splockcar21 unchanged.
