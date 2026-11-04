@@ -3934,4 +3934,4 @@ both halves).
   nolock36f (-Level 3, XXL_NOLOCK=1 XXL_NOLOCKROMANS=1 XXL_NOLOCKROMANSANY=1 XXL_OBELIXPOTION=0
   XXL_NOLOCKPAUSE=4000 XXL_NOLOCKFIRST=2000 XXL_NOLOCKCORK=0): "key has attack 0 movement 0 -- made attack 3
   movement 1" for all 3; Obelix's health 15 -> 8 as he walks round (user watched: "behaves normal now").
-  Squad 4's keys walk too but its fight runs it as a hero-target squad, so it had looked right.
+  Not checked why squad #4 (also "Walk" keys) looked right -- likely its fight switches it to another key.
