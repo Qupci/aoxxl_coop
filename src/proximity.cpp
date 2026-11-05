@@ -1770,7 +1770,16 @@ EventDispatchFn g_origEventDispatch = nullptr;
 uint16_t g_dispatching[32];   // the groups being dispatched, as their first event ids
 int      g_nDispatching = 0;
 
-bool g_heldAtDispatch[2];   // each hero held by the level (AI order not follow) as the dispatch began
+bool g_heldAtDispatch[2];   // each hero in the level's hands (LevelHoldsOrder) as the dispatch began
+
+// An AI order the level gives (go to / jump to a position, wait, hang on a beam,
+// ride a cable car, under external control): not the companion's own (follow,
+// its fights, a hit taken, clearing the path -- LV2-4's 0288 found Asterix in it
+// a moment -- the hint man, the shop).
+static bool LevelHoldsOrder(int o) {
+	return o == AI_GOTO_POS || o == AI_JUMP_TO_POS || o == AI_WAIT || o == AI_HANG_ON_BEAM || o == AI_USE_CABLECAR ||
+	       o == AI_EXTERNAL_CTRL || o == AI_GOTO_POS_NO_PF;
+}
 
 void __fastcall EventDispatchHook(char* es, void* edx, void* arg) {
 	g_nDispatching = 0;
@@ -1780,7 +1789,7 @@ void __fastcall EventDispatchHook(char* es, void* edx, void* arg) {
 		Trio t = GetTrio();
 		for (int h = 0; h < 2; h++) {
 			Hero hh = t ? t.GetHero(h) : Hero();
-			g_heldAtDispatch[h] = hh && hh.Order() != AI_FOLLOW_LEADER;
+			g_heldAtDispatch[h] = hh && h != t.Leader() && LevelHoldsOrder((int)hh.Order());
 		}
 		uint8_t* tab = *(uint8_t**)(es + 0xC);
 		unsigned n1 = *(uint16_t*)(es + 0x1C), n = n1 + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
@@ -1812,24 +1821,35 @@ bool DispatchOnlySwitches(unsigned msg, unsigned* ev) {
 	return found;
 }
 
-// Does a group under way that sends the trio `msg` (a lead switch) also hold the
-// hero losing the lead -- "the sidekick" waits (0x4802), walks or runs to a marker
-// (0x4813..0x4876), is put on one (0x48BB..0x48EC)? The level's hand-over: the
-// hero at the lever is parked, the other plays on (LV4-7's lever #138: 4800 +
-// 4802; LV2-6's #406: 48B8 + 481B).
+// Does a group leave a hero parked at its end -- "the sidekick waits" (0x4802),
+// or walks / runs to a marker (0x4813..0x4876) or is put on one (0x48BB..0x48EC)
+// with no "the sidekick may move" (0x4803) in the group? Judged by what the group
+// sends, not in which order (LV2-6's 0C50, 48CE "put the sidekick at the marker",
+// 4800, 4803: a catch-up, nobody parked; LV2-1's circle 0050, 4801 + 4802; LV4-7's
+// lever #138, 4800 + 4802; LV2-6's #406, 48B8 + 481B).
+static bool GroupParks(char** objs, const uint16_t* msgs, int n) {
+	bool waits = false, moves = false, frees = false;
+	for (int k = 0; k < n; k++) {
+		if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
+		unsigned m = msgs[k];
+		waits |= m == 0x4802;
+		moves |= (m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC);
+		frees |= m == 0x4803;
+	}
+	return waits || (moves && !frees);
+}
+
+// Does a group under way that sends the trio `msg` (a lead switch) park a hero
+// (GroupParks)? The level's hand-over: the hero at the lever is parked, the
+// other plays on.
 bool DispatchHoldsLoser(unsigned msg) {
 	for (int i = 0; i < g_nDispatching; i++) {
 		char* objs[64];
 		uint16_t msgs[64];
 		int n = GroupTargets(g_dispatching[i], objs, msgs, 64);
-		bool sends = false, holds = false;
-		for (int k = 0; k < n; k++) {
-			if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
-			unsigned m = msgs[k];
-			sends |= m == msg;
-			holds |= m == 0x4802 || (m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC);
-		}
-		if (sends && holds) return true;
+		bool sends = false;
+		for (int k = 0; k < n; k++) sends |= objs[k] && *(uintptr_t*)objs[k] == 0x6256A0 && msgs[k] == msg;
+		if (sends && GroupParks(objs, msgs, n)) return true;
 	}
 	return false;
 }
@@ -2656,24 +2676,23 @@ int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max) { r
 bool ProximityGroupCommandsTrio(unsigned ev) { return GroupCommandsTrio(ev); }
 bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev) { return DispatchOnlySwitches(msg, ev); }
 bool ProximityDispatchHoldsLoser(unsigned msg) { return DispatchHoldsLoser(msg); }
-// Does event `ev`'s group order "the sidekick" (wait, walk, teleport) before it
-// switches the lead away from `bound`? Set off by `bound` as the game's sidekick,
-// that order is the catch-up of that hero itself (LV2-6's 0C50, Obelix's: 48CE
-// "teleport the sidekick", then 4800, 4803). A circle switches first, then parks
-// the hero losing the lead (LV2-1's 0050: 4801, 4802) -- a hand-over.
-bool ProximityGroupOrdersBeforeSwitchAway(unsigned ev, int bound) {
+// Does event `ev`'s group switch the lead away from `bound` and park nobody
+// (GroupParks)? Set off by `bound` leading, that is the catch-up of that hero as
+// the game's sidekick (LV2-6's 0C50, Obelix's: 48CE "put the sidekick at the
+// marker", 4800, 4803). A circle parks the hero losing the lead (LV2-1's 0050:
+// 4801 + 4802) -- a hand-over.
+bool ProximityGroupCatchUp(unsigned ev, int bound) {
 	char* objs[64];
 	uint16_t msgs[64];
 	int n = GroupTargets(ev, objs, msgs, 64);
-	bool order = false;
+	bool away = false;
 	for (int k = 0; k < n; k++) {
 		if (!objs[k] || *(uintptr_t*)objs[k] != 0x6256A0) continue;
 		unsigned m = msgs[k];
 		int to = m == 0x4800 || m == 0x48B7 ? HERO_ASTERIX : m == 0x4801 || m == 0x48B8 ? HERO_OBELIX : -1;
-		if (to >= 0) return order && to == (bound ^ 1);
-		order |= m == 0x4802 || (m >= 0x4813 && m <= 0x4876) || (m >= 0x48BB && m <= 0x48EC);
+		away |= to == (bound ^ 1);
 	}
-	return false;
+	return away && !GroupParks(objs, msgs, n);
 }
 // The first group under way that sends the trio `msg` (its event id), or -1.
 int ProximityDispatchGroupOf(unsigned msg) {

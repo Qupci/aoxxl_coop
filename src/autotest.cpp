@@ -42,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -8014,6 +8014,19 @@ const Step kSpLockOrd2[] = {
 	SHOT(6000, "order"), SHOT(12000, "after"), SHOT(20000, "later"),
 	END(24000),
 };
+// splockcork43 (-Level 4; sp_hero_switch_lock on): the user's LV4-3 corkscrew
+// (xxl_coop.v4-3_corkscrew_skip.log): you play Asterix on the top (-601.8 7.5
+// -164.9), Obelix below it (-603.8 -0.6 -160.6) launched (event 01A0: 4846, his
+// jump, AI order 2); landing he crosses 01A8 ("Obelix leads" + 4803 + 488B).
+// Was dropped (no lock); in the game Obelix leads from there.
+const Step kSpLockCork43[] = {
+	MARK(0, "splockcork43"), LOADSECTOR(200, 3),
+	PLACEAT(3000, HERO_ASTERIX, -601.78f, 7.5f, -164.93f), PLACEAT(3000, HERO_OBELIX, -603.83f, -0.57f, -160.62f),
+	{ 4000, S_FLAGEV, 0x01A0, 0, 0, 0, 0, "event 01A0: obelix's launch (4846)" },
+	{ 4400, S_FLAGEV, 0x01A8, 0, 0, 0, 0, "event 01A8: obelix leads (4801 + 4803)" },
+	SHOT(5000, "after"), SHOT(8000, "later"),
+	END(9000),
+};
 // splock43 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
 // the user's LV4-3 light pillar (-607 -1 -148), you play Obelix: zone 00D9's
 // group 01B ("Asterix leads" + "the sidekick may move": dropped), then group 0E7
@@ -8048,17 +8061,143 @@ const Step kSpLockCar44[] = {
 	SHOT(13000, "car_back"),
 	GLIDEAT(15000, HERO_ASTERIX, -684.85f, 8.6f, -216.0f, 1000),
 	SHOT(17000, "in_the_car"),
-	// (a rope car: Obelix pulls it in the game -- moved along its rope here, as splockcar21)
-	{ 19000, S_CARPOS, HERO_ASTERIX, 0, 0, 8.0f, 0, "car along its rope" },
-	{ 20000, S_CARPOS, HERO_ASTERIX, 0, 0, 16.0f, 0, "car along its rope" },
-	{ 21000, S_CARPOS, HERO_ASTERIX, 0, 0, 24.0f, 0, "car along its rope" },
-	{ 22000, S_CARPOS, HERO_ASTERIX, 0, 0, 32.0f, 0, "car along its rope" },
-	{ 23000, S_CARPOS, HERO_ASTERIX, 0, 0, 40.0f, 0, "car along its rope" },
-	{ 24000, S_CARPOS, HERO_ASTERIX, 0, 0, 48.0f, 0, "car along its rope" },
-	{ 25000, S_CARPOS, HERO_ASTERIX, 0, 0, 56.0f, 0, "car along its rope" },
-	{ 26000, S_CARPOS, HERO_ASTERIX, 0, 0, 64.0f, 0, "car along its rope" },
-	SHOT(24500, "riding"), SHOT(28000, "top"), SHOT(34000, "top_2"),
-	END(38000),
+	POTION(17500),
+	PLACEAT(18000, HERO_OBELIX, -684.796f, 5.953f, -216.018f),   // (below the car: Obelix pulls it, X held 2 s -- user)
+	{ 18500, S_ZONEREC, 0x0650, 0, 0, 0, 0, "sphere #4's record" },
+	P1(19000, PAD_X, 0, 0, "p1 X held"), P1(21000, 0, 0, 0, "p1 X let go"),
+	{ 21500, S_CARPOS, HERO_ASTERIX, 0, 0, 16.0f, 0, "car along its rope" },
+	{ 21900, S_CARPOS, HERO_ASTERIX, 0, 0, 20.0f, 0, "car along its rope" },
+	{ 22300, S_CARPOS, HERO_ASTERIX, 0, 0, 24.0f, 0, "car along its rope" },
+	{ 22700, S_CARPOS, HERO_ASTERIX, 0, 0, 28.0f, 0, "car along its rope" },
+	{ 23100, S_CARPOS, HERO_ASTERIX, 0, 0, 32.0f, 0, "car along its rope" },
+	{ 23500, S_CARPOS, HERO_ASTERIX, 0, 0, 36.0f, 0, "car along its rope" },
+	{ 23900, S_CARPOS, HERO_ASTERIX, 0, 0, 40.0f, 0, "car along its rope" },
+	{ 24300, S_CARPOS, HERO_ASTERIX, 0, 0, 44.0f, 0, "car along its rope" },
+	{ 24700, S_CARPOS, HERO_ASTERIX, 0, 0, 48.0f, 0, "car along its rope" },
+	{ 25100, S_CARPOS, HERO_ASTERIX, 0, 0, 52.0f, 0, "car along its rope" },
+	{ 25500, S_CARPOS, HERO_ASTERIX, 0, 0, 56.0f, 0, "car along its rope" },
+	{ 25900, S_CARPOS, HERO_ASTERIX, 0, 0, 60.0f, 0, "car along its rope" },
+	{ 26300, S_CARPOS, HERO_ASTERIX, 0, 0, 64.0f, 0, "car along its rope" },
+	{ 26700, S_CARPOS, HERO_ASTERIX, 0, 0, 68.0f, 0, "car along its rope" },
+	{ 27100, S_CARPOS, HERO_ASTERIX, 0, 0, 72.0f, 0, "car along its rope" },
+	{ 27500, S_CARPOS, HERO_ASTERIX, 0, 0, 76.0f, 0, "car along its rope" },
+	{ 27900, S_CARPOS, HERO_ASTERIX, 0, 0, 80.0f, 0, "car along its rope" },
+	{ 28300, S_CARPOS, HERO_ASTERIX, 0, 0, 84.0f, 0, "car along its rope" },
+	{ 28700, S_CARPOS, HERO_ASTERIX, 0, 0, 88.0f, 0, "car along its rope" },
+	{ 29100, S_CARPOS, HERO_ASTERIX, 0, 0, 92.0f, 0, "car along its rope" },
+	{ 29500, S_CARPOS, HERO_ASTERIX, 0, 0, 96.0f, 0, "car along its rope" },
+	{ 29900, S_CARPOS, HERO_ASTERIX, 0, 0, 100.0f, 0, "car along its rope" },
+	{ 30300, S_CARPOS, HERO_ASTERIX, 0, 0, 104.0f, 0, "car along its rope" },
+	{ 30700, S_CARPOS, HERO_ASTERIX, 0, 0, 108.0f, 0, "car along its rope" },
+	{ 31100, S_CARPOS, HERO_ASTERIX, 0, 0, 112.0f, 0, "car along its rope" },
+	{ 31500, S_CARPOS, HERO_ASTERIX, 0, 0, 116.0f, 0, "car along its rope" },
+	{ 31900, S_CARPOS, HERO_ASTERIX, 0, 0, 120.0f, 0, "car along its rope" },
+	{ 32300, S_CARPOS, HERO_ASTERIX, 0, 0, 124.0f, 0, "car along its rope" },
+	{ 32700, S_CARPOS, HERO_ASTERIX, 0, 0, 128.0f, 0, "car along its rope" },
+	{ 33100, S_CARPOS, HERO_ASTERIX, 0, 0, 132.0f, 0, "car along its rope" },
+	{ 33500, S_CARPOS, HERO_ASTERIX, 0, 0, 136.0f, 0, "car along its rope" },
+	{ 33900, S_CARPOS, HERO_ASTERIX, 0, 0, 140.0f, 0, "car along its rope" },
+	{ 34300, S_CARPOS, HERO_ASTERIX, 0, 0, 144.0f, 0, "car along its rope" },
+	{ 34700, S_CARPOS, HERO_ASTERIX, 0, 0, 148.0f, 0, "car along its rope" },
+	{ 35100, S_CARPOS, HERO_ASTERIX, 0, 0, 152.0f, 0, "car along its rope" },
+	{ 35500, S_CARPOS, HERO_ASTERIX, 0, 0, 156.0f, 0, "car along its rope" },
+	{ 35900, S_CARPOS, HERO_ASTERIX, 0, 0, 160.0f, 0, "car along its rope" },
+	{ 36300, S_CARPOS, HERO_ASTERIX, 0, 0, 164.0f, 0, "car along its rope" },
+	{ 42000, S_ZONEREC, 0x0650, 0, 0, 0, 0, "sphere #4's record" },
+	SHOT(43000, "top"),
+	END(48000),
+};
+// splockcar44b (-Level 4): splockcar44 the user's way (xxl_coop.lv4-4_broke.log):
+// you play Obelix up to the car (Asterix's zones answer him -- the level's
+// leader is Asterix), walking by the ride's top, then switch to Asterix at the
+// car; sphere #4's record (event 0650) logged along the way.
+const Step kSpLockCar44b[] = {
+	MARK(0, "splockcar44b"), LOADSECTOR(200, 4),
+	FORCE(2800, HERO_OBELIX, 1),
+	PLACEAT(3000, HERO_ASTERIX, -681.05f, 8.6f, -214.74f), PLACEAT(3000, HERO_OBELIX, -680.0f, 6.0f, -222.0f),
+	FORCE(3400, HERO_OBELIX, 0),
+	POTION(3600),   // (the fights on the way: user)
+	{ 3800, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 4200, S_ZONEREC, 0x0650, 0, 0, 0, 0, "sphere #4's record" },
+	GLIDEAT(4500, HERO_OBELIX, -705.0f, 6.0f, -235.0f, 2500),
+	GLIDEAT(7500, HERO_OBELIX, -719.0f, 6.0f, -226.0f, 2000),
+	GLIDEAT(10000, HERO_OBELIX, -717.0f, 6.0f, -221.0f, 1000),
+	GLIDEAT(11500, HERO_OBELIX, -683.6f, 8.4f, -219.0f, 2500),
+	{ 14500, S_ZONEREC, 0x0650, 0, 0, 0, 0, "sphere #4's record" },
+	{ 15000, S_PULLLEVER, -1, 0, 0, -681.844f, 9.447f, "the lever (fight-locked: its fight starts)", -214.416f },
+	ENDFIGHTWON(17500),
+	{ 19500, S_PULLLEVER, -1, 0, 0, -681.844f, 9.447f, "the lever: the car comes back", -214.416f },
+	{ 23000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	GLIDEAT(24000, HERO_ASTERIX, -684.85f, 8.6f, -216.0f, 1000),
+	PLACEAT(26500, HERO_OBELIX, -684.796f, 5.953f, -216.018f),   // (below the car: user)
+	{ 27000, S_ZONEREC, 0x0650, 0, 0, 0, 0, "sphere #4's record" },
+	P1(27500, PAD_X, 0, 0, "p1 X held (obelix pulls the car)"), P1(29500, 0, 0, 0, "p1 X let go"),
+	{ 30000, S_CARPOS, HERO_ASTERIX, 0, 0, 16.0f, 0, "car along its rope" },
+	{ 30400, S_CARPOS, HERO_ASTERIX, 0, 0, 20.0f, 0, "car along its rope" },
+	{ 30800, S_CARPOS, HERO_ASTERIX, 0, 0, 24.0f, 0, "car along its rope" },
+	{ 31200, S_CARPOS, HERO_ASTERIX, 0, 0, 28.0f, 0, "car along its rope" },
+	{ 31600, S_CARPOS, HERO_ASTERIX, 0, 0, 32.0f, 0, "car along its rope" },
+	{ 32000, S_CARPOS, HERO_ASTERIX, 0, 0, 36.0f, 0, "car along its rope" },
+	{ 32400, S_CARPOS, HERO_ASTERIX, 0, 0, 40.0f, 0, "car along its rope" },
+	{ 32800, S_CARPOS, HERO_ASTERIX, 0, 0, 44.0f, 0, "car along its rope" },
+	{ 33200, S_CARPOS, HERO_ASTERIX, 0, 0, 48.0f, 0, "car along its rope" },
+	{ 33600, S_CARPOS, HERO_ASTERIX, 0, 0, 52.0f, 0, "car along its rope" },
+	{ 34000, S_CARPOS, HERO_ASTERIX, 0, 0, 56.0f, 0, "car along its rope" },
+	{ 34400, S_CARPOS, HERO_ASTERIX, 0, 0, 60.0f, 0, "car along its rope" },
+	{ 34800, S_CARPOS, HERO_ASTERIX, 0, 0, 64.0f, 0, "car along its rope" },
+	{ 35200, S_CARPOS, HERO_ASTERIX, 0, 0, 68.0f, 0, "car along its rope" },
+	{ 35600, S_CARPOS, HERO_ASTERIX, 0, 0, 72.0f, 0, "car along its rope" },
+	{ 36000, S_CARPOS, HERO_ASTERIX, 0, 0, 76.0f, 0, "car along its rope" },
+	{ 36400, S_CARPOS, HERO_ASTERIX, 0, 0, 80.0f, 0, "car along its rope" },
+	{ 36800, S_CARPOS, HERO_ASTERIX, 0, 0, 84.0f, 0, "car along its rope" },
+	{ 37200, S_CARPOS, HERO_ASTERIX, 0, 0, 88.0f, 0, "car along its rope" },
+	{ 37600, S_CARPOS, HERO_ASTERIX, 0, 0, 92.0f, 0, "car along its rope" },
+	{ 38000, S_CARPOS, HERO_ASTERIX, 0, 0, 96.0f, 0, "car along its rope" },
+	{ 38400, S_CARPOS, HERO_ASTERIX, 0, 0, 100.0f, 0, "car along its rope" },
+	{ 38800, S_CARPOS, HERO_ASTERIX, 0, 0, 104.0f, 0, "car along its rope" },
+	{ 39200, S_CARPOS, HERO_ASTERIX, 0, 0, 108.0f, 0, "car along its rope" },
+	{ 39600, S_CARPOS, HERO_ASTERIX, 0, 0, 112.0f, 0, "car along its rope" },
+	{ 40000, S_CARPOS, HERO_ASTERIX, 0, 0, 116.0f, 0, "car along its rope" },
+	{ 40400, S_CARPOS, HERO_ASTERIX, 0, 0, 120.0f, 0, "car along its rope" },
+	{ 40800, S_CARPOS, HERO_ASTERIX, 0, 0, 124.0f, 0, "car along its rope" },
+	{ 41200, S_CARPOS, HERO_ASTERIX, 0, 0, 128.0f, 0, "car along its rope" },
+	{ 41600, S_CARPOS, HERO_ASTERIX, 0, 0, 132.0f, 0, "car along its rope" },
+	{ 42000, S_CARPOS, HERO_ASTERIX, 0, 0, 136.0f, 0, "car along its rope" },
+	{ 42400, S_CARPOS, HERO_ASTERIX, 0, 0, 140.0f, 0, "car along its rope" },
+	{ 42800, S_CARPOS, HERO_ASTERIX, 0, 0, 144.0f, 0, "car along its rope" },
+	{ 43200, S_CARPOS, HERO_ASTERIX, 0, 0, 148.0f, 0, "car along its rope" },
+	{ 43600, S_CARPOS, HERO_ASTERIX, 0, 0, 152.0f, 0, "car along its rope" },
+	{ 44000, S_CARPOS, HERO_ASTERIX, 0, 0, 156.0f, 0, "car along its rope" },
+	{ 44400, S_CARPOS, HERO_ASTERIX, 0, 0, 160.0f, 0, "car along its rope" },
+	{ 44800, S_CARPOS, HERO_ASTERIX, 0, 0, 164.0f, 0, "car along its rope" },
+	{ 45200, S_CARPOS, HERO_ASTERIX, 0, 0, 168.0f, 0, "car along its rope" },
+	{ 45600, S_CARPOS, HERO_ASTERIX, 0, 0, 172.0f, 0, "car along its rope" },
+	{ 46000, S_CARPOS, HERO_ASTERIX, 0, 0, 176.0f, 0, "car along its rope" },
+	{ 46400, S_CARPOS, HERO_ASTERIX, 0, 0, 180.0f, 0, "car along its rope" },
+	{ 46800, S_CARPOS, HERO_ASTERIX, 0, 0, 184.0f, 0, "car along its rope" },
+	{ 47200, S_CARPOS, HERO_ASTERIX, 0, 0, 188.0f, 0, "car along its rope" },
+	{ 47600, S_CARPOS, HERO_ASTERIX, 0, 0, 192.0f, 0, "car along its rope" },
+	{ 48000, S_CARPOS, HERO_ASTERIX, 0, 0, 196.0f, 0, "car along its rope" },
+	{ 48400, S_CARPOS, HERO_ASTERIX, 0, 0, 200.0f, 0, "car along its rope" },
+	{ 48800, S_CARPOS, HERO_ASTERIX, 0, 0, 204.0f, 0, "car along its rope" },
+	{ 49200, S_CARPOS, HERO_ASTERIX, 0, 0, 208.0f, 0, "car along its rope" },
+	{ 49600, S_CARPOS, HERO_ASTERIX, 0, 0, 212.0f, 0, "car along its rope" },
+	{ 50000, S_CARPOS, HERO_ASTERIX, 0, 0, 216.0f, 0, "car along its rope" },
+	{ 50400, S_CARPOS, HERO_ASTERIX, 0, 0, 220.0f, 0, "car along its rope" },
+	{ 50800, S_CARPOS, HERO_ASTERIX, 0, 0, 224.0f, 0, "car along its rope" },
+	{ 51200, S_CARPOS, HERO_ASTERIX, 0, 0, 228.0f, 0, "car along its rope" },
+	{ 51600, S_CARPOS, HERO_ASTERIX, 0, 0, 232.0f, 0, "car along its rope" },
+	{ 52000, S_CARPOS, HERO_ASTERIX, 0, 0, 236.0f, 0, "car along its rope" },
+	{ 52400, S_CARPOS, HERO_ASTERIX, 0, 0, 240.0f, 0, "car along its rope" },
+	{ 52800, S_CARPOS, HERO_ASTERIX, 0, 0, 244.0f, 0, "car along its rope" },
+	{ 53200, S_CARPOS, HERO_ASTERIX, 0, 0, 248.0f, 0, "car along its rope" },
+	{ 53600, S_CARPOS, HERO_ASTERIX, 0, 0, 252.0f, 0, "car along its rope" },
+	{ 54000, S_CARPOS, HERO_ASTERIX, 0, 0, 256.0f, 0, "car along its rope" },
+	{ 54400, S_CARPOS, HERO_ASTERIX, 0, 0, 260.0f, 0, "car along its rope" },
+	{ 54800, S_CARPOS, HERO_ASTERIX, 0, 0, 264.0f, 0, "car along its rope" },
+	{ 56000, S_ZONEREC, 0x0650, 0, 0, 0, 0, "sphere #4's record" },
+	SHOT(57000, "top"),
+	END(62000),
 };
 // splock26 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=0 XXL_SPSWITCHLOCK=1
 // XXL_LOGTRIO=1): the user's LV2-6 blocks (xxl_coop.lv2-6_question.log). You
@@ -8569,7 +8708,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("splockord2", kSpLockOrd2),
 	SCENARIO("splockslide22", kSpLockSlide22),
 	SCENARIO("splock43", kSpLock43),
+	SCENARIO("splockcork43", kSpLockCork43),
 	SCENARIO("splockcar44", kSpLockCar44),
+	SCENARIO("splockcar44b", kSpLockCar44b),
 	SCENARIO("splock47", kSpLock47),
 	SCENARIO("splaunch24", kSpLaunch24),
 	SCENARIO("splaunch53", kSpLaunch53),
@@ -11520,6 +11661,28 @@ void RunStep(const Step& s) {
 	case S_COMBOHINT:   // combo a as if just bought, for both players (-1: the crowd's Twister hint again)
 		ComboHintsQueue(s.a);
 		break;
+	case S_ZONEREC: {   // the zone tests that flag event a: list, index, bound node (hero), flags +4 / +5
+		CKYellowPages* yp = YellowPages();
+		char* det = yp ? *(char**)((char*)yp + 0x54) : nullptr;
+		if (!det || *(uintptr_t*)det != 0x62504C) { Log("autotest: zonerec: no detection service"); break; }
+		const int bases[5] = { 0x2C, 0x34, 0x3C, 0x44, 0x4C };
+		const char* names[5] = { "box-enter", "sphere-enter", "plane-cross", "box-level", "sphere-level" };
+		char** nodes = *(char***)(det + 0x18);
+		Trio t = GetTrio();
+		for (int li = 0; li < 5; li++) {
+			char* e = *(char**)(det + bases[li]);
+			unsigned cnt = *(uint16_t*)(det + bases[li] + 4);
+			for (unsigned i = 0; e && i < cnt; i++, e += 8) {
+				if (*(uint16_t*)(e + 6) != (uint16_t)s.a) continue;
+				unsigned obj = *(uint16_t*)(e + 2);
+				int who = -1;
+				for (int h = 0; t && nodes && h < HERO_COUNT; h++) if (t.GetHero(h) && (char*)t.GetHero(h).hook->node == nodes[obj]) who = h;
+				Log("autotest: zonerec %04X: %s %u (shape %u), obj %u (%s), flags %02X/%02X -- leader %s", s.a, names[li], i,
+				    *(uint16_t*)e, obj, who >= 0 ? HeroName(who) : "?", (uint8_t)e[4], (uint8_t)e[5], t ? HeroName(t.Leader()) : "?");
+			}
+		}
+		break;
+	}
 	case S_CALLHK: {   // the game's own function s.b (thiscall, no arguments) on the first object of class (2, s.a)
 		char* o = GetNumLvlClassInstances(2, s.a) ? (char*)GetLvlObject(2, s.a, 0) : nullptr;
 		if (!o) { Log("autotest: callhk: no (2,%d) object", s.a); break; }

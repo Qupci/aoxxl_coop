@@ -41,9 +41,13 @@ int ProximityGroupTargets(unsigned ev, char** objs, uint16_t* msgs, int max);
 // `msg`: do they all only switch the lead (and free the sidekick, no cutscene)?
 // The first one's event id in `ev`.
 bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev);
+// A group under way that sends `msg` (a lead switch) leaves a hero parked: a
+// wait, or a walk / a put at a marker without "the sidekick may move".
 bool ProximityDispatchHoldsLoser(unsigned msg);
+// Hero `hero` was in the level's hands (a scripted AI order) as the dispatch began.
 bool ProximityHeldAtDispatch(int hero);
-bool ProximityGroupOrdersBeforeSwitchAway(unsigned ev, int bound);
+// Event `ev`'s group switches the lead away from `bound` and parks nobody.
+bool ProximityGroupCatchUp(unsigned ev, int bound);
 int ProximityDispatchGroupOf(unsigned msg);
 // A Roman passed to hero `receiver` (LB): it ticks with that hero as the trio
 // leader while it flies (state 4).

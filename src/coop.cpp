@@ -52,7 +52,6 @@ static void SoloPotionDash(Trio t);
 static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
 static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
 static bool SoloDropsSwitch(int ev);
-static void SoloGameParks(int ev);
 static bool SoloOrderNeedsLead(int ev);
 static void SoloFreedByLeadersZone(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
@@ -1815,7 +1814,6 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Single player, sp_hero_switch_lock: a level's switch that holds nobody, and
 	// the switch a later order for the sidekick needs.
 	if (SoloDropsSwitch(ev)) return true;
-	SoloGameParks(ev);
 	if (SoloOrderNeedsLead(ev)) return true;
 	SoloFreedByLeadersZone(ev);
 	// Individual heroes: a cable car takes the hero who steps on it from the
@@ -4568,38 +4566,36 @@ void CoopSoloSwitchRequest() { g_soloSwitchAsk++; }
 static const char* const kSwitchTooFar = "the other hero is too far";
 
 // [single_player] sp_hero_switch_lock (with sp_hero_switch; single player
-// only): the hero you play is yours, the level only borrows it. A level's lead
-// switch (an event group's "Obelix leads", from the event service's dispatch,
-// 0x46B180..0x46B331) is dropped unless that group also holds the hero losing
-// the lead -- a wait (0x4802, 0x4849: a light pillar's circle), a walk or run
-// to a marker (0x4813..0x4876), a teleport to one (0x48BB..0x48EC) -- or plays
-// a cutscene, or sends the trio anything but switches and "the sidekick may
-// move" (0x4803) (ProximityDispatchOnlySwitches); a switch the game makes from
-// its own code (a cable car's boarding, the belly slide) stays too. Such a
-// lock is the switch to the other hero; a lock with no switch (the automatic
-// cable car, user: its camera follows the car) switches nothing. A switch
-// whose group holds the hero losing the lead is the level's hand-over (a lever
-// that parks the hero at it): the other hero is yours from then, as with the
-// lock off, and the level's own switch back to the parked hero is kept
-// (SoloHandOver). After any other kept switch -- the game's own (a cable car's
-// boarding, the belly slide), a group with other trio orders, the mod's lending
-// (SoloOrderNeedsLead) -- once the hero you played (`choice`: the leader at the
-// level's start, then your own switches) is free again -- following, on its
-// feet, the switch's own checks met (SoloSwitchRefusal) for 0.3 s -- it leads
-// again. Refused only for its
-// distance for 3 s, the lead stays where it is and is your choice from then.
-// Nothing while a hero is down (second chance leads then).
+// only): the hero you play is yours. The level's lead switches go the game's own
+// way (the new leader is the hero you play from then, no give-back), except the
+// ones that decide for you out of nowhere -- an event group's switch (the event
+// service's dispatch, 0x46B180..0x46B331) with the level's hands off both heroes.
+// Kept (SoloDropsSwitch), as with the lock off:
+//   - a group that parks a hero (ProximityDispatchHoldsLoser: a wait, a walk or a
+//     put at a marker not undone by "the sidekick may move") -- a hand-over:
+//     light pillar circles, levers, corkscrew platforms;
+//   - a switch to a hero in the level's hands as the dispatch began (a scripted
+//     AI order: waiting, walking, jumping off a corkscrew, riding a cable car) --
+//     the level hands the lead back (LV4-3's 01A8, Obelix off his corkscrew;
+//     LV2-6's blocks; a rope car's end);
+//   - the game's own code (a rope car's boarding, the belly slide, the boss's
+//     button) -- but a trio launcher's landing, which decides out of nowhere too;
+//   - a switch to the hero you play, or to the leader.
+// Dropped: the rest -- both heroes free, nobody parked. A dropped group from a
+// zone of your leading hero switching away from it is that hero's own catch-up
+// as the game's sidekick: its orders go too (SoloOwnCatchUp). A level's order
+// for the sidekick after a dropped switch may still lend the lead for it
+// (SoloOrderNeedsLead) -- then, once the hero you play (`choice`) is free again
+// (following, on its feet, the switch's own checks met -- SoloSwitchRefusal --
+// for 0.3 s), it leads again; refused only for its distance for 3 s, the lead
+// stays where it is and is your choice from then. Nothing while a hero is down
+// (second chance leads then).
 struct SoloLock {
 	int   choice = -1;       // the hero you play
 	int   level = -1;        // ... in this level
 	DWORD freeSince = 0, farSince = 0;
-	int   levelLeader = -1;  // the hero the level's last switch (an event group's) means to lead
-	int   release = -1;      // a dropped switch's hero, held by the level then: freed once it waits (SoloReleaseWatch)
+	int   levelLeader = -1;  // the hero the level's last switch means to lead
 	int   handedTo = -1;     // the leader whose zone freed the hero you play (SoloFreedByLeadersZone)
-	int   handedFrom = -1;   // the hero you played before a level's hand-over (SoloHandOver): its switch back is kept
-	DWORD releaseAt = 0;
-	uintptr_t gameSwitchFrom = 0;   // the game code's last switch (not an event group's): where from, when
-	DWORD gameSwitchAt = 0;
 } g_solo;
 
 static bool SoloSwitchLockOn() { return !g.p2Joined && g_config.spSwitchLock; }
@@ -4623,10 +4619,8 @@ int CoopSoloLockedHero() {
 }
 
 // The level's switch to `to` kept as the hero you play from now (the lock off's
-// way): the other hero, parked by the level, noted (handedFrom) -- the level's
-// own hand back to it is kept. Logged on change.
+// way). Logged on change.
 static void SoloHandOver(int to, const char* why) {
-	g_solo.handedFrom = OtherHero(to);
 	if (g_solo.choice == to) return;
 	static int s_told = 0;
 	if (s_told++ < 40)
@@ -4637,12 +4631,12 @@ static void SoloHandOver(int to, const char* why) {
 	g_solo.freeSince = g_solo.farSince = 0;
 }
 
-// A zone bound to the hero you play, leading, whose group orders "the sidekick"
-// before it switches to the other hero: in the game that hero crosses it as the AI
-// sidekick -- its own catch-up (LV2-6's 0C50 by the jump down: 48CE "teleport the
-// sidekick", 4800, 4803, itself off). Leading it yourself it means nothing: the
-// group's orders and switch are dropped (was: Asterix put at the marker and, the
-// group taken for a hand-over, given the lead -- user: an unexpected switch).
+// A zone bound to the hero you play, leading, whose group switches to the other
+// hero and parks nobody: in the game that hero crosses it as the AI sidekick --
+// its own catch-up (LV2-6's 0C50 by the jump down: 48CE "put the sidekick at the
+// marker", 4800, 4803, itself off). Leading it yourself it means nothing: the
+// group's orders and switch are dropped (was: Asterix put at the marker and given
+// the lead -- user: an unexpected switch).
 static int SoloOwnCatchUp(Trio t, unsigned msg) {
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
@@ -4650,7 +4644,7 @@ static int SoloOwnCatchUp(Trio t, unsigned msg) {
 	int l = t.Leader();
 	if ((l != HERO_ASTERIX && l != HERO_OBELIX) || l != g_solo.choice || ProximityDispatchZoneHero(msg) != l) return -1;
 	int g = ProximityDispatchGroupOf(msg);
-	if (g < 0 || !ProximityGroupOrdersBeforeSwitchAway((unsigned)g, l)) return -1;
+	if (g < 0 || !ProximityGroupCatchUp((unsigned)g, l)) return -1;
 	static int s_told = 0, s_last = -1;
 	if (g != s_last && s_told++ < 20)
 		Log("coop: sp_hero_switch_lock: event %04X, %s's zone, is that hero's own catch-up as the sidekick -- %s leads: "
@@ -4659,50 +4653,17 @@ static int SoloOwnCatchUp(Trio t, unsigned msg) {
 	return g;
 }
 
-// The game code's own "the sidekick waits" (0x4802) right after its own switch
-// (the same function, the same frame): the hero that lost the lead is parked --
-// a hand-over, as an event group's switch + 4802 (ProximityDispatchHoldsLoser).
-// LV2-10's boss: Asterix lands on its button, 0x4F3165 "Obelix leads" + 0x4F317E
-// "Asterix waits"; once thrown off it (0x4F18D0: 487C, then 0x4F194F "Asterix
-// leads") the switch back is the hand-back. Was: the hand-back to Obelix noted
-// nobody parked, so "Asterix leads" was a pending switch -- the lock gave Obelix
-// the lead back 1.2 s later, with Asterix free (user: "a strange mod's switch").
-static void SoloGameParks(int ev) {
-	if (!SoloSwitchLockOn() || (ev & 0xFFFF) != 0x4802 || !g_solo.gameSwitchFrom) return;
-	extern void* g_trioEventCaller;
-	uintptr_t from = (uintptr_t)g_trioEventCaller;
-	if (from < g_solo.gameSwitchFrom || from - g_solo.gameSwitchFrom > 0x40 || GetTickCount() - g_solo.gameSwitchAt > 100) return;
-	g_solo.gameSwitchFrom = 0;
-	Trio t = GetTrio();
-	int l = t ? t.Leader() : -1;
-	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
-	static int s_told = 0;
-	if (s_told++ < 20)
-		Log("coop: sp_hero_switch_lock: the game parks %s after its switch (4802 from %p) -- %s's, handed over", HeroName(OtherHero(l)),
-		    (void*)from, HeroName(l));
-	SoloHandOver(l, "the game's switch, the other hero parked");
-}
-
 static bool SoloDropsSwitch(int ev) {
 	if (!SoloSwitchLockOn() || !IsLeaderSwitch(ev)) return false;
-	if (SoloOwnCatchUp(GetTrio(), ev & 0xFFFF) >= 0) return true;
+	Trio t = GetTrio();
+	if (!t) return false;
+	if (SoloOwnCatchUp(t, ev & 0xFFFF) >= 0) return true;
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
-	Trio t = GetTrio();
-	unsigned group = 0;
 	int to = (ev & 0xFFFF) == 0x4800 || (ev & 0xFFFF) == 0x48B7 ? HERO_ASTERIX : HERO_OBELIX;
-	// A trio launcher's landing (CKHkTrioCatapult tick 0x4C2AB0: its +0x15 bit 1,
-	// the launcher's own hero +0x14 bit 2 -- 4800 / 4801 if the other leads; LV5-3's
-	// at -341.2 14.1 151.5 is Asterix's): the level's switch too, sent by the game
-	// itself, not from an event group. Kept, it came mid-flight (deferred to the
-	// landing) and the lock handed the lead back 0.3 s later; never counted as the
-	// level's leader, the one of a 4801 dropped in LV5-3 long before stayed, and
-	// LV5-5's keg order for the sidekick (4815) gave Obelix the lead for it.
-	bool launcher = from >= 0x4C2AB0 && from < 0x4C2AB0 + 1416;
-	if (!t) return false;
 	// (The mod's own switches -- CoopGiveLead: your switch, the lock's give-back, a
 	// lending for a level's order -- are none of the game's: LV2-4's lending to
-	// Asterix was taken for "the game hands the lead back to the hero it parked".)
+	// Asterix was taken for the game's.)
 	static uintptr_t s_exeLo = 0, s_exeHi = 0;
 	if (!s_exeLo) {
 		char* m = (char*)GetModuleHandleA(nullptr);
@@ -4710,40 +4671,12 @@ static bool SoloDropsSwitch(int ev) {
 		s_exeHi = s_exeLo + ((IMAGE_NT_HEADERS*)(m + ((IMAGE_DOS_HEADER*)m)->e_lfanew))->OptionalHeader.SizeOfImage;
 	}
 	if (from < s_exeLo || from >= s_exeHi) return false;
-	if (!launcher && (from < 0x46B180 || from >= 0x46B331)) {
-		// The game's own switches, kept. A rope cable car's boarding
-		// (CKHkTowedTelepher: the rider's tick, 0x49ACB9 4801 -- Asterix holds the
-		// bars, Obelix leads) is a hand-over too: Obelix the hero you play, the
-		// level's leader with it (zones as sent: LV4-4's sphere #4 at the ride's
-		// end), until the ride's end hands it back (LV2-1's zone 0020: "Asterix
-		// leads" + 4803, Asterix still on the car). Was: kept as a lock of yours,
-		// the lead given back once free (the end's switch did it first anyway).
-		// The trio's own ride modes (CKGrpTrio_OnEvent48xx 0x482BB0: 480B..480F,
-		// both heroes into mode 3 -- 480B the belly slide, its 4801 from 0x48349A;
-		// 480C / 480F to Asterix, 480D / 480E to Obelix): the heroes go together,
-		// the new leader stays yours at the ride's end (LV2-2: the slide's end zone
-		// 0030 sends no switch back; user: "every belly-slide section keeps Obelix").
-		// Was: given back to Asterix once free after the end's dialogue.
-		bool rideMode = from >= 0x482BB0 && from < 0x482BB0 + 3991;
-		g_solo.gameSwitchFrom = from;   // (its "the sidekick waits" next: SoloGameParks)
-		g_solo.gameSwitchAt = GetTickCount();
-		if ((from == 0x49ACB9 || rideMode) && t.Leader() != to) {
-			g_solo.levelLeader = to;
-			SoloHandOver(to, rideMode ? "the trio's ride mode (480B..480F: the belly slide), both heroes in it"
-			                          : "a rope cable car's boarding, the rider on it");
-		} else if (to == g_solo.handedFrom && t.Leader() != to) {
-			SoloHandOver(to, "the game hands the lead back to the hero it parked");
-			g_solo.handedFrom = -1;
-		} else if (t.Leader() != to && to != g_solo.choice) {
-			static int s_game = 0;
-			if (s_game++ < 20)
-				Log("coop: sp_hero_switch_lock: the game's own switch %04X (from %p) kept -- %s gets the lead back once free (pending)",
-				    ev & 0xFFFF, (void*)from, HeroName(g_solo.choice));
-		}
-		return false;
-	}
 	g_solo.levelLeader = to;   // (the leader the level means from now, given or not: SoloOrderNeedsLead)
-	if (launcher) {
+	// A trio launcher's landing (CKHkTrioCatapult tick 0x4C2AB0: its +0x15 bit 1,
+	// the launcher's own hero +0x14 bit 2 -- 4800 / 4801 if the other leads; LV5-3's
+	// at -341.2 14.1 151.5 is Asterix's): it comes mid-flight, deferred to the
+	// landing, out of nowhere -- dropped.
+	if (from >= 0x4C2AB0 && from < 0x4C2AB0 + 1416) {
 		if (t.Leader() == to || to == g_solo.choice) return false;
 		static int s_launch = 0;
 		if (s_launch++ < 20)
@@ -4751,81 +4684,37 @@ static bool SoloDropsSwitch(int ev) {
 			    HeroName(t.Leader()));
 		return true;
 	}
-	// The level's hand-over (the group also holds the other hero: a lever that
-	// parks the hero at it -- LV4-7's #138, Obelix's: 4800 + 4802; LV2-6's blocks
-	// lever, Asterix's: Obelix leads, Asterix waits): the other hero is the one you
-	// play from now, as with the lock off. A "pending" lead back to the parked hero
-	// once freed had no end where the level never hands back (LV4-7, user: "LOCK:
-	// ON (OBELIX)" with Asterix leading for good). Also with the lead already
-	// there: the parked hero is noted (LV3-5's rope car end 0C38: "Asterix leads",
-	// Obelix put on the corkscrew, 4802 -- its top box 0340 hands it to him).
+	// The game's own code (not an event group): a rope cable car's boarding
+	// (CKHkTowedTelepher: the rider's tick, 0x49ACB9 4801 -- Asterix holds the bars,
+	// Obelix leads), the trio's ride modes (CKGrpTrio_OnEvent48xx 0x482BB0: 480B the
+	// belly slide, its 4801 from 0x48349A), LV2-10's boss (0x4F3165 "Obelix leads" as
+	// Asterix lands on its button, 0x4F194F "Asterix leads" as it throws him off).
+	if (from < 0x46B180 || from >= 0x46B331) {
+		if (t.Leader() != to) SoloHandOver(to, "the game's own switch");
+		return false;
+	}
+	// The level's hand-over: the group parks a hero (LV4-7's lever #138, Obelix's:
+	// 4800 + 4802; LV2-6's blocks lever; a light pillar's circle; LV3-5's rope car
+	// end 0C38: "Asterix leads", Obelix put on the corkscrew, 4802).
 	if (ProximityDispatchHoldsLoser(ev & 0xFFFF)) {
-		SoloHandOver(to, "its group holds the other hero");
+		SoloHandOver(to, "its group parks a hero");
 		return false;
 	}
-	// (A switch to the hero you play is kept: the level ends a lock of it that
-	// way -- a rope cable car's end, zone 0020 on LV2-1's landing: "Asterix
-	// leads" + "the sidekick may move". Dropped, Asterix stayed the companion with
-	// the ride's wait order, never free, never given the lead back.)
 	if (t.Leader() == to || to == g_solo.choice) return false;
-	// The level hands it back to the hero it parked: kept -- to that hero while
-	// the level holds it (LV2-6: the last block walks Asterix into 01E8, "Asterix
-	// leads" + 4803; user: the SP game's switch; LV3-5's corkscrew box 0340, 4801 +
-	// 4803, Obelix jumping off it, parked by 0C38). A switch-only group to a hero
-	// the level did not park is still dropped.
-	Hero th = t.GetHero(to);
-	// (Held as the dispatch began: LV2-6's other end detector 0D29 sends 4803
-	// before its 48B7 -- Asterix already following when the switch came.)
-	if (to == g_solo.handedFrom && th && (th.Order() != AI_FOLLOW_LEADER || ProximityHeldAtDispatch(to)) && !IndivFallen(to)) {
-		SoloHandOver(to, "the level hands the lead back to the hero it parked");
-		g_solo.handedFrom = -1;
+	// The level hands the lead to a hero it has in hand (LV4-3's 01A8: Obelix lands
+	// off his corkscrew, "Obelix leads" + 4803; LV2-6: the last block walks Asterix
+	// into 01E8; LV3-5's corkscrew box 0340; a rope car's end, the rider on it).
+	// (As the dispatch began: LV2-6's 0D29 sends 4803 before its 48B7.)
+	if (ProximityHeldAtDispatch(to) && !IndivFallen(to)) {
+		SoloHandOver(to, "the level hands it to the hero it had in hand");
 		return false;
 	}
-	if (!ProximityDispatchOnlySwitches(ev & 0xFFFF, &group)) {
-		static int s_other = 0;
-		if (s_other++ < 20)
-			Log("coop: sp_hero_switch_lock: the level's switch %04X kept (its group sends the trio other orders, nobody held: "
-			    "the group's line above) -- %s gets the lead back once free (pending)",
-			    ev & 0xFFFF, HeroName(g_solo.choice));
-		return false;
-	}
+	unsigned group = (unsigned)ProximityDispatchGroupOf(ev & 0xFFFF);
 	static int s_told = 0;
 	if (s_told++ < 40)
-		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: no lock) ignored -- %s keeps the lead",
-		    ev & 0xFFFF, group, HeroName(t.Leader()));
-	// The switch is what frees a hero the level held (LV3-5: Obelix jumps off the
-	// corkscrew -- 484C, AI order 2 -- into box 0340: "Obelix leads" + "the
-	// sidekick may move"). Dropped, the group's 4803 reaches him mid-jump, where
-	// the trio takes no new order (FUN_00481810), and the jump ends in a wait (3):
-	// held for good. SoloReleaseWatch frees him once he waits.
-	if (th && th.Order() != AI_FOLLOW_LEADER) {
-		g_solo.release = to;
-		g_solo.releaseAt = GetTickCount();
-	}
+		Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group: nobody in the level's hands) ignored -- %s "
+		    "keeps the lead", ev & 0xFFFF, group & 0xFFFF, HeroName(t.Leader()));
 	return true;
-}
-
-// A dropped switch's hero (SoloDropsSwitch), held by the level as it came (a
-// jump to a mark, a wait): the level meant it to lead -- no wait was meant for
-// it. Once it waits (AI order 3, its jump or walk done), trio 4803 ("the sidekick
-// may move"): it follows the hero you play. Not after 10 s, nor once it leads,
-// nor after a later order of the level's for the sidekick (SoloOrderNeedsLead).
-static void SoloReleaseWatch(Trio t) {
-	SoloLock& s = g_solo;
-	if (s.release < 0) return;
-	Hero h = t.GetHero(s.release);
-	if (!h || t.Leader() == s.release || GetTickCount() - s.releaseAt > 10000 || h.Order() == AI_FOLLOW_LEADER) {
-		s.release = -1;
-		return;
-	}
-	if ((int)h.Order() != 3 || IndivFallen(s.release)) return;
-	static int s_told = 0;
-	if (s_told++ < 20)
-		Log("coop: sp_hero_switch_lock: %s, the dropped switch's hero, waits where the level held it -- trio 4803, it follows",
-		    HeroName(s.release));
-	s.release = -1;
-	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
-	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4803, nullptr);
 }
 
 // A level's order for "the sidekick" (wait here, walk / run / be put at a
@@ -4844,7 +4733,6 @@ static bool SoloOrderNeedsLead(int ev) {
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	Trio t = GetTrio();
 	if (from < 0x46B180 || from >= 0x46B331 || !t) return false;
-	g_solo.release = -1;   // (the level's own order for the sidekick from now)
 	if (t.Leader() == lead) return false;
 	// From a zone bound to the hero leading (set off by it): the order is for the
 	// companion, as the game sends it -- a zone bound to one hero orders the other
@@ -4963,7 +4851,6 @@ static void SoloHeroSwitch(Trio t) {
 	if (s_logs++ < 60) Log("coop: hero switch: %s -> %s", HeroName(l), HeroName(OtherHero(l)));
 	CoopGiveLead(OtherHero(l), "the hero switch button");
 	g_solo.choice = t.Leader();
-	g_solo.handedFrom = -1;
 }
 
 static void SoloSwitchLockWatch(Trio t) {
@@ -4971,15 +4858,12 @@ static void SoloSwitchLockWatch(Trio t) {
 	if (!SoloSwitchLockOn() || !t || s.level != g.lastLevel) {
 		s.choice = -1;
 		s.levelLeader = -1;
-		s.release = -1;
 		s.handedTo = -1;
-		s.handedFrom = -1;
 		s.level = g.lastLevel;
 		s.freeSince = s.farSince = 0;
 		return;
 	}
 	if (!CoopGameplayLive()) { s.freeSince = s.farSince = 0; return; }   // (a cutscene's: your hero stays yours)
-	SoloReleaseWatch(t);
 	int l = t.Leader();
 	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
 	if (s.choice < 0) {
@@ -5004,8 +4888,8 @@ static void SoloSwitchLockWatch(Trio t) {
 	}
 	// Handed on (SoloFreedByLeadersZone; a lock whose switch was not the level's
 	// hand-over -- those make the other hero yours at once, SoloDropsSwitch): the
-	// level goes on with the leader, the hero you play from now, its own switch
-	// back kept (handedFrom), as with the lock off.
+	// level goes on with the leader, the hero you play from now, as with the lock
+	// off.
 	if (s.handedTo == l) {
 		s.levelLeader = l;
 		SoloHandOver(l, "freed from the leader's zone, 4803 alone");
@@ -5084,7 +4968,6 @@ static void SoloModButtons(Trio t) {
 		Log("coop: cheat: player 1 gives the lead to %s (R3 + X)", HeroName(c));
 		CoopGiveLead(c, "R3 + X");
 		g_solo.choice = t.Leader();
-		g_solo.handedFrom = -1;
 	}
 	ModCheats(pressed, t.Leader(), "player 1");
 }
