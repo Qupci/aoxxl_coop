@@ -42,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -8352,6 +8352,36 @@ const Step kSpBoss210[] = {
 	SHOT(13300, "boss_wake"), SHOT(16000, "boss_2"), SHOT(20000, "boss_3"),
 	END(23000),
 };
+// splockboss210 (level 2; sp_hero_switch_lock on): the user's
+// (xxl_coop.lv2-10_unwanted_switch): you play Asterix through the boss gate, he
+// stands on the corkscrew platform by the light pillar (event 0360: "Obelix
+// leads", "Asterix waits"), Obelix punches the turnstile until the platform is
+// up, Asterix rides the automatic cable car (the level hands him the lead), its
+// end drops him on the boss's button (the boss's 0x4F3165 "Obelix leads" +
+// 0x4F317E "Asterix waits"); about 15 s later the boss throws him off it
+// (0x4F18D0: 487C, 0x4F194F "Asterix leads"). (S_CALLHK runs 0x4F18D0 at once.)
+const Step kSpLockBoss210[] = {
+	MARK(0, "splockboss210"), LOADSECTOR(200, 10),
+	PLACEAT(2500, HERO_ASTERIX, 1665.95f, -743.6f, -1210.66f), PLACEAT(2500, HERO_OBELIX, 1664.54f, -743.6f, -1210.02f),
+	GLIDEAT(4000, HERO_ASTERIX, 1678.0f, -742.8f, -1210.5f, 1500),
+	CINE_ENTER(7000),
+	GLIDEAT(8500, HERO_ASTERIX, 1695.0f, -742.8f, -1210.5f, 2000),
+	GLIDEAT(11000, HERO_ASTERIX, 1700.0f, -747.8f, -1175.0f, 2500),
+	GLIDEAT(14000, HERO_ASTERIX, 1712.0f, -747.8f, -1150.0f, 1500),
+	PLACEAT(16000, HERO_OBELIX, 1715.26f, -747.82f, -1141.75f),
+	PLACEAT(16500, HERO_ASTERIX, 1716.946f, -746.66f, -1144.917f),   // (on the platform: user)
+	SHOT(19500, "circle"),
+	{ 21000, S_NEAROBJ, HERO_OBELIX, 60, 0, 3.55f, -747.6f, "obelix faces the turnstile, on the ground" },
+	P1(21500, PAD_X, 0, 0, "p1 X"), P1(21620, 0, 0, 0, "r"), P1(22000, PAD_X, 0, 0, "p1 X"), P1(22120, 0, 0, 0, "r"),
+	P1(22500, PAD_X, 0, 0, "p1 X"), P1(22620, 0, 0, 0, "r"), P1(23000, PAD_X, 0, 0, "p1 X"), P1(23120, 0, 0, 0, "r"),
+	P1(23500, PAD_X, 0, 0, "p1 X"), P1(23620, 0, 0, 0, "r"), P1(24000, PAD_X, 0, 0, "p1 X"), P1(24120, 0, 0, 0, "r"),
+	P1(24500, PAD_X, 0, 0, "p1 X"), P1(24620, 0, 0, 0, "r"), P1(25000, PAD_X, 0, 0, "p1 X"), P1(25120, 0, 0, 0, "r"),
+	P1(25500, PAD_X, 0, 0, "p1 X"), P1(25620, 0, 0, 0, "r"), P1(26000, PAD_X, 0, 0, "p1 X"), P1(26120, 0, 0, 0, "r"),
+	P1(26500, PAD_X, 0, 0, "p1 X"), P1(26620, 0, 0, 0, "r"),
+	SHOT(28000, "pillar"), SHOT(32000, "car"), SHOT(38000, "button"),
+	SHOT(45000, "on_button"), SHOT(52000, "thrown"), SHOT(56000, "after"),   // (the boss throws him off by itself: user)
+	END(60000),
+};
 // spboss36 (-Level 3, XXL_SPISOLATION=0; sp_hero_switch_lock on): spboss210 on
 // LV3-6 -- you play Obelix, Asterix 10 units back; Obelix crosses the rectangle
 // that loads the boss (-208.3 -> -226), drops onto #46 (wakes it, the sidekick
@@ -8526,6 +8556,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spbar2", kSpBar2),
 	SCENARIO("spbarx2", kSpBarX2),
 	SCENARIO("spboss210", kSpBoss210),
+	SCENARIO("splockboss210", kSpLockBoss210),
 	SCENARIO("spboss36", kSpBoss36),
 	SCENARIO("spboss36j", kSpBoss36J),
 	SCENARIO("spdownhud2", kSpDownHud2),
@@ -10169,7 +10200,7 @@ void RunStep(const Step& s) {
 		float l = sqrtf(dir.len2());
 		dir = l > 0.01f ? dir * (1.0f / l) : Vector3(1, 0, 0);
 		float dist = s.x > 0 ? s.x : 1.5f;
-		Vector3 to(bp.x + dir.x * dist, bp.y + 0.5f, bp.z + dir.z * dist);
+		Vector3 to(bp.x + dir.x * dist, s.y != 0 ? s.y : bp.y + 0.5f, bp.z + dir.z * dist);   // (y: the height, else just over it)
 		SetHeroPos(h, to);
 		Vector3 face = dir * -1.0f;   // facing it, as NEAR_CRATE does
 		h.Dir() = face;
@@ -11489,6 +11520,14 @@ void RunStep(const Step& s) {
 	case S_COMBOHINT:   // combo a as if just bought, for both players (-1: the crowd's Twister hint again)
 		ComboHintsQueue(s.a);
 		break;
+	case S_CALLHK: {   // the game's own function s.b (thiscall, no arguments) on the first object of class (2, s.a)
+		char* o = GetNumLvlClassInstances(2, s.a) ? (char*)GetLvlObject(2, s.a, 0) : nullptr;
+		if (!o) { Log("autotest: callhk: no (2,%d) object", s.a); break; }
+		Log("autotest: callhk: %08X on (2,%d) %p (vt %08X)", (unsigned)s.b, s.a, o, (unsigned)*(uintptr_t*)o);
+		typedef void(__fastcall* Fn)(char* self, void* edx);
+		((Fn)(uintptr_t)(unsigned)s.b)(o, nullptr);
+		break;
+	}
 	case S_SPSWITCH:   // single player: the hero switch button pressed ([single_player] sp_hero_switch)
 		Log("autotest: the hero switch button");
 		CoopSoloSwitchRequest();

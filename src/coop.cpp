@@ -52,6 +52,7 @@ static void SoloPotionDash(Trio t);
 static void SoloModButtons(Trio t);                      // below: the mod's buttons without player 2 ([debug] cheats)
 static void SoloSwitchLockWatch(Trio t);                 // below: sp_hero_switch_lock, the hero you play back
 static bool SoloDropsSwitch(int ev);
+static void SoloGameParks(int ev);
 static bool SoloOrderNeedsLead(int ev);
 static void SoloFreedByLeadersZone(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
@@ -1814,6 +1815,7 @@ bool CoopDeferTrioEvent(void* trio, int ev) {
 	// Single player, sp_hero_switch_lock: a level's switch that holds nobody, and
 	// the switch a later order for the sidekick needs.
 	if (SoloDropsSwitch(ev)) return true;
+	SoloGameParks(ev);
 	if (SoloOrderNeedsLead(ev)) return true;
 	SoloFreedByLeadersZone(ev);
 	// Individual heroes: a cable car takes the hero who steps on it from the
@@ -4596,6 +4598,8 @@ struct SoloLock {
 	int   handedTo = -1;     // the leader whose zone freed the hero you play (SoloFreedByLeadersZone)
 	int   handedFrom = -1;   // the hero you played before a level's hand-over (SoloHandOver): its switch back is kept
 	DWORD releaseAt = 0;
+	uintptr_t gameSwitchFrom = 0;   // the game code's last switch (not an event group's): where from, when
+	DWORD gameSwitchAt = 0;
 } g_solo;
 
 static bool SoloSwitchLockOn() { return !g.p2Joined && g_config.spSwitchLock; }
@@ -4655,6 +4659,30 @@ static int SoloOwnCatchUp(Trio t, unsigned msg) {
 	return g;
 }
 
+// The game code's own "the sidekick waits" (0x4802) right after its own switch
+// (the same function, the same frame): the hero that lost the lead is parked --
+// a hand-over, as an event group's switch + 4802 (ProximityDispatchHoldsLoser).
+// LV2-10's boss: Asterix lands on its button, 0x4F3165 "Obelix leads" + 0x4F317E
+// "Asterix waits"; once thrown off it (0x4F18D0: 487C, then 0x4F194F "Asterix
+// leads") the switch back is the hand-back. Was: the hand-back to Obelix noted
+// nobody parked, so "Asterix leads" was a pending switch -- the lock gave Obelix
+// the lead back 1.2 s later, with Asterix free (user: "a strange mod's switch").
+static void SoloGameParks(int ev) {
+	if (!SoloSwitchLockOn() || (ev & 0xFFFF) != 0x4802 || !g_solo.gameSwitchFrom) return;
+	extern void* g_trioEventCaller;
+	uintptr_t from = (uintptr_t)g_trioEventCaller;
+	if (from < g_solo.gameSwitchFrom || from - g_solo.gameSwitchFrom > 0x40 || GetTickCount() - g_solo.gameSwitchAt > 100) return;
+	g_solo.gameSwitchFrom = 0;
+	Trio t = GetTrio();
+	int l = t ? t.Leader() : -1;
+	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
+	static int s_told = 0;
+	if (s_told++ < 20)
+		Log("coop: sp_hero_switch_lock: the game parks %s after its switch (4802 from %p) -- %s's, handed over", HeroName(OtherHero(l)),
+		    (void*)from, HeroName(l));
+	SoloHandOver(l, "the game's switch, the other hero parked");
+}
+
 static bool SoloDropsSwitch(int ev) {
 	if (!SoloSwitchLockOn() || !IsLeaderSwitch(ev)) return false;
 	if (SoloOwnCatchUp(GetTrio(), ev & 0xFFFF) >= 0) return true;
@@ -4697,6 +4725,8 @@ static bool SoloDropsSwitch(int ev) {
 		// 0030 sends no switch back; user: "every belly-slide section keeps Obelix").
 		// Was: given back to Asterix once free after the end's dialogue.
 		bool rideMode = from >= 0x482BB0 && from < 0x482BB0 + 3991;
+		g_solo.gameSwitchFrom = from;   // (its "the sidekick waits" next: SoloGameParks)
+		g_solo.gameSwitchAt = GetTickCount();
 		if ((from == 0x49ACB9 || rideMode) && t.Leader() != to) {
 			g_solo.levelLeader = to;
 			SoloHandOver(to, rideMode ? "the trio's ride mode (480B..480F: the belly slide), both heroes in it"

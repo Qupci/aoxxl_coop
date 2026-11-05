@@ -4150,3 +4150,23 @@ both halves).
   own catch-up as the sidekick". ProximityDispatchGroupOf(msg): the dispatched group sending msg. splock26c (new: you
   play Obelix by 15.4 2.5 -363.6, S_FLAGEV 0C50): before, Asterix leads, put at 12.3 2.1 -368.0; after, dropped,
   Obelix leads, nobody moved. splock21, splockcork21, splock26, splock26f, splock47, splockord2, splockcar21 unchanged.
+- Round 220 (user: LV2-10 boss, xxl_coop.lv2-10_unwanted_switch.log: "a strange mod's switch" after Asterix jumps off
+  the boss's button). The chain, sp_hero_switch_lock on: Asterix on the corkscrew platform by the light pillar (event
+  0360 = group 06C: pillar 0901, 4801, 4802, cameras) -- hand-over to Obelix; Obelix's punches lift it, the level hands
+  Asterix the lead (Obelix waits); the automatic cable car drops Asterix on the boss's button: the boss's own code
+  (CKHkBoss 2,177, vt 627A60) 0x4F3165 4801 + 0x4F317E 4802. The 4801 matched handedFrom (Obelix): "the game hands the
+  lead back", handedFrom cleared -- nobody noted as parked. ~15 s later the boss throws Asterix off (state end
+  FUN_004F18D0, called from 0x4F2EA3 / 0x4F36C4 / 0x4F3E47 when +0x5B4 reaches the spline +0x600's length: clears +8
+  bit 0x20, flags its event +0x5C0, trio 487C then 4800 from 0x4F194F; FUN_004F1850 starts it: 487A, bit 0x20; Asterix
+  AI order 12, "under external control"): a game switch to a hero nobody parked -> "(pending)", and the lock gave Obelix
+  the lead back once Asterix was free (user's 68.3 s; 3.3 s in the test). Now SoloGameParks (CoopDeferTrioEvent, after
+  SoloDropsSwitch): a 4802 from game code within 0x40 bytes after that code's own switch (g_solo.gameSwitchFrom/At,
+  noted in SoloDropsSwitch's game-code branch) and within 100 ms is a hand-over (SoloHandOver to the leader: the parked
+  hero is handedFrom), logged "the game parks X after its switch". The boss's 4800 is then the hand-back: Asterix
+  yours. New autotest step S_CALLHK (class (2,a) object 0, thiscall s.b) -- 0x4F18D0 on the boss runs fine; S_NEAROBJ's
+  y (if not 0) is the put height. splockboss210 (new, user's spots: Asterix on the platform 1716.946 -746.66 -1144.917,
+  Obelix on the ground 1715.26 -747.82 -1141.75 punching the turnstile 11 times, then the boss left to throw him off):
+  before, "the game's own switch 4800 (from 004F194F) kept ... (pending)", Obelix given the lead 3.3 s later; after,
+  "the game parks Asterix after its switch (4802 from 004F317E)", then "the level hands the lead to Asterix (the game
+  hands the lead back to the hero it parked)", Asterix leads at the end. splockcar21, splock21, splock47 (one extra
+  late 0488 lock: its known slide-off variance), splockcork35, spboss210, splock26c, splock26 unchanged.
