@@ -4170,3 +4170,36 @@ both halves).
   "the game parks Asterix after its switch (4802 from 004F317E)", then "the level hands the lead to Asterix (the game
   hands the lead back to the hero it parked)", Asterix leads at the end. splockcar21, splock21, splock47 (one extra
   late 0488 lock: its known slide-off variance), splockcork35, spboss210, splock26c, splock26 unchanged.
+- Round 221 (user: a whole level 4 run, xxl_coop.v4-3_corkscrew_skip.log / xxl_coop.lv4-4_broke.log; and "can the
+  lock be built around the nuisance switches instead of around the corkscrews, pillars...?"). (1) LV4-3: Obelix,
+  launched off his corkscrew (01B0 4845, 01A0 4846: AI order 2), lands in 01A8 (group 035: 4801 + 4803 + 488B +
+  1B03) -- dropped as "no lock" (nobody parked, Obelix not handedFrom). (2) sp_hero_switch_lock simplified --
+  the SP game's switches are trusted unless they decide out of nowhere. SoloDropsSwitch now: the mod's own (outside
+  axxl.exe) kept; levelLeader = to; a trio launcher's landing (0x4C2AB0) dropped (unless to the leader / your hero);
+  the game's own code (not the dispatch) kept, the new leader yours (SoloHandOver) -- rope car boarding, ride modes,
+  the boss, all one branch; from the dispatch: a group that parks a hero (DispatchHoldsLoser -> GroupParks: 4802,
+  or a walk 4813..4876 / a put 48BB..48EC with no 4803 in the group -- by content, not message order) kept, yours;
+  a switch to the leader / your hero kept; a switch to a hero in the level's hands as the dispatch began
+  (g_heldAtDispatch, now LevelHoldsOrder: AI order 1 go to, 2 jump, 3 wait, 8 beam, 9 cable car, 12 external
+  control, 15 go to no PF -- not 0 follow, 4/5/6 fights, 10 hit, 11 clear the path (LV2-4's 0288 met Asterix in
+  it a moment), 13 hint man, 14 shop; only the hero not leading) kept, yours; the rest dropped. SoloOwnCatchUp is
+  now ProximityGroupCatchUp(ev, bound): the group switches away from `bound` and GroupParks is false (order-free;
+  was "a sidekick order before the switch"). Gone: handedFrom (hand-backs needed the level's own earlier
+  hand-over), the game-code hand-back / rope car / ride mode branches, round 220's SoloGameParks, the "(pending)"
+  kept group with other trio orders and nobody held, the dropped switch's release (SoloReleaseWatch: a held target is kept now).
+  The lending (SoloOrderNeedsLead) and its give-back stay. Consequence: a switch to a waiting hero the level
+  parked is a hand-back now -- LV2-1's keg (0348: 4801 + 4803, Obelix waiting after 0058's walk) gives Obelix
+  the lead for good (round 201 dropped it), LV4-4's 0070 (Asterix walked to a marker at 463 s, waiting) and LV5-3's
+  0858 / 0228 (Asterix waiting) too. (3) LV4-4's sphere #4 (event 0650, sphere-enter 4, bound to Asterix, flags
+  0F/01; off, 0E, once fired) did not fire in the user's run before the car's end (568.2 s) -- with the lock off it
+  fires 0.2 s before the end. Not reproduced: splockcar44 (fresh) and splockcar44b (the user's way: you play Obelix
+  through sector 4, Asterix's zones answering him, then Asterix at the car) both fire it at rope +0x14 ~164, the
+  end ~168 then hands Asterix the lead. Not the lock picture (no restore in the log). Autotest notes: S_ZONEREC
+  (the tests of event a: list, index, bound hero, flags); the rope car needs S_CARPOS (the X hold only starts the
+  pull, and P1's injected X did not -- the user pressed it); POTION against the fights; S_NEAROBJ's y = height.
+  splockcork43 (new: S_FLAGEV 01A0 then 01A8 400 ms later): before, "ignored -- Asterix keeps the lead"; after,
+  Obelix leads, the hero you play.
+  Regression (cmp of HAND / DROP / TAKE / end leader vs the last runs): splock21, splockcork21, splockord2, splock26,
+  26d, 26f, 26c, 26w, splockcar21, spboss210, splockboss210, splaunch24, splockcork35, splock43, splock47, splaunch53,
+  splockcar44b the same; splockev2's keg 0348 now hands Obelix the lead (above); spboss36's test Obelix crushed at its
+  end (as noted in round 204) -- no lock decision in it.
