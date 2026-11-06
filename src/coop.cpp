@@ -4561,7 +4561,39 @@ static void PlaySound(Hero h, uint32_t bankOffset) {
 // (proximity.cpp).
 static int g_soloSwitchAsk = 0;   // autotests: presses to serve
 void CoopSoloSwitchRequest() { g_soloSwitchAsk++; }
+
+// [single_player] sp_sidekick_view: a small view of the other hero at the bottom
+// left (splitscreen.cpp, its camera the game camera's copy -- gamecam.cpp) for
+// 5 s after a refused hero switch (each refusal starts the 5 s over; a switch
+// that goes through takes it away), and with second chance while the other hero
+// is down, until it is up again or the game is over. Not in a cutscene, the
+// pause or a scripted mode with co-op suspended.
+static DWORD g_viewUntil = 0;   // GetTickCount() the refused switch's view ends at (0: none)
+int CoopSidekickView() {
+	if (g.p2Joined || g.suspended || !g_config.spSidekickView) return -1;
+	Trio t = GetTrio();
+	if (!t || !CoopGameplayLive() || CutsceneBars() || g.cutsceneHold > 0) return -1;
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	if (!gm || (*(uint8_t*)(gm + 0xCC) & 3) == 2) return -1;
+	int l = t.Leader();
+	if (l != HERO_ASTERIX && l != HERO_OBELIX) return -1;
+	int other = OtherHero(l);
+	Hero ch = t.GetHero(other);
+	if (!ch || *(uint8_t*)(ch.raw() + 0x1A)) return -1;
+	if (g_config.spSecondChance && IndivFallenHero() == other) return other;
+	if (g_viewUntil && (int)(GetTickCount() - g_viewUntil) < 0) return other;
+	g_viewUntil = 0;
+	return -1;
+}
 static const char* const kSwitchTooFar = "the other hero is too far";
+// Refusals with no other hero to show (no sidekick view for them).
+static const char* const kSwitchNoView[] = { "no game", "paused", "a cutscene", "no leader", "a hero missing",
+                                             "the other hero is not with the leader (level 1: Obelix not found)" };
+static bool SwitchRefusalShowsView(const char* no) {
+	for (const char* s : kSwitchNoView) if (no == s) return false;
+	return true;
+}
 
 // [single_player] sp_hero_switch_lock (with sp_hero_switch; single player
 // only): the hero you play is yours. The level's lead switches go the game's own
@@ -4740,15 +4772,15 @@ static bool SoloCatchUpOrder(int ev) {
 static const char* SoloSwitchRefusal(Trio t) {
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
-	if (!gm || !CoopGameplayLive()) return "no game";
-	if ((*(uint8_t*)(gm + 0xCC) & 3) == 2) return "paused";
-	if (CutsceneBars() || g.cutsceneHold > 0) return "a cutscene";
+	if (!gm || !CoopGameplayLive()) return kSwitchNoView[0];
+	if ((*(uint8_t*)(gm + 0xCC) & 3) == 2) return kSwitchNoView[1];
+	if (CutsceneBars() || g.cutsceneHold > 0) return kSwitchNoView[2];
 	if (*(uint32_t*)(gm + 0x5C) & 0x80000) return "the magic potion's dash";
 	int l = t.Leader();
-	if (l != HERO_ASTERIX && l != HERO_OBELIX) return "no leader";
+	if (l != HERO_ASTERIX && l != HERO_OBELIX) return kSwitchNoView[3];
 	Hero lh = t.GetHero(l), ch = t.GetHero(OtherHero(l));
-	if (!lh || !ch) return "a hero missing";
-	if (*(uint8_t*)(ch.raw() + 0x1A)) return "the other hero is not with the leader (level 1: Obelix not found)";
+	if (!lh || !ch) return kSwitchNoView[4];
+	if (*(uint8_t*)(ch.raw() + 0x1A)) return kSwitchNoView[5];
 	if (IndivFallen(OtherHero(l))) return "the other hero is down";
 	if (HeroMode(lh.Flags18()) != 0 || HeroMode(ch.Flags18()) != 0) return "a scripted mode (a ride, the slide, a machine)";
 	if (lh.Busy() || ch.Busy()) return "a hero busy";
@@ -4779,8 +4811,18 @@ static void SoloHeroSwitch(Trio t) {
 	if (no) {
 		if (s_logs++ < 60) Log("coop: hero switch refused: %s", no);
 		if (l == HERO_ASTERIX || l == HERO_OBELIX) PlaySound(t.GetHero(OtherHero(l)), 0x200);
+		// Where the other hero is: the sidekick view for 5 s (not for a refusal
+		// with nothing to show -- the pause, a cutscene, no other hero).
+		if (g_config.spSidekickView && SwitchRefusalShowsView(no)) {
+			static int s_told = 0;
+			if (!g_viewUntil && s_told++ < 40) Log("coop: sidekick view on (switch refused)");
+			g_viewUntil = GetTickCount() + 5000;
+			if (!g_viewUntil) g_viewUntil = 1;
+		}
 		return;
 	}
+	if (g_viewUntil) Log("coop: sidekick view off (switched)");
+	g_viewUntil = 0;
 	if (s_logs++ < 60) Log("coop: hero switch: %s -> %s", HeroName(l), HeroName(OtherHero(l)));
 	CoopGiveLead(OtherHero(l), "the hero switch button");
 	g_solo.choice = t.Leader();

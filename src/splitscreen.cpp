@@ -575,7 +575,7 @@ void SetViewport(const Viewport& vp) {
 	fn(dev, &vp);
 }
 
-void ClearRect(unsigned x, unsigned y, unsigned w, unsigned h, unsigned color) {
+void ClearRect(unsigned x, unsigned y, unsigned w, unsigned h, unsigned color, unsigned long flags = 1 /* D3DCLEAR_TARGET */) {
 	void* dev = *(void**)kD3DDevicePtr;
 	if (!dev || !w || !h) return;
 	struct { long x1, y1, x2, y2; } rect = { (long)x, (long)y, (long)(x + w), (long)(y + h) };
@@ -583,7 +583,7 @@ void ClearRect(unsigned x, unsigned y, unsigned w, unsigned h, unsigned color) {
 	                                 unsigned long flags, unsigned long color, float z,
 	                                 unsigned long stencil);
 	ClearFn fn = (ClearFn)(*(void***)dev)[43];
-	fn(dev, 1, &rect, 1 /* D3DCLEAR_TARGET */, color, 1.0f, 0);
+	fn(dev, 1, &rect, flags, color, 1.0f, 0);
 }
 
 void* __cdecl BeginUpdateWrapper(void* camera) {
@@ -866,17 +866,21 @@ void DrawP2Hud(char* view, void* dt) {
 }
 }
 
-void RenderSplitFrameImpl(char* view, void* dt);
+void RenderSplitFrameImpl(char* view, void* dt, int pip);
 
-void RenderSplitFrame(char* view, void* dt) {
+// pip >= 0: single player's sidekick view (CoopSidekickView) -- player 1's view
+// on the whole screen and a small one of hero `pip` at the bottom left, the
+// same three walks as the split screen's (the small view's camera in place of
+// player 2's), the HUD the game's single player one over both.
+void RenderSplitFrame(char* view, void* dt, int pip = -1) {
 	if (++g_splitGen == 0) g_splitGen = 1;
 	g_inSplitFrame = true;
-	RenderSplitFrameImpl(view, dt);
+	RenderSplitFrameImpl(view, dt, pip);
 	g_inSplitFrame = false;
 	g_repeatWalk = false;
 }
 
-void RenderSplitFrameImpl(char* view, void* dt) {
+void RenderSplitFrameImpl(char* view, void* dt, int pip) {
 	char* renderer = *(char**)(view + 0x08);
 	if (!*(void**)(renderer + 0x04) || !*(void**)(renderer + 0x08)) return;
 	RwCamera* cam = *(RwCamera**)(renderer + 0x10);
@@ -895,7 +899,19 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	bool vertical = g_config.splitMode == SPLIT_VERTICAL;
 	const unsigned gap = 2;
 	Viewport vp1, vp2;
-	if (vertical) {
+	// The sidekick view: 30 % of the window each way (the window's shape), a
+	// little off the bottom left corner (as Portal 2's partner view, mirrored).
+	float pipM[16], pipWin[2], pipPlanes[3];
+	const bool isPip = pip >= 0 && GameCamView(pip, pipM, pipWin);
+	if (pip >= 0 && !isPip) return;
+	const bool pipPl = isPip && GameCamPlanes(pip, pipPlanes);
+	const unsigned pipBorder = 2;
+	if (isPip) {
+		unsigned pad = (unsigned)(h * 0.022f + 0.5f), bw = (unsigned)(w * 0.3f + 0.5f), bh = (unsigned)(h * 0.3f + 0.5f);
+		if (pad < pipBorder + 2) pad = pipBorder + 2;
+		vp1 = { 0, 0, w, h, 0.0f, 1.0f };
+		vp2 = { pad, h - pad - bh, bw, bh, 0.0f, 1.0f };
+	} else if (vertical) {
 		unsigned half = w / 2;
 		vp1 = { 0, 0, half - gap, h, 0.0f, 1.0f };
 		vp2 = { half + gap, 0, w - half - gap, h, 0.0f, 1.0f };
@@ -959,12 +975,22 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	};
 	float half[2], half1[2], half2[2], win[2];
 	halfWindow(p1cam.window, half);
+	if (isPip) {   // (the view the window's shape: each camera's own window)
+		memcpy(half1, p1cam.window, sizeof(half1));
+		memcpy(half2, pipWin, sizeof(half2));
+	} else {
 	if (P1CamWindow(win)) halfWindow(win, half1); else { half1[0] = half[0]; half1[1] = half[1]; }
 	if (P2CamWindow(win)) halfWindow(win, half2); else { half2[0] = half[0]; half2[1] = half[1]; }
 	memcpy(g_halfWindow[0], half1, sizeof(half1));
 	memcpy(g_halfWindow[1], half2, sizeof(half2));
 	g_halfWindowSet = true;
-	if (!g_loggedLayout) {
+	}
+	if (isPip) {
+		static int s_told = 0;
+		if (s_told++ < 3)
+			Log("split: sidekick view of %s: %ux%u at %u,%u of %ux%u, view window %.4f %.4f", HeroName(pip), vp2.w, vp2.h,
+			    vp2.x, vp2.y, w, h, half2[0], half2[1]);
+	} else if (!g_loggedLayout) {
 		g_loggedLayout = true;
 		char* frame = *(char**)((char*)cam + 4);
 		Log("split: %ux%u %s, view window %.4f %.4f -> %.4f %.4f; camera frame %p root %p",
@@ -994,14 +1020,16 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	void* stampLists[kNumLists];
 	for (int i = 0; i < kNumLists; i++) stampLists[i] = &g_dummy;
 	float m2[16];
-	bool own2 = P2CamMatrix(m2);
+	bool own2 = isPip || P2CamMatrix(m2);
+	if (isPip) memcpy(m2, pipM, sizeof(m2));
 	if (SplitDebug() & 2) { own2 = false; d2 = Vector3(); }   // diagnostics: player 1's camera in both halves
 	// (The game's camera's hero: the leader, or the hero not leading at the merchant.)
 	int camHero = GameCamLiveHero() >= 0 ? GameCamLiveHero() : t ? t.Leader() : -1;
 	bool p2Leads = t && camHero == CoopP2Hero() && g_config.gameCamera;
 	auto placeP2 = [&] {
 		RwCameraSetViewWindow(cam, half2);
-		planesFor(CoopP2Hero());
+		if (isPip) usePlanes(pipPl ? pipPlanes : livePlanes);
+		else planesFor(CoopP2Hero());
 		if (own2) {
 			memcpy(FrameModelling(cam), m2, sizeof(m2));
 			memcpy(FrameLtm(cam), m2, sizeof(m2));
@@ -1017,10 +1045,11 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	// 2's hero, player 1 gets a follow camera of its own on its hero (also
 	// while the game has borrowed it, e.g. Asterix riding the cable car).
 	float m1[16];
-	bool own1 = P1CamMatrix(m1);
+	bool own1 = !isPip && P1CamMatrix(m1);
 	auto placeP1 = [&] {
 		RwCameraSetViewWindow(cam, half1);
-		planesFor(CoopP1Hero());
+		if (isPip) usePlanes(livePlanes);
+		else planesFor(CoopP1Hero());
 		if (own1) {
 			memcpy(FrameModelling(cam), m1, sizeof(m1));
 			memcpy(FrameLtm(cam), m1, sizeof(m1));
@@ -1061,7 +1090,12 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 	g_vpActive = false;
 
 	// 4. Player 2's view: fresh world lists (player 1's pass drew and emptied
-	//    them); the clone batches already cover both views.
+	//    them); the clone batches already cover both views. (The sidekick view:
+	//    its frame and its own picture and depth cleared over player 1's.)
+	if (isPip) {
+		SetViewport({ 0, 0, w, h, 0.0f, 1.0f });
+		ClearRect(vp2.x - pipBorder, vp2.y - pipBorder, vp2.w + 2 * pipBorder, vp2.h + 2 * pipBorder, 0xFF000000, 1 | 2);
+	}
 	*(uint32_t*)(view + 0x68) = viewFlags;
 	placeP2();
 	SyncCameras(view, nullptr);
@@ -1092,6 +1126,12 @@ void RenderSplitFrameImpl(char* view, void* dt) {
 
 	// Divider, then the HUD over the whole screen, then present.
 	SetViewport({ 0, 0, w, h, 0.0f, 1.0f });
+	if (isPip) {   // single player's HUD (DrawHudHook: second chance's rows), over the sidekick view too
+		DrawHud(view, nullptr, dt);
+		Present(renderer, nullptr);
+		*(uint32_t*)(view + 0x68) &= 0xFFFFFFC1;
+		return;
+	}
 	if (vertical) ClearRect(vp1.w, 0, vp2.x - vp1.w, h, 0xFF000000);
 	else          ClearRect(0, vp1.h, w, vp2.y - vp1.h, 0xFF000000);
 	int shopper = CoopShopper();
@@ -1230,7 +1270,20 @@ void __fastcall GraphicTickHook(void* self, void* edx, void* dt) {
 		g_splitActive = want;
 		Log("split: %s", want ? "on" : "off");
 	}
-	if (!want) { g_origGraphicTick(self, edx, dt); return; }
+	if (!want) {
+		// Single player's sidekick view (its camera, the game camera's copy, ready).
+		int pip = g_config.spSidekickView ? CoopSidekickView() : -1;
+		float m[16], wnd[2];
+		if (pip >= 0 && !GameCamView(pip, m, wnd)) pip = -1;
+		static int s_last = -1, s_told = 0;
+		if (pip != s_last && s_told++ < 200) Log("split: sidekick view %s%s", pip >= 0 ? "of " : "off", pip >= 0 ? HeroName(pip) : "");
+		s_last = pip;
+		if (pip < 0) { g_origGraphicTick(self, edx, dt); return; }
+		uint16_t& frameId = *(uint16_t*)kFrameId;
+		frameId = (frameId == 0xFFFE) ? 1 : (uint16_t)(frameId + 1);
+		RenderSplitFrame(*(char**)((char*)self + 4), dt, pip);
+		return;
+	}
 
 	// What CKGraphic::vf17 does before rendering: bump the frame id (0xFFFE wraps
 	// to 1, so 0 and 0xFFFF stay free as markers).

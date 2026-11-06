@@ -123,6 +123,7 @@ void CoopConfig::Load(const char* iniPath) {
 	spHeroSwitch   = ReadBool("single_player", "sp_hero_switch", spHeroSwitch, full);
 	spSwitchLock   = ReadBool("single_player", "sp_hero_switch_lock", spSwitchLock, full);
 	spSecondChance = ReadBool("single_player", "sp_second_chance", spSecondChance, full);
+	spSidekickView = ReadBool("single_player", "sp_sidekick_view", spSidekickView, full);
 	{
 		char sb[32] = {};
 		GetPrivateProfileStringA("single_player", "sp_hero_switch_button", "dpad_up", sb, sizeof(sb), full);
@@ -140,11 +141,12 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_SPSWITCH")) spHeroSwitch = atoi(getenv("XXL_SPSWITCH")) != 0;
 	if (getenv("XXL_SPSWITCHLOCK")) spSwitchLock = atoi(getenv("XXL_SPSWITCHLOCK")) != 0;
 	if (getenv("XXL_SPSECOND")) spSecondChance = atoi(getenv("XXL_SPSECOND")) != 0;
+	if (getenv("XXL_SPVIEW")) spSidekickView = atoi(getenv("XXL_SPVIEW")) != 0;
 	// Isolated: single player is the game's own -- no sp_ feature, whatever the
 	// ini says (the general options' single player parts ask SoloMod()).
 	const bool spComboHintsIni = spComboHints, spCoopIconsIni = spCoopIcons, spHeroSwitchIni = spHeroSwitch,
 	           spSwitchLockIni = spSwitchLock, spSecondChanceIni = spSecondChance;
-	if (spIsolation) spComboHints = spCoopIcons = spHeroSwitch = spSwitchLock = spSecondChance = false;
+	if (spIsolation) spComboHints = spCoopIcons = spHeroSwitch = spSwitchLock = spSecondChance = spSidekickView = false;
 	if (!spHeroSwitch) spSwitchLock = false;   // (only with the switch)
 	sectorCatchUpMs = GetPrivateProfileIntA("coop", "sector_catch_up_ms", sectorCatchUpMs, full);
 	if (sectorCatchUpMs < 0) sectorCatchUpMs = 0;
@@ -230,6 +232,6 @@ void CoopConfig::Load(const char* iniPath) {
 		    coopOnlyIni ? "" : "; difficulty_coop_only taken as on");
 	else
 		Log("config: single player: combo hints %d, co-op icons %d, hero switch %d (pad %04X, key %02X, switch lock %d), "
-		    "second chance %d, Obelix's potion %d, cheats %d", spComboHints, spCoopIcons, spHeroSwitch, spSwitchButton,
-		    spSwitchKey, spSwitchLock, spSecondChance, obelixPotion, cheats);
+		    "second chance %d, sidekick view %d, Obelix's potion %d, cheats %d", spComboHints, spCoopIcons, spHeroSwitch,
+		    spSwitchButton, spSwitchKey, spSwitchLock, spSecondChance, spSidekickView, obelixPotion, cheats);
 }

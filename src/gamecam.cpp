@@ -208,13 +208,14 @@ int HeroOfTarget(void* target) {
 }
 
 // The camera reads CKInput's values through its own input view (+0x580). For
-// player 2's camera those are player 2's.
+// player 2's camera those are player 2's. In single player (the sidekick view)
+// the copy follows the AI companion: no right stick of anyone's.
 struct InputSwap { uint8_t** slot = nullptr; uint8_t* saved = nullptr; };
-void UseInputOf(int hero, InputSwap& s) {
-	if (hero != CoopP2Hero()) return;   // player 1's: the game's own values
+void UseInputOf(int hero, InputSwap& s, bool copy) {
+	if (CoopP2Joined() ? hero != CoopP2Hero() : !copy) return;   // player 1's: the game's own values
 	InputManager im = GetInputManager();
 	if (!im) return;
-	uint8_t* v = CoopP2CameraValues();
+	uint8_t* v = CoopP2Joined() ? CoopP2CameraValues() : nullptr;
 	s.slot = (uint8_t**)(im.raw() + 0x1C);
 	s.saved = *s.slot;
 	*s.slot = v ? v : g_zeros;
@@ -292,7 +293,8 @@ void TickCopy(char* svc, void* frame, int hero) {
 		g_copy.valid = true;
 		g_copy.cut = true;
 		g_copy.haveView = false;
-		Log("gamecam: %s gets a copy of the game's camera", HeroName(hero));
+		static int s_told = 0;
+		if (s_told++ < 100) Log("gamecam: %s gets a copy of the game's camera", HeroName(hero));
 	}
 	// The game's state aside...
 	static Extras live;
@@ -304,7 +306,7 @@ void TickCopy(char* svc, void* frame, int hero) {
 	LoadRefs(g_copy);
 	g_inCopy = true;
 	InputSwap s;
-	UseInputOf(hero, s);
+	UseInputOf(hero, s, true);
 	ApplyFight(svc, hero);
 	if (g_copy.cut) {
 		g_copy.cut = false;
@@ -418,17 +420,23 @@ void ShareShake(char* svc) {
 		    *(float*)(svc + 0x670));
 }
 
+// Split screen, or single player's sidekick view (CoopSidekickView: the copy
+// follows the AI companion for the small view at the bottom left).
 bool Wanted() {
-	return g_config.gameCamera && g_config.splitScreen && CoopP2Joined() && !CoopSuspended() && !CoopOneScreen();
+	if (!CoopP2Joined()) return CoopSidekickView() >= 0;
+	return g_config.gameCamera && g_config.splitScreen && !CoopSuspended() && !CoopOneScreen();
 }
 
 void __fastcall TickHook(char* svc, void* edx, void* frame) {
 	Trio t = GetTrio();
-	int other = CoopNonLeaderPlayer();
+	int other = CoopP2Joined() ? CoopNonLeaderPlayer() : CoopSidekickView();
 	bool want = Wanted() && t && other >= 0 && t.Leader() != other && t.Leader() < 2;
 	if (want != g_active) {
 		g_active = want;
-		Log("gamecam: %s", want ? "each player has a game camera" : "one game camera");
+		static int s_told = 0;
+		if (s_told++ < 200)
+			Log("gamecam: %s", !want ? "one game camera" : CoopP2Joined() ? "each player has a game camera"
+			                                             : "the sidekick view's camera follows the other hero");
 	}
 	if (!want) {
 		g_copy.valid = false;
@@ -458,8 +466,8 @@ void __fastcall TickHook(char* svc, void* edx, void* frame) {
 	}
 	ShareShake(svc);
 	InputSwap s;
-	UseInputOf(own, s);
-	ApplyFight(svc, own);
+	UseInputOf(own, s, false);
+	if (CoopP2Joined()) ApplyFight(svc, own);   // (single player: the game's own fight camera)
 	g_origTick(svc, edx, frame);
 	Unswap(s);
 	TickCopy(svc, frame, copyHero);

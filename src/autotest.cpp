@@ -7719,6 +7719,28 @@ const Step kSpSecond2[] = {
 	SHOT(16000, "walked_on"),
 	END(17000),
 };
+// spview2 (level 2, XXL_SPSWITCH=1; sp_sidekick_view on): the sidekick view at
+// the bottom left -- 5 s after a refused switch (Obelix told to wait, Asterix
+// walks off), started over by the next refusal, gone after its 5 s, and gone at
+// once when a switch goes through (Obelix following again).
+const Step kSpView2[] = {
+	MARK(0, "spview2"),
+	SHOT(1000, "start"),
+	{ 1500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix told to wait" },
+	P1(2000, 0, 0, 1.0f, "p1 forward"), P1(3500, 0, 0, 0, "p1 stop"),
+	{ 4000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: obelix waits) -- view on" },
+	SHOT(5000, "view_on"),
+	P1(5500, 0, 0, 1.0f, "p1 forward"), P1(6500, 0, 0, 0, "p1 stop"),
+	{ 7500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch refused again -- 5 s from now" },
+	SHOT(10000, "view_kept"),
+	SHOT(13000, "view_gone"),
+	{ 13500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch refused -- view on" },
+	{ 14000, S_TRIOEV, 0x4803, 0, 0, 0, 0, "obelix follows again" },
+	SHOT(16500, "view_following"),
+	{ 17000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch -- view off" },
+	SHOT(17300, "switched"),
+	END(18500),
+};
 // spsecond2c (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2): the
 // AI companion Obelix goes down -- he stays there as Asterix walks off and back;
 // Asterix's B by him gets him up, following again.
@@ -8721,6 +8743,7 @@ struct Scenario { const char* name; const Step* steps; int count; };
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
+	SCENARIO("spview2", kSpView2),
 	SCENARIO("spcork21", kSpCork21),
 	SCENARIO("splever25", kSpLever25),
 	SCENARIO("spcombo2", kSpCombo2),

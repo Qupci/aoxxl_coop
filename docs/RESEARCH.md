@@ -4256,3 +4256,28 @@ both halves).
   splockcork35, splock43, splock47, splockcork43, splaunch53, splaunch48, spact65a, spact65o, splever25);
   splockcar44b fired its sphere this time (Asterix leads at the end); no "settled" adoption in any run.
   spact65o's shot: "LEADER: OBELIX  LEVEL'S LEAD: ASTERIX".
+- Round 224 (user: a Portal 2 style partner view -- the other hero in a small box at the bottom left, 5 s after a
+  refused hero switch (restarted by each refusal, gone at once on a switch that goes through), and with second
+  chance while the other hero is down until revived or the game over; the mod's camera on him; the HUD over it).
+  [single_player] sp_sidekick_view (on, behind sp_isolation; env XXL_SPVIEW). coop.cpp CoopSidekickView(): the
+  other hero while g_viewUntil (SoloHeroSwitch: a refusal +5 s; kSwitchNoView refusals -- no game, paused,
+  cutscene, no leader, a hero missing, Obelix not in the level -- start nothing) or IndivFallenHero() is it
+  (sp_second_chance; -1 after a game over); never with player 2 in, co-op suspended, a cutscene or the pause.
+  gamecam.cpp: Wanted() in single player = CoopSidekickView() >= 0, the copy's hero = that hero (TickHook), its
+  input zeros (UseInputOf(copy): nobody's right stick), the game's own fight camera untouched (ApplyFight on the
+  live camera in co-op only); the copy starts from the game's camera with a cut onto the hero, as in co-op, and is
+  dropped with the view. splitscreen.cpp GraphicTickHook: no split + a view + GameCamView ready -> RenderSplitFrame
+  (view, dt, pip): the split frame's three walks (stamp for the box camera, player 1's, the box's) with vp1 the
+  whole screen and vp2 30 % x 30 % of the window, 2.2 % of its height off the bottom left; player 1's camera the
+  game's own (no P1CamMatrix / split_fov), the box the copy's matrix, window and planes; before the box's walk the
+  box and a 2 px frame cleared (D3D Clear target + z, ClearRect flags); then DrawHud (DrawHudHook: single
+  player's HUD and second chance's rows) over everything, present; g_splitActive stays false (HUD layout, hints,
+  klusters, sound as single player). A switch that goes through mid-view: the leader-switch hand-over swaps the
+  game's camera with the copy (the new leader's camera is the copy's), then the copy goes.
+  Not done: crates / bonus beacons only for player 1's frustum (klusters.cpp is split-only) -- ones near the
+  sidekick and out of player 1's view may be missing from the box.
+  Autotests: spview2 (new, XXL_SPISOLATION=0 XXL_SPSWITCH=1): Obelix told to wait, refused at 10.6 s -> view;
+  refused again 14.1 -> off at 19.1; refused 20.1, Obelix follows, switch at 23.6 -> off the same frame. spsecond2c
+  (XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2): view of the fallen Obelix 8.9 s, off at the revive 16.4 (the
+  revive countdown box covers the box's lower part, as the user expected). spsecond2g: off at the game over. split1:
+  co-op split screen as before.

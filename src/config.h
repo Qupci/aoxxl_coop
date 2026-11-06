@@ -70,6 +70,7 @@ struct CoopConfig {
 	int   spSwitchKey    = 0x09;   // ... its key with player 1 on the keyboard (TAB)
 	bool  spSwitchLock   = true;   // sp_hero_switch_lock: the level's lead switches ignored, a lock's switch undone at its end
 	bool  spSecondChance = false;  // sp_second_chance: each hero its own health; a fallen one waits to be revived
+	bool  spSidekickView = true;   // sp_sidekick_view: a small view of the other hero (switch refused, partner down)
 	// The mod's features in single player at all (sp_isolation off).
 	bool  SoloMod() const { return !spIsolation; }
 
