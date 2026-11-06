@@ -4316,3 +4316,14 @@ both halves).
   reworked (Obelix down by Asterix: no view, countdown from the left; Asterix walks off: view at 11.1 units, box
   right of it, flask over it; back by Obelix: hidden at 9.9, box slides back; revived). spview2: the view on at
   the refusal (Obelix waiting, far), hidden at 10.0 as Obelix follows again.
+- Round 228 (Nov 7, commit 9af90b1; user: options' "Overwrite this data?" box text ran past the box under
+  xxl_widescreen2d.asi). CText2d layout 0x42EF80 (thiscall on the layout part = CText2d + 0x20, no args, plain
+  ret; prologue 83 EC 3C 53 56 8B F1): break test glyphW * aspect * [0x623C64] < width(+8) * aspect; words +0x2D4
+  count, +0x2D8 strings, +0x3C8 x/y (height units), +0x5A8 line index, +0x620 hidden flag (room for 60), +0x6AC
+  alignment (1 centre, 2 right, 5 spread), +0x6AD vertical, +0x10 lines shown. Draw 0x42F430 places the left edge
+  at pos - width(+8) * {0, 0.5, 1}, times the aspect. CMessageBox2d layout FUN_0042ADB0: raw text width
+  (FUN_0042B020, no aspect factor) over 0.8 -> text width 0.8, box plate (+0x2C) width 0.8 * 1.05 -- drawn
+  (4/3)/aspect as wide by the asi. Fix in the asi: LayoutHook runs the layout with width * (4/3)/aspect (0 < width
+  < 0.95), then shifts shown words by the difference * alignment share. Autotest bootoptwrap (XXL_LEVEL=-1): title
+  validate, down x2, confirm, up, confirm -- S_BIND one frame (3 frames confirmed the menu's first item too);
+  menu bindings up 16/32/52, down 17/33/53, confirm 20/44/56.
