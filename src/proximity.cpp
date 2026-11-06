@@ -2149,15 +2149,14 @@ bool LeverHeldBack(char* receiver, Trio t) {
 // other hero pull it and hand over) takes no hits while the other hero could
 // lead instead (following, standing: switch and pull it with that one). With
 // the other held by the level (a wait) or down, the lever is the game's.
-// And a lever whose event gives the lead to the companion while that one is free
-// (following you, not held by the level): the level has it pulled only while that
-// hero waits where the level put it -- the lever frees it (LV2-5: lever #419
-// behind the iron crates, 48B7 + 4803, for Asterix held by the hearth's 0D60
-// walk). Pulled early as Obelix (your switch), the push-once lever was spent and
-// the hearth's wait held Asterix for good. Only such a freeing lever (its group's
-// trio orders: switches and 4803, nobody held): one that hands the lead over and
-// parks the hero at it (LV2-6's #406: 48B8 + 481B; LV4-7's #138: 4800 + 4802) is
-// the game's whoever follows.
+// A freeing lever (its group's trio orders: switches and 4803, nobody held) is
+// judged apart (SoloLeverEarly): while the hero it gives the lead to is free and
+// the level's leader, it is not for the hero you switched to -- the lever frees it
+// (LV2-5: lever #419 behind the iron crates, 48B7 + 4803, for Asterix held by the
+// hearth's 0D60 walk). Pulled early as Obelix (your switch), the push-once lever
+// was spent and the hearth's wait held Asterix for good. One that hands the lead
+// over and parks the hero at it (LV2-6's #406: 48B8 + 481B; LV4-7's #138: 4800 +
+// 4802) is the leader rule's.
 static bool GroupSendsTrio(unsigned ev, unsigned msg) {
 	char* objs[64];
 	uint16_t msgs[64];
@@ -2167,30 +2166,49 @@ static bool GroupSendsTrio(unsigned ev, unsigned msg) {
 	return false;
 }
 
-static bool SoloLeverEarly(char* receiver, Trio t) {
-	if (!g_config.safeSequence || *(uintptr_t*)receiver != 0x628DA0) return false;
-	int l = t.Leader();
+// The hero a freeing lever's group gives the lead to (its trio orders: switches
+// and 4803, nobody held), or -1.
+static int FreeingLeverTarget(char* receiver) {
+	if (*(uintptr_t*)receiver != 0x628DA0) return -1;
 	unsigned evs[2] = { *(uint16_t*)(receiver + 0x28), *(uint16_t*)(receiver + 0x2A) };
 	for (unsigned ev : evs) {
 		int to = GroupSwitchTarget(ev);
-		if (to < 0 || to == l || (to != HERO_ASTERIX && to != HERO_OBELIX)) continue;
 		uint16_t sw[4];
-		if (GroupOnlySwitches(ev, sw, 4) <= 0 || !GroupSendsTrio(ev, 0x4803)) continue;
-		Hero h = t.GetHero(to);
-		if (!h || IndivFallen(to) || h.Order() != AI_FOLLOW_LEADER) continue;   // (held by the level: the lever's)
-		if (g_heldBackLogged != receiver) {
-			g_heldBackLogged = receiver;
-			Log("proximity: safe sequence: lever %p ignores %s -- it gives the lead to %s, who is not held by the level (its lever "
-			    "for later)", receiver, HeroName(l), HeroName(to));
-		}
-		return true;
+		if ((to == HERO_ASTERIX || to == HERO_OBELIX) && GroupOnlySwitches(ev, sw, 4) > 0 && GroupSendsTrio(ev, 0x4803)) return to;
 	}
-	return false;
+	return -1;
+}
+
+// A freeing lever gives the lead to the hero the level means to lead, free and
+// following you after your switch: in the game that hero would lead and pull it
+// itself, the switch changing nothing (LV6-5's last lever, 0238: 4800 + 4803 and
+// the boss's door, for Asterix) -- pulled by the other, it hands the lead back
+// before its time: it is for a wait still to come (LV2-5's #419 frees Asterix
+// once the hearth's 0D60, 4801 + 4813, has him wait and Obelix lead -- the level's
+// leader Obelix then). It takes no hits from the hero you switched to; from the
+// level's leader it is the game's (round 212 blocked both: after the leader rule
+// below sent you to Obelix, he could not pull it either -- user). Without the
+// lock (no level's leader kept), any hero but the one it gives the lead to.
+static bool SoloLeverEarly(char* receiver, Trio t) {
+	if (!g_config.safeSequence) return false;
+	int to = FreeingLeverTarget(receiver), l = t.Leader();
+	if (to < 0 || to == l) return false;
+	Hero h = t.GetHero(to);
+	if (!h || IndivFallen(to) || h.Order() != AI_FOLLOW_LEADER) return false;   // (held by the level: the lever's)
+	bool lock = !CoopP2Joined() && g_config.spSwitchLock;
+	if (lock && CoopSoloLevelLeaderAway() != to) return false;   // (the level handed the lead over: it hands it back)
+	if (g_heldBackLogged != receiver) {
+		g_heldBackLogged = receiver;
+		Log("proximity: safe sequence: lever %p ignores %s -- it gives the lead back to %s, %s, who is free (its lever for "
+		    "later)", receiver, HeroName(l), HeroName(to), lock ? "the level's leader" : "the hero it was");
+	}
+	return true;
 }
 
 static bool SoloLeverHeldBack(char* receiver, Trio t) {
 	if (!SoloLeadFree()) return false;
 	if (SoloLeverEarly(receiver, t)) return true;
+	if (FreeingLeverTarget(receiver) >= 0) return false;   // (judged above alone)
 	if (!LeverHeldBack(receiver, t)) return false;
 	int l = t.Leader();
 	int c = l == HERO_ASTERIX ? HERO_OBELIX : l == HERO_OBELIX ? HERO_ASTERIX : -1;

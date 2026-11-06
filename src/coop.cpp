@@ -4701,6 +4701,18 @@ static bool SoloDropsSwitch(int ev) {
 		return false;
 	}
 	if (t.Leader() == to || to == g_solo.choice) return false;
+	// Mid-flight from a trio launcher: the sidekick waits as the launcher's, not
+	// the level's (its call 4804, then AI order 3) -- a landing zone's switch decides
+	// out of nowhere, as the launcher's own (LV4-8's at -1008.5 273.4 -989.8 with
+	// Obelix on it: Asterix's zone 0858, "Asterix leads" + 4803, was kept as a
+	// hand-back to the hero in hand, then deferred to the landing).
+	if (HeroFlying(t)) {
+		static int s_fly = 0;
+		if (s_fly++ < 20)
+			Log("coop: sp_hero_switch_lock: the level's switch %04X (event %04X's group) mid-flight from a launcher ignored -- %s "
+			    "keeps the lead", ev & 0xFFFF, (unsigned)ProximityDispatchGroupOf(ev & 0xFFFF) & 0xFFFF, HeroName(t.Leader()));
+		return true;
+	}
 	// The level hands the lead to a hero it has in hand (LV4-3's 01A8: Obelix lands
 	// off his corkscrew, "Obelix leads" + 4803; LV2-6: the last block walks Asterix
 	// into 01E8; LV3-5's corkscrew box 0340; a rope car's end, the rider on it).

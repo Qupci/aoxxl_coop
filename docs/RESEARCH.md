@@ -4203,3 +4203,35 @@ both halves).
   26d, 26f, 26c, 26w, splockcar21, spboss210, splockboss210, splaunch24, splockcork35, splock43, splock47, splaunch53,
   splockcar44b the same; splockev2's keg 0348 now hands Obelix the lead (above); spboss36's test Obelix crushed at its
   end (as noted in round 204) -- no lock decision in it.
+- Round 222 (user: a whole-game run with round 221, xxl_coop.full_game_run.log; xxl_coop.lv4-8_switch.log,
+  xxl_coop.lv6-5_last_boss_activator_safe_{on,off}.log). (1) LV4-8's launcher (-1008.5 273.4 -989.8), you play
+  Obelix: mid-flight Asterix's landing zone 0858 (4800 + 4803) was kept as "the level hands it to the hero it had
+  in hand" -- Asterix's AI order 3 is the launcher's (its call 4804, the companion's wait on it), not the level's
+  -- then deferred to the landing (CoopDeferTrioEvent: a switch mid-flight hung both heroes in the air): Obelix
+  -> Asterix. SoloDropsSwitch: a dispatch switch while a hero flies from a catapult (HeroFlying, situation 0x0D)
+  and not to the leader / your hero is dropped, as the launcher's own landing switch. splaunch48 (new, -Level 4):
+  before, the hand-over + "after the landing"; after, "mid-flight from a launcher ignored -- Obelix keeps the
+  lead", 4803 still sent. (2) LV6-5's last lever (749.3 64.9 -257.4, (2,52) #5, +0x2A 0238: 4800 + 4803, the
+  boss's door) took no hits in single player with safe_sequence: Asterix leading -> the leader rule ("switches to
+  Asterix, who leads already (Obelix's to pull)"), Obelix leading -> round 212's SoloLeverEarly ("gives the lead
+  to Asterix, who is not held by the level"). A freeing lever (FreeingLeverTarget: GroupOnlySwitches + 4803) is now
+  judged by SoloLeverEarly alone: blocked only for a hero not the one it gives the lead to, that one free
+  (following), and -- with the lock -- that one the level's leader (CoopSoloLevelLeaderAway == to: you switched
+  away from it); the leader rule no longer applies to it. LV2-5's #419 (48B7 + 4803, for the hearth's 0D60 wait;
+  user: only Obelix gets onto that cliff) stays blocked for an early Obelix (the level's leader Asterix); after
+  0D60 hands the lead to Obelix it is the game's. Tried and dropped: "an armed zone / any group of the level parks
+  that hero later" -- 0D60 is no detection zone (flagged by the hearth), and every level's table has groups that
+  park a hero (LV2's circle 0050, LV6's 0008). spact65a / spact65o (new, -Level 6: the spy's talk, X x3, then
+  sector 5 -- loaded before the talk's end the arrival camera never ended, user --, teleport): Asterix's punch
+  opens the door (was ignored); Obelix (switched) still ignored -- it gives the lead back to Asterix, the level's
+  leader (switch back). splever25: Asterix's punch dropped from it (cannot reach the cliff), Obelix ignored as
+  before. (3) User question, the "pending" switch: in the full run (8.7 h, all levels) the catapult deferral fired
+  once (LV4-8, 5770 s); the shop deferral (co-op only) never; the lock's lending (SoloOrderNeedsLead "leads for
+  it first") and its give-back ("the hero you play, free again") never. The deferral stays (it is the mid-flight
+  hang fix, co-op and the lock off too); under the lock the LV4-8 switch no longer reaches it.
+  Regression (cmp of HAND / DROP / TAKE / SAFE / end leader vs round 221's runs): splock21, splockcork21,
+  splockord2, splock26, 26d, 26f, 26c, 26w, splockcar21, spboss210, splockboss210, splaunch24, splockev2,
+  splockcork35, splock43, splock47, splockcork43, splaunch53 the same. splockcar44b: one run with both hero
+  switches refused ("a hero off its feet", a timing flake) -- sphere #4 fired, as before; the rerun (switches
+  taken, the user's path) -- sphere 0650 stayed armed (0F/01) past the rope's end, Obelix kept the lead: the
+  user's LV4-4 bug of round 221, intermittent on the same path (round 221's run fired). Open, next round.

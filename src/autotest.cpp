@@ -7622,8 +7622,8 @@ const Step kSpCork21[] = {
 	END(14000),
 };
 // splever25 (level 2, XXL_SPSWITCH=1): sector 5's lever behind the iron crates
-// ("switch to Asterix"): Asterix leading punches it -- safe sequence, nothing;
-// the switch to Obelix, who punches it: nothing either since round 212 (Asterix
+// ("switch to Asterix"), on a cliff only Obelix gets onto (user): the switch to
+// Obelix, who punches it: nothing since round 212 (Asterix, the level's leader,
 // follows, not held by the level -- the lever is for the hearth's wait; was: the
 // lead to Asterix, the push-once lever spent, the hearth held him for good).
 #define SPLEVER_PUNCHES(t, hero) \
@@ -7638,8 +7638,7 @@ const Step kSpLever25[] = {
 	{ 3000, S_PLACE, HERO_ASTERIX, 15, 0, 0, 0, "asterix at the lever" },
 	{ 3000, S_PLACE, HERO_OBELIX, 16, 0, 0, 0, "obelix at the hearth" },
 	FORCE(3400, HERO_OBELIX, 0),
-	SPLEVER_PUNCHES(3600, HERO_ASTERIX),
-	SHOT(5800, "asterix_punched"),
+	SHOT(5800, "asterix_by_it"),   // (no punch: Asterix cannot reach the cliff -- user)
 	{ 6500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
 	FORCE(6800, HERO_ASTERIX, 1),
 	{ 7000, S_PLACE, HERO_OBELIX, 15, 0, 0, 0, "obelix at the lever" },
@@ -8349,6 +8348,56 @@ const Step kSpLaunch53[] = {
 	SHOT(16000, "landed"), SHOT(20000, "landed_2"),
 	END(21000),
 };
+// splaunch48 (-Level 4, XXL_SPSWITCH=1 XXL_SPSWITCHLOCK=1): the user's LV4-8
+// launcher (-1008.5 273.4 -989.8, xxl_coop.lv4-8_switch.log): you switch to
+// Obelix, he takes the launcher (X); Asterix walks to it and waits. Mid-flight
+// Asterix's landing zone 0858 sends "Asterix leads" + 4803. Was: kept as a
+// hand-back to the hero in hand (Asterix's wait is the launcher's), deferred to
+// the landing: Obelix -> Asterix.
+const Step kSpLaunch48[] = {
+	MARK(0, "splaunch48"), LOADSECTOR(200, 8),
+	PLACEAT(3000, HERO_ASTERIX, -1006.3f, 274.0f, -989.6f), PLACEAT(3000, HERO_OBELIX, -1008.3f, 274.0f, -989.62f),
+	{ 3500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	P1(5000, PAD_X, 0, 0, "p1 X (launcher)"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(9000, "waiting"), SHOT(14000, "flight"),
+	SHOT(24000, "landed"), SHOT(28000, "landed_2"),
+	END(29000),
+};
+// spact65a / spact65o (-Level 6, XXL_SPSWITCH=1 XXL_SPSWITCHLOCK=1, safe_sequence
+// on): the last lever, before the last boss's door (749.4 64.1 -258.0; the user's
+// xxl_coop.lv6-5_last_boss_activator_safe_on.log). The spy's talk at the start
+// first (5 s, X three times, 3 s), then sector 5 (user). Its event 02E0: 4800 + 4803, the door, the boss.
+// Asterix punches it (a): the door opens (was: "switches to Asterix, who leads
+// already (Obelix's to pull)"). You switch to Obelix and he punches it (o):
+// nothing, as before -- it gives the lead back to Asterix, the level's leader.
+#define SPACT65_START() \
+	MARK(0, "spact65"), \
+	P1(5000, PAD_X, 0, 0, "p1 X (spy)"), P1(5200, 0, 0, 0, "p1 release"), \
+	P1(6000, PAD_X, 0, 0, "p1 X (spy)"), P1(6200, 0, 0, 0, "p1 release"), \
+	P1(7000, PAD_X, 0, 0, "p1 X (spy)"), P1(7200, 0, 0, 0, "p1 release"), \
+	SHOT(13000, "dialogue_done"), LOADSECTOR(14000, 5), \
+	PLACEAT(18000, HERO_ASTERIX, 749.404f, 64.07f, -258.015f), PLACEAT(18000, HERO_OBELIX, 750.9f, 64.07f, -258.015f), \
+	{ 18500, S_LEVERS, 0, 0, 0, 0, 0, "levers" }
+#define SPACT65_PUNCHES(t, hero) \
+	{ t, S_NEAROBJ, hero, 52, 0, 1.2f, 0, "facing the lever" }, \
+	P1(t + 400, PAD_X, 0, 0, "p1 X"), P1(t + 600, 0, 0, 0, "p1 release"), \
+	P1(t + 1400, PAD_X, 0, 0, "p1 X"), P1(t + 1600, 0, 0, 0, "p1 release")
+const Step kSpAct65A[] = {
+	SPACT65_START(),
+	SHOT(19000, "at_lever"),
+	SPACT65_PUNCHES(25000, HERO_ASTERIX),
+	SHOT(27000, "punched"), SHOT(30000, "after"),
+	END(31000),
+};
+const Step kSpAct65O[] = {
+	SPACT65_START(),
+	{ 25000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix (past the arrival's camera, ~5 s)" },
+	SPACT65_PUNCHES(27000, HERO_OBELIX),
+	SHOT(29000, "punched"), SHOT(32000, "after"),
+	END(33000),
+};
+#undef SPACT65_START
+#undef SPACT65_PUNCHES
 // splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
 // the user's LV4-7 (#137 at -972.8 247.5 -1069.1, plane #17 bound to Obelix),
 // Asterix leads from the level start, you switch to Obelix: event 0448 ("the
@@ -8714,6 +8763,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("splock47", kSpLock47),
 	SCENARIO("splaunch24", kSpLaunch24),
 	SCENARIO("splaunch53", kSpLaunch53),
+	SCENARIO("splaunch48", kSpLaunch48),
+	SCENARIO("spact65a", kSpAct65A),
+	SCENARIO("spact65o", kSpAct65O),
 	SCENARIO("splock26", kSpLock26),
 	SCENARIO("splock26d", kSpLock26d),
 	SCENARIO("splock26f", kSpLock26f),
