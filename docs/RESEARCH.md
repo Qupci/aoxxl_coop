@@ -4295,3 +4295,16 @@ both halves).
   XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2 XXL_REVIVELIMIT=60): flask up, Obelix down -> the countdown box comes in above
   the view (lift 0.329), the flask slides to x 0.35; revived -> both back. sppotion2 with XXL_SPISOLATION=1
   XXL_SPVIEWALWAYS=1: the view from the level's start, on Asterix after Obelix takes the lead.
+- Round 226 (user, on round 225: the left box right of the view instead -- where the flask had gone -- and the
+  flask rising as it does over the left box; the box in from below the screen when the view is already up, else
+  from the left as before). hints.cpp: BoxPlace(p, slot, plate) -- the one place DrawSlot and HintBoxRect take a
+  box's x and rise from: sideways slide (now also over g_leftAside), or Slot.fromBelow (set as new content starts:
+  the left box in single player with SidekickViewRect up): x in place, risen by -(1 - e) * (its top + 0.01) --
+  in from below and out the same way. g_leftAside (was g_leftLift) moves the left box right of the view (its
+  left edge at view right + 0.01) at the flask's speed, back when the view goes; snapped while the box is away or
+  coming in. hud2.cpp LayoutFlask: the sidekick view is a third rect (q 2) the flask rises over, as a hint box;
+  g_flaskAside gone; Hud2FlaskMoved (lift > 0) keeps the layout running in plain single player while it comes
+  back down. Autotests: spviewbox2 (new, XXL_SPSWITCH=1): hint in the left box (from the left, flask risen over
+  it), refused switch -> box right of the view (0.294), flask over the view; view gone -> box back left; view
+  first, then a hint -> in from below. spviewhud2: the revive countdown right of the view, clear of player 1's
+  "Hold B to revive" box; the flask over the view.

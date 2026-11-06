@@ -7757,6 +7757,29 @@ const Step kSpViewHud2[] = {
 	SHOT(10000, "back"),
 	END(11000),
 };
+// spviewbox2 (level 2, XXL_SPSWITCH=1): single player's left box and the
+// sidekick view -- a hint in the left box (in from the left, the potion's flask
+// risen over it), then a refused switch: the box moves right of the view, the
+// flask rises over the view; the view gone: the box back to the left. Then the
+// view first and a hint: it comes in from below the screen, and leaves that way.
+const Step kSpViewBox2[] = {
+	MARK(0, "spviewbox2"),
+	POTION(800),
+	{ 1000, S_HINTTEST, 1, 1, 0, 0, 7500, "hint in the left box (in from the left)" },
+	SHOT(2500, "box_left"),
+	{ 3000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix told to wait" },
+	{ 3200, S_SPSWITCH, 0, 0, 0, 0, 0, "switch refused -- view on" },
+	SHOT(3350, "moving"),
+	SHOT(4500, "moved"),
+	SHOT(8400, "going_back"),
+	SHOT(9200, "back"),
+	{ 10000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch refused -- view on" },
+	{ 10600, S_HINTTEST, 1, 1, 0, 0, 2500, "hint in the left box (in from below)" },
+	SHOT(10650, "from_below"),
+	SHOT(11500, "below_in"),
+	SHOT(13150, "below_out"),
+	END(14500),
+};
 // spsecond2c (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2): the
 // AI companion Obelix goes down -- he stays there as Asterix walks off and back;
 // Asterix's B by him gets him up, following again.
@@ -8761,6 +8784,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spswitch2", kSpSwitch2),
 	SCENARIO("spview2", kSpView2),
 	SCENARIO("spviewhud2", kSpViewHud2),
+	SCENARIO("spviewbox2", kSpViewBox2),
 	SCENARIO("spcork21", kSpCork21),
 	SCENARIO("splever25", kSpLever25),
 	SCENARIO("spcombo2", kSpCombo2),

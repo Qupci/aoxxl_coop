@@ -161,6 +161,7 @@ struct Slot {
 	bool     leaving = false;        // sliding out, then the new content in
 	float    in = 0.0f;              // 0 out of sight .. 1 in place
 	bool     rightAligned = false;
+	bool     fromBelow = false;      // slides in and out at the bottom (else at its side)
 	alignas(16) char obj[kText2dSize];
 	bool     laid = false;
 	int      nLines = 1, lastLineWord = 0, nWords = 0;
@@ -299,14 +300,14 @@ void LayOutGlyphs(const char* game) {
 // split's top half). Single player: player 1's at the game's place, the left
 // box (HINT_LEFT_BOX) where player 1's is side by side.
 struct Place { bool left; float up; };
-// Single player's sidekick view (splitscreen.cpp, bottom left) under the left
-// box: the box rises just above it -- at the game's speed for the potion's
-// flask, as the flask rises over a box -- and back down when it goes. A box
-// coming in while the view is up comes in above it.
-float g_leftLift = 0.0f;    // how far the left box is raised now (a share of the screen's height)
-float g_leftBase = -1.0f;   // its bottom, not raised (-1: not seen yet)
+// Single player's sidekick view (splitscreen.cpp, bottom left): the left box
+// stands right of it -- moved there at the game's speed for the potion's flask
+// when the view comes with the box up, and back when it goes. A box coming in
+// while the view is up slides in from below the screen (and out the same way);
+// else from the left edge.
+float g_leftAside = 0.0f;   // how far the left box is moved right now (a share of the screen's width)
 Place PlaceOf(int p) {
-	if (!CoopP2Joined()) return { p == HINT_LEFT_BOX, p == HINT_LEFT_BOX ? g_leftLift : 0.0f };
+	if (!CoopP2Joined()) return { p == HINT_LEFT_BOX, 0.0f };
 	if (SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL) return { false, p == 0 ? 0.5f : 0.0f };
 	return { p == 0, 0.0f };
 }
@@ -371,6 +372,8 @@ void UpdateSlot(int p, char* itf, float dt) {
 			wcsncpy(s.text, text, kTextLen - 1);
 			s.rightAligned = right;
 			s.in = 0.0f;
+			float vl, vr, vb, vt;
+			s.fromBelow = p == HINT_LEFT_BOX && !CoopP2Joined() && SidekickViewRect(&vl, &vr, &vb, &vt);
 			if (kind) LayOutSlot(s, p, game);
 			char a[kTextLen] = {};
 			for (int i = 0; kind && s.text[i] && i < kTextLen - 1; i++)
@@ -386,19 +389,19 @@ void UpdateSlot(int p, char* itf, float dt) {
 	if (s.kind && !s.leaving) s.in = s.in + dt / kInTime > 1.0f ? 1.0f : s.in + dt / kInTime;
 	else s.in = s.in - dt / kOutTime < 0.0f ? 0.0f : s.in - dt / kOutTime;
 	if (p == HINT_LEFT_BOX && !CoopP2Joined()) {
-		float l, r, b, t, bl, br, bb, bt, want = 0.0f;
-		if (HintBoxRect(p, &bl, &br, &bb, &bt)) g_leftBase = bb - g_leftLift;
-		if (SidekickViewRect(&l, &r, &b, &t) && g_leftBase > -0.5f && t + 0.01f > g_leftBase) want = t + 0.01f - g_leftBase;
-		float speed = *(float*)(itf + 0x278);   // (the flask's, a share of the screen's height a second)
+		float l, r, b, t, want = 0.0f;
+		if (SidekickViewRect(&l, &r, &b, &t)) want = r + 0.01f - (kEdge - kMargin);
+		float speed = *(float*)(itf + 0x278);   // (the flask's, a share of the screen a second)
 		if (!(speed > 0.1f && speed < 10.0f)) speed = 1.0f;
 		bool entering = s.kind && !s.leaving && s.in < 1.0f;
-		float was = g_leftLift;
-		if (!s.kind || s.in <= 0.0f || entering) g_leftLift = want;
-		else if (g_leftLift < want) g_leftLift = g_leftLift + speed * dt > want ? want : g_leftLift + speed * dt;
-		else if (g_leftLift > want) g_leftLift = g_leftLift - speed * dt < want ? want : g_leftLift - speed * dt;
+		float was = g_leftAside;
+		if (!s.kind || s.in <= 0.0f || entering) g_leftAside = want;
+		else if (g_leftAside < want) g_leftAside = g_leftAside + speed * dt > want ? want : g_leftAside + speed * dt;
+		else if (g_leftAside > want) g_leftAside = g_leftAside - speed * dt < want ? want : g_leftAside - speed * dt;
 		static int s_told = 0;
-		if ((was == 0.0f) != (g_leftLift == 0.0f) && s_told++ < 60)
-			Log("hints: the left box %s the sidekick view (%.3f)", g_leftLift > 0.0f ? "rises over" : "is back down from", want);
+		if ((was == 0.0f) != (g_leftAside == 0.0f) && s_told++ < 60)
+			Log("hints: the left box %s the sidekick view (%.3f)%s", g_leftAside > 0.0f ? "right of" : "back from", want,
+			    s.fromBelow ? ", in from below" : "");
 	}
 }
 
@@ -419,6 +422,27 @@ bool HudUp(char* itf) {
 // above the screen -- on no plate -- with their words' y lowered by as much
 // (a word is drawn at its text's place y - 1 + its own y): where they are meant.
 const float kAboveScreen = 1.5f;
+
+// A box's place as drawn (its text's x, how far up), its slide in or out
+// included -- sideways from its edge, or up from below the screen (fromBelow:
+// as far down as its top). `plate`: the game's prompt plate, as the game left it.
+void BoxPlace(int p, const Slot& s, const float* plate, float* x, float* up) {
+	Place pl = PlaceOf(p);
+	float w = s.longest / Aspect();
+	float e = 1.0f - (1.0f - s.in) * (1.0f - s.in);
+	float aside = p == HINT_LEFT_BOX && !CoopP2Joined() ? g_leftAside : 0.0f;
+	*up = pl.up + (s.nLines > 2 ? s.step * (s.nLines - 2) : 0.0f);
+	if (s.fromBelow && plate) {
+		float y = plate[6] - 0.012f * (s.nLines - 1) + *up, h = plate[14] * s.nLines + 0.015f;
+		uint8_t ay = ((const uint8_t*)plate)[7];
+		float top = (ay == 0 ? y - h : ay == 2 ? y : y - h * 0.5f) + h;
+		*up -= (1.0f - e) * (top + 0.01f);
+		*x = (pl.left ? kEdge : 1.0f - kEdge - w) + aside;
+		return;
+	}
+	float off = (1.0f - e) * (w + 2.0f * kMargin + kEdge + aside);
+	*x = pl.left ? kEdge + aside - off : 1.0f - kEdge - w + off;
+}
 
 void DrawGlyph(int gi, float cx, float cy, float size, void* arg) {
 	if (gi < 0 || gi >= 8 || !g_glyphLaid[gi]) return;
@@ -447,11 +471,9 @@ void DrawSlot(int p, char* itf, void* arg) {
 	Place pl = PlaceOf(p);
 	float a = Aspect();
 	float w = s.longest / a;
-	float e = 1.0f - (1.0f - s.in) * (1.0f - s.in);
-	float off = (1.0f - e) * (w + 2.0f * kMargin + kEdge);
-	float x = pl.left ? kEdge - off : 1.0f - kEdge - w + off;
 	// Lines go down from the prompt's line; more than two: the box goes up.
-	float up = pl.up + (s.nLines > 2 ? s.step * (s.nLines - 2) : 0.0f);
+	float x, up;
+	BoxPlace(p, s, plate && *(uintptr_t*)plate == 0x6235C0 ? plate : nullptr, &x, &up);
 	float y = ((float*)game)[6] + up;
 	if (plate && *(uintptr_t*)plate == 0x6235C0) {
 		uint8_t* pb = (uint8_t*)plate;
@@ -735,12 +757,9 @@ bool HintBoxRect(int player, float* left, float* right, float* bottom, float* to
 	float* plate = *(float**)(g_itf + 0x140);
 	if (!plate || *(uintptr_t*)plate != 0x6235C0) return false;
 	// As DrawSlot places it.
-	Place pl = PlaceOf(player);
 	float w = s.longest / Aspect();
-	float e = 1.0f - (1.0f - s.in) * (1.0f - s.in);
-	float off = (1.0f - e) * (w + 2.0f * kMargin + kEdge);
-	float x = pl.left ? kEdge - off : 1.0f - kEdge - w + off;
-	float up = pl.up + (s.nLines > 2 ? s.step * (s.nLines - 2) : 0.0f);
+	float x, up;
+	BoxPlace(player, s, plate, &x, &up);
 	float y = plate[6] - 0.012f * (s.nLines - 1) + up, h = plate[14] * s.nLines + 0.015f;
 	uint8_t ay = ((uint8_t*)plate)[7];
 	*left = x - kMargin;
