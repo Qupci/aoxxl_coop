@@ -607,6 +607,24 @@ const Step kBoot0[] = {
 const Step kBoot1[] = { BOOT_SKIP(2000, "boot1") };
 const Step kBoot2[] = { BOOT_SKIP(17000, "boot2") };
 
+// bootoptwrap (XXL_LEVEL=-1; "boot": the run starts at level 0's intro): the intro skipped, the title validated, the main menu's
+// Options (down x2, confirmed), its Apply (up), confirmed: the message box "Options data
+// already exists. Overwrite this data?" -- with xxl_widescreen2d.asi its
+// sentence ran on one line past the box. The menus' bindings for each press:
+// up 16/32/52, down 17/33/53, confirm 20/44/56 (interface / D-pad / message box).
+#define OPT_PRESS(t, a, b, c, n) { t, S_BIND, a, b, c, 1.0f, 0, n }   // one frame: held longer, the title's Validate also confirms the menu's first item
+const Step kOptWrap[] = {
+	MARK(0, "level 0"), CINE_ENTER(2000),
+	SHOT(9000, "optwrap_title"),
+	OPT_PRESS(10000, 20, 44, 56, "confirm (title)"), SHOT(12500, "optwrap_menu"),
+	OPT_PRESS(13000, 17, 33, 53, "down"), OPT_PRESS(14000, 17, 33, 53, "down"), SHOT(15000, "optwrap_options"),
+	OPT_PRESS(15500, 20, 44, 56, "confirm (options)"), SHOT(17500, "optwrap_options2"),
+	OPT_PRESS(18000, 16, 32, 52, "up (apply)"), SHOT(19000, "optwrap_apply"),
+	OPT_PRESS(19500, 20, 44, 56, "confirm (apply)"),
+	SHOT(21500, "optwrap_box"), SHOT(23000, "optwrap_box2"),
+	END(24000),
+};
+
 // cine1 (-Level 1): the cinematic scenes' graphs -- the one playing (the intro)
 // and the first few.
 const Step kCine1[] = {
@@ -8911,6 +8929,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("boot0", kBoot0),
 	SCENARIO("boot1", kBoot1),
 	SCENARIO("boot2", kBoot2),
+	SCENARIO("bootoptwrap", kOptWrap),
 	SCENARIO("skip1", kSkip1),
 	SCENARIO("intro1", kIntro1),
 	SCENARIO("torch", kTorch),

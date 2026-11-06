@@ -319,6 +319,46 @@ int __fastcall TextDrawHook(char* self, void* edx, float* pos, int a, char align
 	return g_origText(self, edx, p, a, alignX, alignY, b);
 }
 
+// --- Line wrapping ---------------------------------------------------------------
+// The text layout (0x42EF80, thiscall on the CText2d's layout part, no arguments)
+// breaks lines where the words' widths (font widths times aspect * the constant at
+// 0x623C64) pass the text's width (+8, a share of the screen) times the aspect.
+// With the game's 0.75 both sides grow with the aspect, so lines break where they
+// do on a 4:3 screen; with the constant at 1 / aspect only the width grows, and a
+// message box's sentence (wrapped at 0.8 of the screen, its plate drawn (4/3) /
+// aspect as wide) ran on one line far past its plate. The layout is run with the
+// width (4/3) / aspect as wide -- the 4:3 line breaks -- and the lines are then
+// moved over the full width by the alignment (+0x6AC: 1 centred, 2 right, 5
+// spread -- kept as a centred block). Words: count +0x2D4, x / y +0x3C8, flag
+// +0x620 (1 = not shown). Texts as wide as the screen (the co-op hint boxes lay
+// out on one line at width 8) are left as they are, like the plates.
+typedef uint32_t(__fastcall* LayoutFn)(char* t, void* edx);
+LayoutFn g_origLayout = nullptr;
+
+uint32_t __fastcall LayoutHook(char* t, void* edx) {
+	float* w = (float*)(t + 8);
+	float width = *w;
+	float s = PlateSqueeze();
+	if (s > 0.995f || !(width > 0.0f && width < 0.95f)) return g_origLayout(t, edx);
+	*w = width * s;
+	uint32_t r = g_origLayout(t, edx);
+	*w = width;
+	uint8_t align = *(uint8_t*)(t + 0x6AC);
+	float share = align == 1 || align == 5 ? 0.5f : align == 2 ? 1.0f : 0.0f;
+	if (share > 0.0f) {
+		float dx = (width - width * s) * ((4.0f / 3.0f) / s) * share;   // the aspect = (4/3) / s
+		uint32_t n = *(uint32_t*)(t + 0x2D4);
+		float* pos = (float*)(t + 0x3C8);
+		for (uint32_t i = 0; i < n && i < 60; i++)   // (room for 60 words)
+			if (!*(uint8_t*)(t + 0x620 + i)) pos[2 * i] += dx;
+	}
+	static int told = 0;
+	if (told++ < 3)
+		Log("wrap: a text %d (x1000) wide laid out at %d, %d words, %d lines shown", (int)(width * 1000),
+		    (int)(width * s * 1000), (int)*(uint32_t*)(t + 0x2D4), (int)*(uint32_t*)(t + 0x10));
+	return r;
+}
+
 bool Detour(uintptr_t target, const uint8_t* expected, size_t len, void* hook, void** orig) {
 	uint8_t* code = (uint8_t*)target;
 	if (memcmp(code, expected, len) != 0) return false;
@@ -343,7 +383,10 @@ void InstallPlateHooks() {
 	static const uint8_t kText[7] = { 0x83, 0xEC, 0x28, 0x53, 0x56, 0x8B, 0xF1 };
 	bool bb = Detour(0x42D6F0, kBillboard, sizeof(kBillboard), (void*)BillboardDrawHook, (void**)&g_origBillboard);
 	bool tx = Detour(0x42F430, kText, sizeof(kText), (void*)TextDrawHook, (void**)&g_origText);
-	Log("plates: billboard draw %s, text draw %s", bb ? "hooked" : "NOT hooked", tx ? "hooked" : "NOT hooked");
+	static const uint8_t kLayout[7] = { 0x83, 0xEC, 0x3C, 0x53, 0x56, 0x8B, 0xF1 };
+	bool lo = Detour(0x42EF80, kLayout, sizeof(kLayout), (void*)LayoutHook, (void**)&g_origLayout);
+	Log("plates: billboard draw %s, text draw %s, text layout %s", bb ? "hooked" : "NOT hooked",
+	    tx ? "hooked" : "NOT hooked", lo ? "hooked" : "NOT hooked");
 }
 
 // A HUD model's place as a 2D point (x 0..1 from the left, y 0..1 from the
