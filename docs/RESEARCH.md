@@ -4327,3 +4327,9 @@ both halves).
   < 0.95), then shifts shown words by the difference * alignment share. Autotest bootoptwrap (XXL_LEVEL=-1): title
   validate, down x2, confirm, up, confirm -- S_BIND one frame (3 frames confirmed the menu's first item too);
   menu bindings up 16/32/52, down 17/33/53, confirm 20/44/56.
+- Round 229 (Nov 7; user: after a refused switch, getting near the companion hid the view, but walking off again
+  within the 5 s showed it again). CoopSidekickView: the other hero near (hysteresis 10/11) ends a refused
+  switch's 5 s (g_viewUntil = 0, logged "refused switch's 5 s ended"); nothing shows until the next refusal. A
+  fallen hero's view still comes back once away. Autotest spviewnear2 (XXL_SPSWITCH=1): Obelix told to wait,
+  Asterix off 3 s, refusal -- view; glide by Obelix -- hidden at 9.8, 5 s ended; glide 13 units out inside the old
+  window -- no view; refusal -- view again.

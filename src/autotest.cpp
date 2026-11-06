@@ -7759,6 +7759,23 @@ const Step kSpView2[] = {
 	SHOT(17300, "switched"),
 	END(18500),
 };
+// spviewnear2 (level 2, XXL_SPSWITCH=1): a refused switch's view (Obelix told to
+// wait, Asterix off), Asterix back by Obelix -- the view gone and its 5 s ended:
+// off again within them, no view until the next refusal.
+const Step kSpViewNear2[] = {
+	MARK(0, "spviewnear2"),
+	{ 1500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix told to wait" },
+	P1(2000, 0, 0, 1.0f, "p1 forward"), P1(5000, 0, 0, 0, "p1 stop"),
+	{ 5200, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: obelix waits) -- view on" },
+	SHOT(5700, "view_on"),
+	GLIDEBY(5900, HERO_ASTERIX, 1.0f, 0.0f, 500),
+	SHOT(6600, "near_hidden"),
+	GLIDEBY(7000, HERO_ASTERIX, 13.0f, 0.0f, 1500),
+	SHOT(9800, "away_no_view"),
+	{ 10500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch refused -- view on again" },
+	SHOT(11000, "view_again"),
+	END(12000),
+};
 // spviewhud2 (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2
 // XXL_REVIVELIMIT=60): the magic potion's flask up at the bottom left, then
 // Obelix down by Asterix -- no sidekick view (within 10 units): the countdown in
@@ -8804,6 +8821,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
 	SCENARIO("spview2", kSpView2),
+	SCENARIO("spviewnear2", kSpViewNear2),
 	SCENARIO("spviewhud2", kSpViewHud2),
 	SCENARIO("spviewbox2", kSpViewBox2),
 	SCENARIO("spcork21", kSpCork21),
