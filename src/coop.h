@@ -51,7 +51,7 @@ bool CoopFusionAllowed(int lead);
 int  CoopSoloLevelLeaderAway();
 // Single player, sp_hero_switch_lock: -2 off (or player 2 in), else the hero you
 // play (-1 not chosen yet). For the show_leader tag.
-int  CoopSoloLockedHero();
+int  CoopSoloLevelLead();   // single player, sp_hero_switch: the hero the level's last switch meant (-1 none yet, -2 off)
 int  CoopShopper();      // the hero at the merchant while co-op goes on around it (-1: none)
 // The hero at the merchant from its X until it is out of the shop's situation
 // (-1: none): the merchant ticks as its and the game's camera is its.

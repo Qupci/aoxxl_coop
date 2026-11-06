@@ -1257,7 +1257,8 @@ const uint8_t* Glyph(char c) {
 		{ 'L', { 16, 16, 16, 16, 16, 16, 31 } }, { 'O', { 14, 17, 17, 17, 17, 17, 14 } },
 		{ 'P', { 30, 17, 17, 30, 16, 16, 16 } }, { 'R', { 30, 17, 17, 30, 20, 18, 17 } },
 		{ 'S', { 15, 16, 16, 14, 1, 1, 30 } },   { 'T', { 31, 4, 4, 4, 4, 4, 4 } },
-		{ 'X', { 17, 17, 10, 4, 10, 17, 17 } },  { '1', { 4, 12, 4, 4, 4, 4, 14 } },
+		{ 'X', { 17, 17, 10, 4, 10, 17, 17 } },  { 'V', { 17, 17, 17, 17, 17, 10, 4 } },
+		{ '\'', { 4, 4, 8, 0, 0, 0, 0 } },  { '1', { 4, 12, 4, 4, 4, 4, 14 } },
 		{ '2', { 14, 17, 1, 2, 4, 8, 31 } },     { '(', { 2, 4, 8, 8, 8, 4, 2 } },
 		{ ')', { 8, 4, 2, 2, 2, 4, 8 } },        { ':', { 0, 12, 12, 0, 12, 12, 0 } },
 	};
@@ -1289,14 +1290,10 @@ void DrawLeaderTag(char* renderer) {
 	for (const char* c = name; *c && n < 30; c++) text[n++] = (char)toupper((unsigned char)*c);
 	text[n] = 0;
 	if (CoopP2Joined()) sprintf(text + n, " (P%d)", p2 ? 2 : 1);
-	else if (g_config.spHeroSwitch) {   // (single player: the switch lock's state -- autotest shots tell it)
-		int you = CoopSoloLockedHero();
-		n += sprintf(text + n, you == -2 ? "  LOCK: OFF" : "  LOCK: ON");
-		if (you >= 0) {
-			n += sprintf(text + n, " (");
-			for (const char* c = HeroName(you); *c && n < 44; c++) text[n++] = (char)toupper((unsigned char)*c);
-			sprintf(text + n, ")");
-		}
+	else if (CoopSoloLevelLead() >= 0) {   // (single player: the hero the level's last switch meant, not yours)
+		n += sprintf(text + n, "  LEVEL'S LEAD: ");
+		for (const char* c = HeroName(CoopSoloLevelLead()); *c && n < 54; c++) text[n++] = (char)toupper((unsigned char)*c);
+		text[n] = 0;
 	}
 	// Where: the leader's half (split: player 2's is the right / bottom one).
 	unsigned x0 = 0, y0 = 0;

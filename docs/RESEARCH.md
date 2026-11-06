@@ -4235,3 +4235,24 @@ both halves).
   switches refused ("a hero off its feet", a timing flake) -- sphere #4 fired, as before; the rerun (switches
   taken, the user's path) -- sphere 0650 stayed armed (0F/01) past the rope's end, Obelix kept the lead: the
   user's LV4-4 bug of round 221, intermittent on the same path (round 221's run fired). Open, next round.
+- Round 223 (user: the "pending" meant is the lock's own -- the hero in show_leader's "LOCK: ON (X)", the lock's
+  `choice` given back to you -- never needed in the whole-game run: remove it; show the level's lead instead).
+  coop.cpp: gone -- SoloOrderNeedsLead's lending (CoopGiveLead to levelLeader for a level's later sidekick order),
+  SoloFreedByLeadersZone / handedTo, and SoloSwitchLockWatch's give-back (0.3 s free -> the lead back to `choice`),
+  its "sequence under way" wait and "free again but far" adoption (freeSince / farSince). Kept: `choice` as the
+  lock's "the hero you play" (SoloDropsSwitch's "to your hero: kept", SoloOwnCatchUp, CoopSoloLevelLeaderAway) --
+  the mod's own short leads (the machine gun's gunner, second chance's) give the lead back themselves; a leader
+  other than `choice` that stays settled (no fallen hero, SoloSwitchRefusal null) for 1 s becomes `choice`
+  (otherSince), no switch. SoloCatchUpOrder: only the catch-up group's orders dropped (SoloOwnCatchUp). The
+  level's lead (levelLeader): set by SoloDropsSwitch for every switch from axxl.exe (dispatch or game code, kept
+  or dropped; not the mod's own -- your switch, R3 + X, the landing deferral's resend) now in single player with
+  sp_hero_switch whether locked or not, reset per level, the leader at the level's start. show_leader: "LEADER:
+  X  LEVEL'S LEAD: Y" (CoopSoloLevelLead, was CoopSoloLockedHero; glyphs V and ' added). In the full run the
+  removed parts never ran (no "leads for it first", no "the hero you play, free again"). LV4-4 (user): the
+  sphere and the switch to Asterix at the car's end fired in the user's play -- splockcar44b's one miss (round
+  222) taken as the test's (S_CARPOS drives the car), not a bug.
+  Regression (cmp HAND / DROP / TAKE / SAFE / end leader vs round 222): all 23 the same (splock21, splockcork21,
+  splockord2, splock26, 26d, 26f, 26c, 26w, splockcar21, spboss210, splockboss210, splaunch24, splockev2,
+  splockcork35, splock43, splock47, splockcork43, splaunch53, splaunch48, spact65a, spact65o, splever25);
+  splockcar44b fired its sphere this time (Asterix leads at the end); no "settled" adoption in any run.
+  spact65o's shot: "LEADER: OBELIX  LEVEL'S LEAD: ASTERIX".

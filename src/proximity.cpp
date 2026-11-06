@@ -1732,7 +1732,7 @@ bool GroupOnlyLeadsTo(unsigned ev, int up) {
 // Whatever else it does outside the trio does not count -- a cinematic bloc
 // included (LV3-5's 0850: 0501 to a CKManageEventCinematicBloc, a music stream;
 // kept, the lead came back 0.3 s later): a later order for "the sidekick" the
-// level meant for the other hero gets its switch then (coop.cpp SoloOrderNeedsLead).
+// level meant for the other hero goes to the sidekick, as sent.
 int GroupOnlySwitches(unsigned ev, uint16_t* out, int max) {
 	char* objs[64];
 	uint16_t msgs[64];
@@ -2076,7 +2076,7 @@ bool DispatchInBossRun(unsigned msg) {
 
 // Single player, sp_hero_switch_lock: the hero bound to the zones whose group,
 // being dispatched, sends the trio `msg` (a level's order for the sidekick: a
-// zone bound to one hero orders the other -- SoloOrderNeedsLead). LV4-7's plane
+// zone bound to one hero orders the other). LV4-7's plane
 // #17, Obelix's (event 0448: 4818 "the sidekick walks to marker 5", Asterix to
 // the automatic car's foot). The hero, or -1 (no zone's group, or zones of both).
 // `withSwitch`: such a group also switches the leader (4800 / 4801 / 48B7 / 48B8).
