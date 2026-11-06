@@ -15,6 +15,7 @@ struct CoopConfig {
 	bool  renderProbe   = false;  // find the scene-render call via RwCamera.beginUpdate
 	bool  splitTest     = false;
 	bool  showLeader    = false;  // the trio's leader written on the screen
+	bool  sidekickViewAlways = false;  // single player: the sidekick view always on (watching the AI)
 	bool  cheats        = false;  // test helpers and the mod buttons (R3 + A / B / X / Y / D-pad); single player too with SoloMod()
 	int   splitMode     = SPLIT_VERTICAL;
 	bool  splitScreen   = true;   // off = shared camera on the leader

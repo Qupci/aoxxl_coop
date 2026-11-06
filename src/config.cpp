@@ -160,6 +160,8 @@ void CoopConfig::Load(const char* iniPath) {
 	cheats      = ReadBool("debug", "cheats", cheats, full);
 	showLeader  = ReadBool("debug", "show_leader", showLeader, full);
 	if (getenv("XXL_SHOWLEADER")) showLeader = atoi(getenv("XXL_SHOWLEADER")) != 0;   // autotests
+	sidekickViewAlways = ReadBool("debug", "sidekick_view_always", sidekickViewAlways, full);
+	if (getenv("XXL_SPVIEWALWAYS")) sidekickViewAlways = atoi(getenv("XXL_SPVIEWALWAYS")) != 0;
 	skipCutscenes = ReadBool("debug", "skip_cutscenes", skipCutscenes, full);
 
 	char buf[64] = {};

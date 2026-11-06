@@ -820,6 +820,10 @@ bool          g_splitActive = false;
 bool          g_loggedLayout = false;
 float         g_halfWindow[2][2];      // each player's half: the view window it was drawn with
 bool          g_halfWindowSet = false;
+// Single player's sidekick view: shown this frame, and where (shares of the
+// screen, y up from the bottom -- the HUD's 2D places), frame included.
+bool          g_pipShown = false;
+float         g_pipRect[4] = {};   // left, right, bottom, top
 
 // The render of one frame with two 3D passes. Mirrors FUN_00413EC0 step for step.
 int SplitDebug() {
@@ -986,6 +990,10 @@ void RenderSplitFrameImpl(char* view, void* dt, int pip) {
 	g_halfWindowSet = true;
 	}
 	if (isPip) {
+		g_pipRect[0] = (float)(vp2.x - pipBorder) / w;
+		g_pipRect[1] = (float)(vp2.x + vp2.w + pipBorder) / w;
+		g_pipRect[2] = (float)(h - vp2.y - vp2.h - pipBorder) / h;
+		g_pipRect[3] = (float)(h - vp2.y + pipBorder) / h;
 		static int s_told = 0;
 		if (s_told++ < 3)
 			Log("split: sidekick view of %s: %ux%u at %u,%u of %ux%u, view window %.4f %.4f", HeroName(pip), vp2.w, vp2.h,
@@ -1251,9 +1259,16 @@ const uint8_t kDrawHudPrologue[7] = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4E, 0x5C }
 
 void __fastcall DrawHudHook(char* view, void* edx, void* dt) {
 	// (Single player's second chance: the other hero's health row the same way.)
-	if (g_splitActive || (!CoopP2Joined() && !Hud2SoloRows())) { g_origDrawHud(view, edx, dt); return; }
 	char* renderer = *(char**)(view + 0x08);
 	RwCamera* hud = renderer ? *(RwCamera**)(renderer + 0x14) : nullptr;
+	// (Single player's sidekick view: the flask moved out of its way.)
+	if (!g_splitActive && !CoopP2Joined() && !Hud2SoloRows() && (g_pipShown || Hud2FlaskAside())) {
+		Hud2BeginP1(hud);
+		g_origDrawHud(view, edx, dt);
+		Hud2EndP1();
+		return;
+	}
+	if (g_splitActive || (!CoopP2Joined() && !Hud2SoloRows())) { g_origDrawHud(view, edx, dt); return; }
 	Hud2BeginP1(hud);
 	g_origDrawHud(view, edx, dt);
 	Hud2EndP1();
@@ -1270,11 +1285,13 @@ void __fastcall GraphicTickHook(void* self, void* edx, void* dt) {
 		g_splitActive = want;
 		Log("split: %s", want ? "on" : "off");
 	}
+	if (want) g_pipShown = false;
 	if (!want) {
 		// Single player's sidekick view (its camera, the game camera's copy, ready).
-		int pip = g_config.spSidekickView ? CoopSidekickView() : -1;
+		int pip = CoopSidekickView();
 		float m[16], wnd[2];
 		if (pip >= 0 && !GameCamView(pip, m, wnd)) pip = -1;
+		g_pipShown = pip >= 0;
 		static int s_last = -1, s_told = 0;
 		if (pip != s_last && s_told++ < 200) Log("split: sidekick view %s%s", pip >= 0 ? "of " : "off", pip >= 0 ? HeroName(pip) : "");
 		s_last = pip;
@@ -1393,6 +1410,12 @@ void __fastcall PresentHook(char* renderer, void* edx) {
 
 bool SplitActive() { return g_splitActive; }
 long SplitFrames() { return g_splitFrames; }
+
+bool SidekickViewRect(float* left, float* right, float* bottom, float* top) {
+	if (!g_pipShown || g_pipRect[1] <= g_pipRect[0]) return false;
+	*left = g_pipRect[0]; *right = g_pipRect[1]; *bottom = g_pipRect[2]; *top = g_pipRect[3];
+	return true;
+}
 
 bool SplitHalfWindow(int player, float out[2]) {
 	if (!g_splitActive || !g_halfWindowSet || player < 0 || player > 1) return false;

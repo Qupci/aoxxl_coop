@@ -4281,3 +4281,17 @@ both halves).
   (XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2): view of the fallen Obelix 8.9 s, off at the revive 16.4 (the
   revive countdown box covers the box's lower part, as the user expected). spsecond2g: off at the game over. split1:
   co-op split screen as before.
+- Round 225 (user, on round 224: crates missing in the view is fine; the left box -- the revive countdown -- above
+  the view while it shows, animated as the flask moves out of a box's way; the potion's flask out of the view's
+  way too, not over the combo bar's column at the left; a debug option with the view always on, to watch the AI).
+  splitscreen.cpp: SidekickViewRect (shown this frame; frame included, shares of the screen, y up from the bottom
+  -- the HUD's 2D places, as HintBoxRect's). hints.cpp: in single player PlaceOf(HINT_LEFT_BOX).up = g_leftLift,
+  UpdateSlot moves it towards (view top + 0.01 - the box's unraised bottom) at the flask's speed (interface
+  +0x278), snapped while the box comes in or is away. hud2.cpp LayoutFlask: in single player g_flaskAside moves it
+  right of the view (view right + 0.01 + its half width) at the same speed, before the hint-box rise check;
+  DrawHudHook runs Hud2BeginP1 / EndP1 (the flask's layout) in plain single player while the view shows or the flask
+  is still on its way back (Hud2FlaskAside). [debug] sidekick_view_always (env XXL_SPVIEWALWAYS): CoopSidekickView
+  gives the other hero whenever playing (also with sp_isolation on). Autotests: spviewhud2 (new; XXL_SPSECOND=1
+  XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2 XXL_REVIVELIMIT=60): flask up, Obelix down -> the countdown box comes in above
+  the view (lift 0.329), the flask slides to x 0.35; revived -> both back. sppotion2 with XXL_SPISOLATION=1
+  XXL_SPVIEWALWAYS=1: the view from the level's start, on Asterix after Obelix takes the lead.

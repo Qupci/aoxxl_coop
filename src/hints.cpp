@@ -299,8 +299,14 @@ void LayOutGlyphs(const char* game) {
 // split's top half). Single player: player 1's at the game's place, the left
 // box (HINT_LEFT_BOX) where player 1's is side by side.
 struct Place { bool left; float up; };
+// Single player's sidekick view (splitscreen.cpp, bottom left) under the left
+// box: the box rises just above it -- at the game's speed for the potion's
+// flask, as the flask rises over a box -- and back down when it goes. A box
+// coming in while the view is up comes in above it.
+float g_leftLift = 0.0f;    // how far the left box is raised now (a share of the screen's height)
+float g_leftBase = -1.0f;   // its bottom, not raised (-1: not seen yet)
 Place PlaceOf(int p) {
-	if (!CoopP2Joined()) return { p == HINT_LEFT_BOX, 0.0f };
+	if (!CoopP2Joined()) return { p == HINT_LEFT_BOX, p == HINT_LEFT_BOX ? g_leftLift : 0.0f };
 	if (SplitActive() && g_config.splitMode == SPLIT_HORIZONTAL) return { false, p == 0 ? 0.5f : 0.0f };
 	return { p == 0, 0.0f };
 }
@@ -379,6 +385,21 @@ void UpdateSlot(int p, char* itf, float dt) {
 	}
 	if (s.kind && !s.leaving) s.in = s.in + dt / kInTime > 1.0f ? 1.0f : s.in + dt / kInTime;
 	else s.in = s.in - dt / kOutTime < 0.0f ? 0.0f : s.in - dt / kOutTime;
+	if (p == HINT_LEFT_BOX && !CoopP2Joined()) {
+		float l, r, b, t, bl, br, bb, bt, want = 0.0f;
+		if (HintBoxRect(p, &bl, &br, &bb, &bt)) g_leftBase = bb - g_leftLift;
+		if (SidekickViewRect(&l, &r, &b, &t) && g_leftBase > -0.5f && t + 0.01f > g_leftBase) want = t + 0.01f - g_leftBase;
+		float speed = *(float*)(itf + 0x278);   // (the flask's, a share of the screen's height a second)
+		if (!(speed > 0.1f && speed < 10.0f)) speed = 1.0f;
+		bool entering = s.kind && !s.leaving && s.in < 1.0f;
+		float was = g_leftLift;
+		if (!s.kind || s.in <= 0.0f || entering) g_leftLift = want;
+		else if (g_leftLift < want) g_leftLift = g_leftLift + speed * dt > want ? want : g_leftLift + speed * dt;
+		else if (g_leftLift > want) g_leftLift = g_leftLift - speed * dt < want ? want : g_leftLift - speed * dt;
+		static int s_told = 0;
+		if ((was == 0.0f) != (g_leftLift == 0.0f) && s_told++ < 60)
+			Log("hints: the left box %s the sidekick view (%.3f)", g_leftLift > 0.0f ? "rises over" : "is back down from", want);
+	}
 }
 
 // The game's interface is the in-game one, its HUD up (not a menu's, a pause's

@@ -7741,6 +7741,22 @@ const Step kSpView2[] = {
 	SHOT(17300, "switched"),
 	END(18500),
 };
+// spviewhud2 (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2
+// XXL_REVIVELIMIT=60): the magic potion's flask up at the bottom left, then
+// Obelix down -- the sidekick view: the revive countdown's left box rises above
+// it, the flask slides right of it; Asterix revives him -- both back.
+const Step kSpViewHud2[] = {
+	MARK(0, "spviewhud2"),
+	POTION(1000),
+	SHOT(2700, "flask"),
+	SHOT(3150, "moving"),
+	SHOT(4500, "moved"),
+	GLIDEBY(5000, HERO_ASTERIX, 1.0f, 0.0f, 400),
+	P1(5600, PAD_B, 0, 0, "p1 holds B"), P1(8500, 0, 0, 0, "p1 release"),
+	SHOT(8700, "going_back"),
+	SHOT(10000, "back"),
+	END(11000),
+};
 // spsecond2c (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2): the
 // AI companion Obelix goes down -- he stays there as Asterix walks off and back;
 // Asterix's B by him gets him up, following again.
@@ -8744,6 +8760,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
 	SCENARIO("spview2", kSpView2),
+	SCENARIO("spviewhud2", kSpViewHud2),
 	SCENARIO("spcork21", kSpCork21),
 	SCENARIO("splever25", kSpLever25),
 	SCENARIO("spcombo2", kSpCombo2),

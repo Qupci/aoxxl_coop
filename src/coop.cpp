@@ -4567,10 +4567,11 @@ void CoopSoloSwitchRequest() { g_soloSwitchAsk++; }
 // 5 s after a refused hero switch (each refusal starts the 5 s over; a switch
 // that goes through takes it away), and with second chance while the other hero
 // is down, until it is up again or the game is over. Not in a cutscene, the
-// pause or a scripted mode with co-op suspended.
+// pause or a scripted mode with co-op suspended. [debug] sidekick_view_always:
+// all the time (watching what the AI does), sp_isolation or not.
 static DWORD g_viewUntil = 0;   // GetTickCount() the refused switch's view ends at (0: none)
 int CoopSidekickView() {
-	if (g.p2Joined || g.suspended || !g_config.spSidekickView) return -1;
+	if (g.p2Joined || g.suspended || (!g_config.spSidekickView && !g_config.sidekickViewAlways)) return -1;
 	Trio t = GetTrio();
 	if (!t || !CoopGameplayLive() || CutsceneBars() || g.cutsceneHold > 0) return -1;
 	CKYellowPages* yp = YellowPages();
@@ -4581,6 +4582,7 @@ int CoopSidekickView() {
 	int other = OtherHero(l);
 	Hero ch = t.GetHero(other);
 	if (!ch || *(uint8_t*)(ch.raw() + 0x1A)) return -1;
+	if (g_config.sidekickViewAlways) return other;
 	if (g_config.spSecondChance && IndivFallenHero() == other) return other;
 	if (g_viewUntil && (int)(GetTickCount() - g_viewUntil) < 0) return other;
 	g_viewUntil = 0;

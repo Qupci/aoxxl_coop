@@ -392,7 +392,11 @@ void LayoutGate(char* itf, const float* cl, bool stacked) {
 // stacked: the bottom of that player's half, right of its combo bar's column,
 // at the half's 3/4 size), and rises out of the way of the hint box under it,
 // at the game's own speed, while the box is there.
+// Single player's sidekick view (bottom left, splitscreen.cpp): the flask moves
+// right, past the view, at the same speed (not up: the combo bar's column is
+// above the view at the left edge), and back when the view goes.
 float g_flaskLift = 0.0f;   // how far it is raised now (a share of the screen's height)
+float g_flaskAside = 0.0f;  // how far it is moved right now (a share of the screen's width)
 DWORD g_flaskAt = 0;
 
 float Aspect2d() {
@@ -416,8 +420,12 @@ void LayoutFlask(char* itf, const float* cl) {
 	float s = stacked ? 0.75f : 1.0f;
 	float tx = stacked ? corner + 0.07f : p == 0 ? corner : 1.0f - corner;
 	float ty = stacked ? (p == 0 ? 0.5f : 0.0f) + py * s : py;
+	float halfW = 0.035f * s, halfH = 0.06f * s, want = 0.0f, wantAside = 0.0f;
+	// Out of the way of the sidekick view: right of it.
+	float vl, vr, vb, vt;
+	if (solo && SidekickViewRect(&vl, &vr, &vb, &vt) && tx - halfW < vr && ty - halfH < vt) wantAside = vr + 0.01f + halfW - tx;
+	tx += g_flaskAside;
 	// Out of the way of a hint box under it: just above the box's top.
-	float halfW = 0.035f * s, halfH = 0.06f * s, want = 0.0f;
 	for (int q = 0; q < 2; q++) {
 		float l, r, b, t;
 		if (!HintBoxRect(q, &l, &r, &b, &t) || r < tx - halfW || l > tx + halfW || b > ty + halfH || t < ty - halfH) continue;
@@ -432,6 +440,8 @@ void LayoutFlask(char* itf, const float* cl) {
 	if (!(speed > 0.1f && speed < 10.0f)) speed = 1.0f;
 	if (g_flaskLift < want) g_flaskLift = g_flaskLift + speed * dt > want ? want : g_flaskLift + speed * dt;
 	else if (g_flaskLift > want) g_flaskLift = g_flaskLift - speed * dt < want ? want : g_flaskLift - speed * dt;
+	if (g_flaskAside < wantAside) g_flaskAside = g_flaskAside + speed * dt > wantAside ? wantAside : g_flaskAside + speed * dt;
+	else if (g_flaskAside > wantAside) g_flaskAside = g_flaskAside - speed * dt < wantAside ? wantAside : g_flaskAside - speed * dt;
 	ty += g_flaskLift;
 	if (s == 1.0f && fabsf(tx - px) < 0.0005f && fabsf(ty - py) < 0.0005f) return;   // the game's own place
 	Xf3d(n, cl, Xform{ px, py, s, tx - px, ty - py }, true);
@@ -739,7 +749,9 @@ void Hud2BeginP1(RwCamera* hud) {
 	g.nScaled = 0;
 	char* lvlItf = (char*)GetLvlObject(2, 132, 0);
 	bool solo = SoloRows() && g.soloLeader >= 0;
-	if (hud && lvlItf && (CoopP2Joined() || solo) && CoopShopper() < 0)   // co-op, split or one screen; second chance's left box
+	float vl, vr, vb, vt;
+	if (hud && lvlItf && (CoopP2Joined() || solo || SidekickViewRect(&vl, &vr, &vb, &vt) || g_flaskAside > 0.0f) &&
+	    CoopShopper() < 0)   // co-op, split or one screen; second chance's left box; the sidekick view
 		LayoutFlask(lvlItf, (float*)((char*)*(void**)((char*)hud + 4) + 0x50));
 	char* itf = g.itf;
 	if (solo) {
@@ -1035,6 +1047,8 @@ void Hud2EndP2() {
 	Apply(g.itf, g.s1);
 	g.p2Pass = false;
 }
+
+bool Hud2FlaskAside() { return g_flaskAside > 0.0f; }
 
 bool Hud2SoloRows() { return SoloRows() && g.soloLeader >= 0; }
 int Hud2HudHero() { return HudOwner(); }

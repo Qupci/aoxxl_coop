@@ -37,6 +37,9 @@ void Hud2EndP2();
 // under it, each in its hero's colours) -- the game's HUD is the leading hero's,
 // the other hero's row a copy as player 2's, drawn in the same second pass.
 bool Hud2SoloRows();
+// Single player: the potion's flask moved aside for the sidekick view (still on
+// its way back too).
+bool Hud2FlaskAside();
 // The hero whose stats the game's HUD shows (player 1's, a shopper's, single
 // player's leader).
 int Hud2HudHero();

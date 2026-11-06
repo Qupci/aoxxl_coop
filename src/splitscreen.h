@@ -24,3 +24,8 @@ long SplitFrames();
 // The view window a player's half was last drawn with (player 0 = player 1's
 // half), false while the split screen is down.
 bool SplitHalfWindow(int player, float out[2]);
+
+// Single player's sidekick view (CoopSidekickView) drawn this frame: where, in
+// shares of the screen (y up from the bottom, the HUD's 2D places), its frame
+// included.
+bool SidekickViewRect(float* left, float* right, float* bottom, float* top);
