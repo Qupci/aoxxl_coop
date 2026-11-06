@@ -1291,7 +1291,7 @@ void DrawLeaderTag(char* renderer) {
 	text[n] = 0;
 	if (CoopP2Joined()) sprintf(text + n, " (P%d)", p2 ? 2 : 1);
 	else if (CoopSoloLevelLead() >= 0) {   // (single player: the hero the level's last switch meant, not yours)
-		n += sprintf(text + n, "  LEVEL'S LEAD: ");
+		n += sprintf(text + n, "  LVL LEAD: ");
 		for (const char* c = HeroName(CoopSoloLevelLead()); *c && n < 54; c++) text[n++] = (char)toupper((unsigned char)*c);
 		text[n] = 0;
 	}
