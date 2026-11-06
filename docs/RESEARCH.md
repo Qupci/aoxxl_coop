@@ -4308,3 +4308,11 @@ both halves).
   it), refused switch -> box right of the view (0.294), flask over the view; view gone -> box back left; view
   first, then a hint -> in from below. spviewhud2: the revive countdown right of the view, clear of player 1's
   "Hold B to revive" box; the flask over the view.
+- Round 227 (user: less clutter -- no sidekick view with the other hero within 10 units, also as you reach the
+  fallen one; the flask and the left box back to their places without it). coop.cpp CoopSidekickView: the other
+  hero within 10 units of the leader (out again past 11: no flicker) -> -1 while a view is wanted (the refused
+  switch's 5 s run on; second chance's view back as you walk off); not with [debug] sidekick_view_always. The HUD
+  pieces follow SidekickViewRect as before (box back left at the flask's speed, flask down). Autotests: spviewhud2
+  reworked (Obelix down by Asterix: no view, countdown from the left; Asterix walks off: view at 11.1 units, box
+  right of it, flask over it; back by Obelix: hidden at 9.9, box slides back; revived). spview2: the view on at
+  the refusal (Obelix waiting, far), hidden at 10.0 as Obelix follows again.

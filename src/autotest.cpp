@@ -7743,19 +7743,22 @@ const Step kSpView2[] = {
 };
 // spviewhud2 (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:3000 XXL_REVIVEHOLD=2
 // XXL_REVIVELIMIT=60): the magic potion's flask up at the bottom left, then
-// Obelix down -- the sidekick view: the revive countdown's left box rises above
-// it, the flask slides right of it; Asterix revives him -- both back.
+// Obelix down by Asterix -- no sidekick view (within 10 units): the countdown in
+// from the left, the flask over it; Asterix walks off -- the view: the box right
+// of it, the flask over it; back by Obelix -- the view gone, both back; revived.
 const Step kSpViewHud2[] = {
 	MARK(0, "spviewhud2"),
 	POTION(1000),
 	SHOT(2700, "flask"),
-	SHOT(3150, "moving"),
-	SHOT(4500, "moved"),
-	GLIDEBY(5000, HERO_ASTERIX, 1.0f, 0.0f, 400),
-	P1(5600, PAD_B, 0, 0, "p1 holds B"), P1(8500, 0, 0, 0, "p1 release"),
-	SHOT(8700, "going_back"),
-	SHOT(10000, "back"),
-	END(11000),
+	SHOT(3500, "down_near"),
+	P1(4000, 0, 0, 1.0f, "p1 forward"), P1(6000, 0, 0, 0, "p1 stop"),
+	SHOT(5000, "walking_off"),
+	SHOT(6800, "away"),
+	GLIDEBY(7200, HERO_ASTERIX, 1.0f, 0.0f, 600),
+	SHOT(8100, "back_near"),
+	P1(8600, PAD_B, 0, 0, "p1 holds B"), P1(11500, 0, 0, 0, "p1 release"),
+	SHOT(12000, "revived"),
+	END(13000),
 };
 // spviewbox2 (level 2, XXL_SPSWITCH=1): single player's left box and the
 // sidekick view -- a hint in the left box (in from the left, the potion's flask

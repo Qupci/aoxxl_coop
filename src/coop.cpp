@@ -4583,6 +4583,21 @@ int CoopSidekickView() {
 	Hero ch = t.GetHero(other);
 	if (!ch || *(uint8_t*)(ch.raw() + 0x1A)) return -1;
 	if (g_config.sidekickViewAlways) return other;
+	// The other hero near (within 10 units; out again past 11, no flicker at the
+	// edge): no view -- it is in sight anyway (the refused switch's 5 s run on).
+	static bool s_near = false;
+	Hero lh = t.GetHero(l);
+	float d2 = lh ? (lh.Pos() - ch.Pos()).len2() : 1e9f;
+	bool nearNow = d2 < (s_near ? 11.0f * 11.0f : 10.0f * 10.0f);
+	bool wanted = (g_config.spSecondChance && IndivFallenHero() == other) ||
+	              (g_viewUntil && (int)(GetTickCount() - g_viewUntil) < 0);
+	if (nearNow != s_near) {
+		static int s_told = 0;
+		if (wanted && s_told++ < 60)
+			Log("coop: sidekick view: %s %s (%.1f units)", HeroName(other), nearNow ? "near -- hidden" : "away again", sqrtf(d2));
+		s_near = nearNow;
+	}
+	if (wanted && s_near) return -1;
 	if (g_config.spSecondChance && IndivFallenHero() == other) return other;
 	if (g_viewUntil && (int)(GetTickCount() - g_viewUntil) < 0) return other;
 	g_viewUntil = 0;
