@@ -4347,3 +4347,16 @@ both halves).
   0.15-0.5 ms. Autotests: spunited23 (refused at the user's spot; both indoors goes through), spunited55
   (-Level 5: REACH ledge -> Obelix's area no, together yes; Obelix placed by an autotest on level 5 -- PLACEAT or
   R3 + A -- hangs at y 7.0, body 0B, "off its feet", so the press stops there), spview2 regression.
+- Round 231 (Nov 7, commit 37a7600; user's pad test, userlogs/xxl_coop.lv5_5_fail.log: LV5-5 switch
+  refused with Asterix at 6.1 10.7 63.1, let through a step on (~13.9 10.5 63.4), Asterix walked to 6.8 3.0 67.8
+  behind the door). Round 230's off-graph seed (nearest walkable cell centre over the whole graph) is not the
+  game's. The AI's start (FUN_004a00f0, AI states 1/9): its place in a node (FUN_0045caa0: strict box x/y/z, the
+  last node first, then its transitions' nodes, then all); else FUN_0045c890: the node whose box is nearest in 3D
+  (FUN_0045aa50 = point clamped to the box), FUN_0045ca30 clamps the place into it -> its cell (FUN_00459710) /
+  centre at box min y + 0.01 (FUN_004597a0); FUN_004a0010 tests the cell (table 0x665240, 0x7F = not for this
+  mover); not valid -> FUN_0045a080: rings round the cell within that node (up to 100), the first ring with a valid
+  cell, its nearest (3D) cell. pathfind.cpp NearestCell does the same; the switch log gives "its AI start cell".
+  Autotest spstart55 (-Level 5, S_SIDEREACH / SIDEREACH(t, x, y, z): hero a's AI way to a point, start cells):
+  ledge points 6.1 / 9.9 / 13.9 / 8.2 -> start cell 6.93 67.77 (node box top 16.4), no way to Obelix 17.4 1.7
+  77.7; Asterix as the sidekick put on the ledge walks to 6.96 67.62 and drops to 7.93 2.74 66.77. spunited23
+  unchanged.
