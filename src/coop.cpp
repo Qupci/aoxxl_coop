@@ -4379,7 +4379,30 @@ static void SoloBeforeLifeTick(int heroIndex, Hero hero) {
 	*(uint32_t*)(trio + 0x4C) = 0;
 }
 
+// A slide's push without the slide (LV2-1, the lever's slope: Obelix's slide stuck
+// against its wall, the hero switch then -- the AI Obelix ran backwards and in
+// place for good). The walk (FUN_0048FE70) pushes a hero down a slope with +0x30
+// (direction) x +0x44 (speed, eased to the target +0x3C at the rate +0x40); the
+// slide's start sets the target (+0x8E0) together with +0x388 bit 0x80, and the
+// first frame on walkable ground with that bit set brakes it (target 0, rate
+// +0x8E8). Leaving the player's or the AI's Life state clears the bit (State1_Ai's
+// exit: +0x388 &= ~0x80) and keeps the push: a lead change mid-slide left a push
+// that never ends (an AI hero is then held in its node box, so it ran at the box's
+// edge). The bit is put back: on walkable ground the game brakes the push, on the
+// slope the slide carries on.
+static void KeepSlideFlag(int heroIndex, Hero hero) {
+	if (heroIndex != HERO_ASTERIX && heroIndex != HERO_OBELIX) return;
+	char* r = hero.raw();
+	if (HeroMode(hero.Flags18()) != 0 || *(float*)(r + 0x3C) == 0.0f || (*(uint32_t*)(r + 0x388) & 0x80)) return;
+	*(uint32_t*)(r + 0x388) |= 0x80;
+	static int s_told = 0;
+	if (s_told++ < 20)
+		Log("coop: %s had a slide's push (target %.1f, speed %.1f) without the slide -- its slide flag put back",
+		    HeroName(heroIndex), *(float*)(r + 0x3C), *(float*)(r + 0x44));
+}
+
 void CoopBeforeLifeTick(int heroIndex, Hero hero) {
+	KeepSlideFlag(heroIndex, hero);
 	TorchBeforeTick(heroIndex, hero);
 	g.indivPrev = IndivEnter(heroIndex);   // this hero's health and combo bar in the game's place
 	g.hpBeforeTick = (uint8_t)Health();

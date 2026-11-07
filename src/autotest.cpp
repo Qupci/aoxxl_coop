@@ -41,8 +41,26 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 	return g_origSlotStep(pf, edx, slot, node, out);
 }
 
+// CLEARLINE: the AI start's line test (FUN_004A1970, thiscall(Vector3* to), ret 4:
+// true = the hero's sweep to its start place hit nothing -> it walks there (+0x390
+// |= 0x80, +0x580), false -> it is put there) reports a clear line while on --
+// the way a hero switched back to the AI off the graph went in the user's logs.
+const uint8_t kStartLinePrologue[7] = { 0x6A, 0xFF, 0x68, 0xA8, 0xD8, 0x61, 0x00 };
+bool(__fastcall* g_origStartLine)(char* hero, void* edx, float* to) = nullptr;
+bool g_clearLine = false;
+
+bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
+	bool r = g_origStartLine(hero, edx, to);
+	static int n = 0;
+	if (n++ < 20)
+		Log("autotest: AI start line from (%.2f %.2f %.2f) to (%.2f %.2f %.2f): %s%s", *(float*)(hero + 0x6C),
+		    *(float*)(hero + 0x70), *(float*)(hero + 0x74), to[0], to[1], to[2], r ? "clear" : "blocked",
+		    g_clearLine && !r ? " -> reported clear (CLEARLINE)" : "");
+	return r || g_clearLine;
+}
+
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7809,6 +7827,26 @@ const Step kSpUnited55[] = {
 	SHOT(27000, "after"),
 	END(27500),
 };
+// sprun21 (level 2): LV2-1's lever (-758.3 508.8 -1037.9; the user's
+// xxl_coop.ai_slide_bug.log) -- Obelix's slide stuck against the lever's wall, the
+// hero switch then: the AI Obelix ran backwards, held at his node box's edge. The
+// state the switch left (Life state exit: +0x388 bit 0x80 cleared, the slide's
+// push kept) put on the AI Obelix by SLIDEPUSH, Asterix leading by the lever, then
+// walking off: Obelix must follow, not run off west and stay.
+#define AIWATCH(t, hero, ms) { t, S_AIWATCH, hero, ms, 0, 0, 0, "ai watch" }
+const Step kSpRun21[] = {
+	MARK(0, "sprun21"),
+	PLACEAT(1000, HERO_ASTERIX, -765.0f, 508.6f, -1036.5f),
+	FORCE(800, HERO_OBELIX, 1), PLACEAT(1000, HERO_OBELIX, -766.5f, 508.6f, -1037.2f), FORCE(1300, HERO_OBELIX, 0),
+	AIWATCH(2900, HERO_OBELIX, 12000),
+	{ 3000, S_SLIDEPUSH, HERO_OBELIX, 0, 0, 0, 0, "obelix: the slide's push without the slide (the user's log)" },
+	SHOT(3500, "pushed"),
+	SHOT(5000, "after_2s"),
+	GLIDEAT(6000, HERO_ASTERIX, -769.6f, 508.4f, -1037.3f, 1200),
+	GLIDEAT(8500, HERO_ASTERIX, -766.6f, 508.5f, -1034.7f, 1200),
+	SHOT(11000, "after_8s"),
+	END(13000),
+};
 // spstart55 (-Level 5, sector 5): the user's LV5-5 pad test
 // (xxl_coop.lv5_5_fail.log) -- the switch refused with Asterix at 6.1 10.7 63.1 on
 // the ledge, let through a step on (~13.9 10.5 63.4), Asterix then walking to 6.8
@@ -8897,6 +8935,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spunited23", kSpUnited23),
 	SCENARIO("spunited55", kSpUnited55),
 	SCENARIO("spstart55", kSpStart55),
+	SCENARIO("sprun21", kSpRun21),
 	SCENARIO("spviewnear2", kSpViewNear2),
 	SCENARIO("spviewhud2", kSpViewHud2),
 	SCENARIO("spviewbox2", kSpViewBox2),
@@ -9401,6 +9440,9 @@ struct AutotestState {
 	Vector3 beaconPoint;
 	int     cineScene = -1;         // scene started by CINE_START
 	bool    probe = false;          // log cutscene-related engine state each tick
+	int     aiWatch = -1;           // AIWATCH: this hero's AI fields after each tick, until aiWatchUntil
+	DWORD   aiWatchUntil = 0;
+	int     aiWatchLogs = 0;
 	struct Glide { bool on; Vector3 from, to; DWORD start, ms; } glide[HERO_COUNT] = {};
 } at;
 
@@ -11952,6 +11994,31 @@ void RunStep(const Step& s) {
 		    fo ? "start cell" : "in a node", fa.x, fa.y, fa.z, tof ? "start cell" : "in a node", ta.x, ta.y, ta.z);
 		break;
 	}
+	case S_CLEARLINE: {   // a = 1: the AI start's line test reports clear (StartLineHook); 0: as the game says
+		static bool hooked = false;
+		if (!hooked)
+			hooked = InstallDetour(0x4A1970, (void*)StartLineHook, (void**)&g_origStartLine, kStartLinePrologue,
+			                       sizeof(kStartLinePrologue), "AI start line test (autotest)");
+		g_clearLine = s.a != 0;
+		Log("autotest: AI start line test %s", g_clearLine ? "forced clear" : "as the game says");
+		break;
+	}
+	case S_SLIDEPUSH: {   // hero a: a slide's push without the slide (+0x30 direction, +0x3C target, +0x40
+		// rate, +0x44 speed; +0x388 bit 0x80 clear) -- as a lead change mid-slide left it
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		float* f = (float*)(h.raw() + 0x30);
+		f[0] = -0.73f; f[1] = -0.56f; f[2] = -0.38f; f[3] = 30.0f; f[4] = 25.0f; f[5] = 30.0f;
+		*(uint32_t*)(h.raw() + 0x388) &= ~0x80u;
+		Log("autotest: %s given a slide's push without the slide", HeroName(s.a));
+		break;
+	}
+	case S_AIWATCH:   // hero a's AI fields logged on change for b ms (AutotestAfterLifeTick)
+		at.aiWatch = s.a;
+		at.aiWatchUntil = GetTickCount() + (DWORD)s.b;
+		Log("autotest: aiwatch %s for %d ms", HeroName(s.a), s.b);
+		break;
 	case S_SPMOD:   // single player: the mod's buttons a (PAD_* bits) with R3 held ([debug] cheats)
 		Log("autotest: R3 + buttons %04X", s.a);
 		CoopSoloModRequest(s.a);
@@ -12282,5 +12349,32 @@ void AutotestBeforeLifeTick(int heroIndex, Hero hero) {
 }
 
 void AutotestAfterLifeTick(int heroIndex, Hero hero) {
-	(void)heroIndex; (void)hero;
+	// AIWATCH: hero a's AI after its tick, logged on change (capped) -- AI state
+	// +0x561, order +0x564, +0x390 (bit 0x80: walking straight to +0x580, no
+	// pathfinding), the AI's start place +0x7CC / node +0x7D8, body +0xE5.
+	if (at.phase != AutotestState::RUN || heroIndex != at.aiWatch || !hero) return;
+	if ((int)(GetTickCount() - at.aiWatchUntil) > 0) { at.aiWatch = -1; return; }
+	char* r = hero.raw();
+	const Vector3& p = hero.Pos();
+	const float* to = (const float*)(r + 0x580);
+	const float* st = (const float*)(r + 0x7CC);
+	const float* wp = (const float*)(r + 0x800);
+	char line[480];
+	_snprintf(line, sizeof(line), "ai=%02X order=%d body=%02X 390=%08X to=(%.1f %.1f %.1f) start=(%.1f %.1f %.1f) node=%d "
+	          "path=%d wp=(%.1f %.1f %.1f) for node %d (target node %d) 384=%08X 388=%08X 38C=%08X 3E9=%02X 8C=%.2f 81C=%X",
+	          *(uint8_t*)(r + 0x561), (int)*(uint8_t*)(r + 0x564), *(uint8_t*)(r + 0xE5), *(uint32_t*)(r + 0x390),
+	          to[0], to[1], to[2], st[0], st[1], st[2], (int)*(int16_t*)(r + 0x7D8),
+	          (int)*(int8_t*)(r + 0x7F0), wp[0], wp[1], wp[2], (int)*(int16_t*)(r + 0x818), (int)*(int16_t*)(r + 0x7E8),
+	          *(uint32_t*)(r + 0x384), *(uint32_t*)(r + 0x388), *(uint32_t*)(r + 0x38C), *(uint8_t*)(r + 0x3E9), *(float*)(r + 0x8C),
+	          *(uint32_t*)(r + 0x81C));
+	line[sizeof(line) - 1] = 0;
+	static char s_last[480];
+	static Vector3 s_lastPos;
+	float dx = p.x - s_lastPos.x, dz = p.z - s_lastPos.z;
+	bool moved = dx * dx + dz * dz > 1.0f;
+	if ((strcmp(line, s_last) == 0 && !moved) || at.aiWatchLogs >= 900) return;
+	strcpy(s_last, line);
+	s_lastPos = p;
+	at.aiWatchLogs++;
+	Log("autotest: aiwatch %s pos=(%.2f %.2f %.2f) %s", HeroName(heroIndex), p.x, p.y, p.z, line);
 }
