@@ -2265,14 +2265,15 @@ static void SoloWatchLock(Trio t) {
 // no way there: put on the marker (user: LV2-3, Obelix walked into the hearth
 // room before Asterix lit the hearth, its door shut behind him -- he never got
 // to his marker outside). Asked every 0.5 s once the walk is 1 s old; three noes
-// in a row (not a door swinging, a step in mid-air). Off by default (nolock on:
-// the level walks no player's hero).
+// in a row (not a door swinging, a step in mid-air). On by default; in co-op
+// only with nolock off (user: nolock on walks no player's hero to a marker --
+// nothing to put anywhere). Single player has no nolock: sp_isolation off.
 struct MarkerWalk { DWORD since = 0, askedAt = 0; int noes = 0; Vector3 to; };
 MarkerWalk g_markerWalk[HERO_COUNT];
 
 static void WatchMarkerWalk(Trio t) {
 	if (!g_config.markerTeleport || !t || CoopSuspended() || CutsceneBars()) return;
-	if (!g.p2Joined && !g_config.SoloMod()) return;
+	if (g.p2Joined ? g_config.noLock : !g_config.SoloMod()) return;
 	DWORD now = GetTickCount();
 	int l = t.Leader();
 	for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++) {

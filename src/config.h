@@ -43,7 +43,7 @@ struct CoopConfig {
 	bool  noLockExceptBeams = false;   // no-lock mode: a rotary beam's circle still locks its hero, through the ride and after
 	bool  carRiderLeads = false;      // a hero boarding a cable car while the other leads takes the lead at once
 	bool  romansInView  = false;      // every spawn marker of a squad in a player's view: its Romans come anyway (farthest marker)
-	bool  markerTeleport = false;     // a hero the level walks to a marker it has no way to (pathfinding) is put on it
+	bool  markerTeleport = true;      // a hero the level walks to a marker it has no way to (pathfinding) is put on it (co-op: nolock off only)
 	float deadzone      = 0.24f;
 
 	// Co-op difficulty ([coop_difficulty]; read at startup)
