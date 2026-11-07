@@ -4478,3 +4478,15 @@ both halves).
   spshopa2 (shop menu by S_BIND 20 confirm / 19 right / 21 cancel -- the P1 pad injection does not reach menus),
   spdrain2 / spdrain2b (bar filled by HITS 3 x 11: S_GIVE's 40 hits in one frame skip the bar's full state).
   Regressions spsecond2, combofull2, shopbuyo unchanged.
+
+- Round 238 (Nov 7, commit 7810796; user: in single player with the hero switch, switching to Obelix holds
+  Asterix's torch at will -- it should be held only while the sidekick Asterix is parked; co-op stays per lead).
+  CKHkTorch::vf15 (0x4AF790), carried (+0x3E & 3 == 1) and lit (bits 2-4): +0x1C counts down only while trio
+  vf40 (0x47C5F0: +0x2C == 0, Asterix leads) -- held, not slowed; the HUD flames (vf15/vf16 loop over the
+  interface's 4 icons) and the flame anim follow the state. No other leader read in state 1 (FUN_004B10B0 /
+  FUN_004B1060 only write the torch's own nodes). SoloTick (proximity.cpp, single player with SoloLeadFree):
+  Obelix leading, Asterix's AI order a follow / fight one (IsScriptedOrder false) and not down -> the torch ticks
+  with Asterix posing as the leader (as the spitter's potion); otherwise the game's own tick (held). Logged on
+  change. Autotest sptorch2 (XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_LIFTLOG=1, LV2-1 start): Asterix leads 4.90 ->
+  2.44; switched to Obelix, following, 2.33 -> 0.36 then flame 4 -> 3; 4802 (order wait) held at 3.43 for 4 s;
+  4803 burns 3.37 -> 0.86; Asterix again burns. HUD lit with Obelix leading (obelix_leads.png).
