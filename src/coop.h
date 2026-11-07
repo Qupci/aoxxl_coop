@@ -116,11 +116,11 @@ bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
 // it), the sequence is undone so the other can come and revive it. Returns who
 // led before that sequence (its event can hand the lead over), else -1.
 int CoopUndoLockFor(int fallen);
-// Single player's second chance: the companion's wait undone by CoopUndoLockFor
-// put back once `revived` (the hero that went down) leads again -- its spot,
+// Individual heroes: the companion's level order (a wait, a marker walk) the
+// leader's fall interrupted put back once `revived` (the hero that went down) leads again -- its spot,
 // "wait" (0x4802), the detectors as when it fell. True: it was.
-bool CoopRestoreSoloPark(int revived);
-void CoopDropSoloPark(const char* why);
+bool CoopRestorePark(int revived);
+void CoopDropPark(const char* why);
 // What R3 + B does for `hero` (autotests): unlocks it from a level lock.
 void CoopUnlockHero(int hero);
 // Single player ([single_player] sp_hero_switch): a press of the hero switch

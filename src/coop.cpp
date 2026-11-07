@@ -2109,15 +2109,17 @@ static char* NearestTowedCar(Hero h) {
 	return best;
 }
 
-// Single player's second chance: the order the level last gave the AI companion
-// -- a marker walk (0x4813..0x4876: LV2-3's hearth 4826, order 1) or a wait
+// Individual heroes (co-op, or single player's second chance): the order the
+// level last gave the companion (the hero not leading) -- a marker walk (0x4813..0x4876: LV2-3's hearth 4826, order 1) or a wait
 // (0x4802, order 3) -- until a 0x4803 sets it following again
 // (CoopNoteTrioEvent).
 struct SoloOrder { unsigned event = 0; int hero = -1, level = -1; } g_soloOrder;
 
-// The leader went down while that order held the companion (AI order 1 or 3):
-// it is freed to come and revive (CoopUndoLockFor's undo, or the player simply
-// takes it). Once the revived hero leads again, the order goes on as it was:
+// The leader went down while that order held the companion (AI order 1 or 3;
+// in co-op, player 2's hero handed to the game for it -- nolock = off, or a
+// lock nolock keeps): it is freed to come and revive (CoopUndoLockFor's undo,
+// or the player simply takes it). Not nolock-dependent otherwise: a revive
+// would lose a marker park the level can't set off again (user). Once the revived hero leads again, the order goes on as it was:
 // a lock's detectors, circles and cameras as when the leader fell, the companion
 // back on its spot, the level's event sent again (user: the interrupted events
 // restored, the sidekick back on its marker). Not a cable car's ride, not a
@@ -2142,7 +2144,7 @@ static bool PictureLightsPillar(const LockPicture& p) {
 }
 
 static void NoteSoloOrder(Trio t, unsigned ev) {
-	if (g.p2Joined || !t) return;
+	if (!t) return;
 	int l = t.Leader();
 	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
 	if (ev == 0x4803) { g_soloOrder = SoloOrder(); return; }
@@ -2155,7 +2157,8 @@ static void NoteSoloOrder(Trio t, unsigned ev) {
 static void NoteSoloPark(int fallen, int up, Hero h) {
 	g_soloPark.set = false;
 	int order = (int)h.Order();
-	if (g.p2Joined || !IndivActive() || (order != AI_WAIT && order != AI_GOTO_POS)) return;
+	if (!IndivActive() || (order != AI_WAIT && order != AI_GOTO_POS)) return;
+	if (g.p2Joined && !g.held[up]) return;   // (co-op: a player's hero the level does not hold -- nolock)
 	if (g_soloOrder.hero != up || !g_soloOrder.event || g_soloOrder.level != CurrentLevelNow()) return;
 	bool lock = g_lock.hero == up && LockedByLevel(up, h);
 	if (lock && (g_lock.car || PictureLightsPillar(g_lock.pic))) return;
@@ -2172,24 +2175,24 @@ static void NoteSoloPark(int fallen, int up, Hero h) {
 		k.before = g_lock.pic;
 		TakePicture(k.after);
 	}
-	Log("coop: single player: %s's %s (event %04X, AI order %d) at (%.1f %.1f %.1f) kept -- on again once %s is revived and leads",
+	Log("coop: revive: %s's %s (event %04X, AI order %d) at (%.1f %.1f %.1f) kept -- on again once %s is revived and leads",
 	    HeroName(up), order == AI_WAIT ? "wait" : "walk to a marker", k.event, order, k.at.x, k.at.y, k.at.z, HeroName(fallen));
 }
 
-void CoopDropSoloPark(const char* why) {
+void CoopDropPark(const char* why) {
 	if (!g_soloPark.set) return;
 	g_soloPark.set = false;
-	Log("coop: single player: %s's kept order dropped (%s)", HeroName(g_soloPark.hero), why);
+	Log("coop: revive: %s's kept order dropped (%s)", HeroName(g_soloPark.hero), why);
 }
 
-bool CoopRestoreSoloPark(int revived) {
+bool CoopRestorePark(int revived) {
 	SoloPark& k = g_soloPark;
 	if (!k.set || k.fallen != revived) return false;
 	k.set = false;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(k.hero) : Hero();
-	if (!t || !h || g.p2Joined || CurrentLevelNow() != k.level || t.Leader() != revived) {
-		Log("coop: single player: %s's kept order dropped (the lead is not %s's)", HeroName(k.hero), HeroName(revived));
+	if (!t || !h || CurrentLevelNow() != k.level || t.Leader() != revived) {
+		Log("coop: revive: %s's kept order dropped (the lead is not %s's)", HeroName(k.hero), HeroName(revived));
 		return false;
 	}
 	if (k.lock) RestoreLockPicture(k.after);
@@ -2204,7 +2207,7 @@ bool CoopRestoreSoloPark(int revived) {
 	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
 	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, (int)k.event, nullptr);
 	if (k.lock && g_lock.hero == k.hero) g_lock.pic = k.before;   // (a later undo: back to before the level's wait)
-	Log("coop: single player: %s back at (%.1f %.1f %.1f), the level's %04X again (AI order %d, was %d) -- %s leads",
+	Log("coop: revive: %s back at (%.1f %.1f %.1f), the level's %04X again (AI order %d, was %d) -- %s leads",
 	    HeroName(k.hero), k.at.x, k.at.y, k.at.z, k.event, (int)h.Order(), k.order, HeroName(revived));
 	return true;
 }

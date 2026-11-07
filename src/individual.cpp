@@ -93,7 +93,7 @@ struct State {
 	Vector3  broughtFrom[2], broughtTo[2];
 	int      sendBack = -1;            // revived its leader: that hero goes back where it came from
 	bool     offGround[2] = {};        // down where the graph has walls only (WayToFallen)
-	int      parkRevived = -1;         // single player: revived -- the companion's kept wait back once it leads
+	int      parkRevived = -1;         // revived -- the companion's kept level order back once it leads
 	DWORD    parkRevivedAt = 0;
 	DWORD    fellAt[2] = {};
 	DWORD    reachAt[2] = {};          // last asked whether the other hero can walk to it
@@ -1105,7 +1105,8 @@ void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 	// back to it (next frame -- a launcher's revive is inside a hero's tick).
 	if (g.fellLeading[idx] && !g.levelLead[idx]) g.leadBack = idx;
 	g.offGround[idx] = false;
-	if (g.solo) { g.parkRevived = idx; g.parkRevivedAt = GetTickCount(); }
+	g.parkRevived = idx;
+	g.parkRevivedAt = GetTickCount();
 	g.fellLeading[idx] = false;
 	g.levelLead[idx] = false;
 	g.limitSet[idx] = false;
@@ -1138,7 +1139,7 @@ void TimeOut(int down, Hero h, int up, const char* why = "was not revived in tim
 	    HeroName(down), HeroName(up));
 	g.gameOver = true;
 	g.spared = up;
-	CoopDropSoloPark("game over");
+	CoopDropPark("game over");
 	g.limitSet[down] = false;
 	g.drain[down] = g.drain[up] = false;
 	Use(down);   // the game manager sees its 0
@@ -1729,17 +1730,17 @@ void IndivFrame() {
 			Use(StandingOr(lead));
 		}
 	}
-	// Single player: the companion's wait the fall undid, back once the revived
-	// hero leads (coop.cpp CoopRestoreSoloPark) -- after its send-back.
+	// The companion's level order the fall interrupted, back once the revived
+	// hero leads (coop.cpp CoopRestorePark) -- after its send-back.
 	if (g.parkRevived >= 0 && !CoopSuspended() && g.sendBack < 0 && g.leadBack < 0) {
 		int back = g.parkRevived;
 		if (g.fallen[back]) g.parkRevived = -1;
 		else if (lead == back) {
 			g.parkRevived = -1;
-			if (CoopRestoreSoloPark(back)) g.brought[Other(back)] = false;
+			if (CoopRestorePark(back)) g.brought[Other(back)] = false;
 		} else if (now - g.parkRevivedAt > 2000) {
 			g.parkRevived = -1;
-			CoopDropSoloPark("the revived hero does not lead");
+			CoopDropPark("the revived hero does not lead");
 		}
 	}
 

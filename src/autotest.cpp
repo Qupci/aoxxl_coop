@@ -3124,6 +3124,23 @@ const Step kSpHearth23[] = {
 	END(26000),
 };
 
+// cohearth23 (-Level 2, XXL_NOLOCK=0 XXL_DOWNAT=0:12000 XXL_REVIVEHOLD=2):
+// sphearth23 in co-op -- player 2's Obelix outside, walked to his marker by the
+// hearth's 4826 (the game's); player 1's Asterix down inside: Obelix brought in,
+// player 2 holds B; revived, Obelix back outside and walked to his marker again.
+const Step kCoHearth23[] = {
+	MARK(0, "cohearth23"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -56.731f, 1.0f, -534.386f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	SHOT(9000, "lit"), SHOT(11500, "obelix_walks"),
+	SHOT(16500, "brought"),
+	VPAD(17000, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(20000, 1, 0, 0, 0, "p2 release"),
+	SHOT(21000, "revived"), SHOT(25000, "after"), REACH(25200),
+	END(26000),
+};
+
 // reach26w (-Level 2, XXL_DOWNAT=0:5000): the user's LV2-6 run -- Obelix the
 // waiting AI companion (trio 4802) from before the pit (no safe spot of his
 // since the level's start), Asterix falls on the far side: the lock's undo must
@@ -8653,6 +8670,20 @@ const Step kLedgeRev65[] = {
 	SHOT(38000, "after"),
 	END(40000),
 };
+// coledgerev65 (-Level 6, XXL_NOLOCK=0 XXL_DOWNAT=0:24000 XXL_REVIVEHOLD=2):
+// ledgerev65 in co-op -- player 2's Obelix held by the level's wait (4802) below,
+// player 1's Asterix down on the ledge: Obelix brought up, player 2 holds B;
+// revived, Asterix leads, Obelix back on his spot, the game's again (waiting).
+const Step kCoLedgeRev65[] = {
+	SPACT65_START(),
+	VPAD(19000, 1, PAD_START, 0, 0, "p2 start"), VPAD(19200, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(19500, HERO_ASTERIX, 830.27f, 70.0f, -254.14f), PLACEAT(19500, HERO_OBELIX, 844.02f, 64.5f, -265.74f),
+	{ 20500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits" },
+	SHOT(23000, "parked"), SHOT(29500, "brought"),
+	VPAD(30000, 1, PAD_B, 0, 0, "p2 holds B"), VPAD(33000, 1, 0, 0, 0, "p2 release"),
+	SHOT(34500, "revived"), SHOT(38000, "after"),
+	END(40000),
+};
 #undef SPACT65_START
 #undef SPACT65_PUNCHES
 // splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
@@ -9097,6 +9128,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("ledge65", kLedge65),
 	SCENARIO("ledgerev65", kLedgeRev65),
 	SCENARIO("sphearth23", kSpHearth23),
+	SCENARIO("cohearth23", kCoHearth23),
+	SCENARIO("coledgerev65", kCoLedgeRev65),
 	SCENARIO("spdownhud2", kSpDownHud2),
 	SCENARIO("spsq24", kSpSq24),
 	SCENARIO("spsq24n", kSpSq24N),
