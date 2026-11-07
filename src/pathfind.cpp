@@ -42,6 +42,7 @@ struct Graph {
 	std::vector<uint8_t> closedDoor;        // per cell: a closed door stands on it
 	std::vector<uint8_t> closedNode;        // per node: shut (PfCloseNodesAt)
 	int cells = 0;
+	bool sidekick = false;                  // the AI sidekick's own rules (PfSidekickReaches)
 };
 
 // PfCloseNodesAt's places, and the nodes they shut last time (for the log).
@@ -110,7 +111,8 @@ void Doors(std::vector<Door>* out) {
 	}
 }
 
-bool Load(Graph* g) {
+bool Load(Graph* g, bool sidekick = false) {
+	g->sidekick = sidekick;
 	char* srv = Service();
 	if (!srv) return false;
 	char** list = *(char***)(srv + 0xC);
@@ -153,7 +155,9 @@ bool Load(Graph* g) {
 				// Walked over: shut only when it is the sidekick's and off (a bridge, a
 				// platform not there). The enemies' own (LV2-3's hearth room: the
 				// sidekick is never to go in) are a door's: the door's cells tell.
+				// The AI sidekick's own rules: only its own and on.
 				if (!on && sidekicks) continue;
+				if (g->sidekick && (!on || !sidekicks)) continue;
 				g->walkTo[i].push_back(ti);
 				continue;
 			}
@@ -208,6 +212,7 @@ bool Walkable(const Graph& g, int ni, int x, int z) {
 	const Node& n = g.nodes[ni];
 	int v = Value(n, x, z);
 	if (v & 8 || v == 7) return false;
+	if (g.sidekick && v == 0) return false;   // (the enemies' cells: the AI sidekick never steps on them, door open or not)
 	return !g.closedDoor[n.base + z * n.nx + x];
 }
 
@@ -328,6 +333,54 @@ int PfReachable(const Vector3& from, const Vector3& to) {
 	std::vector<int> a, b;
 	Seeds(g, from, &a);
 	Seeds(g, to, &b);
+	if (a.empty() || b.empty()) return PF_UNKNOWN;
+	std::vector<uint8_t> seen;
+	Flood(g, a, &seen);
+	for (int c : b)
+		if (seen[c]) return PF_YES;
+	return PF_NO;
+}
+
+namespace {
+// A place in no node of the graph (LV5-5's ledge up by the progression): the
+// walkable cell nearest it, as the AI sidekick goes to the nearest cell it can
+// stand on -- x / z distance, plus how far it is above or below the node's box.
+int NearestCell(const Graph& g, const Vector3& p) {
+	int best = -1;
+	float bestD = 1e30f;
+	for (int ni = 0; ni < (int)g.nodes.size(); ni++) {
+		const Node& n = g.nodes[ni];
+		float dy = p.y < n.mn[1] ? n.mn[1] - p.y : p.y > n.mx[1] ? p.y - n.mx[1] : 0.0f;
+		for (int z = 0; z < n.nz; z++)
+			for (int x = 0; x < n.nx; x++) {
+				if (!Walkable(g, ni, x, z)) continue;
+				Vector3 c = Centre(n, x, z);
+				float dx = c.x - p.x, dz = c.z - p.z, d = dx * dx + dz * dz + dy * dy;
+				if (d < bestD) { bestD = d; best = n.base + z * n.nx + x; }
+			}
+	}
+	return best;
+}
+} // namespace
+
+int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff, bool* toOff) {
+	Graph g;
+	if (fromOff) *fromOff = false;
+	if (toOff) *toOff = false;
+	if (!Load(&g, true) || g.cells == 0) return PF_UNKNOWN;
+	std::vector<int> a, b;
+	Seeds(g, from, &a);
+	Seeds(g, to, &b);
+	if (a.empty()) {
+		int c = NearestCell(g, from);
+		if (c >= 0) a.push_back(c);
+		if (fromOff) *fromOff = true;
+	}
+	if (b.empty()) {
+		int c = NearestCell(g, to);
+		if (c >= 0) b.push_back(c);
+		if (toOff) *toOff = true;
+	}
 	if (a.empty() || b.empty()) return PF_UNKNOWN;
 	std::vector<uint8_t> seen;
 	Flood(g, a, &seen);

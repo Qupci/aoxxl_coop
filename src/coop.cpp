@@ -34,6 +34,7 @@
 #include "individual.h"
 #include "nolock.h"
 #include "guard.h"
+#include "pathfind.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -4793,7 +4794,7 @@ static bool SoloCatchUpOrder(int ev) {
 	return SoloOwnCatchUp(GetTrio(), e) >= 0;
 }
 
-static const char* SoloSwitchRefusal(Trio t) {
+static const char* SoloSwitchRefusal(Trio t, bool press) {
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	if (!gm || !CoopGameplayLive()) return kSwitchNoView[0];
@@ -4816,6 +4817,25 @@ static const char* SoloSwitchRefusal(Trio t) {
 		if (sh && (*(uint8_t*)(sh + 8) & 7) != 0) return "at the merchant";
 	}
 	if ((lh.Pos() - ch.Pos()).len2() > 25.0f * 25.0f) return kSwitchTooFar;
+	// The leader, the sidekick after the switch, must be able to walk to the other
+	// by the AI's own rules (the level's pathfinding graph, one look on the press:
+	// both heroes are on their feet by now, no jump to wait out). LV2-3: Obelix
+	// indoors, Asterix out past the doorway's cells only enemies cross -- Obelix
+	// stood there for good; LV5-5: Asterix up on a ledge in no node, its nearest
+	// cell behind a door. No graph: the switch goes through. (Not for the lock's
+	// "both heroes free" asked each frame: only a press looks.)
+	if (!press) return nullptr;
+	LARGE_INTEGER t0, t1, f;
+	QueryPerformanceCounter(&t0);
+	bool fromOff = false, toOff = false;
+	int r = PfSidekickReaches(lh.Pos(), ch.Pos(), &fromOff, &toOff);
+	QueryPerformanceCounter(&t1);
+	static int s_told = 0;
+	if (s_told++ < 40 && QueryPerformanceFrequency(&f))
+		Log("coop: hero switch: can %s walk to %s as the sidekick? %s%s%s (%.2f ms)", HeroName(l), HeroName(OtherHero(l)),
+		    r == PF_YES ? "yes" : r == PF_NO ? "no" : "no graph", fromOff ? ", from the cell nearest it" : "",
+		    toOff ? ", to the cell nearest the other" : "", (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart);
+	if (r == PF_NO) return "the leader couldn't walk to the other hero (the pathfinding graph)";
 	return nullptr;
 }
 
@@ -4829,7 +4849,7 @@ static void SoloHeroSwitch(Trio t) {
 	}
 	if (g_config.spSwitchKey && PadsKeyPressed(g_config.spSwitchKey) && !(GetAsyncKeyState(VK_MENU) & 0x8000)) pressed = true;
 	if (!pressed) return;
-	const char* no = SoloSwitchRefusal(t);
+	const char* no = SoloSwitchRefusal(t, true);
 	int l = t.Leader();
 	static int s_logs = 0;
 	if (no) {
@@ -4870,7 +4890,7 @@ static void SoloSwitchLockWatch(Trio t) {
 		s.choice = l;
 		Log("coop: sp_hero_switch_lock: you play %s", HeroName(l));
 	}
-	if (l == s.choice || IndivFallenHero() >= 0 || SoloSwitchRefusal(t)) { s.otherSince = 0; return; }
+	if (l == s.choice || IndivFallenHero() >= 0 || SoloSwitchRefusal(t, false)) { s.otherSince = 0; return; }
 	DWORD now = GetTickCount();
 	if (!s.otherSince) s.otherSince = now;
 	if (now - s.otherSince < 1000) return;

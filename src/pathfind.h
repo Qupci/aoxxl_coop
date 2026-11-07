@@ -14,6 +14,11 @@ int PfReachable(const Vector3& from, const Vector3& to);
 // Can a hero walk from either place to the other (a drop one way is enough)?
 // One read of the graph for both ways.
 int PfConnected(const Vector3& a, const Vector3& b);
+// Can the AI sidekick at `from` walk to `to` by its own rules: never on the
+// enemies' cells (cyan: a doorway, open or not), walk-overs only its own and on.
+// A place in no node stands for the walkable cell nearest it (`*fromOff` /
+// `*toOff` set), as the sidekick goes there. PF_UNKNOWN: no graph.
+int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff = nullptr, bool* toOff = nullptr);
 
 // The graph's small nodes (16 units across at most: a lifter's shaft) holding
 // any of these `n` places count as shut -- no step into, within or out of them

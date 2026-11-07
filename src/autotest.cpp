@@ -7759,6 +7759,47 @@ const Step kSpView2[] = {
 	SHOT(17300, "switched"),
 	END(18500),
 };
+// spunited23 (level 2, sector 3; XXL_SPISOLATION=0): the user's LV2-3 spot --
+// Obelix leading indoors (-46.5 0.1 -538.1), Asterix outdoors (-57.1 0.7 -534.3)
+// past the doorway's cells only enemies may cross: the switch refused (Obelix
+// couldn't walk to Asterix); both indoors, it goes through.
+const Step kSpUnited23[] = {
+	MARK(0, "spunited23"),
+	LOADSECTOR(200, 3),
+	{ 1500, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	PLACEAT(2500, HERO_OBELIX, -46.455f, 0.138f, -538.070f), PLACEAT(2600, HERO_ASTERIX, -57.068f, 0.655f, -534.267f),
+	PFDUMP(4000, HERO_OBELIX, 14.0f), REACH(4100),
+	SHOT(4500, "apart"),
+	{ 5000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: obelix can't walk to asterix)" },
+	SHOT(5500, "refused"),
+	PLACEAT(7000, HERO_ASTERIX, -44.0f, 0.138f, -540.0f), REACH(8500),
+	{ 9000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (both indoors: goes through)" },
+	SHOT(10000, "switched"),
+	END(11000),
+};
+// spunited55 (-Level 5, sector 5; XXL_SPISOLATION=0): the user's LV5-5 spot --
+// Asterix leading up on the progression's ledge (8.2 10.9 61.9, in no node of
+// the graph), Obelix behind, walked up as near as he can (Obelix put anywhere
+// on level 5 by an autotest hangs at y 7, so only Asterix is put: first at
+// 45.2 3.5 74.9, Obelix brought by R3 + A -- a switch there and back goes through --
+// then on the ledge): the switch refused (Asterix's nearest cell is behind a door).
+const Step kSpUnited55[] = {
+	MARK(0, "spunited55"),
+	LOADSECTOR(200, 5),
+	{ 1500, S_TRIOEV, 0x4800, 0, 0, 0, 0, "asterix leads" },
+	PLACEAT(2500, HERO_ASTERIX, 45.158f, 3.473f, 74.856f),
+	{ 4000, S_SPMOD, PAD_A, 0, 0, 0, 0, "R3 + A: obelix brought beside asterix" },
+	REACH(9000),
+	SHOT(9200, "caught_up"),
+	{ 9500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (together on the cells: goes through)" },
+	{ 11000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back (asterix leads)" },
+	PLACEAT(12000, HERO_ASTERIX, 8.153f, 11.4f, 61.899f),
+	PFDUMP(19000, HERO_ASTERIX, 25.0f), REACH(19100),
+	SHOT(19500, "apart"),
+	{ 20000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: asterix can't walk to obelix)" },
+	SHOT(20500, "refused"),
+	END(21500),
+};
 // spviewnear2 (level 2, XXL_SPSWITCH=1): a refused switch's view (Obelix told to
 // wait, Asterix off), Asterix back by Obelix -- the view gone and its 5 s ended:
 // off again within them, no view until the next refusal.
@@ -8821,6 +8862,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
 	SCENARIO("spview2", kSpView2),
+	SCENARIO("spunited23", kSpUnited23),
+	SCENARIO("spunited55", kSpUnited55),
 	SCENARIO("spviewnear2", kSpViewNear2),
 	SCENARIO("spviewhud2", kSpViewHud2),
 	SCENARIO("spviewbox2", kSpViewBox2),
@@ -10251,6 +10294,8 @@ void RunStep(const Step& s) {
 		Log("autotest: reach obelix->asterix %s, asterix->obelix %s (asterix %.1f %.1f %.1f, obelix %.1f %.1f %.1f)",
 		    kName[PfReachable(o.Pos(), a.Pos()) + 1], kName[PfReachable(a.Pos(), o.Pos()) + 1], a.Pos().x, a.Pos().y,
 		    a.Pos().z, o.Pos().x, o.Pos().y, o.Pos().z);
+		Log("autotest: the AI sidekick's rules: obelix->asterix %s, asterix->obelix %s",
+		    kName[PfSidekickReaches(o.Pos(), a.Pos()) + 1], kName[PfSidekickReaches(a.Pos(), o.Pos()) + 1]);
 		break;
 	}
 	case S_ENDFIGHT: {   // the fights behind gates won: each squad a gate counts (+0x154 >= -1) put away (vf34), nothing
