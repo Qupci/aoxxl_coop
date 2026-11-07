@@ -4364,3 +4364,24 @@ both halves).
   brings Obelix, player 2 leaves (Obelix on the ground; put by PLACEAT or single player's R3 + A on level 5 he
   hangs at y 7.0, body 0B): switch there and back goes through; Asterix at 6.1 10.7 63.1 and 13.9 10.5 63.4 on
   the ledge -> "from its AI start cell 6.9 16.4 67.8 ... no", refused both times (the second was round 230's let-through).
+- Round 232 (Nov 7, commit 3c87227; user: LV2-1, Obelix by the lever (-758.3 508.8 -1037.9) after a hero
+  switch ran backwards fast, then ran in place at -777.1 -1037.96 for good; narrowed by the user to a slide
+  stuck against the lever's wall when the switch is pressed; logs xxl_coop.strange_obelix_infinite_run_lock{,2}.log,
+  xxl_coop.ai_slide_bug.log, userlogs/xxl_coop.lv2-1_slide_switch_aiwatch{1,2,3}.log). The walk (FUN_0048FE70,
+  from FUN_0048FDA0 in the player / AI Life states) adds a slope's push: +0x30 direction x +0x44 speed, eased to
+  the target +0x3C at the rate +0x40. Steep ground (normal y +0x2E8 < +0x8DC, ground +0x280's +0x2A bit 0 clear):
+  first frame +0x388 bit 0x40 + time +0x8F8; after +0x8FC on its feet: speed 0, target +0x8E0 (30), rate +0x8E4
+  (25), bit 0x80 (sliding). Walkable ground: bit 0x80 set -> rate +0x8E8, target 0 (the brake); bits 0x40/0x80
+  cleared. Leaving the Life state (State1_Ai param 2: +0x388 &= ~0x80, likewise the player's) clears 0x80 and
+  keeps the push -- a lead change mid-slide left target 30 forever (the user's log: push (-0.73 -0.56 -0.38)
+  target 30 rate 25 speed 30, +0x388 0). An AI hero's new place is clamped into its node box (FUN_004A1A20 ->
+  FUN_0045C970: AI states other than 2/3/8/9/0xC/0xF), so it ran at the box's edge (-767.49 = node 22's x min,
+  -777.58 = node 15's); a player kept the speed until X (an attack) or a hit. Fix coop.cpp KeepSlideFlag
+  (CoopBeforeLifeTick, both heroes, normal mode): push target != 0 without bit 0x80 -> bit put back (the game
+  then brakes it on walkable ground, or the slide carries on on the slope). Side notes: the AI's start
+  (FUN_004A00F0) puts a hero off the graph on its start cell only when the sweep there (FUN_004A1970, ret 4) hits
+  something, else +0x390 |= 0x80 and walks to +0x580 (AI state 0F); entering State1_Ai frees the path slot
+  (FUN_004A00F0(1)). Autotest sprun21: Asterix leads by the lever, the AI Obelix beside him given the user's
+  state (new step S_SLIDEPUSH) -- before: to -777.28 -1037.96, running in place; after: "slide flag put back",
+  3 units, then follows. New test steps S_AIWATCH (a hero's AI fields on change), S_CLEARLINE (FUN_004A1970
+  reported clear). spswitch2 unchanged.
