@@ -4560,3 +4560,18 @@ both halves).
   4.9), sptorchthrowo2 (box gone after the throw with Obelix leading), sptorchthrow2 / sptorch2 / sptorchout2
   unchanged (box gone after a burn-out with Obelix leading as before). Shots are 960x540 or 770x422 by run (crop
   by share).
+- Round 242 (Nov 8, commit d4bb01a; user: with Obelix leading the used-up torch (LV5-10's keg) is thrown away, but
+  without Asterix's throw on his model). Asterix's throw is the player situation 0x49B420: enter (param 1) sets the
+  action field +0x3EC bits 25-30 = 13; tick (param 0): field 13 and +0xE8 == 0x28 -> 0x5127, +0x464 = 0, field 14
+  (later 0). +0xE8 is the hero's current ANIMATION id, not a frame (the AI sat at 101): 39 the wind-up, 40 (0x28)
+  the throw. Setting the field on the AI did nothing (the animation is chosen from the player situation +0x3E9).
+  Fix: coop.cpp SoloTorchThrow (CoopFrame, single player with the lead free, Obelix leading): Asterix holding a lit,
+  used-up torch in a playable mode, not busy / down / in another action -> +0x1A = 1 (the pad's commands ignored),
+  bit 0x400000 cleared for the frame (his life's vf13 0x4AA850 on becoming a player's drops a used-up torch at once
+  with 0x513C), +0x18 player variant; next frame the bit back -> his situation 06 picks the throw. Over when the
+  torch is gone and the field is 0 (or 1.5 s after it left; 2.5 s without a throw): +0x18 AI variant, +0x1A back.
+  CoopFrame's "a player hero without player 2" reset skips Asterix meanwhile. SoloTick: the immediate throw waits
+  0.3 s (SoloTorchThrowSoon) and not while throwing (CoopSoloTorchThrowing); a flying torch (state 2) is ticked as
+  Asterix's then. Autotest sptorchthrowo2: field 13 / animation 39 -> 40 (torch gone) -> field 14 -> 0, the AI
+  again 0.7 s later (f18 03, order follow, +0x1A 0); shots throw_0..4 match sptorchthrow2's (Asterix leading).
+  sptorch2 / sptorchhud2 unchanged.
