@@ -500,6 +500,17 @@ void KeepHealthIndex(char* itf, bool fromGame) {
 	col = 0;
 }
 
+bool g_muteHudSound = false;
+// The interface's sounds (FUN_005153F0, thiscall(interface, sound, arg), ret 8:
+// the combo bar's levels, its "Combo"), muted for a bar ticked out of sight.
+typedef void(__fastcall* ItfSoundFn)(char* self, void* edx, uint32_t sound, uint32_t arg);
+ItfSoundFn g_origItfSound = nullptr;
+const uint8_t kItfSoundPrologue[11] = { 0xA1, 0xF4, 0x21, 0x66, 0x00, 0x8B, 0x89, 0x6C, 0x01, 0x00, 0x00 };
+void __fastcall ItfSoundHook(char* self, void* edx, uint32_t sound, uint32_t arg) {
+	if (g_muteHudSound) return;
+	g_origItfSound(self, edx, sound, arg);
+}
+
 typedef void(__fastcall* VoidFn)(char* self, void* edx);
 VoidFn g_origShieldsShown = nullptr, g_origItfVf15 = nullptr, g_origItfVf16 = nullptr;
 const uint8_t kShieldsShownPrologue[8] = { 0x83, 0xEC, 0x10, 0xA1, 0xF4, 0x21, 0x66, 0x00 };
@@ -594,6 +605,8 @@ bool Hud2InstallHooks() {
 	                      "CKHkInterfaceInGame::vf15 (the HUD owner's health)");
 	ok &= PatchVtableSlot(0x6285F0, 16, 0x517870, (void*)ItfVf16Hook, (void**)&g_origItfVf16,
 	                      "CKHkInterfaceInGame::vf16 (a reset: player 2's HUD too)");
+	ok &= InstallDetour(0x5153F0, (void*)ItfSoundHook, (void**)&g_origItfSound, kItfSoundPrologue,
+	                    sizeof(kItfSoundPrologue), "HUD sound (muted for second chance's unseen combo bar)");
 	return ok;
 }
 
@@ -707,9 +720,15 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 	g.inP2Tick = true;
 	if (!(f & 0x100000)) {
 		kHealthPart(itf, nullptr, time);
-		if (!solo && !(f & 0x10000000)) {
+		// Second chance: the other hero's combo bar ticks on too, not drawn and
+		// silent -- kept only in its copy, a full bar stood still where the switch
+		// left it and came back with the lead, full over a drained gauge: hits
+		// did not fill it until it had run down (user).
+		if (!(f & 0x10000000)) {
+			g_muteHudSound = solo;
 			kComboPart(itf, nullptr, time);
 			kComboGlowPart(itf, nullptr, time);
+			g_muteHudSound = false;
 		}
 	}
 	g.inP2Tick = false;
@@ -748,6 +767,13 @@ void Hud2BeginP1(RwCamera* hud) {
 	    CoopShopper() < 0)   // co-op, split or one screen; second chance's left box; the sidekick view
 		LayoutFlask(lvlItf, (float*)((char*)*(void**)((char*)hud + 4) + 0x50));
 	char* itf = g.itf;
+	// Second chance at the merchant: the shop's HUD (the game's, the shopper's
+	// health) in the shopper's colours (user).
+	if (!solo && Hud2ShopTint() && hud && itf && itf == lvlItf) {
+		TintBegin(SoloLeader(), false);
+		g.soloTint = true;
+		return;
+	}
 	if (solo) {
 		// The leading hero's row (the game's pass): Obelix's under Asterix's, in
 		// its colours (the shields' textures as learned in the other row's pass).
@@ -1045,4 +1071,5 @@ void Hud2EndP2() {
 bool Hud2FlaskMoved() { return g_flaskLift > 0.0f; }
 
 bool Hud2SoloRows() { return SoloRows() && g.soloLeader >= 0; }
+bool Hud2ShopTint() { return IndivActive() && !CoopP2Joined() && MerchantOpen() && SoloLeader() >= 0; }
 int Hud2HudHero() { return HudOwner(); }

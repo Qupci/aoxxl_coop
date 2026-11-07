@@ -1669,8 +1669,37 @@ void IndivFrame() {
 	Hero ob = t ? t.GetHero(HERO_OBELIX) : Hero();
 	bool want = (solo ? g_config.spSecondChance : g_config.individual) && t && t.GetHero(HERO_ASTERIX) && ob &&
 	            (g.active || *(uint8_t*)(ob.raw() + 0x1A) == 0);
+	// Second chance <-> individual heroes (player 2 joining or leaving with both
+	// on): each hero keeps its own stats (user: they were the leader's for both
+	// -- a free heal, or a loss). A hero down then gets up as before, with the
+	// revive's health.
+	bool carry = false;
+	Stats carried[2];
+	if (g.active && g.solo != solo && want) {
+		carry = true;
+		for (int i = 0; i < 2; i++) {
+			carried[i] = Current(i);
+			if (g.fallen[i]) {
+				int hp = (carried[i].shields * 5 + 1) / 2;
+				carried[i].hp = (uint8_t)(hp > 0 ? hp : 1);
+			}
+		}
+	}
 	if (g.active && g.solo != solo) Deactivate(t);
-	if (want && !g.active) { g.solo = solo; Activate(t); }
+	if (want && !g.active) {
+		g.solo = solo;
+		Activate(t);
+		if (carry && g.active) {
+			g.st[0] = carried[0];
+			g.st[1] = carried[1];
+			Write(g.st[g.ctx]);
+			g.kept = false;
+			RefreshHud();
+			Log("indiv: %s -- each hero's own stats kept: Asterix health %d, %d shields; Obelix health %d, %d shields",
+			    solo ? "single player again (second chance)" : "co-op (individual heroes)", carried[0].hp, carried[0].shields,
+			    carried[1].hp, carried[1].shields);
+		}
+	}
 	if (!want && g.active) Deactivate(t);
 	if (!g.active) {
 		// A game over in single player starts everyone afresh.

@@ -37,6 +37,9 @@ void Hud2EndP2();
 // under it, each in its hero's colours) -- the game's HUD is the leading hero's,
 // the other hero's row a copy as player 2's, drawn in the same second pass.
 bool Hud2SoloRows();
+// Second chance at the merchant: the shop's HUD (the shopper's health) is
+// drawn in the shopper's colours.
+bool Hud2ShopTint();
 // The potion's flask raised out of a box's or the sidekick view's way (still on
 // its way back too).
 bool Hud2FlaskMoved();

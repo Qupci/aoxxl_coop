@@ -1261,8 +1261,9 @@ void __fastcall DrawHudHook(char* view, void* edx, void* dt) {
 	// (Single player's second chance: the other hero's health row the same way.)
 	char* renderer = *(char**)(view + 0x08);
 	RwCamera* hud = renderer ? *(RwCamera**)(renderer + 0x14) : nullptr;
-	// (Single player's sidekick view: the flask raised out of its way.)
-	if (!g_splitActive && !CoopP2Joined() && !Hud2SoloRows() && (g_pipShown || Hud2FlaskMoved())) {
+	// (Single player's sidekick view: the flask raised out of its way. Second
+	// chance at the merchant: the shop's health in the shopper's colours.)
+	if (!g_splitActive && !CoopP2Joined() && !Hud2SoloRows() && (g_pipShown || Hud2FlaskMoved() || Hud2ShopTint())) {
 		Hud2BeginP1(hud);
 		g_origDrawHud(view, edx, dt);
 		Hud2EndP1();

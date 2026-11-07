@@ -8015,6 +8015,94 @@ const Step kSpSecond2H[] = {
 	SHOT(7000, "after"),
 	END(8000),
 };
+// spshopo2 / spshopa2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1):
+// single player's second chance at sector 1's merchant, both heroes at 5
+// health: Obelix (switched to) / Asterix buys three items -- they are his own,
+// his row in his colours. (The shop's menu reads the menu bindings: confirm
+// 20, right 19, cancel 21.)
+#define SPSHOP2(hero) \
+	{ 1500, S_POKE8, -10, 0x50, 0, 5.0f, 0, "asterix health 5" }, \
+	{ 1500, S_POKE8, -11, 0x50, 0, 5.0f, 0, "obelix health 5" }, \
+	{ 1500, S_POKE8, -1, 0x6A, 0, 2.0f, 0, "helmets (+0x68) 131072 more" }, \
+	GLIDEAT(2000, hero, -764.3f, 509.0f, -1011.0f, 1500), \
+	{ 3700, S_NEAROBJ, hero, 172, 0, 1.6f, 0, "at the merchant" }, \
+	P1(4500, PAD_X, 0, 0, "p1 X"), P1(4700, 0, 0, 0, "p1 release"), \
+	{ 8000, S_BIND, 20, 0, 0, 3.0f, 0, "confirm (words)" }, \
+	SHOT(10000, "shop_menu"), \
+	{ 10500, S_BIND, 20, 0, 0, 3.0f, 0, "confirm (buy the ham)" }, \
+	{ 12500, S_BIND, 19, 0, 0, 3.0f, 0, "right (the shield)" }, \
+	{ 13500, S_BIND, 20, 0, 0, 3.0f, 0, "confirm (buy the shield)" }, \
+	{ 15500, S_BIND, 19, 0, 0, 3.0f, 0, "right" }, \
+	{ 16500, S_BIND, 20, 0, 0, 3.0f, 0, "confirm (buy)" }, \
+	SHOT(18000, "bought"), \
+	{ 20000, S_BIND, 21, 0, 0, 3.0f, 0, "cancel (back)" }, \
+	{ 23000, S_BIND, 20, 0, 0, 3.0f, 0, "confirm (words)" }, \
+	SHOT(26000, "after"), \
+	END(27000)
+const Step kSpShopO2[] = {
+	MARK(0, "spshopo2"),
+	{ 1000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	SPSHOP2(HERO_OBELIX),
+};
+const Step kSpShopA2[] = {
+	MARK(0, "spshopa2"),
+	SPSHOP2(HERO_ASTERIX),
+};
+// spjoin2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1): second chance's own
+// health for each hero (Asterix 5, Obelix 9) through player 2 joining
+// (individual heroes), leaving, joining and leaving again.
+const Step kSpJoin2[] = {
+	MARK(0, "spjoin2"),
+	{ 1500, S_POKE8, -10, 0x50, 0, 5.0f, 0, "asterix health 5" },
+	{ 1500, S_POKE8, -11, 0x50, 0, 9.0f, 0, "obelix health 9" },
+	SHOT(2500, "solo"),
+	VPAD(3000, 1, PAD_START, 0, 0, "p2 start (joins)"), VPAD(3200, 1, 0, 0, 0, "p2 release"),
+	SHOT(4500, "coop"),
+	{ 5000, S_POKE8, -11, 0x50, 0, 7.0f, 0, "obelix health 7 (player 2's)" },
+	VPAD(6000, 1, PAD_START, 0, 0, "p2 start (leaves)"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
+	SHOT(7500, "solo_again"),
+	VPAD(8500, 1, PAD_START, 0, 0, "p2 start (joins)"), VPAD(8700, 1, 0, 0, 0, "p2 release"),
+	SHOT(10000, "coop_again"),
+	VPAD(11000, 1, PAD_START, 0, 0, "p2 start (leaves)"), VPAD(11200, 1, 0, 0, 0, "p2 release"),
+	SHOT(12500, "solo_last"),
+	END(13500),
+};
+// spdrain2 (level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1): Asterix's
+// combo bar filled hit by hit (the bar's own "full" needs the hits to cross
+// the full mark), then the switch to Obelix: Asterix's bar runs down meanwhile;
+// back to Asterix at 12 s -- his bar where it ran down to. spdrain2b: back after
+// it ran out (34 s) -- an empty bar that hits fill again.
+#define SPDRAIN2_START \
+	MARK(0, "spdrain2"), \
+	HITS(1500, HERO_ASTERIX, 3), \
+	HITS(1700, HERO_ASTERIX, 3), \
+	HITS(1900, HERO_ASTERIX, 3), \
+	HITS(2100, HERO_ASTERIX, 3), \
+	HITS(2300, HERO_ASTERIX, 3), \
+	HITS(2500, HERO_ASTERIX, 3), \
+	HITS(2700, HERO_ASTERIX, 3), \
+	HITS(2900, HERO_ASTERIX, 3), \
+	HITS(3100, HERO_ASTERIX, 3), \
+	HITS(3300, HERO_ASTERIX, 3), \
+	HITS(3500, HERO_ASTERIX, 3), \
+	SHOT(4000, "asterix_full"), \
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" }, \
+	SHOT(5500, "obelix_leads")
+const Step kSpDrain2[] = {
+	SPDRAIN2_START,
+	SHOT(8000, "obelix_8s"),
+	{ 12000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back to asterix" },
+	SHOT(12600, "asterix_back"), SHOT(16000, "asterix_16s"),
+	END(17000),
+};
+const Step kSpDrain2B[] = {
+	SPDRAIN2_START,
+	{ 34000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back to asterix" },
+	SHOT(34600, "asterix_back"),
+	HITS(35500, HERO_ASTERIX, 10),
+	SHOT(36500, "asterix_hits"),
+	END(37500),
+};
 // spcork21d (level 2, XXL_SPSECOND=1 XXL_DOWNAT=1:9000 XXL_REVIVEHOLD=2): Asterix
 // leading onto LV2-1's spinning platform: he waits there, Obelix leads and walks
 // through zone 03C8 (Asterix freed, the platform's turn under way); Obelix goes
@@ -9120,6 +9208,11 @@ const Scenario kScenarios[] = {
 	SCENARIO("spsecond2c", kSpSecond2C),
 	SCENARIO("spsecond2g", kSpSecond2G),
 	SCENARIO("spsecond2h", kSpSecond2H),
+	SCENARIO("spshopo2", kSpShopO2),
+	SCENARIO("spshopa2", kSpShopA2),
+	SCENARIO("spjoin2", kSpJoin2),
+	SCENARIO("spdrain2", kSpDrain2),
+	SCENARIO("spdrain2b", kSpDrain2B),
 	SCENARIO("spcork21d", kSpCork21D),
 	SCENARIO("spcork21e", kSpCork21E),
 	SCENARIO("spbump2", kSpBump2),
