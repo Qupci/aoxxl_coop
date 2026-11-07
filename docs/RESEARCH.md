@@ -4385,3 +4385,25 @@ both halves).
   state (new step S_SLIDEPUSH) -- before: to -777.28 -1037.96, running in place; after: "slide flag put back",
   3 units, then follows. New test steps S_AIWATCH (a hero's AI fields on change), S_CLEARLINE (FUN_004A1970
   reported clear). spswitch2 unchanged.
+- Round 233 (Nov 7, commit 023a0f5; user: LV3-6 boss run, second chance, you play Obelix, log
+  xxl_coop.lv3-6_partner_death_underground.log: Obelix down at -307.5 5.5 -167.3 ahead of the rolling machine,
+  shoved by it along z to -114.4, then at 66.8 s to -311.9 -3.82 -105.5 under the floor (PF "not known"), the
+  revive time ran out). The machine is CKHkBoss (2,177, vt 627A60), object 0 at -218.4 5.5 -174.8; its +0x600
+  (CKSpline4L, length 34.7, -419.8 12.2 -110.9 .. -437.6 5.8 -110.8) is only the jump at the run's end (state
+  bit +8 0x20, distance +0x5B4 += +0x598->+0xC x dt, point at distance = way vf13(out, d, tangent), length way
+  +8); the chase itself rolls 5.9 units/s: x -218.4 -> -317.9 at z -174.9, north to z -110.6, west to the arena
+  (the user's editor corners are the line's, a few units off). Speed/flags unchanged in the chase (+8 3C6; 3C2
+  after a respawn put it back at its start). individual.cpp, levels 2 and 3 only (LV4-11 / LV5-11 / LV6-5 go to
+  and fro): TrackBosses keeps each boss's trail (a spot per unit, 512; a jump > 20 = respawn clears it; a turn
+  back starts it afresh); rolling = moved within 1 s. A fallen hero (co-op or second chance) is the game over
+  (TimeOut with a reason) when (a) dragged: 2+ units moved with a rolling boss within 12 (user: can't hold the
+  grab before its saws), or (b) behind: within 8.5 of the trail 9+ units back along it and 6+ behind the boss's
+  back (heading over its last 3 units -- without it the body shoved round the first corner counted, the trail
+  cuts it), the standing hero not behind too. WayToFallen brings nobody while a boss rolls (bossdown36 before:
+  Asterix put by the body in the boss's way, killed too). KeepBodyOnGround: a fallen body's last place in a PF
+  node (every 0.1 s; none set while it is in none, e.g. a death in mid-air); 1.5+ lower and in no node (no
+  lifter) -> put back there. Not exercised by the autotests: the drag now ends the user's case before the
+  corner. Autotests bossdown36 (XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=1:24000: dragged, game over 2 s
+  after the boss reaches it), bossbehind36 (XXL_DOWNAT=1:23000, Obelix put at -255 -172 behind it: "23 units
+  back", game over), spboss36 (Obelix killed by the boss at -248, dragged -> game over). Diagnostic bossway36
+  + step S_BOSSDUMP (each (2,177): flags, +0x5B4, +0x600 way, place; a=1 samples the way). LV2-10 not run.
