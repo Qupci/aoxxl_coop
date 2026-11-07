@@ -4456,3 +4456,25 @@ both halves).
   Follow-up (commit 8cf602b, user): walk_to_marker_teleport defaults on; in co-op it runs only with nolock off
   (WatchMarkerWalk: g.p2Joined ? noLock : !SoloMod() -> nothing). comarker23 with the defaults: XXL_NOLOCK=0 put
   on the marker 2 s after 4826; XXL_NOLOCK=1 "Obelix stays its player's (event 4826 ... not followed)", no teleport.
+- Round 237 (Nov 7, commit 8e18e0e; user: second chance <-> co-op resets health; second chance at the merchant
+  has no coloured shields and "purchases are shared"; a full combo bar switched away stands still and comes back
+  broken -- hits do not fill it until it has visibly run down). (1) individual.cpp IndivFrame: a solo <-> co-op
+  change with individual stats wanted in both modes snapshots Current() of both heroes, runs Deactivate/Activate
+  as before, then writes the snapshot back (g.kept cleared; a fallen hero gets the revive's half health, as it is
+  raised by Deactivate). Log "each hero's own stats kept". (2) hud2.cpp Hud2ShopTint (IndivActive, solo, a
+  CKHkAsterixShop (2,172) state != 0): Hud2BeginP1 tints the game's pass with the leader's (shopper's) colours;
+  splitscreen.cpp DrawHudHook routes single player's HUD through Hud2BeginP1 for it (it skipped the hook unless
+  the solo rows / sidekick view were up). The shop's item pictures are not the shield textures: untouched. The
+  purchase itself (FUN_004BFC50 state 3 writes the +0x40 block) already went to the shopper in single player
+  (game's place = leader): spshopo2 Obelix 5/3 -> 30/6, Asterix 5/3 kept. (3) The combo bar (FUN_00518190;
+  +0x24 bits 12-14: 0 hidden, 1 sliding in, 2 partial, 4 full -- entered only when hits cross gm +0xC8 (30) from
+  below, itf +0x2C0 the hits last seen) lives in the interface; single player's other row (s2) ticked only the
+  health part, so a full bar's own countdown froze in the copy at the switch and came back with the lead: still
+  state 4, it played "Combo" again and set the gauge back to +0xA0 (spdrain2b before: back at 44.5 s -> gauge
+  28.1). Now the other row ticks kComboPart / kComboGlowPart too (as player 2's copy), not drawn, with the
+  interface's sounds (FUN_005153F0, thiscall(itf, sound, arg), ret 8, detoured) muted for it. spdrain2b after:
+  state 4 ends at 45.8 s with the gauge, 10 hits then show state 2. Autotests (XXL_SPISOLATION=0 XXL_SPSECOND=1
+  XXL_SPSWITCH=1): spjoin2 (A 5 / O 9 -> co-op 5/9, O 7 in co-op -> single player 5/7, twice), spshopo2 /
+  spshopa2 (shop menu by S_BIND 20 confirm / 19 right / 21 cancel -- the P1 pad injection does not reach menus),
+  spdrain2 / spdrain2b (bar filled by HITS 3 x 11: S_GIVE's 40 hits in one frame skip the bar's full state).
+  Regressions spsecond2, combofull2, shopbuyo unchanged.
