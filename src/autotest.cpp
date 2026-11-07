@@ -42,7 +42,7 @@ uint32_t __fastcall SlotStepHook(char* pf, void* edx, uint32_t slot, void* node,
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7800,6 +7800,29 @@ const Step kSpUnited55[] = {
 	SHOT(20500, "refused"),
 	END(21500),
 };
+// spstart55 (-Level 5, sector 5): the user's LV5-5 pad test
+// (xxl_coop.lv5_5_fail.log) -- the switch refused with Asterix at 6.1 10.7 63.1 on
+// the ledge, let through a step on (~13.9 10.5 63.4), Asterix then walking to 6.8
+// 3.0 67.8, the wrong side of the door from Obelix (17.4 1.7 77.7). The AI's way
+// from points along the ledge (its start cell, the game's way), then Asterix as
+// the sidekick put at the second spot: where he walks to.
+#define SIDEREACH(t, X, Y, Z) { t, S_SIDEREACH, HERO_ASTERIX, 0, 0, X, Y, "sidekick way", Z }
+const Step kSpStart55[] = {
+	MARK(0, "spstart55"),
+	LOADSECTOR(200, 5),
+	{ 1500, S_TRIOEV, 0x4800, 0, 0, 0, 0, "asterix leads" },
+	PLACEAT(2500, HERO_ASTERIX, 6.12f, 10.9f, 63.12f), SIDEREACH(4000, 17.44f, 1.68f, 77.71f),
+	PLACEAT(4500, HERO_ASTERIX, 10.0f, 10.9f, 63.3f), SIDEREACH(6000, 17.44f, 1.68f, 77.71f),
+	PLACEAT(6500, HERO_ASTERIX, 13.85f, 10.7f, 63.44f), SIDEREACH(8000, 17.44f, 1.68f, 77.71f),
+	PLACEAT(8500, HERO_ASTERIX, 8.15f, 11.1f, 61.9f), SIDEREACH(10000, 17.44f, 1.68f, 77.71f),
+	PFDUMP(10500, HERO_ASTERIX, 20.0f),
+	{ 11000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads: asterix the sidekick" },
+	PLACEAT(12000, HERO_ASTERIX, 13.85f, 10.7f, 63.44f),
+	SHOT(13000, "sidekick_ledge"),
+	SHOT(17000, "sidekick_went"),
+	SIDEREACH(17100, 17.44f, 1.68f, 77.71f),
+	END(18000),
+};
 // spviewnear2 (level 2, XXL_SPSWITCH=1): a refused switch's view (Obelix told to
 // wait, Asterix off), Asterix back by Obelix -- the view gone and its 5 s ended:
 // off again within them, no view until the next refusal.
@@ -8864,6 +8887,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spview2", kSpView2),
 	SCENARIO("spunited23", kSpUnited23),
 	SCENARIO("spunited55", kSpUnited55),
+	SCENARIO("spstart55", kSpStart55),
 	SCENARIO("spviewnear2", kSpViewNear2),
 	SCENARIO("spviewhud2", kSpViewHud2),
 	SCENARIO("spviewbox2", kSpViewBox2),
@@ -11905,6 +11929,18 @@ void RunStep(const Step& s) {
 		    r ? *(float*)(r + 0x28) : -1.0f, w ? w[0] : -1.0f, w ? w[1] : -1.0f, cs ? *(uint32_t*)(cs + 0xC) : 0,
 		    cs && (*(uint32_t*)(cs + 0xC) & 0x1000) ? 1 : 0, cs ? *(float*)(cs + 0x668) : 0.0f, cs ? *(float*)(cs + 0x670) : 0.0f,
 		    cs ? *(uint32_t*)(cs + 0x680) : 0);
+		break;
+	}
+	case S_SIDEREACH: {   // the AI sidekick's way (PfSidekickReaches) from hero a to the point x / y / z, its start cells
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		Vector3 to(s.x, s.y, s.z), fa = h.Pos(), ta = to;
+		bool fo = false, tof = false;
+		int r = PfSidekickReaches(h.Pos(), to, &fo, &tof, &fa, &ta);
+		Log("autotest: sidekick way %s (%.2f %.2f %.2f) -> (%.2f %.2f %.2f): %s; from %s %.2f %.2f %.2f, to %s %.2f %.2f %.2f",
+		    HeroName(s.a), h.Pos().x, h.Pos().y, h.Pos().z, to.x, to.y, to.z, r == PF_YES ? "yes" : r == PF_NO ? "no" : "unknown",
+		    fo ? "start cell" : "in a node", fa.x, fa.y, fa.z, tof ? "start cell" : "in a node", ta.x, ta.y, ta.z);
 		break;
 	}
 	case S_SPMOD:   // single player: the mod's buttons a (PAD_* bits) with R3 held ([debug] cheats)

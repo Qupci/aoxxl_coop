@@ -16,9 +16,12 @@ int PfReachable(const Vector3& from, const Vector3& to);
 int PfConnected(const Vector3& a, const Vector3& b);
 // Can the AI sidekick at `from` walk to `to` by its own rules: never on the
 // enemies' cells (cyan: a doorway, open or not), walk-overs only its own and on.
-// A place in no node stands for the walkable cell nearest it (`*fromOff` /
-// `*toOff` set), as the sidekick goes there. PF_UNKNOWN: no graph.
-int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff = nullptr, bool* toOff = nullptr);
+// A place in no node stands for the cell the game's AI starts from there (the
+// nearest node's box, the place clamped into it, its cell or the nearest
+// walkable one round it): `*fromOff` / `*toOff` set, that cell's centre in
+// `*fromAt` / `*toAt`. PF_UNKNOWN: no graph.
+int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff = nullptr, bool* toOff = nullptr,
+                      Vector3* fromAt = nullptr, Vector3* toAt = nullptr);
 
 // The graph's small nodes (16 units across at most: a lifter's shaft) holding
 // any of these `n` places count as shut -- no step into, within or out of them

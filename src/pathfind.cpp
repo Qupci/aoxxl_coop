@@ -343,27 +343,60 @@ int PfReachable(const Vector3& from, const Vector3& to) {
 
 namespace {
 // A place in no node of the graph (LV5-5's ledge up by the progression): the
-// walkable cell nearest it, as the AI sidekick goes to the nearest cell it can
-// stand on -- x / z distance, plus how far it is above or below the node's box.
+// cell the AI sidekick starts its way from, the game's own way (the AI's start,
+// FUN_004a00f0): the node holding the place (box x / y / z, FUN_0045caa0), else
+// the node whose box is nearest it in 3D (FUN_0045c890 over FUN_0045aa50); the
+// place clamped into that box, its cell (FUN_0045ca30); that cell if walkable,
+// else the nearest walkable one (3D, to the cell's centre on the box's floor) of
+// the first ring round it that has any, up to 100 rings, in that node only
+// (FUN_0045a080). Not the nearest cell of the whole graph: round 230's first
+// try picked a cell of another node, on the other hero's side of the door.
 int NearestCell(const Graph& g, const Vector3& p) {
-	int best = -1;
+	int ni = -1;
 	float bestD = 1e30f;
-	for (int ni = 0; ni < (int)g.nodes.size(); ni++) {
-		const Node& n = g.nodes[ni];
-		float dy = p.y < n.mn[1] ? n.mn[1] - p.y : p.y > n.mx[1] ? p.y - n.mx[1] : 0.0f;
-		for (int z = 0; z < n.nz; z++)
-			for (int x = 0; x < n.nx; x++) {
+	for (int i = 0; i < (int)g.nodes.size(); i++) {
+		const Node& n = g.nodes[i];
+		float d = 0.0f;
+		for (int k = 0; k < 3; k++) {
+			float v = (&p.x)[k], c = v < n.mn[k] ? n.mn[k] : v > n.mx[k] ? n.mx[k] : v;
+			d += (v - c) * (v - c);
+		}
+		if (d < bestD) { bestD = d; ni = i; }
+		if (d == 0.0f) break;
+	}
+	if (ni < 0) return -1;
+	const Node& n = g.nodes[ni];
+	int cx, cz;
+	CellOf(n, p.x, p.z, &cx, &cz);
+	if (Walkable(g, ni, cx, cz)) return n.base + cz * n.nx + cx;
+	for (int r = 1; r <= 100; r++) {
+		int best = -1;
+		float bd = 1e30f;
+		for (int z = cz - r; z <= cz + r; z++)
+			for (int x = cx - r; x <= cx + r; x++) {
+				if (x < 0 || z < 0 || x >= n.nx || z >= n.nz) continue;
+				if (abs(x - cx) != r && abs(z - cz) != r) continue;
 				if (!Walkable(g, ni, x, z)) continue;
 				Vector3 c = Centre(n, x, z);
-				float dx = c.x - p.x, dz = c.z - p.z, d = dx * dx + dz * dz + dy * dy;
-				if (d < bestD) { bestD = d; best = n.base + z * n.nx + x; }
+				float dx = c.x - p.x, dy = c.y - p.y, dz = c.z - p.z, d = dx * dx + dy * dy + dz * dz;
+				if (d < bd) { bd = d; best = n.base + z * n.nx + x; }
 			}
+		if (best >= 0) return best;
+		if (r > n.nx && r > n.nz) break;
 	}
-	return best;
+	return -1;
+}
+
+Vector3 CellCentre(const Graph& g, int c) {
+	const Node& n = g.nodes[NodeOfCell(g, c)];
+	int i = c - n.base;
+	Vector3 v = Centre(n, i % n.nx, i / n.nx);
+	v.y = n.mx[1];
+	return v;
 }
 } // namespace
 
-int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff, bool* toOff) {
+int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff, bool* toOff, Vector3* fromAt, Vector3* toAt) {
 	Graph g;
 	if (fromOff) *fromOff = false;
 	if (toOff) *toOff = false;
@@ -374,11 +407,13 @@ int PfSidekickReaches(const Vector3& from, const Vector3& to, bool* fromOff, boo
 	if (a.empty()) {
 		int c = NearestCell(g, from);
 		if (c >= 0) a.push_back(c);
+		if (c >= 0 && fromAt) *fromAt = CellCentre(g, c);
 		if (fromOff) *fromOff = true;
 	}
 	if (b.empty()) {
 		int c = NearestCell(g, to);
 		if (c >= 0) b.push_back(c);
+		if (c >= 0 && toAt) *toAt = CellCentre(g, c);
 		if (toOff) *toOff = true;
 	}
 	if (a.empty() || b.empty()) return PF_UNKNOWN;

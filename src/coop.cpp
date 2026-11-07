@@ -4828,13 +4828,21 @@ static const char* SoloSwitchRefusal(Trio t, bool press) {
 	LARGE_INTEGER t0, t1, f;
 	QueryPerformanceCounter(&t0);
 	bool fromOff = false, toOff = false;
-	int r = PfSidekickReaches(lh.Pos(), ch.Pos(), &fromOff, &toOff);
+	Vector3 fromAt = lh.Pos(), toAt = ch.Pos();
+	int r = PfSidekickReaches(lh.Pos(), ch.Pos(), &fromOff, &toOff, &fromAt, &toAt);
 	QueryPerformanceCounter(&t1);
 	static int s_told = 0;
-	if (s_told++ < 40 && QueryPerformanceFrequency(&f))
+	if (s_told++ < 40 && QueryPerformanceFrequency(&f)) {
+		char from[128] = "", to[128] = "";
+		if (fromOff)
+			sprintf_s(from, ", from its AI start cell %.1f %.1f %.1f (%.1f %.1f %.1f in no node)", fromAt.x, fromAt.y, fromAt.z,
+			          lh.Pos().x, lh.Pos().y, lh.Pos().z);
+		if (toOff)
+			sprintf_s(to, ", to the other's AI start cell %.1f %.1f %.1f (%.1f %.1f %.1f in no node)", toAt.x, toAt.y, toAt.z,
+			          ch.Pos().x, ch.Pos().y, ch.Pos().z);
 		Log("coop: hero switch: can %s walk to %s as the sidekick? %s%s%s (%.2f ms)", HeroName(l), HeroName(OtherHero(l)),
-		    r == PF_YES ? "yes" : r == PF_NO ? "no" : "no graph", fromOff ? ", from the cell nearest it" : "",
-		    toOff ? ", to the cell nearest the other" : "", (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart);
+		    r == PF_YES ? "yes" : r == PF_NO ? "no" : "no graph", from, to, (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart);
+	}
 	if (r == PF_NO) return "the leader couldn't walk to the other hero (the pathfinding graph)";
 	return nullptr;
 }
