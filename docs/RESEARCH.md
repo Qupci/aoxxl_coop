@@ -4540,3 +4540,23 @@ both halves).
   fight53c (co-op, XXL_LOGMARKERS=1: none placed in view), marker56 regression (LV5-6 marker 28 still behind its
   rock, 7 Romans throughout). Open: vf33's starting Romans are placed with no view check (none seen in view in the
   tests); the user's co-op case and crate spot not known -- the new log lines name them next time.
+
+- Round 241 (Nov 7, commit 741b112; user: the torch HUD should go when Asterix throws his torch away (round 239's
+  open item), and with Obelix leading by hand a lit torch's HUD fire still looks slowed although the timer runs).
+  The bottom-right box is the in-game interface's (CKHkInterfaceInGame, yp +0x8C -> ... the interface whose vf18
+  calls FUN_00520230: thiscall(itf, time), ret 4, prologue 83 EC 2C 53 55). State in itf +0x24 bits 19-20 (0 off,
+  1 sliding in, 2 shown, 3 sliding out), Asterix's held object from trio vf46 (0x47C6A0, Asterix +0x464; vf37 is
+  the leader's), box node +0x118, the 4 fire-level flames +0x11C..+0x128 (particle pieces), +0x14C its slide,
+  +0x414 the level shown, +0x418/+0x41C/+0x420 slide target/speed/place. In state 2 it calls trio vf40 ("Asterix
+  leads", +0xA0) twice: (1) Asterix holds nothing -> slide out only if Asterix leads; (2) a level shown -> leader
+  Asterix: the flame piece's +0x10 bit 0 set (its own clock); else bit 0 cleared and +0x20 = dt * 0.05 (stepped:
+  the sidekick's slowed flame). The torch's own +0x1C..+0x28 "icons" (CKGrpMecaCpntAsterix) are the fire on the
+  torch tip in the world (node at Asterix's hand) -- not the box. Fix: coop.cpp TorchHudHook (detour) -- single
+  player with the lead free (SoloLeadFree), Obelix leading, box shown: Asterix poses as the leader for the call
+  when he holds no torch or is not parked (ProximitySoloAsterixParked, proximity.cpp, shared with SoloTick's
+  timer). Parked keeps the game's slowed flame (as the held timer). Co-op unchanged. Autotests (XXL_SPISOLATION=0
+  XXL_SPSWITCH=1): sptorchhud2 (burst shots of the box, mean change per pixel between shots: Asterix leading
+  30.6 / 66.3, Obelix leading with Asterix following 34 / 61.5 -- was 1.8 / 8.7 --, Asterix told to wait 0.9 /
+  4.9), sptorchthrowo2 (box gone after the throw with Obelix leading), sptorchthrow2 / sptorch2 / sptorchout2
+  unchanged (box gone after a burn-out with Obelix leading as before). Shots are 960x540 or 770x422 by run (crop
+  by share).
