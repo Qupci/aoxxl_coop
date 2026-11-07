@@ -4444,3 +4444,12 @@ both halves).
   back on the marker, 4826 -> held, order 3; with XXL_NOLOCK=1 nothing kept, sent back, stays player 2's),
   coledgerev65 (-Level 6, XXL_NOLOCK=0 XXL_DOWNAT=0:24000: 4802 kept, brought up the ledge, back, held waiting).
   sphearth23 unchanged.
+- Round 236 (Nov 7, commit ea2b0b1; user: LV2-3 (they wrote LV3-2) with nolock off, Obelix walked into the hearth room
+  before Asterix lit the hearth: the door shut behind him and the hearth's 4826 walked him to his marker outside --
+  stuck inside for good). New [coop] walk_to_marker_teleport (default off, user: nolock on is the default; in the
+  user's ini and dist; env XXL_MARKERTP). coop.cpp WatchMarkerWalk (every frame, gameplay live, no cutscene):
+  co-op a held hero (g.held), single player the AI companion with sp_isolation off; AI order 1 and its target
+  (+0x568) 2+ units off (x/z), the walk 1 s old: PfReachable every 0.5 s, three PF_NO in a row -> SetHeroPosition
+  on the target (+0.5 y). Autotest comarker23 (-Level 2, XXL_NOLOCK=0; Obelix at -46.5 0.8 -539.5 in the room):
+  XXL_MARKERTP=0 -- order 1 at -46.5 -539.5 for good; =1 -- "no way to its marker (-54.6 0.3 -523.1) -- put on
+  it" 2 s after the 4826, order 3 there.
