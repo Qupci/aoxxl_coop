@@ -353,6 +353,32 @@ bool SoloTick(int* life, void* dt, char* hook, Trio t) {
 		}
 		return true;
 	}
+	// A carried, lit torch (CKHkTorch 2,32: +0x3E state 1, bits 2-4) burns down
+	// only while Asterix leads (trio vf40; its HUD and flame go with the timer).
+	// The game's sidekick Asterix with Obelix leading is the level's, parked --
+	// a wait, a walk, a ride. With the lead switched by hand, Obelix led to hold
+	// the torch at will: it is held only while the level holds Asterix (a scripted
+	// AI order) or he is down; following Obelix, it burns as if he led.
+	if (vt == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 1 && (*(uint8_t*)(hook + 0x3E) & 0x1C) &&
+	    t.Leader() == HERO_OBELIX) {
+		Hero a = t.GetHero(HERO_ASTERIX);
+		AiOrder o = a ? a.Order() : AI_WAIT;   // (a fight's orders are the following sidekick's: coop.cpp IsScriptedOrder)
+		bool scripted = o != AI_FOLLOW_LEADER && o != AI_HIT_ENEMY && o != AI_THROW_ENEMY && o != AI_BITE_ENEMY && o != AI_TAKE_HIT;
+		bool parked = !a || scripted || IndivFallen(HERO_ASTERIX);
+		static int s_parked = -1, s_told = 0;
+		if (parked != (s_parked == 1) && s_told++ < 40)
+			Log("proximity: torch %p carried by Asterix, Obelix leads -- %s (AI order %s)", hook,
+			    parked ? "Asterix parked: held" : "Asterix follows: burns", a ? AiOrderName((int)a.Order()) : "-");
+		s_parked = parked ? 1 : 0;
+		if (parked) return false;
+		uint8_t* tr = (uint8_t*)t.raw();
+		uint8_t leader = tr[0x2C], companion = tr[0x2D];
+		tr[0x2C] = HERO_ASTERIX;
+		tr[0x2D] = HERO_OBELIX;
+		tick(life, nullptr, dt);
+		if (tr[0x2C] == HERO_ASTERIX) { tr[0x2C] = leader; tr[0x2D] = companion; }
+		return true;
+	}
 	return false;
 }
 
@@ -465,7 +491,8 @@ void TickLife(int* life, void* dt, bool isGroup, Trio t, int p1, int p2, const V
 	// A carried torch (CKHkTorch 2,32, +0x3E state 1) burns down only while the
 	// trio's leader is Asterix (trio vf40, its tick at 0x4AF790); the HUD reads the
 	// real leader. Ticked as Asterix's nearest with him posing as the leader, it
-	// burned at his rate while Obelix led (single player: it waits).
+	// burned at his rate while Obelix led (single player: it waits; with the lead
+	// switched by hand, only while Asterix is parked -- SoloTick).
 	bool carriedTorch = hook && *(uintptr_t*)hook == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 1;
 	if (vt == kAsterixLifeVtbl || vt == kObelixLifeVtbl || vt == kIdefixLifeVtbl ||
 	    vt == kBonusGroupLife || vt == kTrioGroupLife || vt == kCheckpointLife || plate || carriedTorch ||

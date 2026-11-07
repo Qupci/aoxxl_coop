@@ -7686,6 +7686,24 @@ const Step kSpSwitch2[] = {
 	SHOT(11500, "obelix_again"),
 	END(12000),
 };
+// sptorch2 (level 2, XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_LIFTLOG=1): Asterix
+// carries a lit torch; switched to Obelix with Asterix following, it burns on;
+// Asterix told to wait (trio 0x4802, parked), it is held; free again (0x4803),
+// it burns; back to Asterix, it burns. (Lift log: the torch's timer and leader.)
+const Step kSpTorch2[] = {
+	MARK(0, "sptorch2"),
+	{ 800, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 1000, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" },
+	{ 1300, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" },
+	SHOT(2500, "asterix_torch"),
+	{ 4000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix (asterix follows: burns)" },
+	SHOT(5000, "obelix_leads"),
+	{ 8000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix told to wait (parked: held)" },
+	SHOT(9000, "asterix_parked"),
+	{ 12000, S_TRIOEV, 0x4803, 0, 0, 0, 0, "asterix follows again (burns)" },
+	{ 15000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	SHOT(16000, "asterix_leads"),
+	END(18000),
+};
 // spcork21 (level 2, XXL_SPSWITCH=1): LV2-1's spinning platform (its circle makes
 // Asterix wait): Obelix leading walks onto it -- nothing; the switch to Asterix,
 // who walks onto it: he waits there, Obelix leads; the switch then refused.
@@ -9191,6 +9209,7 @@ struct Scenario { const char* name; const Step* steps; int count; };
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
+	SCENARIO("sptorch2", kSpTorch2),
 	SCENARIO("spview2", kSpView2),
 	SCENARIO("spunited23", kSpUnited23),
 	SCENARIO("spunited55", kSpUnited55),
