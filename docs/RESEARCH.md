@@ -4490,3 +4490,25 @@ both halves).
   change. Autotest sptorch2 (XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_LIFTLOG=1, LV2-1 start): Asterix leads 4.90 ->
   2.44; switched to Obelix, following, 2.33 -> 0.36 then flame 4 -> 3; 4802 (order wait) held at 3.43 for 4 s;
   4803 burns 3.37 -> 0.86; Asterix again burns. HUD lit with Obelix leading (obelix_leads.png).
+- Round 239 (Nov 7, commit 36d5d36; user: LV5-10's keg at 587.727 -441.649 -176.906 -- Asterix throws his torch
+  away when it blows (xxl_coop.torch_throw_asterix_leader.log), but switched to Obelix before it blew he kept it
+  until switched back (xxl_coop.torch_no_throw_obleix_leader.log)). Trio 0x4811 (FUN_00482610's 48xx case 0x11) only
+  sets Asterix +0x3EC |= 0x400000. Read by his player situation: Hero_ChooseSituationState via FUN_0049A460 (from
+  CKHkAsterixLife::State0_Player 0x4AAAE0) -> 0x49B420: at sub-state (+0x3EC & 0x7E000000) == 0x1A000000 and anim
+  frame +0xE8 == 0x28, 0x5127 to the torch, +0x464 = 0, then +0x3EC & ~0x400000 & 0x9DFFFFFF | 0x1C000000 -- and by
+  CKHkAsterixLife::InitOnce (vf13, 0x4AA850: lead back to him) with 0x513C. The AI states never get there.
+  CKHkTorch::sendEvent: 0x5127 and 0x513C both clear the 4 flame icons (CKGrpMecaCpntAsterix, yp+0x8C -> +0x18 ->
+  +0x24, +0x1C..+0x28: +0x10 bit 0x80 via FUN_0041AB10(7,0), +0x48+4 & ~8, unlinked from their branch +0x0C),
+  move the torch's node to the world and set state 2 (flying); 0x513C also hides the node (+0x10 bit 1).
+  FUN_0043B730 / FUN_0043C150 (ECX yp+0x18) are the sound player, torch +0x2C its sounds. Fix (SoloTick): Obelix
+  leading, Asterix's +0x464 == this carried torch with the bit -> 0x5127, +0x464 = 0, bit cleared, the torch ticked
+  that frame with Asterix posing as the leader (else vf15 state 2 found its node unseen -- +0x14 != the frame stamp
+  DAT_006464C4 -- and went to 3 at once: no flight). Autotests (XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_LIFTLOG=1,
+  level 2): sptorchthrow2 (Asterix leads: thrown 0.2 s after 4811 at 0x49B462, unchanged), sptorchthrowo2 (Obelix
+  leads: thrown at the 4811, flies 0x12 -> 0x13), sptorch2 unchanged. OPEN: with Obelix leading the burning-torch
+  picture at the bottom right stays (live -- 876/1140 sampled pixels change in 0.5 s) until Asterix leads; a
+  burn-out with Obelix leading does take it down (sptorchout2). Ruled out (same in both cases, S_TORCH 10/14): the
+  4 flame icons, the torch's branch +0x34 (CSGBranch), CKGrpMeca's action box (+0x90 null; +0x9C/+0xA0 empty),
+  CKGrpMecaCpntAsterix +0x64, Asterix's nodes +0x36C/+0xC28..+0xC48 (FUN_004A3EF0), the torch's events +0x38/+0x3A/
+  +0x3C (FFF8), the mod's SP icons / hints / sidekick view (XXL_SPICONS/SPCOMBOHINTS/SPVIEW=0). The crash.cpp
+  write-watch slots alias across re-arming (S_TORCH 4 then 8): later hits name earlier addresses.
