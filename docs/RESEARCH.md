@@ -4512,3 +4512,31 @@ both halves).
   CKGrpMecaCpntAsterix +0x64, Asterix's nodes +0x36C/+0xC28..+0xC48 (FUN_004A3EF0), the torch's events +0x38/+0x3A/
   +0x3C (FFF8), the mod's SP icons / hints / sidekick view (XXL_SPICONS/SPCOMBOHINTS/SPVIEW=0). The crash.cpp
   write-watch slots alias across re-arming (S_TORCH 4 then 8): later hits name earlier addresses.
+- Round 240 (user, userlogs xxl_coop.lv5_3_marker64_in_view.log, Nov 4: LV5-3's fight, Obelix played at -243
+  9.6 318 in single player with sp_isolation off -- Romans came in on top of him at "marker 64"; seen in co-op too;
+  crates "load in view" the same way). Diagnostic first: FUN_0052EC30 (thiscall(squad, Roman, position, facing,
+  flag), ret 0x10; prologue `mov eax, fs:[0]`) places every Roman a squad brings in -- from vf33 (the squad's
+  starting Romans, 0x52EF70), vf37 (reinforcements, 0x52F930), vf38 (spawn markers, 0x52FB80), vf55 (no-lock,
+  0x52DA90); proximity.cpp PlaceRomanHook logs one placed in a player's view (KlusterViewsSeeing 60 units +
+  SeesMarker) with the path, bounded 60. The fight's squad (box x -272.5..-187.3) has markers 0 (-245.8 10.1 358.7),
+  1 (-219.3 9.7 321.0), 2 (-242.6 9.8 315.0) -- by the user's spot, the likely "marker 64" -- and 3 (-252.1 10.0
+  319.1). (1) Single player: MarkerSpawnHook / SpawnPointHook only ran with player 2 in, and the game's vf38 takes a
+  marker in its camera's cone facing it first -- marker 2 right by Obelix. Now SpawnRuleOn(): co-op, or single player
+  with sp_isolation off (isolation on stays the game's own). (2) Co-op: markers 2 and 3 "in a view 1, seen 0" -- the
+  wall sweep's walls without a top reach up for ever, and a camera over the lava (outside the arena's walls) had one
+  between itself and every spot of the arena floor. WallsHideFrom(eye): the hero nearest the eye (the one it follows)
+  behind a wall from it = the camera is outside the walls, they hide nothing from it (kept per eye, 4; log "outside
+  the walls", bounded). Marker 3 now seen; marker 2 still hidden from one eye by a wall WITH a top at (-244.0 11.4
+  322.6), the line 1.9 above its foot -- a real occluder (the arena's crate stacks). XXL_LOGMARKERS now also logs the
+  wall each eye hits (WallBetween's new `hit`: point, res[12] height above the foot, res+0x34 bit 0 = has a top).
+  (3) Crates: the crate log (CrateUpdateHook) now works in single player (the plain query's answer kept). In this
+  arena the game's own single player (sp_isolation on) has the same shortage as off: handler 3 has 26 crate objects
+  and up to 6-7 crates in view had none (a crate keeps its object anywhere in the frustum, however far). Round 158's
+  nearest-first cut (CutCrates, out of QueryHook) now also runs in single player with sp_isolation off; it only
+  orders who waits -- more crates in view than objects still leaves some waiting (placeholder geometry). Autotests
+  (-Level 5, XXL_MARKERTP=0 -- with it on, round 236's teleport put the AI Asterix on a stale marker 225 units off
+  (-16.8 11.4 305.4) right after the PLACEAT, and the level's camera broke): fight53 (single player, XXL_SPISOLATION=0:
+  Asterix twists the fight every 6.5 s; "1 of 4 spawn markers in a player's view, left out", no Roman placed in view),
+  fight53c (co-op, XXL_LOGMARKERS=1: none placed in view), marker56 regression (LV5-6 marker 28 still behind its
+  rock, 7 Romans throughout). Open: vf33's starting Romans are placed with no view check (none seen in view in the
+  tests); the user's co-op case and crate spot not known -- the new log lines name them next time.
