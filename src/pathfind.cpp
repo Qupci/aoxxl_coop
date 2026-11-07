@@ -560,6 +560,20 @@ float PfWayFrom(const Vector3& from) {
 	return best < kNoWay ? best : -1.0f;
 }
 
+int PfSeedRing(const Vector3& p) {
+	Graph g;
+	if (!Load(&g)) return -1;
+	std::vector<int> seeds;
+	Seeds(g, p, &seeds);
+	if (seeds.empty()) return -1;
+	const Node& n = g.nodes[NodeOfCell(g, seeds[0])];
+	int cx, cz;
+	CellOf(n, p.x, p.z, &cx, &cz);
+	int c = seeds[0] - n.base, x = c % n.nx, z = c / n.nx;
+	int dx = abs(x - cx), dz = abs(z - cz);
+	return dx > dz ? dx : dz;
+}
+
 int PfLineInNodes(const Vector3& from, const Vector3& to) {
 	Graph g;
 	if (!Load(&g)) return PF_UNKNOWN;

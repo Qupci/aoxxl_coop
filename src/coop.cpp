@@ -2109,12 +2109,113 @@ static char* NearestTowedCar(Hero h) {
 	return best;
 }
 
+// Single player's second chance: the order the level last gave the AI companion
+// -- a marker walk (0x4813..0x4876: LV2-3's hearth 4826, order 1) or a wait
+// (0x4802, order 3) -- until a 0x4803 sets it following again
+// (CoopNoteTrioEvent).
+struct SoloOrder { unsigned event = 0; int hero = -1, level = -1; } g_soloOrder;
+
+// The leader went down while that order held the companion (AI order 1 or 3):
+// it is freed to come and revive (CoopUndoLockFor's undo, or the player simply
+// takes it). Once the revived hero leads again, the order goes on as it was:
+// a lock's detectors, circles and cameras as when the leader fell, the companion
+// back on its spot, the level's event sent again (user: the interrupted events
+// restored, the sidekick back on its marker). Not a cable car's ride, not a
+// light pillar's sequence (their undo stands). The lock's own "before" picture
+// kept for a later undo.
+struct SoloPark {
+	bool        set = false, lock = false;
+	unsigned    event = 0;
+	int         fallen = -1, hero = -1, level = -1, order = -1;
+	Vector3     at;
+	LockPicture after, before;
+} g_soloPark;
+
+static bool PictureLightsPillar(const LockPicture& p) {
+	if (p.event == 0xFFFF) return false;
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = ProximityGroupTargets(p.event, objs, msgs, 64);
+	for (int i = 0; i < n; i++)
+		if (objs[i] && *(uintptr_t*)objs[i] == 0x629030 && (msgs[i] == 0x900 || msgs[i] == 0x901)) return true;
+	return false;
+}
+
+static void NoteSoloOrder(Trio t, unsigned ev) {
+	if (g.p2Joined || !t) return;
+	int l = t.Leader();
+	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
+	if (ev == 0x4803) { g_soloOrder = SoloOrder(); return; }
+	if (ev != 0x4802 && !(ev >= 0x4813 && ev <= 0x4876)) return;
+	g_soloOrder.event = ev;
+	g_soloOrder.hero = OtherHero(l);
+	g_soloOrder.level = CurrentLevelNow();
+}
+
+static void NoteSoloPark(int fallen, int up, Hero h) {
+	g_soloPark.set = false;
+	int order = (int)h.Order();
+	if (g.p2Joined || !IndivActive() || (order != AI_WAIT && order != AI_GOTO_POS)) return;
+	if (g_soloOrder.hero != up || !g_soloOrder.event || g_soloOrder.level != CurrentLevelNow()) return;
+	bool lock = g_lock.hero == up && LockedByLevel(up, h);
+	if (lock && (g_lock.car || PictureLightsPillar(g_lock.pic))) return;
+	SoloPark& k = g_soloPark;
+	k.set = true;
+	k.lock = lock;
+	k.event = g_soloOrder.event;
+	k.fallen = fallen;
+	k.hero = up;
+	k.level = CurrentLevelNow();
+	k.order = order;
+	k.at = h.Pos();
+	if (lock) {
+		k.before = g_lock.pic;
+		TakePicture(k.after);
+	}
+	Log("coop: single player: %s's %s (event %04X, AI order %d) at (%.1f %.1f %.1f) kept -- on again once %s is revived and leads",
+	    HeroName(up), order == AI_WAIT ? "wait" : "walk to a marker", k.event, order, k.at.x, k.at.y, k.at.z, HeroName(fallen));
+}
+
+void CoopDropSoloPark(const char* why) {
+	if (!g_soloPark.set) return;
+	g_soloPark.set = false;
+	Log("coop: single player: %s's kept order dropped (%s)", HeroName(g_soloPark.hero), why);
+}
+
+bool CoopRestoreSoloPark(int revived) {
+	SoloPark& k = g_soloPark;
+	if (!k.set || k.fallen != revived) return false;
+	k.set = false;
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(k.hero) : Hero();
+	if (!t || !h || g.p2Joined || CurrentLevelNow() != k.level || t.Leader() != revived) {
+		Log("coop: single player: %s's kept order dropped (the lead is not %s's)", HeroName(k.hero), HeroName(revived));
+		return false;
+	}
+	if (k.lock) RestoreLockPicture(k.after);
+	// Back where it was (its marker, or its walk there) -- not a hero that has
+	// gone on more than 40 units since (a sector away).
+	Vector3 d = h.Pos() - k.at;
+	if (d.len2() > 0.25f && d.len2() < 40.0f * 40.0f) {
+		Vector3 to = k.at;
+		to.y += 0.5f;
+		SetHeroPosition(h, to);
+	}
+	typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+	((SendEventFn)(*(void***)t.raw())[5])(t.raw(), nullptr, (int)k.event, nullptr);
+	if (k.lock && g_lock.hero == k.hero) g_lock.pic = k.before;   // (a later undo: back to before the level's wait)
+	Log("coop: single player: %s back at (%.1f %.1f %.1f), the level's %04X again (AI order %d, was %d) -- %s leads",
+	    HeroName(k.hero), k.at.x, k.at.y, k.at.z, k.event, (int)h.Order(), k.order, HeroName(revived));
+	return true;
+}
+
 int CoopUndoLockFor(int fallen) {
 	int up = fallen == HERO_ASTERIX ? HERO_OBELIX : fallen == HERO_OBELIX ? HERO_ASTERIX : -1;
 	if (up < 0 || (!g.p2Joined && !IndivActive())) return -1;
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
 	if (!h) return -1;
+	NoteSoloPark(fallen, up, h);
 	if (!LockedByLevel(up, h)) {
 		if (!SequenceUnderWay()) return -1;
 		// Freed already, but the platform's turn not finished: back to before it set off.
@@ -2655,6 +2756,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		Trio tl = GetTrio();
 		if (tl) g_telepherRider = tl.Leader();   // (the leader its tick saw: the rider)
 	}
+	if (IndivActive()) NoteSoloOrder(GetTrio(), (unsigned)event & 0xFFFF);
 	if (LocksTracked() && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
 		if ((event & 0xFFFF) == 0x4803) {

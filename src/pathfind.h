@@ -45,6 +45,11 @@ float PfWayFrom(const Vector3& from);
 // was (its tick, 0x4CEE00). PF_UNKNOWN when the level has no graph.
 int PfLineInNodes(const Vector3& from, const Vector3& to);
 
+// How many cells out from `p`'s own the walkable cells a query starts from lie
+// (0 its own cell, 1 to 3 the ring round it; the deepest node holding it that
+// has any): -1 none, or in no node.
+int PfSeedRing(const Vector3& p);
+
 // The box round the cells a hero at `from` can walk to (as PfReachable) within
 // `radius` units of it (x / z), from the lowest of their nodes' boxes to the
 // highest; false when `from` is in no node of the graph.

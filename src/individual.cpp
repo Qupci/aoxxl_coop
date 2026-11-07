@@ -92,6 +92,9 @@ struct State {
 	bool     hadWay[2] = {};           // down: the other hero could walk to it at some time since the fall
 	Vector3  broughtFrom[2], broughtTo[2];
 	int      sendBack = -1;            // revived its leader: that hero goes back where it came from
+	bool     offGround[2] = {};        // down where the graph has walls only (WayToFallen)
+	int      parkRevived = -1;         // single player: revived -- the companion's kept wait back once it leads
+	DWORD    parkRevivedAt = 0;
 	DWORD    fellAt[2] = {};
 	DWORD    reachAt[2] = {};          // last asked whether the other hero can walk to it
 	int      cutOff[2] = {};           // ... and was told no that many times in a row
@@ -765,6 +768,7 @@ struct ShutLifters {
 	void Open() { PfCloseNodesAt(nullptr, 0); }
 };
 const int kReachOnlyLifter = 2;   // reachTold: no way but over a lifter
+const int kReachOffGround = 3;    // ... it lies off the graph's walkable cells
 
 // The revive time limit's "auto": the walk to the fallen hero, then the grace.
 // The bosses that roll after the heroes along a way of their own (CKHkBoss,
@@ -946,6 +950,10 @@ Vector3 CatchUpSpot(int down, Hero h, int up, Hero o, float* way) {
 	Vector3 at = h.Pos(), from = o.Pos();
 	Vector3 best = SpotBesideFallen(down, at);
 	*way = sqrtf((best - at).len2());
+	if (g.offGround[down]) {   // (off the graph's cells: the graph's spots are all below it)
+		Log("indiv: %s lies off the graph's walkable cells -- %s is brought beside it", HeroName(down), HeroName(up));
+		return best;
+	}
 	if (!PfWayTo(at)) {
 		Log("indiv: no pathfinding where %s lies -- %s is brought beside it", HeroName(down), HeroName(up));
 		return best;
@@ -1008,13 +1016,29 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 		byLifter = PfReachable(o.Pos(), h.Pos()) == PF_YES;
 		shut.Close();
 	}
-	int told = byLifter ? kReachOnlyLifter : r;
+	// It lies where the graph has walls only (2+ cells to its nearest walkable
+	// one): ground the AI's grid knows nothing of -- LV6-5's ledge (830.3 69.6
+	// -254.1) over the floor of the same node, 5.5 lower, read as "yes, 12 units"
+	// from below and nobody could get up (xxl_coop.lv6-5_death_stuck.log). No way
+	// known then, unless the other hero is beside it already -- or on its height
+	// (2 units: a ledge apart; level 2's start has wall cells round the floor the
+	// heroes stand on, spsecond2: Obelix 1.2 lower was brought for nothing).
+	bool offGround = false;
+	if (r == PF_YES) {
+		Vector3 d = o.Pos() - h.Pos();
+		bool beside = (d.x * d.x + d.z * d.z < 4.0f * 4.0f && fabsf(d.y) < kReviveHeight) || fabsf(d.y) <= 2.0f;
+		int ring = beside ? 0 : PfSeedRing(h.Pos());
+		if (ring >= 2) { r = PF_NO; offGround = true; }
+	}
+	int told = byLifter ? kReachOnlyLifter : offGround ? kReachOffGround : r;
 	if (told != g.reachTold[down]) {
 		static int s_told;
 		if (s_told++ < 40)
 			Log("indiv: can %s walk to fallen %s (%s when it fell)? %s", HeroName(up), HeroName(down),
 			    g.fellLeading[down] ? "leading" : "not leading",
-			    r == PF_YES ? "yes" : byLifter ? "no -- only over a lifter, shut while it is down" : r == PF_NO ? "no" : "not known");
+			    r == PF_YES ? "yes" : byLifter ? "no -- only over a lifter, shut while it is down"
+			    : offGround ? "no -- it lies off the graph's walkable cells (ground the AI's grid has as walls)"
+			    : r == PF_NO ? "no" : "not known");
 		g.reachTold[down] = told;
 	}
 	if (r != PF_NO) {
@@ -1027,7 +1051,8 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 		}
 		return;
 	}
-	bool cutItself = !byLifter && g.hadWay[down];
+	bool cutItself = !byLifter && !offGround && g.hadWay[down];
+	g.offGround[down] = offGround;
 	if (BossRolling(now)) {
 		// The boss is between them, or shoving the body on before it: no bringing
 		// the hero there (bossdown36: it was put in the boss's way and died too).
@@ -1079,6 +1104,8 @@ void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 	// It led when it fell: the lead went to the other hero meanwhile, and comes
 	// back to it (next frame -- a launcher's revive is inside a hero's tick).
 	if (g.fellLeading[idx] && !g.levelLead[idx]) g.leadBack = idx;
+	g.offGround[idx] = false;
+	if (g.solo) { g.parkRevived = idx; g.parkRevivedAt = GetTickCount(); }
 	g.fellLeading[idx] = false;
 	g.levelLead[idx] = false;
 	g.limitSet[idx] = false;
@@ -1111,6 +1138,7 @@ void TimeOut(int down, Hero h, int up, const char* why = "was not revived in tim
 	    HeroName(down), HeroName(up));
 	g.gameOver = true;
 	g.spared = up;
+	CoopDropSoloPark("game over");
 	g.limitSet[down] = false;
 	g.drain[down] = g.drain[up] = false;
 	Use(down);   // the game manager sees its 0
@@ -1129,7 +1157,7 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	char* gm = GM();
 	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
 	bool counting = !paused && !CoopSuspended() && CoopShopper() < 0 && g.reachTold[down] != PF_NO &&
-	                g.reachTold[down] != kReachOnlyLifter;
+	                g.reachTold[down] != kReachOnlyLifter && g.reachTold[down] != kReachOffGround;
 	if (counting) g.limitLeft[down] -= dt;
 	if (counting && !holding && g.limitLeft[down] <= 0.0f) {
 		TimeOut(down, h, up);
@@ -1699,6 +1727,19 @@ void IndivFrame() {
 			CoopGiveLead(back, "revived, it led when it fell");
 			lead = t.Leader();
 			Use(StandingOr(lead));
+		}
+	}
+	// Single player: the companion's wait the fall undid, back once the revived
+	// hero leads (coop.cpp CoopRestoreSoloPark) -- after its send-back.
+	if (g.parkRevived >= 0 && !CoopSuspended() && g.sendBack < 0 && g.leadBack < 0) {
+		int back = g.parkRevived;
+		if (g.fallen[back]) g.parkRevived = -1;
+		else if (lead == back) {
+			g.parkRevived = -1;
+			if (CoopRestoreSoloPark(back)) g.brought[Other(back)] = false;
+		} else if (now - g.parkRevivedAt > 2000) {
+			g.parkRevived = -1;
+			CoopDropSoloPark("the revived hero does not lead");
 		}
 	}
 

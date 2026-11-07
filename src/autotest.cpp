@@ -3107,6 +3107,23 @@ const Step kReach23[] = {
 	END(14500),
 };
 
+// sphearth23 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:12000
+// XXL_REVIVEHOLD=2): reach23 in single player's second chance -- Asterix lights
+// the hearth, the door shuts behind him and the level walks Obelix to his marker
+// (user); Asterix goes down inside, you play Obelix: brought in, holds B; revived,
+// Asterix leads again and Obelix goes back to his marker, waiting there.
+const Step kSpHearth23[] = {
+	MARK(0, "sphearth23"), LOADSECTOR(200, 3),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -56.731f, 1.0f, -534.386f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	SHOT(9000, "lit"), SHOT(11500, "obelix_parked"),
+	SHOT(13000, "down"), SHOT(16500, "brought"),
+	P1(17000, PAD_B, 0, 0, "p1 holds B"), P1(20000, 0, 0, 0, "p1 release"),
+	SHOT(21000, "revived"), SHOT(25000, "after"), REACH(25200),
+	END(26000),
+};
+
 // reach26w (-Level 2, XXL_DOWNAT=0:5000): the user's LV2-6 run -- Obelix the
 // waiting AI companion (trio 4802) from before the pit (no safe spot of his
 // since the level's start), Asterix falls on the far side: the lock's undo must
@@ -8606,6 +8623,36 @@ const Step kSpAct65O[] = {
 	SHOT(29000, "punched"), SHOT(32000, "after"),
 	END(33000),
 };
+// ledge65 (-Level 6): the user's xxl_coop.lv6-5_death_stuck.log -- Asterix on the
+// ledge (830.27 69.55 -254.14) where he went down, Obelix parked below on his
+// marker (844.02 64.07 -265.74): the graph said Obelix walks there (11.8 units);
+// he couldn't. The graph round them, both ways' answers.
+const Step kLedge65[] = {
+	SPACT65_START(),
+	PLACEAT(19500, HERO_ASTERIX, 830.27f, 70.0f, -254.14f), PLACEAT(19500, HERO_OBELIX, 844.02f, 64.5f, -265.74f),
+	REACH(21000),
+	{ 21000, S_SIDEREACH, HERO_OBELIX, 0, 0, 830.27f, 69.55f, "obelix to the ledge", -254.14f },
+	PFDUMP(21500, HERO_OBELIX, 22.0f),
+	SHOT(22000, "ledge"),
+	END(23000),
+};
+// ledgerev65 (-Level 6, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:24000
+// XXL_REVIVEHOLD=2): ledge65 in single player's second chance -- Obelix waits
+// below on his spot (trio 4802, order 3, as the level parked him), Asterix goes
+// down on the ledge; you play Obelix on. He can't get up there: brought beside
+// Asterix, holds B; revived, Asterix leads again and Obelix is back on his spot,
+// waiting (user: as in co-op).
+const Step kLedgeRev65[] = {
+	SPACT65_START(),
+	PLACEAT(19500, HERO_ASTERIX, 830.27f, 70.0f, -254.14f), PLACEAT(19500, HERO_OBELIX, 844.02f, 64.5f, -265.74f),
+	{ 20500, S_TRIOEV, 0x4802, 0, 0, 0, 0, "obelix waits" },
+	SHOT(23000, "parked"),
+	SHOT(27000, "down"), SHOT(29500, "brought"),
+	P1(30000, PAD_B, 0, 0, "p1 holds B"), SHOT(31000, "reviving"), P1(33000, 0, 0, 0, "p1 release"),
+	SHOT(34500, "revived"), REACH(35000),
+	SHOT(38000, "after"),
+	END(40000),
+};
 #undef SPACT65_START
 #undef SPACT65_PUNCHES
 // splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
@@ -9047,6 +9094,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("bossway36", kBossWay36),
 	SCENARIO("bossdown36", kBossDown36),
 	SCENARIO("bossbehind36", kBossBehind36),
+	SCENARIO("ledge65", kLedge65),
+	SCENARIO("ledgerev65", kLedgeRev65),
+	SCENARIO("sphearth23", kSpHearth23),
 	SCENARIO("spdownhud2", kSpDownHud2),
 	SCENARIO("spsq24", kSpSq24),
 	SCENARIO("spsq24n", kSpSq24N),
