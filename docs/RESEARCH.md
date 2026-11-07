@@ -4453,3 +4453,6 @@ both halves).
   on the target (+0.5 y). Autotest comarker23 (-Level 2, XXL_NOLOCK=0; Obelix at -46.5 0.8 -539.5 in the room):
   XXL_MARKERTP=0 -- order 1 at -46.5 -539.5 for good; =1 -- "no way to its marker (-54.6 0.3 -523.1) -- put on
   it" 2 s after the 4826, order 3 there.
+  Follow-up (commit 8cf602b, user): walk_to_marker_teleport defaults on; in co-op it runs only with nolock off
+  (WatchMarkerWalk: g.p2Joined ? noLock : !SoloMod() -> nothing). comarker23 with the defaults: XXL_NOLOCK=0 put
+  on the marker 2 s after 4826; XXL_NOLOCK=1 "Obelix stays its player's (event 4826 ... not followed)", no teleport.
