@@ -4433,3 +4433,14 @@ both halves).
   Obelix outside at the user's -56.731 0.75 -534.386 walking to his marker with 4826; brought in, B, sent back,
   4826 again -> walks to -54.6 0.5 -523.3, order 3), spsecond2 unchanged. Autotest note: an AI Obelix put by
   PLACEAT can hang in the air (as LV5-5's y 7.0; the user's spot is fine) -- cause still unknown.
+- Round 235 (Nov 7, commit 56ae603; user: round 234 confirmed on the pad; "restore the park in co-op too ...
+  not nolock-dependent": a revive loses a marker park the level can't set off again; light pillars can be stood
+  on again). coop.cpp NoteSoloOrder / NoteSoloPark / CoopRestorePark (was CoopRestoreSoloPark) / CoopDropPark:
+  no p2Joined gate; in co-op the order is kept only if player 2's hero was held for it (g.held -- Hold() hands a
+  player's hero to the game on a scripted order, or nolock leaves it the player's: then never held, nothing
+  kept). The replayed event goes through the same trio path, so Hold() re-holds it ("handed to the game (event
+  4826 / 4802)"). individual.cpp: parkRevived set in co-op too. Autotests cohearth23 (-Level 2, XXL_NOLOCK=0
+  XXL_DOWNAT=0:12000 XXL_REVIVEHOLD=2: Obelix at his marker -54.6 0.6 -523.1, order 3, kept; brought in, P2 B,
+  back on the marker, 4826 -> held, order 3; with XXL_NOLOCK=1 nothing kept, sent back, stays player 2's),
+  coledgerev65 (-Level 6, XXL_NOLOCK=0 XXL_DOWNAT=0:24000: 4802 kept, brought up the ledge, back, held waiting).
+  sphearth23 unchanged.
