@@ -4360,3 +4360,7 @@ both halves).
   ledge points 6.1 / 9.9 / 13.9 / 8.2 -> start cell 6.93 67.77 (node box top 16.4), no way to Obelix 17.4 1.7
   77.7; Asterix as the sidekick put on the ledge walks to 6.96 67.62 and drops to 7.93 2.74 66.77. spunited23
   unchanged.
+  End to end: spunited55 reworked as the user did it -- Asterix put at 17.4 1.7 77.7, player 2 joins, R3 + A
+  brings Obelix, player 2 leaves (Obelix on the ground; put by PLACEAT or single player's R3 + A on level 5 he
+  hangs at y 7.0, body 0B): switch there and back goes through; Asterix at 6.1 10.7 63.1 and 13.9 10.5 63.4 on
+  the ledge -> "from its AI start cell 6.9 16.4 67.8 ... no", refused both times (the second was round 230's let-through).
