@@ -4407,3 +4407,29 @@ both halves).
   after the boss reaches it), bossbehind36 (XXL_DOWNAT=1:23000, Obelix put at -255 -172 behind it: "23 units
   back", game over), spboss36 (Obelix killed by the boss at -248, dragged -> game over). Diagnostic bossway36
   + step S_BOSSDUMP (each (2,177): flags, +0x5B4, +0x600 way, place; a=1 samples the way). LV2-10 not run.
+- Round 234 (Nov 7, commit 15ed42c; user: LV6-5, xxl_coop.lv6-5_death_stuck.log, second chance, sp_hero_switch_lock).
+  Obelix pulled the block Asterix rode (Asterix order 9, Obelix sit 03) to 844.0 64.1 -265.7; "its group parks a
+  hero": Asterix yours on the ledge, Obelix order 3. Asterix down at 830.3 69.6 -254.1: "can Obelix walk? yes,
+  11.8 units" -- no bring; Obelix's jump reached y 67.4, never up. Graph (ledge65, PFDUMP): node 8 (753.0 62.1
+  -270.6)..(847.0 84.0 -250.6), one flat grid for the floor (64.1) and the ledge (69.6); the ledge's rows z -251.6
+  .. -257.6 are all wall cells, Seeds takes the ring-3 walkable cells on the floor below. Fix: pathfind.cpp
+  PfSeedRing (how many cells out a place's seed cells are); WayToFallen: PF_YES -> no way (reachTold
+  kReachOffGround, revive time not counted) when the fallen hero's ring >= 2 and it is > 2 units above/below the
+  other hero (spsecond2: level 2's start has wall rings round the floor -- Obelix 1.2 lower was brought for
+  nothing before the height rule) and not already beside it; CatchUpSpot then SpotBesideFallen (the fallen
+  hero's own safe spots, else on it). The grab's revive sends the brought hero back (as in co-op).
+  (2) user: single player should restore what the down interrupted -- the companion back on its marker, the
+  lead back. The lead back and the send-back already worked; the companion's order did not: a level wait
+  (4802) noted as a lock is undone at the down (4803, order 0), and LV2-3's hearth walk (4826, order 1) was
+  lost at the takeover (order 0 after the revive). coop.cpp: NoteSoloOrder (CoopNoteTrioEvent) keeps the last
+  marker walk 0x4813..0x4876 or 4802 sent while a leader leads (4803 clears); NoteSoloPark at CoopUndoLockFor's
+  start (every second-chance down): companion order 1 or 3 and that order its -> kept (place, event, a lock's
+  "after" picture and its "before" one; not a cable car's or a light pillar group's); individual.cpp after the
+  lead back (Revive sets parkRevived; 2 s without the lead -> dropped; a game over drops it): CoopRestoreSoloPark
+  -- the after picture, the companion put back (if within 40 units), the event sent again, the lock's before
+  picture kept for a later undo. Autotests ledgerev65 (-Level 6, XXL_SPISOLATION=0 XXL_SPSECOND=1
+  XXL_DOWNAT=0:24000 XXL_REVIVEHOLD=2; Obelix parked by S_TRIOEV 4802: before "yes", stuck; after brought, B,
+  back at 844.0 64.1 -265.7 with 4802, order 3, Asterix leads), sphearth23 (-Level 2, XXL_DOWNAT=0:12000:
+  Obelix outside at the user's -56.731 0.75 -534.386 walking to his marker with 4826; brought in, B, sent back,
+  4826 again -> walks to -54.6 0.5 -523.3, order 3), spsecond2 unchanged. Autotest note: an AI Obelix put by
+  PLACEAT can hang in the air (as LV5-5's y 7.0; the user's spot is fine) -- cause still unknown.
