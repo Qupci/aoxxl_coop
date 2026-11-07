@@ -353,6 +353,33 @@ bool SoloTick(int* life, void* dt, char* hook, Trio t) {
 		}
 		return true;
 	}
+	// Asterix's torch used up (trio 0x4811: his +0x3EC |= 0x400000 -- LV5-10's keg
+	// at 587.7 -441.6 -176.9): only his player situation throws it (0x49B420 at
+	// its anim frame 0x28: 0x5127 to the torch, +0x464 = 0, the bit cleared), or
+	// his life's vf13 (0x4AA850, 0x513C) once he leads again. The game's sidekick
+	// Asterix never has one to throw; with Obelix led by hand he kept it until
+	// switched to: thrown as his player situation does.
+	if (vt == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 1 && t.Leader() == HERO_OBELIX) {
+		Hero a = t.GetHero(HERO_ASTERIX);
+		if (a && *(char**)(a.raw() + 0x464) == hook && (*(uint32_t*)(a.raw() + 0x3EC) & 0x400000)) {
+			typedef int(__fastcall* SendFn)(void*, void*, int, void*);
+			uint8_t* tr = (uint8_t*)t.raw();
+			uint8_t leader = tr[0x2C], companion = tr[0x2D];
+			tr[0x2C] = HERO_ASTERIX;
+			tr[0x2D] = HERO_OBELIX;
+			((SendFn)(*(void***)hook)[5])(hook, nullptr, 0x5127, nullptr);
+			*(char**)(a.raw() + 0x464) = nullptr;
+			*(uint32_t*)(a.raw() + 0x3EC) &= ~0x400000u;
+			// (Ticked as Asterix's this frame too: it flies off as his throw does --
+			// otherwise its flight saw itself unseen and ended at once.)
+			tick(life, nullptr, dt);
+			if (tr[0x2C] == HERO_ASTERIX) { tr[0x2C] = leader; tr[0x2D] = companion; }
+			static int s_told = 0;
+			if (s_told++ < 20)
+				Log("proximity: torch %p used up (trio 0x4811) with Obelix leading -- thrown away by the sidekick Asterix", hook);
+			return true;
+		}
+	}
 	// A carried, lit torch (CKHkTorch 2,32: +0x3E state 1, bits 2-4) burns down
 	// only while Asterix leads (trio vf40; its HUD and flame go with the timer).
 	// The game's sidekick Asterix with Obelix leading is the level's, parked --

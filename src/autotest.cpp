@@ -7704,6 +7704,50 @@ const Step kSpTorch2[] = {
 	SHOT(16000, "asterix_leads"),
 	END(18000),
 };
+// sptorchthrow2 / sptorchthrowo2 (level 2, XXL_SPISOLATION=0 XXL_SPSWITCH=1
+// XXL_LIFTLOG=1): Asterix carries a lit torch; trio 0x4811 ("his torch used up",
+// as LV5-10's keg) with Asterix leading / with Obelix leading -- thrown away
+// either way. Writers of Asterix's +0x464 (the torch held) watched; the torch
+// HUD's state logged (S_TORCH 10, 14). Open: with Obelix leading the burning
+// torch picture at the bottom right stays until Asterix leads again (not the 4
+// flame icons, CKGrpMeca's action box, Asterix's own nodes, nor the torch's
+// events -- all as with Asterix leading).
+#define SPTORCHTHROW_SETUP \
+	{ 800, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 1000, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" }, \
+	{ 1300, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" }, \
+	{ 2500, S_TORCH, 4, 0, 0, 0, 0, "watch asterix+464" }
+#define SPTORCHTHROW_ICONS \
+	{ 3900, S_TORCH, getenv("XXL_WATCHICONS") ? 12 : 10, 0, 0, 0, 0, "icons before" }, \
+	{ 3950, S_TORCH, 14, 0, 0, 0, 0, "meca branches before" }, \
+	{ 4000, S_TRIOEV, 0x4811, 0, 0, 0, 0, "asterix's torch used up" }, \
+	{ 4400, S_TORCH, 10, 0, 0, 0, 0, "icons +0.4 s" }, { 4450, S_TORCH, 14, 0, 0, 0, 0, "meca branches" }, \
+	{ 5000, S_TORCH, 10, 0, 0, 0, 0, "icons +1 s" }
+const Step kSpTorchThrow2[] = {
+	MARK(0, "sptorchthrow2"), SPTORCHTHROW_SETUP, SPTORCHTHROW_ICONS,
+	SHOT(5500, "thrown"),
+	END(7000),
+};
+const Step kSpTorchThrowO2[] = {
+	MARK(0, "sptorchthrowo2"), SPTORCHTHROW_SETUP,
+	{ 3000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	SPTORCHTHROW_ICONS,
+	SHOT(5500, "thrown_obelix_leads"), SHOT(6000, "thrown_obelix_leads_b"),
+	{ 7000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	SHOT(8000, "asterix_leads"),
+	END(9000),
+};
+// sptorchout2: the same torch burnt out (4 x 5 s) while Obelix leads.
+const Step kSpTorchOut2[] = {
+	MARK(0, "sptorchout2"), SPTORCHTHROW_SETUP,
+	{ 3000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	SHOT(5000, "obelix_leads"), SHOT(5500, "obelix_leads_b"),
+	SHOT(26000, "burnt_out"),
+	{ 28000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	SHOT(29000, "asterix_leads"),
+	END(30000),
+};
+#undef SPTORCHTHROW_SETUP
+#undef SPTORCHTHROW_ICONS
 // spcork21 (level 2, XXL_SPSWITCH=1): LV2-1's spinning platform (its circle makes
 // Asterix wait): Obelix leading walks onto it -- nothing; the switch to Asterix,
 // who walks onto it: he waits there, Obelix leads; the switch then refused.
@@ -9210,6 +9254,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
 	SCENARIO("sptorch2", kSpTorch2),
+	SCENARIO("sptorchthrow2", kSpTorchThrow2),
+	SCENARIO("sptorchthrowo2", kSpTorchThrowO2),
+	SCENARIO("sptorchout2", kSpTorchOut2),
 	SCENARIO("spview2", kSpView2),
 	SCENARIO("spunited23", kSpUnited23),
 	SCENARIO("spunited55", kSpUnited55),
@@ -11284,6 +11331,101 @@ void RunStep(const Step& s) {
 			break;
 		}
 		char* c = at.watchTorch;
+		if (s.a == 10) {   // the HUD's 4 torch icons: +0x10 (0x80 shown), +0x0C (container), +0x48+4
+			CKYellowPages* yp = YellowPages();
+			char* itf = yp ? *(char**)(*(char**)((char*)yp + 0x8C) + 0x18) : nullptr;
+			char** icons = itf ? (char**)(*(char**)(itf + 0x24) + 0x1C) : nullptr;
+			if (!icons) break;
+			char line[256] = "";
+			for (int i = 0; i < 4; i++)
+				sprintf_s(line + strlen(line), sizeof(line) - strlen(line), " | %d: +10 %04X +0C %p +48+4 %08X", i + 1,
+				          *(uint16_t*)(icons[i] + 0x10), *(void**)(icons[i] + 0xC), *(uint32_t*)(*(char**)(icons[i] + 0x48) + 4));
+			Log("autotest: torch icons%s; leader %d; Asterix +3EC %08X +3F0 %08X +464 %p", line, t.Leader(),
+			    *(uint32_t*)(a.raw() + 0x3EC), *(uint32_t*)(a.raw() + 0x3F0), *(void**)(a.raw() + 0x464));
+			// Asterix's own nodes that his life's vf13 hides (FUN_004A3EF0): +0x10, +0x48+4
+			static const int kNodes[] = { 0x36C, 0xC28, 0xC2C, 0xC30, 0xC34, 0xC38, 0xC3C, 0xC40, 0xC44, 0xC48 };
+			char nodes[512] = "";
+			for (int o : kNodes) {
+				char* n = *(char**)(a.raw() + o);
+				if (!n) continue;
+				sprintf_s(nodes + strlen(nodes), sizeof(nodes) - strlen(nodes), " %03X:%04X/%X", o, *(uint16_t*)(n + 0x10),
+				          *(char**)(n + 0x48) ? *(uint32_t*)(*(char**)(n + 0x48) + 4) & 0xF : 0xF);
+			}
+			Log("autotest: Asterix's nodes (+10 / +48+4 low bits):%s", nodes);
+			// every node pointer of the HUD part: its +0x10 flags (bit 0x80 shown)
+			char* part = *(char**)(itf + 0x24);
+			char all[1024] = "";
+			for (int o = 0; o < 0x100; o += 4) {
+				char* p = *(char**)(part + o);
+				if ((uintptr_t)p < 0x01000000 || (uintptr_t)p >= 0x60000000 || IsBadReadPtr(p, 0x14)) continue;
+				sprintf_s(all + strlen(all), sizeof(all) - strlen(all), " %02X:%04X", o, *(uint16_t*)(p + 0x10));
+			}
+			Log("autotest: torch HUD part %p (vt %08X):%s", part, *(uint32_t*)part, all);
+			if (c) {
+				char* box = *(char**)(c + 0x34);
+				Log("autotest: torch %p +3E %02X +34 %p (vt %08X, +4 %08X +8 %08X +C %08X +10 %08X)", c, *(uint8_t*)(c + 0x3E), box,
+				    box ? *(uint32_t*)box : 0, box ? *(uint32_t*)(box + 4) : 0, box ? *(uint32_t*)(box + 8) : 0,
+				    box ? *(uint32_t*)(box + 0xC) : 0, box ? *(uint32_t*)(box + 0x10) : 0);
+			}
+			break;
+		}
+		if (s.a == 14) {   // CKGrpMeca's +0x9C / +0xA0 branches vs the torch's +0x34
+			CKYellowPages* yp = YellowPages();
+			char* meca = yp ? *(char**)(*(char**)((char*)yp + 0x8C) + 0x18) : nullptr;
+			if (!meca) break;
+			char* b9c = *(char**)(meca + 0x9C);
+			char* ba0 = *(char**)(meca + 0xA0);
+			char* first = c ? *(char**)(*(char**)(c + 0x34) + 0xC) : nullptr;
+			Log("autotest: meca %p +90 %p +9C %p (+C %p) +A0 %p (+C %p); torch +34 %p (+C %p, its +C %p vt %08X)", meca,
+			    *(void**)(meca + 0x90), b9c, b9c ? *(void**)(b9c + 0xC) : nullptr, ba0, ba0 ? *(void**)(ba0 + 0xC) : nullptr,
+			    c ? *(void**)(c + 0x34) : nullptr, first, first ? *(void**)(first + 0xC) : nullptr, first ? *(uint32_t*)first : 0);
+			// the torch's events (+0x38 taken, +0x3A thrown, +0x3C burnt out) and their groups' targets
+			char* es = yp ? *(char**)((char*)yp + 0x6C) : nullptr;
+			for (int k = 0; c && es && k < 3; k++) {
+				unsigned e = *(uint16_t*)(c + 0x38 + 2 * k), g = e >> 3;
+				unsigned n = (unsigned)*(uint16_t*)(es + 0x1C) + *(uint16_t*)(es + 0x1E) + *(uint16_t*)(es + 0x20);
+				if (g >= n) { Log("autotest: torch event +%02X = %04X (none)", 0x38 + 2 * k, e); continue; }
+				uint8_t* tab = *(uint8_t**)(es + 0xC);
+				char** objs = *(char***)(es + 0x10);
+				uint16_t* msgs = *(uint16_t**)(es + 0x14);
+				unsigned f = 0;
+				for (unsigned q = 0; q < g; q++) f += tab[q * 3];
+				char line[512] = "";
+				for (unsigned q = 0; q < tab[g * 3] && strlen(line) < 440; q++)
+					sprintf_s(line + strlen(line), sizeof(line) - strlen(line), " %p(vt %06X):%04X", objs[f + q],
+					          objs[f + q] ? (unsigned)*(uintptr_t*)objs[f + q] : 0, msgs[f + q]);
+				Log("autotest: torch event +%02X = %04X, group %03X:%s", 0x38 + 2 * k, e, g, line);
+			}
+			break;
+		}
+		if (s.a == 12) {   // who writes the torch's HUD branch (+0x34, CSGBranch): +4, +8, +C, +10
+			char* box = c ? *(char**)(c + 0x34) : nullptr;
+			if (!box) break;
+			const void* w[4] = { box + 4, box + 8, box + 0xC, box + 0x10 };
+			WatchBytes(w, 4, 0, 0);
+			Log("autotest: watching the torch's HUD branch %p", box);
+			break;
+		}
+		if (s.a == 9) {   // who reads or writes the fire-4 torch icon's +0x10
+			CKYellowPages* yp = YellowPages();
+			char* itf = yp ? *(char**)(*(char**)((char*)yp + 0x8C) + 0x18) : nullptr;
+			char** icons = itf ? (char**)(*(char**)(itf + 0x24) + 0x1C) : nullptr;
+			if (!icons) break;
+			WatchBytesRW(icons[3] + 0x10);
+			Log("autotest: watching reads/writes of torch icon 4 %p +10 (%04X), +0C %p, +48+4 %08X", icons[3],
+			    *(uint16_t*)(icons[3] + 0x10), *(void**)(icons[3] + 0xC), *(uint32_t*)(*(char**)(icons[3] + 0x48) + 4));
+			break;
+		}
+		if (s.a == 8) {   // who writes the HUD's 4 torch icons' +0x10 (bit 0x80: shown)
+			CKYellowPages* yp = YellowPages();
+			char* itf = yp ? *(char**)(*(char**)((char*)yp + 0x8C) + 0x18) : nullptr;
+			char** icons = itf ? (char**)(*(char**)(itf + 0x24) + 0x1C) : nullptr;
+			if (!icons) break;
+			const void* w[4] = { icons[0] + 0x10, icons[1] + 0x10, icons[2] + 0x10, icons[3] + 0x10 };
+			WatchBytes(w, 4, 0, 0);
+			Log("autotest: watching the torch icons' +10: %p %p %p %p", w[0], w[1], w[2], w[3]);
+			break;
+		}
 		if (s.a == 4) {   // who writes the trio's offer (+0x4C) and Asterix's +0x464
 			const void* w[2] = { (char*)t.raw() + 0x4C, a.raw() + 0x464 };
 			WatchBytes(w, 2, 0, 0);
