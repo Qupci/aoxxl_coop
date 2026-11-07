@@ -4333,3 +4333,17 @@ both halves).
   fallen hero's view still comes back once away. Autotest spviewnear2 (XXL_SPSWITCH=1): Obelix told to wait,
   Asterix off 3 s, refusal -- view; glide by Obelix -- hidden at 9.8, 5 s ended; glide 13 units out inside the old
   window -- no view; refusal -- view again.
+- Round 230 (Nov 7, commit e88e976; user: after a manual hero switch the new sidekick could be stuck for good --
+  LV2-3 Obelix leading indoors (-46.5 0.1 -538.1), Asterix outside (-57.1 0.7 -534.3) past the doorway's cyan
+  cells; LV5-5 Asterix leading on the progression ledge (8.2 10.9 61.9, in no node), Obelix behind (20.5 1.5
+  77.0) -- Asterix went to the nearest cell, behind a door). The mod's graph (round 83) lets a hero on foot
+  through cyan cells by an open door and over the enemies' walk-overs: right for a player, wrong for the AI (the
+  game's cell table: 0 = Romans only; after the LV2-3 switch Obelix never moved). pathfind.cpp PfSidekickReaches
+  (Graph.sidekick): value-0 cells always shut, walk-overs only with bit 0 (sidekick) and bit 31 (on), a place in
+  no node seeded with the nearest walkable cell (x/z + distance above/below the node box). coop.cpp
+  SoloSwitchRefusal(t, press): last check, on the press only (not SoloSwitchLockWatch's per-frame "both free"):
+  PfSidekickReaches(leader, other) == PF_NO -> "the leader couldn't walk to the other hero"; no graph -> goes
+  through. One query, both heroes already required on their feet (no 3 x 0.5 s like WayToFallen / ApartFrame):
+  0.15-0.5 ms. Autotests: spunited23 (refused at the user's spot; both indoors goes through), spunited55
+  (-Level 5: REACH ledge -> Obelix's area no, together yes; Obelix placed by an autotest on level 5 -- PLACEAT or
+  R3 + A -- hangs at y 7.0, body 0B, "off its feet", so the press stops there), spview2 regression.
