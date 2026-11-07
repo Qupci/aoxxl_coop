@@ -728,10 +728,17 @@ SpawnPointFn g_origSpawnPoint = nullptr;
 bool g_squadForNonLeader = false;   // inside EnemyTickHook's non-leader pass
 volatile long g_spawnsMoved = 0, g_spawnsHidden = 0;
 
+// Romans come in out of every player's view in co-op, and in single player
+// with sp_isolation off (the game's own picks a spawn marker in front of its
+// camera facing it -- LV5-3's marker 2 brought them in on top of Obelix).
+bool SpawnRuleOn() {
+	return (CoopP2Joined() || g_config.SoloMod()) && !CoopSuspended();
+}
+
 char __fastcall SpawnPointHook(char* squad, void* edx, float* out) {
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
-	if (!CoopP2Joined() || CoopSuspended() || !svc) return g_origSpawnPoint(squad, edx, out);
+	if (!SpawnRuleOn() || !svc) return g_origSpawnPoint(squad, edx, out);
 	float saved[9];
 	float m[16];
 	bool swapped = false;
@@ -849,7 +856,7 @@ typedef uint32_t(__fastcall* WallSweepFn)(void* coll, void* edx, float* seg, flo
                                           int gather);
 const uintptr_t kWallSweep = 0x449C90;
 
-bool WallBetween(const float* a, const float* b) {
+bool WallBetween(const float* a, const float* b, float* hit = nullptr) {
 	CKYellowPages* yp = YellowPages();
 	void* coll = yp ? *(void**)((char*)yp + 0x50) : nullptr;
 	if (!coll) return false;
@@ -863,9 +870,56 @@ bool WallBetween(const float* a, const float* b) {
 			seg[3 + k] = d[k] / pieces;
 		}
 		res[9] = 2.0f;
-		if ((((WallSweepFn)kWallSweep)(coll, nullptr, seg, 0.0f, res, 0, 1) & 0xFF) && res[9] <= 1.0f) return true;
+		if ((((WallSweepFn)kWallSweep)(coll, nullptr, seg, 0.0f, res, 0, 1) & 0xFF) && res[9] <= 1.0f) {
+			if (hit) {   // where, how far the line passes above the wall's foot, and whether it has a top
+				for (int k = 0; k < 3; k++) hit[k] = seg[k] + seg[3 + k] * res[9];
+				hit[3] = res[12];
+				hit[4] = (*(uint8_t*)(res + 13) & 1) ? 1.0f : 0.0f;
+			}
+			return true;
+		}
 	}
 	return false;
+}
+
+// Do the level's walls tell what a camera at eye sees? The sweep's walls without
+// a top reach up for ever, and a camera often hangs outside the walls round the
+// ground it looks at (LV5-3's fight: over the lava, past the arena's edge) --
+// then every spot on that ground was "behind a wall", marker 2 (-242.6 9.8 315.0)
+// by Obelix too, and Romans came in there in plain view. A camera that has a
+// wall even between itself and the hero nearest to it (the one it follows) is
+// one of those: walls hide nothing from it. Kept per eye.
+volatile long g_eyesOutside = 0;
+bool WallsHideFrom(const float* eye) {
+	struct Eye { float eye[3]; bool trusted; };
+	static Eye s_eyes[4] = {};
+	static int s_next = 0;
+	for (const Eye& e : s_eyes)
+		if (!memcmp(e.eye, eye, 12)) return e.trusted;
+	Trio t = GetTrio();
+	Vector3 ev(eye[0], eye[1], eye[2]);
+	Hero best;
+	float bestD = 1e30f;
+	for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++) {
+		Hero h = t.GetHero(i);
+		if (!h) continue;
+		float d = (h.Pos() - ev).len2();
+		if (d < bestD) { bestD = d; best = h; }
+	}
+	bool trusted = true;
+	if (best) {
+		Vector3 hp = best.Pos();
+		float head[3] = { hp.x, hp.y + 1.5f, hp.z };
+		trusted = !WallBetween(eye, head);
+		if (!trusted && InterlockedIncrement(&g_eyesOutside) % 600 == 1)
+			Log("proximity: a camera at (%.1f %.1f %.1f) has a wall between itself and %s -- outside the walls, they hide "
+			    "no spawn marker from it", eye[0], eye[1], eye[2], HeroName(best.raw() == t.GetHero(HERO_ASTERIX).raw()
+			                                                               ? HERO_ASTERIX : HERO_OBELIX));
+	}
+	Eye& e = s_eyes[s_next++ & 3];
+	memcpy(e.eye, eye, 12);
+	e.trusted = trusted;
+	return trusted;
 }
 
 // Can a camera at eye see a Roman standing on the marker at p (its feet or its
@@ -881,7 +935,7 @@ bool SeesMarker(const float* eye, const float* p) {
 	Seen& s = s_seen[s_next++ & 15];
 	memcpy(s.p, p, 12);
 	memcpy(s.eye, eye, 12);
-	s.seen = !WallBetween(eye, head) || !WallBetween(eye, feet);
+	s.seen = !WallsHideFrom(eye) || !WallBetween(eye, head) || !WallBetween(eye, feet);
 	return s.seen;
 }
 
@@ -899,12 +953,49 @@ bool SpawnMarkerSeen(const float* p) {
 	return false;
 }
 
+// Every Roman a squad brings in goes through FUN_0052EC30 (thiscall(squad,
+// Roman, position, facing, flag), ret 0x10), from vf33 (the squad's starting
+// Romans), vf37 (reinforcements), vf38 (spawn markers) or vf55 (the no-lock
+// Romans). Diagnostic: one placed where a player can see it is logged (bounded),
+// with the path that placed it.
+typedef void(__fastcall* PlaceRomanFn)(char* squad, void* edx, char* roman, const float* pos, const float* dir, int flag);
+const uintptr_t kPlaceRoman = 0x52EC30;
+const uint8_t   kPlaceRomanPrologue[6] = { 0x64, 0xA1, 0x00, 0x00, 0x00, 0x00 };
+PlaceRomanFn g_origPlaceRoman = nullptr;
+volatile long g_placedInView = 0;
+
+const char* PlacePath(uintptr_t ret) {
+	if (ret >= 0x52EF70 && ret < 0x52F59D) return "the squad's start (vf33)";
+	if (ret >= 0x52F930 && ret < 0x52FB72) return "reinforcement (vf37)";
+	if (ret >= 0x52FB80 && ret < 0x53005A) return "spawn marker (vf38)";
+	if (ret >= 0x52DA90 && ret < 0x52DD04) return "no-lock (vf55)";
+	return "?";
+}
+
+void __fastcall PlaceRomanHook(char* squad, void* edx, char* roman, const float* pos, const float* dir, int flag) {
+	uintptr_t ret = (uintptr_t)_ReturnAddress();
+	if (pos && g_placedInView < 60) {
+		const float* eyes[4];
+		int n = KlusterViewsSeeing(pos, 1.0f, 60.0f, eyes), seen = 0;
+		for (int i = 0; i < n && !seen; i++) seen = SeesMarker(eyes[i], pos);
+		if (seen && InterlockedIncrement(&g_placedInView) <= 60) {
+			Trio t = GetTrio();
+			Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+			Vector3 p(pos[0], pos[1], pos[2]);
+			Log("proximity: squad %p brought a Roman in at (%.1f %.1f %.1f) in a player's view -- %s, %s; Asterix %.1f "
+			    "off, Obelix %.1f", squad, pos[0], pos[1], pos[2], PlacePath(ret), CoopP2Joined() ? "co-op" : "single player",
+			    a ? sqrtf((a.Pos() - p).len2()) : -1.0f, o ? sqrtf((o.Pos() - p).len2()) : -1.0f);
+		}
+	}
+	g_origPlaceRoman(squad, edx, roman, pos, dir, flag);
+}
+
 void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned group) {
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
 	unsigned n = *(unsigned*)(squad + 0x64);
 	char* list = *(char**)(squad + 0x5C);
-	if (!CoopP2Joined() || CoopSuspended() || !svc || !list || n == 0 || n > 64) {
+	if (!SpawnRuleOn() || !svc || !list || n == 0 || n > 64) {
 		g_origMarkerSpawn(squad, edx, count, group);
 		return;
 	}
@@ -953,6 +1044,14 @@ void __fastcall MarkerSpawnHook(char* squad, void* edx, int count, unsigned grou
 			float dot = d > 0 ? (dx * m2[8] + dy * m2[9] + dz * m2[10]) / d : 0;
 			Log("proximity: marker %u (%.1f %.1f %.1f): in a view %d, seen %d; other view %d at %.1f, cos to its axis %.2f",
 			    i, p[0], p[1], p[2], KlusterSphereInAnyView(p, 1.5f, 40.0f), SpawnMarkerSeen(p), have, d, dot);
+			const float* eyes[4];
+			int ne = KlusterViewsSeeing(p, 1.5f, 40.0f, eyes);
+			for (int e = 0; e < ne; e++) {
+				float head[3] = { p[0], p[1] + 1.8f, p[2] }, hit[5] = {};
+				if (WallBetween(eyes[e], head, hit))
+					Log("proximity:   eye %d (%.1f %.1f %.1f): a wall at (%.1f %.1f %.1f), the line %.1f above its foot%s", e,
+					    eyes[e][0], eyes[e][1], eyes[e][2], hit[0], hit[1], hit[2], hit[3], hit[4] ? ", it has a top" : "");
+			}
 		}
 	}
 	// All in sight: the Romans wait -- the member group's +0x14 keeps them asked
@@ -2886,6 +2985,8 @@ bool ProximityInstallHooks() {
 	}
 	ok &= InstallDetour(kSpawnPoint, (void*)SpawnPointHook, (void**)&g_origSpawnPoint, kSpawnPointPrologue,
 	                    sizeof(kSpawnPointPrologue), "Roman reinforcement point (both players' cameras)");
+	ok &= InstallDetour(kPlaceRoman, (void*)PlaceRomanHook, (void**)&g_origPlaceRoman, kPlaceRomanPrologue,
+	                    sizeof(kPlaceRomanPrologue), "Roman placed by its squad (diagnostics: in a view)");
 	ok &= InstallDetour(kFightMode, (void*)FightHook, (void**)&g_origFight, kFightModePrologue,
 	                    sizeof(kFightModePrologue), "trio fight mode (music) for the non-leader");
 	ok &= InstallDetour(kFlagEvent, (void*)FlagEventHook, (void**)&g_origFlagEvent, kFlagEventPrologue,

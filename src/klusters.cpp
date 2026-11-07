@@ -19,6 +19,7 @@
 // the game camera gets a second frustum with the window of the half showing it.
 
 #include "klusters.h"
+#include "config.h"
 #include "coop.h"
 #include "detour.h"
 #include "kal.h"
@@ -219,13 +220,58 @@ void __fastcall CrateUpdateHook(char* self, void* edx, int handler, int arg) {
 	last = waiting > 0;
 }
 
+// Crates: the klusters past the objects there are go outside (CrateUpdateHook),
+// but not one handed its objects less than kCrateHoldMs ago. `inside` comes
+// nearest first (flag 2).
+void CutCrates(char* self, int handler, Entry*& inside, Entry*& out) {
+	DWORD now = GetTickCount();
+	unsigned freeN = 0, cap = CrateObjects(g_crateCpnt, &freeN), sum = 0, moved = 0;
+	Entry** link = &inside;
+	while (*link && sum < cap) {
+		unsigned waiting = 0;
+		sum += CrateNeeds(self, *link, &waiting);
+		if (waiting) *CrateGivenAt(*link, true) = now;
+		link = &(*link)->next;
+	}
+	while (Entry* e = *link) {
+		unsigned waiting = 0;
+		DWORD* at = CrateNeeds(self, e, &waiting) > waiting ? CrateGivenAt(e, false) : nullptr;
+		if (at && now - *at < kCrateHoldMs) {
+			link = &e->next;
+			continue;
+		}
+		*link = e->next;
+		Insert(out, e, 0, false);
+		moved++;
+	}
+	static int lastMoved[256];
+	static bool primed = false;
+	static long logged = 0;
+	if (!primed) { primed = true; memset(lastMoved, 0xFF, sizeof(lastMoved)); }
+	int& last = lastMoved[handler & 0xFF];
+	if ((int)(moved > 0) != last && logged < 40) {
+		logged++;
+		Log("klusters: crates (handler %d): %u klusters past the %u objects passed as outside", handler & 0xFF, moved, cap);
+	}
+	last = moved > 0;
+}
+
 // FUN_0046DED0, with the union frustum (see the top of the file).
 Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, Entry** outside,
                             const float* ref) {
 	CKYellowPages* yp = YellowPages();
 	char* svc = yp ? *(char**)((char*)yp + 0x68) : nullptr;
-	if (!(flags & 1) || !g_p2Planes || !svc || !SplitActive())
-		return g_origQuery(self, edx, handler, flags, outside, ref);
+	if (!(flags & 1) || !g_p2Planes || !svc || !SplitActive()) {
+		Entry* r = g_origQuery(self, edx, handler, flags, outside, ref);
+		if (g_crateCpnt && flags == 7) {
+			// Single player with sp_isolation off: the nearest crates get the objects
+			// here too (the game keeps one with a crate anywhere in its view -- LV5-3's
+			// fight: 26 objects, up to 7 crates in view without one).
+			if (g_config.SoloMod() && !CoopP2Joined() && outside && (flags & 1)) CutCrates(self, handler, r, *outside);
+			g_crateInside = r;   // (the crates' log in single player too)
+		}
+		return r;
+	}
 	InterlockedIncrement(&g_queries);
 
 	if (outside) *outside = nullptr;
@@ -335,39 +381,8 @@ Entry* __fastcall QueryHook(char* self, void* edx, int handler, uint32_t flags, 
 		for (int i = 0; i < nf; i++) Insert(inside, fe[i], 0xFFFFFFFFu - fr[i], true);
 	}
 	if (g_crateCpnt && flags == 7) {
-		// Crates: the klusters past the objects there are go outside (CrateUpdateHook),
-		// but not one handed its objects less than kCrateHoldMs ago.
-		DWORD now = GetTickCount();
-		unsigned freeN = 0, cap = CrateObjects(g_crateCpnt, &freeN), sum = 0, moved = 0;
-		Entry** link = &inside;
-		while (*link && sum < cap) {
-			unsigned waiting = 0;
-			sum += CrateNeeds(self, *link, &waiting);
-			if (waiting) *CrateGivenAt(*link, true) = now;
-			link = &(*link)->next;
-		}
-		while (Entry* e = *link) {
-			unsigned waiting = 0;
-			DWORD* at = CrateNeeds(self, e, &waiting) > waiting ? CrateGivenAt(e, false) : nullptr;
-			if (at && now - *at < kCrateHoldMs) {
-				link = &e->next;
-				continue;
-			}
-			*link = e->next;
-			Insert(out, e, 0, false);
-			moved++;
-		}
+		CutCrates(self, handler, inside, out);
 		g_crateInside = inside;
-		static int lastMoved[256];
-		static bool primed = false;
-		static long logged = 0;
-		if (!primed) { primed = true; memset(lastMoved, 0xFF, sizeof(lastMoved)); }
-		int& last = lastMoved[handler & 0xFF];
-		if ((int)(moved > 0) != last && logged < 40) {
-			logged++;
-			Log("klusters: crates (handler %d): %u klusters past the %u objects passed as outside", handler & 0xFF, moved, cap);
-		}
-		last = moved > 0;
 	}
 	static const char* klog = getenv("XXL_KLOG");   // diagnostics: "x,z" of a point to follow
 	if (klog && (flags & 3) == 3) {

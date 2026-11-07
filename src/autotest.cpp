@@ -9023,6 +9023,35 @@ const Step kSpLockBoss210[] = {
 	SHOT(45000, "on_button"), SHOT(52000, "thrown"), SHOT(56000, "after"),   // (the boss throws him off by itself: user)
 	END(60000),
 };
+// fight53 / fight53c (-Level 5): the user's LV5-3 fight (Obelix at -243 9.6 318,
+// "Romans spawn on top of Obelix at marker 64"). fight53: single player;
+// fight53c: player 2 joins as Obelix. The heroes walk in from -205 10 324 as the
+// user did, Asterix twists the Romans down every 6.5 s (reinforcements keep
+// coming) and player 1's camera turns; "brought a Roman in ... in a player's
+// view" lines tell.
+#define FIGHT53_BODY \
+	{ 1000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, \
+	{ 2500, S_WATCHENEMIES, 0, 0, 0, -243.0f, 9.6f, "watch romans", 330.0f }, \
+	PLACEAT(2600, HERO_ASTERIX, -205.0f, 10.3f, 324.0f), PLACEAT(2600, HERO_OBELIX, -207.0f, 10.3f, 322.0f), \
+	GLIDEAT(3500, HERO_ASTERIX, -240.0f, 10.0f, 321.0f, 3000), GLIDEAT(3500, HERO_OBELIX, -243.0f, 10.0f, 318.0f, 3000), \
+	SHOT(7000, "fight53_start"), GLIDEAT(7200, HERO_ASTERIX, -246.0f, 10.0f, 332.0f, 1500), \
+	GLIDEAT(7200, HERO_OBELIX, -248.0f, 10.0f, 330.0f, 1500), \
+	TWIST1(10000), SHOT(14000, "fight53_1"), P1R(14500, 1.0f, 0, "camera turns"), P1R(15500, 0, 0, "camera stops"), \
+	TWIST1(16500), SHOT(20500, "fight53_2"), P1R(21000, 1.0f, 0, "camera turns"), P1R(22000, 0, 0, "camera stops"), \
+	TWIST1(23000), SHOT(27000, "fight53_3"), P1R(27500, -1.0f, 0, "camera turns"), P1R(29000, 0, 0, "camera stops"), \
+	TWIST1(30000), SHOT(34000, "fight53_4"), TWIST1(36500), SHOT(40500, "fight53_5"), TWIST1(43000), SHOT(47000, "fight53_6"), \
+	TWIST1(49500), SHOT(53500, "fight53_end"), \
+	END(55000)
+const Step kFight53[] = {
+	MARK(0, "fight53"), LOADSECTOR(200, 3),
+	FIGHT53_BODY,
+};
+const Step kFight53C[] = {
+	MARK(0, "fight53c"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	LOADSECTOR(600, 3),
+	FIGHT53_BODY,
+};
 // spboss36 (-Level 3, XXL_SPISOLATION=0; sp_hero_switch_lock on): spboss210 on
 // LV3-6 -- you play Obelix, Asterix 10 units back; Obelix crosses the rectangle
 // that loads the boss (-208.3 -> -226), drops onto #46 (wakes it, the sidekick
@@ -9295,6 +9324,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("spboss210", kSpBoss210),
 	SCENARIO("splockboss210", kSpLockBoss210),
 	SCENARIO("spboss36", kSpBoss36),
+	SCENARIO("fight53", kFight53),
+	SCENARIO("fight53c", kFight53C),
 	SCENARIO("spboss36j", kSpBoss36J),
 	SCENARIO("bossway36", kBossWay36),
 	SCENARIO("bossdown36", kBossDown36),
