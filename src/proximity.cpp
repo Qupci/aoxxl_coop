@@ -389,9 +389,7 @@ bool SoloTick(int* life, void* dt, char* hook, Trio t) {
 	if (vt == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 1 && (*(uint8_t*)(hook + 0x3E) & 0x1C) &&
 	    t.Leader() == HERO_OBELIX) {
 		Hero a = t.GetHero(HERO_ASTERIX);
-		AiOrder o = a ? a.Order() : AI_WAIT;   // (a fight's orders are the following sidekick's: coop.cpp IsScriptedOrder)
-		bool scripted = o != AI_FOLLOW_LEADER && o != AI_HIT_ENEMY && o != AI_THROW_ENEMY && o != AI_BITE_ENEMY && o != AI_TAKE_HIT;
-		bool parked = !a || scripted || IndivFallen(HERO_ASTERIX);
+		bool parked = ProximitySoloAsterixParked(t);
 		static int s_parked = -1, s_told = 0;
 		if (parked != (s_parked == 1) && s_told++ < 40)
 			Log("proximity: torch %p carried by Asterix, Obelix leads -- %s (AI order %s)", hook,
@@ -2877,6 +2875,14 @@ int ProximityDispatchGroupOf(unsigned msg) {
 	return -1;
 }
 bool ProximityHeldAtDispatch(int hero) { return hero >= 0 && hero < 2 && g_heldAtDispatch[hero]; }
+
+bool ProximitySoloAsterixParked(Trio t) {
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+	if (!a) return true;
+	AiOrder o = a.Order();   // (a fight's orders are the following sidekick's: coop.cpp IsScriptedOrder)
+	bool scripted = o != AI_FOLLOW_LEADER && o != AI_HIT_ENEMY && o != AI_THROW_ENEMY && o != AI_BITE_ENEMY && o != AI_TAKE_HIT;
+	return scripted || IndivFallen(HERO_ASTERIX);
+}
 int ProximityLeverSwitchTarget(void* lever) {
 	char* l = (char*)lever;
 	int a = GroupSwitchTarget(*(uint16_t*)(l + 0x28));

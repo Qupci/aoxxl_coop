@@ -7708,10 +7708,8 @@ const Step kSpTorch2[] = {
 // XXL_LIFTLOG=1): Asterix carries a lit torch; trio 0x4811 ("his torch used up",
 // as LV5-10's keg) with Asterix leading / with Obelix leading -- thrown away
 // either way. Writers of Asterix's +0x464 (the torch held) watched; the torch
-// HUD's state logged (S_TORCH 10, 14). Open: with Obelix leading the burning
-// torch picture at the bottom right stays until Asterix leads again (not the 4
-// flame icons, CKGrpMeca's action box, Asterix's own nodes, nor the torch's
-// events -- all as with Asterix leading).
+// HUD's state logged (S_TORCH 10, 14). The interface's torch box (bottom right,
+// FUN_00520230) slides out with Obelix leading too (coop.cpp TorchHudHook).
 #define SPTORCHTHROW_SETUP \
 	{ 800, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 1000, S_TORCH, 2, 0, 0, 0, 0, "torch to asterix" }, \
 	{ 1300, S_TORCH, 6, 0, 0, 0, 0, "cheat: give fire" }, \
@@ -7735,6 +7733,23 @@ const Step kSpTorchThrowO2[] = {
 	{ 7000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
 	SHOT(8000, "asterix_leads"),
 	END(9000),
+};
+// sptorchhud2: the torch box's flame at the bottom right (bursts of shots a*, o*,
+// p*) with Asterix leading, with Obelix leading and Asterix following (its own
+// speed, as Asterix's), then with Asterix told to wait (parked: the game's
+// slowed flame).
+const Step kSpTorchHud2[] = {
+	MARK(0, "sptorchhud2"), SPTORCHTHROW_SETUP,
+	{ 3000, S_TORCH, 15, 0, 0, 0, 0, "asterix leads" }, { 3100, S_TORCH, 15, 0, 0, 0, 0, "" },
+	{ 3200, S_TORCH, 15, 0, 0, 0, 0, "" }, { 3300, S_TORCH, 15, 0, 0, 0, 0, "" },
+	SHOT(3400, "a0"), SHOT(3450, "a1"), SHOT(3500, "a2"), SHOT(3550, "a3"), SHOT(3600, "a4"), SHOT(3650, "a5"),
+	{ 4000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 5000, S_TORCH, 15, 0, 0, 0, 0, "obelix leads" }, { 5100, S_TORCH, 15, 0, 0, 0, 0, "" },
+	{ 5200, S_TORCH, 15, 0, 0, 0, 0, "" }, { 5300, S_TORCH, 15, 0, 0, 0, 0, "" },
+	SHOT(5400, "o0"), SHOT(5450, "o1"), SHOT(5500, "o2"), SHOT(5550, "o3"), SHOT(5600, "o4"), SHOT(5650, "o5"),
+	{ 6000, S_TRIOEV, 0x4802, 0, 0, 0, 0, "asterix told to wait (parked)" },
+	SHOT(6600, "p0"), SHOT(6650, "p1"), SHOT(6700, "p2"), SHOT(6750, "p3"), SHOT(6800, "p4"), SHOT(6850, "p5"),
+	END(7200),
 };
 // sptorchout2: the same torch burnt out (4 x 5 s) while Obelix leads.
 const Step kSpTorchOut2[] = {
@@ -9286,6 +9301,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("sptorchthrow2", kSpTorchThrow2),
 	SCENARIO("sptorchthrowo2", kSpTorchThrowO2),
 	SCENARIO("sptorchout2", kSpTorchOut2),
+	SCENARIO("sptorchhud2", kSpTorchHud2),
 	SCENARIO("spview2", kSpView2),
 	SCENARIO("spunited23", kSpUnited23),
 	SCENARIO("spunited55", kSpUnited55),
@@ -11398,6 +11414,40 @@ void RunStep(const Step& s) {
 				    box ? *(uint32_t*)box : 0, box ? *(uint32_t*)(box + 4) : 0, box ? *(uint32_t*)(box + 8) : 0,
 				    box ? *(uint32_t*)(box + 0xC) : 0, box ? *(uint32_t*)(box + 0x10) : 0);
 			}
+			break;
+		}
+		if (s.a == 15) {   // the shown flame icon (fire level): its +0x48 object's first 0x60 bytes, as hex
+			CKYellowPages* yp = YellowPages();
+			char* itf = yp ? *(char**)(*(char**)((char*)yp + 0x8C) + 0x18) : nullptr;
+			char** icons = itf ? (char**)(*(char**)(itf + 0x24) + 0x1C) : nullptr;
+			int lvl = c ? (*(uint8_t*)(c + 0x3E) >> 2) & 7 : 0;
+			if (!icons || lvl < 1 || lvl > 4) break;
+			char* ic = icons[lvl - 1];
+			char* o = *(char**)(ic + 0x48);
+			char line[700] = "";
+			for (int k = 0; k < 0x60 && o; k += 4)
+				sprintf_s(line + strlen(line), sizeof(line) - strlen(line), " %02X:%08X", k, *(uint32_t*)(o + k));
+			Log("autotest: flame icon %d %p +48 %p:%s; leader %d", lvl, ic, o, line, t.Leader());
+			// every particle-like piece of the component: +0x48 -> +0x10 count / +0x14 max / +0x30 clock
+			char* part = *(char**)(itf + 0x24);
+			char sys[700] = "";
+			for (int off = 0x0C; off <= 0x40; off += 4) {
+				char* p = *(char**)(part + off);
+				char* q = p && !IsBadReadPtr(p, 0x4C) ? *(char**)(p + 0x48) : nullptr;
+				if (!q || IsBadReadPtr(q, 0x34)) continue;
+				sprintf_s(sys + strlen(sys), sizeof(sys) - strlen(sys), " %02X:n%u/%u t%.3f f%X", off, *(uint32_t*)(q + 0x10),
+				          *(uint32_t*)(q + 0x14), *(float*)(q + 0x30), *(uint32_t*)(q + 4) & 0xFFF);
+			}
+			Log("autotest: component pieces:%s", sys);
+			// the shown icon's node place and its particles' first 0x80 bytes (as floats)
+			char* fr = *(char**)(ic + 4);
+			char* arr = o ? *(char**)(o + 0x20) : nullptr;
+			char pf[900] = "";
+			for (int k = 0; arr && !IsBadReadPtr(arr, 0x80) && k < 0x80; k += 4)
+				sprintf_s(pf + strlen(pf), sizeof(pf) - strlen(pf), " %.2f", *(float*)(arr + k));
+			Log("autotest: flame icon node at %.2f %.2f %.2f (modelling %.2f %.2f %.2f); particles:%s", fr ? *(float*)(fr + 0x80) : 0.0f,
+			    fr ? *(float*)(fr + 0x84) : 0.0f, fr ? *(float*)(fr + 0x88) : 0.0f, fr ? *(float*)(fr + 0x40) : 0.0f,
+			    fr ? *(float*)(fr + 0x44) : 0.0f, fr ? *(float*)(fr + 0x48) : 0.0f, pf);
 			break;
 		}
 		if (s.a == 14) {   // CKGrpMeca's +0x9C / +0xA0 branches vs the torch's +0x34

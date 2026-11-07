@@ -46,6 +46,11 @@ bool ProximityDispatchOnlySwitches(unsigned msg, unsigned* ev);
 bool ProximityDispatchHoldsLoser(unsigned msg);
 // Hero `hero` was in the level's hands (a scripted AI order) as the dispatch began.
 bool ProximityHeldAtDispatch(int hero);
+// Single player: the sidekick Asterix is the level's (a scripted AI order -- a
+// wait, a walk, a ride -- a fight's orders aside) or down. His carried torch is
+// held then, its HUD flame slowed, as the game's sidekick's.
+struct Trio;
+bool ProximitySoloAsterixParked(Trio t);
 // Event `ev`'s group switches the lead away from `bound` and parks nobody.
 bool ProximityGroupCatchUp(unsigned ev, int bound);
 int ProximityDispatchGroupOf(unsigned msg);

@@ -4459,6 +4459,49 @@ static void TorchBeforeTick(int heroIndex, Hero hero) {
 // 0x10, which only the drinker's flag ends: Obelix leading ran on. The AI
 // drinker never dashes -- the flag goes, the potion runs on.
 static bool SoloLeadFree() { return !g.p2Joined && (g_config.spHeroSwitch || g_config.spSecondChance); }
+
+// The interface's torch box at the bottom right (FUN_00520230, from
+// CKHkInterfaceInGame::vf18; thiscall(itf, time), ret 4; its state in itf +0x24
+// bits 19-20: 0 off, 1 sliding in, 2 shown, 3 sliding out; Asterix's torch from
+// trio vf46). Shown, it asks the trio's vf40 ("Asterix leads") twice: to slide
+// out once Asterix holds no torch, and to run the fire level's flame (+0x118 +
+// 4 * level) on its own clock (+0x10 bit 0) -- otherwise stepped by dt * 0.05,
+// the sidekick's slowed flame. Single player with the lead free, Obelix leading:
+// a torch thrown away (LV5-10's keg) left the box up until Asterix led, and a
+// torch burning with Asterix following showed the slowed flame. Updated with
+// Asterix posing as the leader then -- with no torch, or one burning (Asterix
+// not parked, ProximitySoloAsterixParked): parked, it is the game's slowed one.
+typedef void(__fastcall* TorchHudFn)(char* itf, void* edx, void* time);
+const uintptr_t kTorchHud = 0x520230;
+const uint8_t   kTorchHudPrologue[5] = { 0x83, 0xEC, 0x2C, 0x53, 0x55 };   // sub esp,2Ch; push ebx; push ebp
+TorchHudFn g_origTorchHud = nullptr;
+
+static void __fastcall TorchHudHook(char* itf, void* edx, void* time) {
+	Trio t = GetTrio();
+	bool pose = false;
+	if (t && SoloLeadFree() && t.Leader() == HERO_OBELIX && (*(uint32_t*)(itf + 0x24) >> 19 & 3) == 2) {
+		Hero a = t.GetHero(HERO_ASTERIX);
+		char* torch = a ? *(char**)(a.raw() + 0x464) : nullptr;
+		pose = a && (!torch || !ProximitySoloAsterixParked(t));
+		static int s_told = 0, s_last = -1;
+		int now = !pose ? 0 : torch ? 1 : 2;
+		if (now != s_last && s_told++ < 40)
+			Log("coop: torch box with Obelix leading: %s", now == 0 ? "Asterix parked -- the game's slowed flame"
+			    : now == 1 ? "Asterix follows -- the flame at its own speed" : "Asterix holds no torch -- the box goes");
+		s_last = now;
+	}
+	if (!pose) {
+		g_origTorchHud(itf, edx, time);
+		return;
+	}
+	uint8_t* tr = (uint8_t*)t.raw();
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	tr[0x2C] = HERO_ASTERIX;
+	tr[0x2D] = HERO_OBELIX;
+	g_origTorchHud(itf, edx, time);
+	if (tr[0x2C] == HERO_ASTERIX) { tr[0x2C] = leader; tr[0x2D] = companion; }
+}
+
 static void SoloPotionDash(Trio t) {
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
@@ -5794,6 +5837,8 @@ void CoopInit() {
 	              sizeof(kReadCmdPrologue), "hero potion flag (Obelix's potion)");
 	InstallDetour(kHeroPrompt, (void*)PromptHook, (void**)&g_origPrompt, kHeroPromptPrologue,
 	              sizeof(kHeroPromptPrologue), "HUD action prompt (either player's)");
+	InstallDetour(kTorchHud, (void*)TorchHudHook, (void**)&g_origTorchHud, kTorchHudPrologue, sizeof(kTorchHudPrologue),
+	              "interface torch box (single player: Asterix's torch with Obelix leading)");
 	InstallDetour(kFuseStep25, (void*)FuseStep25Hook, (void**)&g_origFuseStep25, kFuseStep25Prologue,
 	              sizeof(kFuseStep25Prologue), "Twister Fusion step 0x25 (partner as companion)");
 	InstallDetour(kFuseStep26, (void*)FuseStep26Hook, (void**)&g_origFuseStep26, kFuseStep26Prologue,
