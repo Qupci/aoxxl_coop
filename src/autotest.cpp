@@ -7777,28 +7777,37 @@ const Step kSpUnited23[] = {
 	SHOT(10000, "switched"),
 	END(11000),
 };
-// spunited55 (-Level 5, sector 5; XXL_SPISOLATION=0): the user's LV5-5 spot --
-// Asterix leading up on the progression's ledge (8.2 10.9 61.9, in no node of
-// the graph), Obelix behind, walked up as near as he can (Obelix put anywhere
-// on level 5 by an autotest hangs at y 7, so only Asterix is put: first at
-// 45.2 3.5 74.9, Obelix brought by R3 + A -- a switch there and back goes through --
-// then on the ledge): the switch refused (Asterix's nearest cell is behind a door).
+// spunited55 (-Level 5, sector 5; XXL_SPISOLATION=0): the user's LV5-5 pad test
+// (xxl_coop.lv5_5_fail.log) -- Asterix put at 17.4 1.7 77.7 (where Obelix stood), player 2 joins,
+// brings Obelix by R3 + A and leaves, as the user did (put by an autotest, or by
+// single player's R3 + A, he hangs at y 7); a switch there and back goes through. Asterix up on the ledge (in no
+// node of the graph), Obelix following as near as he can (~17.4 1.7 77.7): the
+// switch refused at the user's two spots (6.1 10.7 63.1, and 13.9 10.5 63.4 -- let
+// through by round 230, Asterix then walking to the door's far side).
 const Step kSpUnited55[] = {
 	MARK(0, "spunited55"),
 	LOADSECTOR(200, 5),
 	{ 1500, S_TRIOEV, 0x4800, 0, 0, 0, 0, "asterix leads" },
-	PLACEAT(2500, HERO_ASTERIX, 45.158f, 3.473f, 74.856f),
-	{ 4000, S_SPMOD, PAD_A, 0, 0, 0, 0, "R3 + A: obelix brought beside asterix" },
-	REACH(9000),
-	SHOT(9200, "caught_up"),
-	{ 9500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (together on the cells: goes through)" },
-	{ 11000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back (asterix leads)" },
-	PLACEAT(12000, HERO_ASTERIX, 8.153f, 11.4f, 61.899f),
-	PFDUMP(19000, HERO_ASTERIX, 25.0f), REACH(19100),
-	SHOT(19500, "apart"),
-	{ 20000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: asterix can't walk to obelix)" },
-	SHOT(20500, "refused"),
-	END(21500),
+	PLACEAT(2500, HERO_ASTERIX, 17.44f, 1.68f, 77.71f),
+	VPAD(3000, 1, PAD_START, 0, 0, "p2 start (joins as obelix)"), VPAD(3200, 1, 0, 0, 0, "p2 release"),
+	VPAD(4000, 1, PAD_RTHUMB, 0, 0, "p2 R3"), VPAD(4200, 1, PAD_RTHUMB | PAD_A, 0, 0, "p2 R3 + A: obelix to asterix"),
+	VPAD(4500, 1, 0, 0, 0, "p2 release"),
+	VPAD(5500, 1, PAD_START, 0, 0, "p2 start (leaves)"), VPAD(5700, 1, 0, 0, 0, "p2 release"),
+	REACH(8000),
+	SHOT(8200, "caught_up"),
+	{ 8500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (together on the cells: goes through)" },
+	{ 10000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back (asterix leads)" },
+	PLACEAT(11000, HERO_ASTERIX, 6.12f, 10.9f, 63.12f),
+	REACH(18000),
+	SHOT(18200, "apart"),
+	{ 18500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused at 6.1 10.7 63.1)" },
+	SHOT(19000, "refused"),
+	PLACEAT(20000, HERO_ASTERIX, 13.85f, 10.7f, 63.44f),
+	REACH(22000),
+	{ 22500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused at 13.9 10.5 63.4: let through by round 230)" },
+	SHOT(23000, "refused2"),
+	SHOT(27000, "after"),
+	END(27500),
 };
 // spstart55 (-Level 5, sector 5): the user's LV5-5 pad test
 // (xxl_coop.lv5_5_fail.log) -- the switch refused with Asterix at 6.1 10.7 63.1 on
