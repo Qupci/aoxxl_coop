@@ -324,6 +324,16 @@ bool SoloToldOnce(char* hook, int leader) {
 	return s_lines++ < 40;
 }
 
+// Asterix's used-up torch first seen this long ago (ms): his own throw (coop.cpp
+// SoloTorchThrow, from the frame's code) has 0.3 s to take it over.
+bool SoloTorchThrowSoon(Hero a) {
+	static char* s_torch = nullptr;
+	static DWORD s_seen = 0;
+	char* torch = *(char**)(a.raw() + 0x464);
+	if (torch != s_torch) { s_torch = torch; s_seen = GetTickCount(); }
+	return GetTickCount() - s_seen < 300;
+}
+
 bool SoloTick(int* life, void* dt, char* hook, Trio t) {
 	TickFn tick = (TickFn)(*(void***)life)[17];
 	uintptr_t vt = *(uintptr_t*)hook;
@@ -361,7 +371,10 @@ bool SoloTick(int* life, void* dt, char* hook, Trio t) {
 	// switched to: thrown as his player situation does.
 	if (vt == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 1 && t.Leader() == HERO_OBELIX) {
 		Hero a = t.GetHero(HERO_ASTERIX);
-		if (a && *(char**)(a.raw() + 0x464) == hook && (*(uint32_t*)(a.raw() + 0x3EC) & 0x400000)) {
+		// (His own throw first: coop.cpp SoloTorchThrow makes him a player's hero for
+		// it. This is for when that cannot be.)
+		if (a && *(char**)(a.raw() + 0x464) == hook && (*(uint32_t*)(a.raw() + 0x3EC) & 0x400000) && !CoopSoloTorchThrowing() &&
+		    !SoloTorchThrowSoon(a)) {
 			typedef int(__fastcall* SendFn)(void*, void*, int, void*);
 			uint8_t* tr = (uint8_t*)t.raw();
 			uint8_t leader = tr[0x2C], companion = tr[0x2D];
@@ -379,6 +392,17 @@ bool SoloTick(int* life, void* dt, char* hook, Trio t) {
 				Log("proximity: torch %p used up (trio 0x4811) with Obelix leading -- thrown away by the sidekick Asterix", hook);
 			return true;
 		}
+	}
+	// A torch flying off (state 2) with Obelix leading -- Asterix's own throw as a
+	// player's hero: ticked as Asterix's, or its flight ended at once (as above).
+	if (vt == kTorchVtbl && (*(uint8_t*)(hook + 0x3E) & 3) == 2 && t.Leader() == HERO_OBELIX && CoopSoloTorchThrowing()) {
+		uint8_t* tr = (uint8_t*)t.raw();
+		uint8_t leader = tr[0x2C], companion = tr[0x2D];
+		tr[0x2C] = HERO_ASTERIX;
+		tr[0x2D] = HERO_OBELIX;
+		tick(life, nullptr, dt);
+		if (tr[0x2C] == HERO_ASTERIX) { tr[0x2C] = leader; tr[0x2D] = companion; }
+		return true;
 	}
 	// A carried, lit torch (CKHkTorch 2,32: +0x3E state 1, bits 2-4) burns down
 	// only while Asterix leads (trio vf40; its HUD and flame go with the timer).

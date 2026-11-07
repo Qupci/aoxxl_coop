@@ -7718,8 +7718,8 @@ const Step kSpTorch2[] = {
 	{ 3900, S_TORCH, getenv("XXL_WATCHICONS") ? 12 : 10, 0, 0, 0, 0, "icons before" }, \
 	{ 3950, S_TORCH, 14, 0, 0, 0, 0, "meca branches before" }, \
 	{ 4000, S_TRIOEV, 0x4811, 0, 0, 0, 0, "asterix's torch used up" }, \
-	{ 4400, S_TORCH, 10, 0, 0, 0, 0, "icons +0.4 s" }, { 4450, S_TORCH, 14, 0, 0, 0, 0, "meca branches" }, \
-	{ 5000, S_TORCH, 10, 0, 0, 0, 0, "icons +1 s" }
+	SHOT(4150, "throw_0"), SHOT(4300, "throw_1"), SHOT(4450, "throw_2"), SHOT(4600, "throw_3"), SHOT(4800, "throw_4"), \
+	{ 4900, S_TORCH, 10, 0, 0, 0, 0, "icons +0.9 s" }, { 4950, S_TORCH, 14, 0, 0, 0, 0, "meca branches" }
 const Step kSpTorchThrow2[] = {
 	MARK(0, "sptorchthrow2"), SPTORCHTHROW_SETUP, SPTORCHTHROW_ICONS,
 	SHOT(5500, "thrown"),

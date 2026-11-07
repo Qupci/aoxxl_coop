@@ -111,6 +111,7 @@ bool CoopDeferTrioEvent(void* trio, int event);
 
 bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
+bool CoopSoloTorchThrowing();  // single player: Asterix throws his used-up torch as a player's hero
 // Individual heroes: hero `fallen` just went down. If the other was locked in a
 // sequence waiting for it (a blue circle's "wait here", a cable car pulled by
 // it), the sequence is undone so the other can come and revive it. Returns who

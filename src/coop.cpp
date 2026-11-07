@@ -3056,6 +3056,17 @@ static void ModCheats(uint16_t pressed, int me, const char* player) {
 	}
 }
 
+// Single player, Obelix leading: Asterix's used-up torch thrown with his own
+// throw (SoloTorchThrow, below): he is a player's hero for its length.
+struct SoloThrow {
+	int     phase = 0;       // 0 none, 1 just made a player's hero, 2 his throw under way
+	DWORD   since = 0;       // phase 1 began
+	DWORD   thrownAt = 0;    // the torch left his hands
+	uint8_t f1A = 0;         // his +0x1A before
+} g_spThrow;
+static void SoloTorchThrow(Trio t);
+bool CoopSoloTorchThrowing() { return g_spThrow.phase != 0; }
+
 void CoopFrame() {
 	DWORD now = GetTickCount();
 	g.frames++;
@@ -3179,13 +3190,15 @@ void CoopFrame() {
 			Hero c = ci >= 0 ? t.GetHero(ci) : Hero();
 			uint8_t f = c ? *F18(c) : 0;
 			// (A fallen hero of second chance stays a player's: SoloBeforeLifeTick.)
-			if (c && HeroModePlayable(f) && HeroIsPlayerVariant(f) && !CutsceneBars() && !IndivFallen(ci)) {
+			if (c && HeroModePlayable(f) && HeroIsPlayerVariant(f) && !CutsceneBars() && !IndivFallen(ci) &&
+			    !(g_spThrow.phase && ci == HERO_ASTERIX)) {
 				*F18(c) = HeroAiVariant(f);
 				Log("coop: %s was a player hero without player 2 (from the save?) -- AI companion again (f18 %02X -> %02X)",
 				    HeroName(ci), f, *F18(c));
 			}
 		}
 		SoloPotionDash(t);
+		SoloTorchThrow(t);
 		SoloWatchLock(t);
 		SoloModButtons(t);
 		SoloHeroSwitch(t);
@@ -4500,6 +4513,79 @@ static void __fastcall TorchHudHook(char* itf, void* edx, void* time) {
 	tr[0x2D] = HERO_OBELIX;
 	g_origTorchHud(itf, edx, time);
 	if (tr[0x2C] == HERO_ASTERIX) { tr[0x2C] = leader; tr[0x2D] = companion; }
+}
+
+// Asterix's torch used up (trio 0x4811, +0x3EC 0x400000: LV5-10's keg) is thrown
+// by his player situation (0x49B420: entered, his action field +0x3EC bits 25-30
+// = 13; once his animation +0xE8 is the throw, 0x28, 0x5127 to the torch,
+// +0x464 = 0, the field 14, then 0) -- the AI never enters it. Single player
+// with the lead free, Obelix leading: Asterix is made a player's hero (+0x18
+// player variant) for the throw, the pad's commands ignored (+0x1A), so his own
+// throw plays; the AI's again once it is over (the field back to 0, or 1.5 s
+// after the torch left). His life's vf13 on becoming a player's (0x4AA850) drops
+// a used-up torch at once (0x513C, no throw): the bit is held back that frame.
+// Not possible (a ride, the slide, busy, down) or not thrown in 2.5 s: SoloTick
+// (proximity.cpp) throws it as before, without the throw.
+static void SoloTorchThrow(Trio t) {
+	SoloThrow& s = g_spThrow;
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+	auto end = [&](const char* why) {
+		if (a) {
+			if (t.Leader() == HERO_OBELIX) *F18(a) = HeroAiVariant(*F18(a));
+			*(uint8_t*)(a.raw() + 0x1A) = s.f1A;
+		}
+		static int s_told = 0;
+		if (s_told++ < 20) Log("coop: Asterix's torch throw as a player's hero over (%s) -- the AI companion again", why);
+		s = SoloThrow();
+	};
+	if (s.phase) {
+		DWORD now = GetTickCount();
+		if (!a || !CoopGameplayLive()) { s = SoloThrow(); return; }
+		if (t.Leader() != HERO_OBELIX) { end("Asterix leads"); return; }
+		uint32_t& f = *(uint32_t*)(a.raw() + 0x3EC);
+		if (s.phase == 1) {   // a player's hero now: the throw situation picks the bit up
+			f |= 0x400000;
+			s.phase = 2;
+			return;
+		}
+		unsigned field = (f >> 25) & 0x3F;
+		{
+			static int s_logs = 0, s_last = -1;
+			int key = (int)field << 16 | (*(int*)(a.raw() + 0xE8) & 0xFFFF);
+			if (key != s_last && s_logs++ < 40)
+				Log("coop: Asterix's throw: action field %u, animation %d, situation %02X, torch %p", field, *(int*)(a.raw() + 0xE8),
+				    *(uint8_t*)(a.raw() + 0x3E9), *(void**)(a.raw() + 0x464));
+			s_last = key;
+		}
+		if (!*(char**)(a.raw() + 0x464) && !s.thrownAt) s.thrownAt = now ? now : 1;
+		if (s.thrownAt && (field == 0 || now - s.thrownAt > 1500)) { end("thrown"); return; }
+		if (!s.thrownAt && (now - s.since > 2500 || IndivFallen(HERO_ASTERIX))) { end("not thrown in time"); return; }
+		return;
+	}
+	if (!t || !SoloLeadFree() || !CoopGameplayLive() || CutsceneBars() || g.cutsceneHold > 0 || t.Leader() != HERO_OBELIX || !a)
+		return;
+	char* torch = *(char**)(a.raw() + 0x464);
+	uint32_t& f = *(uint32_t*)(a.raw() + 0x3EC);
+	uint8_t f18 = *F18(a);
+	if (!torch || *(uintptr_t*)torch != 0x625F08 || (*(uint8_t*)(torch + 0x3E) & 3) != 1 || !(f & 0x400000)) return;
+	static int s_no = 0;
+	if (!HeroModePlayable(f18) || HeroIsPlayerVariant(f18) || IndivFallen(HERO_ASTERIX) || a.Busy() || (f & 0x7E000000)) {
+		if (s_no++ < 10)
+			Log("coop: Asterix's torch used up with Obelix leading -- no throw of his own (f18 %02X, busy %d, field %u): thrown "
+			    "without it", f18, a.Busy() ? 1 : 0, (f >> 25) & 0x3F);
+		return;
+	}
+	s.phase = 1;
+	s.since = GetTickCount();
+	s.thrownAt = 0;
+	s.f1A = *(uint8_t*)(a.raw() + 0x1A);
+	*(uint8_t*)(a.raw() + 0x1A) = 1;
+	f &= ~0x400000u;   // (held back while his life's vf13 runs)
+	*F18(a) = HeroPlayerVariant(f18);
+	static int s_told = 0;
+	if (s_told++ < 20)
+		Log("coop: Asterix's torch used up with Obelix leading -- he throws it as a player's hero (f18 %02X -> %02X)", f18,
+		    *F18(a));
 }
 
 static void SoloPotionDash(Trio t) {
