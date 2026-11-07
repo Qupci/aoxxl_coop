@@ -767,6 +767,168 @@ struct ShutLifters {
 const int kReachOnlyLifter = 2;   // reachTold: no way but over a lifter
 
 // The revive time limit's "auto": the walk to the fallen hero, then the grace.
+// The bosses that roll after the heroes along a way of their own (CKHkBoss,
+// class (2,177): LV2-10, LV3-6 -- its +0x600 way is only the jump at the run's
+// end): where each went, a spot every unit, newest last. A fallen hero lying
+// on that trail, the boss rolling on away from it, is left behind the boss: the
+// other hero can't get past the boss to it (user: game over then; xxl_coop.
+// lv3-6_partner_death_underground.log). A boss that turns back starts its
+// trail afresh (one moving to and fro leaves nobody behind).
+const int kBossTrail = 512;
+const int kBosses = 2;
+const float kBossBack = 9.0f;     // this far back along its trail (its half length, 7.3, and some): behind it
+const float kBossWide = 8.5f;     // ... and this near the trail's line (its half width: 7.3, the user's run)
+const float kBossHalf = 6.0f;     // ... and this far behind its back (its half length about 7)
+const DWORD kBossRollMs = 1000;   // moved this lately: still rolling
+struct BossTrail {
+	char*   obj = nullptr;
+	Vector3 at;
+	DWORD   movedAt = 0;
+	Vector3 pts[kBossTrail];
+	int     n = 0, next = 0;
+	const Vector3& Pt(int back) const { return pts[(next + kBossTrail - 1 - back) % kBossTrail]; }   // 0: newest
+};
+BossTrail g_boss[kBosses];
+int g_bossLevel = -2;
+
+bool BossPos(char* o, Vector3* out) {
+	char* node = o ? *(char**)(o + 0x10) : nullptr;
+	char* fr = node ? *(char**)(node + 4) : nullptr;
+	if (!fr) return false;
+	const float* m = (const float*)(fr + 0x80);
+	*out = Vector3(m[0], m[1], m[2]);
+	return true;
+}
+
+void TrackBosses(int level, DWORD now) {
+	if (level != g_bossLevel) {
+		g_bossLevel = level;
+		for (BossTrail& b : g_boss) b = BossTrail();
+	}
+	// Only the bosses that chase the heroes (user: LV4-11's, LV5-11's and LV6-5's
+	// go to and fro, and stay the game's).
+	if (level != 2 && level != 3) return;
+	unsigned count = GetNumLvlClassInstances(2, 177);
+	for (unsigned i = 0; i < count && i < (unsigned)kBosses; i++) {
+		BossTrail& b = g_boss[i];
+		char* o = (char*)GetLvlObject(2, 177, i);
+		Vector3 p;
+		if (!BossPos(o, &p)) continue;
+		if (o != b.obj) { b = BossTrail(); b.obj = o; b.at = p; }
+		Vector3 d = p - b.at;
+		b.at = p;
+		if (d.len2() > 20.0f * 20.0f) { b.n = b.next = 0; b.movedAt = 0; continue; }   // put back (a respawn)
+		if (d.len2() > 0.0001f) b.movedAt = now;
+		if (b.n && (p - b.Pt(0)).len2() < 1.0f) continue;
+		if (b.n >= 2) {
+			Vector3 a = b.Pt(0) - b.Pt(1), c = p - b.Pt(0);
+			if (a.x * c.x + a.z * c.z < -0.5f * sqrtf((a.x * a.x + a.z * a.z) * (c.x * c.x + c.z * c.z))) {
+				Vector3 last = b.Pt(0);
+				b.n = 1;
+				b.next = 1;
+				b.pts[0] = last;
+				static int s_turned;
+				if (s_turned++ < 10) Log("indiv: boss #%u turned back at (%.1f %.1f %.1f) -- its trail afresh", i, p.x, p.y, p.z);
+			}
+		}
+		b.pts[b.next] = p;
+		b.next = (b.next + 1) % kBossTrail;
+		if (b.n < kBossTrail) b.n++;
+	}
+}
+
+bool BossRolling(DWORD now) {
+	for (const BossTrail& b : g_boss)
+		if (b.obj && b.n >= 2 && now - b.movedAt < kBossRollMs) return true;
+	return false;
+}
+
+// How far back along a rolling boss's trail `p` lies (units from the boss), -1
+// not on it (or not kBossBack back).
+float BehindBoss(const Vector3& p, DWORD now, int* which) {
+	for (int i = 0; i < kBosses; i++) {
+		const BossTrail& b = g_boss[i];
+		if (!b.obj || b.n < 2 || now - b.movedAt >= kBossRollMs) continue;
+		// Behind its back too (its heading over the last 3 units): a body it shoves
+		// on round a corner lies by the trail it has just come along, before it
+		// (bossdown36, the first corner).
+		Vector3 head = b.at - b.Pt(b.n > 3 ? 3 : b.n - 1);
+		float hl = sqrtf(head.x * head.x + head.z * head.z);
+		if (hl < 0.5f || ((p.x - b.at.x) * head.x + (p.z - b.at.z) * head.z) / hl > -kBossHalf) continue;
+		float arc = sqrtf((b.at - b.Pt(0)).len2());
+		for (int k = 1; k < b.n; k++) {
+			const Vector3& a = b.Pt(k - 1);
+			const Vector3& c = b.Pt(k);
+			arc += sqrtf((a - c).len2());
+			if (arc < kBossBack) continue;
+			Vector3 d = p - c;
+			if (d.x * d.x + d.z * d.z <= kBossWide * kBossWide && fabsf(d.y) < 3.0f) {
+				*which = i;
+				return arc;
+			}
+		}
+	}
+	return -1.0f;
+}
+
+// A rolling boss within `r` units (x / z) of `p`.
+int BossNear(const Vector3& p, float r, DWORD now) {
+	for (int i = 0; i < kBosses; i++) {
+		const BossTrail& b = g_boss[i];
+		if (!b.obj || b.n < 2 || now - b.movedAt >= kBossRollMs) continue;
+		Vector3 d = p - b.at;
+		if (d.x * d.x + d.z * d.z <= r * r) return i;
+	}
+	return -1;
+}
+
+// A body the rolling boss shoves on before it can't be revived either (user:
+// it moves as fast as the boss, and its saws kill a hero standing in its way to
+// hold the grab): this far dragged with a boss near, the game over.
+const float kBossDragNear = 12.0f;
+const float kBossDragged = 2.0f;
+Vector3 g_downLast[2];
+float g_dragged[2];
+
+// A fallen hero's last place on the level's walkable ground, and a body shoved
+// off it: the rolling boss pushes a body before it, and at LV3-6's second corner
+// (x -317.9, z -110.6) through the floor (user: -311.9 -3.8 -105.5, nobody could
+// reach it). Lower than that place by this much and in no pathfinding node: put
+// back there.
+const float kSunk = 1.5f;
+Vector3 g_downGood[2];
+bool g_downGoodSet[2];
+DWORD g_downGoodAt[2];
+
+void KeepBodyOnGround(int down, Hero h, DWORD now) {
+	Vector3 p = h.Pos();
+	if (!g_downGoodSet[down]) {   // (on the ground's nodes only: not a death in mid-air)
+		if (now - g_downGoodAt[down] < 100) return;
+		g_downGoodAt[down] = now;
+		if (PfLineInNodes(p, p) != PF_YES) return;
+		g_downGood[down] = p;
+		g_downGoodSet[down] = true;
+		return;
+	}
+	if (p.y < g_downGood[down].y - kSunk) {
+		if (LifterUnderFallen() || PfLineInNodes(p, p) == PF_YES) {   // (a lower floor it can be walked to on)
+			g_downGood[down] = p;
+			return;
+		}
+		static int s_sunk;
+		if (s_sunk++ < 20)
+			Log("indiv: %s's body was shoved off the ground to (%.1f %.1f %.1f), in no pathfinding node -- back on it (%.1f %.1f %.1f)",
+			    HeroName(down), p.x, p.y, p.z, g_downGood[down].x, g_downGood[down].y, g_downGood[down].z);
+		Vector3 to = g_downGood[down];
+		to.y += 0.5f;
+		PlaceHero(h, to);
+		return;
+	}
+	if (now - g_downGoodAt[down] < 100 || (p - g_downGood[down]).len2() < 0.25f) return;
+	g_downGoodAt[down] = now;
+	if (PfLineInNodes(p, p) == PF_YES) g_downGood[down] = p;
+}
+
 void SetLimit(int down, float way, const char* what) {
 	g.limitLeft[down] = way / kWalkSpeed + g_config.reviveGrace;
 	g.limitSet[down] = true;
@@ -866,6 +1028,15 @@ void WayToFallen(int down, Hero h, int up, Hero o, DWORD now) {
 		return;
 	}
 	bool cutItself = !byLifter && g.hadWay[down];
+	if (BossRolling(now)) {
+		// The boss is between them, or shoving the body on before it: no bringing
+		// the hero there (bossdown36: it was put in the boss's way and died too).
+		static int s_rolling;
+		if (g.cutOff[down] == 0 && s_rolling++ < 10)
+			Log("indiv: %s not brought to %s -- a boss is rolling", HeroName(up), HeroName(down));
+		g.cutOff[down] = 1;
+		return;
+	}
 	if (++g.cutOff[down] < 3) return;
 	g.cutOff[down] = 0;
 	g.broughtStays[up] = byLifter || cutItself;
@@ -935,8 +1106,8 @@ void Revive(int idx, Hero h, const char* how, bool byGrab = false) {
 // as the chooser picks the death once more). The hero still standing keeps its
 // own health for its own business (IndivEnter's spare scope): it does not die
 // beside it.
-void TimeOut(int down, Hero h, int up) {
-	Log("indiv: %s was not revived in time -- game over, the death is %s's (%s stays on its feet)", HeroName(down),
+void TimeOut(int down, Hero h, int up, const char* why = "was not revived in time") {
+	Log("indiv: %s %s -- game over, the death is %s's (%s stays on its feet)", HeroName(down), why,
 	    HeroName(down), HeroName(up));
 	g.gameOver = true;
 	g.spared = up;
@@ -1356,6 +1527,9 @@ bool IndivHeroDown(int hero, const char* how) {
 	}
 	g.fallen[hero] = true;
 	g.revive[hero] = 0;
+	g_downGoodSet[hero] = false;
+	g_downLast[hero] = h.Pos();
+	g_dragged[hero] = 0.0f;
 	{
 		// Its combo bar empties, "full" and all, as the game's respawn empties it
 		// (CKAsterixGameManager::vf13) -- a fallen hero kept a full bar through its
@@ -1480,6 +1654,7 @@ void IndivFrame() {
 	}
 	if (!t) return;
 	if (CoopP2Hero() >= 0) g.p2Hero = CoopP2Hero();
+	TrackBosses(level, GetTickCount());
 
 	int lead = t.Leader();
 	if (lead != HERO_ASTERIX && lead != HERO_OBELIX) return;
@@ -1558,6 +1733,30 @@ void IndivFrame() {
 			PlaceHero(h, p);
 			Revive(i, h, "the other hero went on into another area");
 			continue;
+		}
+		KeepBodyOnGround(i, h, now);
+		{
+			// Left behind a rolling boss (its trail between them), the other hero not
+			// behind it too: the game over at once (user).
+			int which = -1, w2 = -1;
+			float back = BehindBoss(h.Pos(), now, &which);
+			if (back >= 0.0f && !CoopSuspended() && BehindBoss(o.Pos(), now, &w2) < 0.0f) {
+				char why[96];
+				sprintf(why, "lies behind the rolling boss #%d (%.0f units back on its way)", which, back);
+				TimeOut(i, h, up, why);
+				return;
+			}
+			// Dragged on by it.
+			Vector3 m = h.Pos() - g_downLast[i];
+			g_downLast[i] = h.Pos();
+			int nearBoss = BossNear(h.Pos(), kBossDragNear, now);
+			if (nearBoss >= 0 && m.len2() < 5.0f * 5.0f) g_dragged[i] += sqrtf(m.x * m.x + m.z * m.z);
+			if (nearBoss >= 0 && g_dragged[i] >= kBossDragged && !CoopSuspended()) {
+				char why[96];
+				sprintf(why, "is dragged on by the rolling boss #%d (%.1f units)", nearBoss, g_dragged[i]);
+				TimeOut(i, h, up, why);
+				return;
+			}
 		}
 		WayToFallen(i, h, up, o, now);
 		Vector3 d = h.Pos() - o.Pos();

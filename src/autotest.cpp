@@ -60,7 +60,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -8797,6 +8797,85 @@ const Step kSpBoss36[] = {
 	SHOT(14500, "run"), SHOT(18000, "run_2"), SHOT(23000, "run_3"),
 	END(26000),
 };
+// bossway36 (-Level 3, XXL_SPISOLATION=0): spboss36's start (you play Obelix), then
+// Obelix runs the boss's whole way to the arena (the user's corners: -218 -174.8,
+// -312.3 -171.4, -323.3 -113.9, -420.1 -110.2); S_BOSSDUMP logs the boss as it rolls.
+const Step kBossWay36[] = {
+	MARK(0, "bossway36"), LOADSECTOR(200, 6),
+	PLACEAT(2500, HERO_ASTERIX, -208.28f, 11.5f, -200.22f), PLACEAT(2500, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	PLACEAT(5000, HERO_ASTERIX, -198.0f, 11.5f, -200.22f),
+	GLIDEAT(5300, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	{ 8000, S_BOSSDUMP, 1, 0, 0, 0, 0, "boss before" },
+	PLACEAT(9000, HERO_OBELIX, -232.0f, 16.0f, -173.9f),
+	GLIDEAT(11000, HERO_OBELIX, -248.0f, 6.0f, -173.4f, 3000),
+	{ 12000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 14000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	GLIDEAT(14500, HERO_OBELIX, -300.0f, 6.0f, -171.0f, 8000),
+	{ 16000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 18000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	{ 20000, S_BOSSDUMP, 1, 0, 0, 0, 0, "boss" }, { 22000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	GLIDEAT(23000, HERO_OBELIX, -318.0f, 6.0f, -150.0f, 5000),
+	{ 24000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 26000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	{ 28000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	GLIDEAT(28500, HERO_OBELIX, -330.0f, 6.0f, -112.0f, 5000),
+	{ 30000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 32000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	SHOT(33000, "corner"),
+	GLIDEAT(34000, HERO_OBELIX, -380.0f, 6.0f, -111.0f, 9000),
+	{ 34000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 37000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	{ 40000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 43000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	GLIDEAT(43500, HERO_OBELIX, -425.0f, 6.0f, -110.0f, 7000),
+	{ 46000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 50000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	{ 54000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 58000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	{ 62000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 66000, S_BOSSDUMP, 1, 0, 0, 0, 0, "boss" },
+	SHOT(66500, "end"),
+	END(68000),
+};
+// bossdown36 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=1:24000; the
+// user's xxl_coop.lv3-6_partner_death_underground.log): you play Obelix through the
+// boss's start; he goes down where the user's did (-307.5 5.5 -167.3), ahead of the
+// rolling boss; Asterix (yours now) waits by the arena (-385 -111). The boss
+// shoves the body to its second corner (x -317.9, z -110.6), turns west and leaves
+// it behind (user: under the ground at -311.9 -3.8 -105.5).
+const Step kBossDown36[] = {
+	MARK(0, "bossdown36"), LOADSECTOR(200, 6),
+	PLACEAT(2500, HERO_ASTERIX, -208.28f, 11.5f, -200.22f), PLACEAT(2500, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	PLACEAT(5000, HERO_ASTERIX, -198.0f, 11.5f, -200.22f),
+	GLIDEAT(5300, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	PLACEAT(9000, HERO_OBELIX, -232.0f, 16.0f, -173.9f),
+	GLIDEAT(11000, HERO_OBELIX, -248.0f, 6.0f, -173.4f, 3000),
+	GLIDEAT(14500, HERO_OBELIX, -300.0f, 6.0f, -169.0f, 7000),
+	PLACEAT(22500, HERO_OBELIX, -307.53f, 6.0f, -167.34f),
+	{ 23000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	PLACEAT(26000, HERO_ASTERIX, -385.0f, 6.0f, -111.0f),
+	{ 30000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 34000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	SHOT(36000, "pushed"),
+	{ 38000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 42000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	SHOT(43000, "corner"),
+	{ 46000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" }, { 50000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	SHOT(51000, "after"),
+	{ 54000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	END(56000),
+};
+// bossbehind36 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=1:23000):
+// bossdown36's run, but Obelix goes down behind the rolling boss (put at -255 -172
+// once it has passed), Asterix ahead of it by the arena: the game over at once.
+const Step kBossBehind36[] = {
+	MARK(0, "bossbehind36"), LOADSECTOR(200, 6),
+	PLACEAT(2500, HERO_ASTERIX, -208.28f, 11.5f, -200.22f), PLACEAT(2500, HERO_OBELIX, -208.28f, 11.5f, -199.22f),
+	{ 4500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	PLACEAT(5000, HERO_ASTERIX, -198.0f, 11.5f, -200.22f),
+	GLIDEAT(5300, HERO_OBELIX, -226.0f, 11.5f, -199.22f, 1500),
+	PLACEAT(9000, HERO_OBELIX, -232.0f, 16.0f, -173.9f),
+	GLIDEAT(11000, HERO_OBELIX, -248.0f, 6.0f, -173.4f, 3000),
+	GLIDEAT(14500, HERO_OBELIX, -288.0f, 6.0f, -170.0f, 7000),
+	{ 21800, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	PLACEAT(22000, HERO_OBELIX, -255.0f, 6.0f, -172.0f),
+	PLACEAT(22000, HERO_ASTERIX, -385.0f, 6.0f, -111.0f),
+	{ 23500, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	SHOT(24000, "behind"),
+	{ 30000, S_BOSSDUMP, 0, 0, 0, 0, 0, "boss" },
+	END(36000),
+};
 // spboss36j (-Level 3, XXL_SPISOLATION=0; sp_hero_switch_lock on): you play
 // Obelix; the far jump off the platform (user: -229.6 13.6 -181.4) -- past #143's
 // plane (x -235.8, the boss's "move to the other end", Obelix's) above the arena,
@@ -8965,6 +9044,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("splockboss210", kSpLockBoss210),
 	SCENARIO("spboss36", kSpBoss36),
 	SCENARIO("spboss36j", kSpBoss36J),
+	SCENARIO("bossway36", kBossWay36),
+	SCENARIO("bossdown36", kBossDown36),
+	SCENARIO("bossbehind36", kBossBehind36),
 	SCENARIO("spdownhud2", kSpDownHud2),
 	SCENARIO("spsq24", kSpSq24),
 	SCENARIO("spsq24n", kSpSq24N),
@@ -12012,6 +12094,30 @@ void RunStep(const Step& s) {
 		f[0] = -0.73f; f[1] = -0.56f; f[2] = -0.38f; f[3] = 30.0f; f[4] = 25.0f; f[5] = 30.0f;
 		*(uint32_t*)(h.raw() + 0x388) &= ~0x80u;
 		Log("autotest: %s given a slide's push without the slide", HeroName(s.a));
+		break;
+	}
+	case S_BOSSDUMP: {   // every boss (CKHkBoss, class (2,177)): its flags, its way's distance, its place, its way
+		unsigned n = GetNumLvlClassInstances(2, 177);
+		for (unsigned i = 0; i < n; i++) {
+			char* o = (char*)GetLvlObject(2, 177, i);
+			char* node = o ? *(char**)(o + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			char* sp = o ? *(char**)(o + 0x600) : nullptr;
+			char* spd = o ? *(char**)(o + 0x598) : nullptr;
+			const float* m = fr ? (const float*)(fr + 0x80) : nullptr;
+			Log("autotest: boss #%u %p flags %08X dist %.2f speed %.2f way %p (vt %08X, length %.1f) at (%.1f %.1f %.1f)", i, o,
+			    *(uint32_t*)(o + 8), *(float*)(o + 0x5B4), spd ? *(float*)(spd + 0xC) : -1.0f, sp, sp ? *(unsigned*)sp : 0,
+			    sp ? *(float*)(sp + 8) : -1.0f, m ? m[0] : 0, m ? m[1] : 0, m ? m[2] : 0);
+			if (!sp || s.a == 0) continue;
+			typedef void(__fastcall* AtFn)(char* self, void* edx, float* out, float d, int tangent);
+			AtFn at = *(AtFn*)(*(char**)sp + 0x34);
+			float len = *(float*)(sp + 8);
+			for (float d = 0; d <= len + 0.01f; d += len / 16.0f) {
+				float p[3] = {};
+				at(sp, nullptr, p, d, 0);
+				Log("autotest:   way at %.1f: (%.1f %.1f %.1f)", d, p[0], p[1], p[2]);
+			}
+		}
 		break;
 	}
 	case S_AIWATCH:   // hero a's AI fields logged on change for b ms (AutotestAfterLifeTick)
