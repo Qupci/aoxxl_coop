@@ -2259,6 +2259,47 @@ static void SoloWatchLock(Trio t) {
 	}
 }
 
+// [coop] walk_to_marker_teleport: the level walks a hero to a marker (AI order 1,
+// its target +0x568) -- player 2's hero handed to the game for it (nolock off),
+// or single player's AI companion (sp_isolation off) -- and the pathfinding has
+// no way there: put on the marker (user: LV2-3, Obelix walked into the hearth
+// room before Asterix lit the hearth, its door shut behind him -- he never got
+// to his marker outside). Asked every 0.5 s once the walk is 1 s old; three noes
+// in a row (not a door swinging, a step in mid-air). Off by default (nolock on:
+// the level walks no player's hero).
+struct MarkerWalk { DWORD since = 0, askedAt = 0; int noes = 0; Vector3 to; };
+MarkerWalk g_markerWalk[HERO_COUNT];
+
+static void WatchMarkerWalk(Trio t) {
+	if (!g_config.markerTeleport || !t || CoopSuspended() || CutsceneBars()) return;
+	if (!g.p2Joined && !g_config.SoloMod()) return;
+	DWORD now = GetTickCount();
+	int l = t.Leader();
+	for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++) {
+		MarkerWalk& w = g_markerWalk[i];
+		Hero h = t.GetHero(i);
+		bool ours = g.p2Joined ? g.held[i] : (i != l && !h.IsPlayerControlled());
+		if (!h || i == l || !ours || (int)h.Order() != AI_GOTO_POS || IndivFallen(i)) { w = MarkerWalk(); continue; }
+		Vector3 to = h.AiTargetPos();
+		if (!w.since || (to - w.to).len2() > 1.0f) { w = MarkerWalk(); w.since = now; w.to = to; }
+		Vector3 d = to - h.Pos();
+		if (d.x * d.x + d.z * d.z < 2.0f * 2.0f || now - w.since < 1000 || now - w.askedAt < 500) continue;
+		w.askedAt = now;
+		int r = PfReachable(h.Pos(), to);
+		if (r != PF_NO) { w.noes = 0; continue; }
+		if (++w.noes < 3) continue;
+		Vector3 at = h.Pos();
+		Vector3 put = to;
+		put.y += 0.5f;
+		SetHeroPosition(h, put);
+		w = MarkerWalk();
+		static int s_told = 0;
+		if (s_told++ < 20)
+			Log("coop: walk_to_marker_teleport: %s has no way to its marker (%.1f %.1f %.1f) from (%.1f %.1f %.1f) -- put on it",
+			    HeroName(i), to.x, to.y, to.z, at.x, at.y, at.z);
+	}
+}
+
 // The trio's lead to `who` (0x4800 Asterix, 0x4801 Obelix).
 static void GiveLead(Trio t, int who) {
 	if ((who != HERO_ASTERIX && who != HERO_OBELIX) || t.Leader() == who) return;
@@ -3127,6 +3168,7 @@ void CoopFrame() {
 	}
 	WatchControllerPreset();
 	WatchBindings();
+	if (t && CoopGameplayLive()) WatchMarkerWalk(t);
 	if (!g.p2Joined) {
 		// Without player 2 the hero that is not leading is the AI companion. A
 		// save made during co-op stores player 2's hero in the player variant:

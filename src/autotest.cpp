@@ -3141,6 +3141,21 @@ const Step kCoHearth23[] = {
 	END(26000),
 };
 
+// comarker23 (-Level 2, XXL_NOLOCK=0, XXL_MARKERTP=0 / 1): the user's LV2-3 case --
+// player 2's Obelix inside the hearth room with Asterix as he lights the hearth:
+// the door shuts, the hearth's 4826 walks Obelix (the game's) to his marker
+// outside (-54.6 0.6 -523.1), no way there. Off: he stays inside trying; on: put
+// on the marker ([coop] walk_to_marker_teleport).
+const Step kCoMarker23[] = {
+	MARK(0, "comarker23"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -44.03f, 0.8f, -541.286f), PLACEAT(3000, HERO_OBELIX, -46.5f, 0.8f, -539.5f),
+	{ 4500, S_TORCH, 0, 0, 0, 0, 0, "torches" }, { 4700, S_TORCH, 6, 0, 0, 0, 0, "asterix gets a lit torch" },
+	P1(5800, PAD_X, 0, 0, "p1 X"), P1(5950, 0, 0, 0, "p1 release"),
+	SHOT(9000, "lit"), SHOT(12000, "walk"), REACH(12500), SHOT(16000, "after"),
+	END(17000),
+};
+
 // reach26w (-Level 2, XXL_DOWNAT=0:5000): the user's LV2-6 run -- Obelix the
 // waiting AI companion (trio 4802) from before the pit (no safe spot of his
 // since the level's start), Asterix falls on the far side: the lock's undo must
@@ -9129,6 +9144,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("ledgerev65", kLedgeRev65),
 	SCENARIO("sphearth23", kSpHearth23),
 	SCENARIO("cohearth23", kCoHearth23),
+	SCENARIO("comarker23", kCoMarker23),
 	SCENARIO("coledgerev65", kCoLedgeRev65),
 	SCENARIO("spdownhud2", kSpDownHud2),
 	SCENARIO("spsq24", kSpSq24),

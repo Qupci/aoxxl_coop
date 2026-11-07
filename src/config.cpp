@@ -106,6 +106,7 @@ void CoopConfig::Load(const char* iniPath) {
 	noLockExceptBeams = ReadBool("coop", "nolock_except_rotarybeams", noLockExceptBeams, full);
 	carRiderLeads = ReadBool("coop", "cable_car_rider_leads", carRiderLeads, full);
 	romansInView = ReadBool("coop", "romans_spawn_in_view", romansInView, full);
+	markerTeleport = ReadBool("coop", "walk_to_marker_teleport", markerTeleport, full);
 	noLockRomans = ReadBool("coop_difficulty.experimental", "nolock_romans", noLockRomans, full);
 	noLockRomansAnyMarkers = ReadBool("coop_difficulty.experimental", "nolock_romans_any_markers", noLockRomansAnyMarkers, full);
 	if (getenv("XXL_NOLOCK")) noLock = atoi(getenv("XXL_NOLOCK")) != 0;   // autotests
@@ -113,6 +114,7 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_NOLOCKBEAMS")) noLockExceptBeams = atoi(getenv("XXL_NOLOCKBEAMS")) != 0;
 	if (getenv("XXL_RIDERLEADS")) carRiderLeads = atoi(getenv("XXL_RIDERLEADS")) != 0;
 	if (getenv("XXL_ROMANSINVIEW")) romansInView = atoi(getenv("XXL_ROMANSINVIEW")) != 0;
+	if (getenv("XXL_MARKERTP")) markerTeleport = atoi(getenv("XXL_MARKERTP")) != 0;
 	if (getenv("XXL_NOLOCKROMANS")) noLockRomans = atoi(getenv("XXL_NOLOCKROMANS")) != 0;
 	if (getenv("XXL_NOLOCKROMANSANY")) noLockRomansAnyMarkers = atoi(getenv("XXL_NOLOCKROMANSANY")) != 0;
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
