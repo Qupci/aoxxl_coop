@@ -4590,3 +4590,16 @@ both halves).
   runs 60+ s with nobody steering; trio 0x4806 by hand ends the mode but leaves Asterix at 0 0 0 -- no second ride
   of the same slide in one run (left to the pad test). Placing the leader with one PLACEAT right after level 2's
   start / into an unloaded spot does not stick (a short GLIDEAT does). gunlist3 lists level 3's guns (2,31).
+- Round 244 (Nov 8, commit b7401ad; user: (1) co-op's start takes the leader the player switched to in single
+  player with sp_hero_switch, not the level's lead (LVL LEAD); (2) LVL LEAD skips LV2-1's switch at -793.3 526.2
+  -989.6). (1) coop.cpp TryJoin: once CoopAllowedNow passes and before p2Joined, CoopSoloLevelLead() (the level's
+  lead, -2 with sp_hero_switch off or in co-op) differing from the leader -> CoopGiveLead to it ("co-op starts: the
+  level's lead ..."), unless that hero is not following (AI order != 0), +0x1A set or down (then logged, kept).
+  p2_hero = other is decided after it. (2) The zone is 01E0 (group 03C: 4800 "Asterix leads", 4803, ...), Obelix's:
+  with Obelix played and leading, SoloDropsSwitch's lock check SoloOwnCatchUp (that hero's own catch-up as the
+  sidekick) returned before levelLeader was set (user's xxl_coop.1.log 75.8 s). The level's lead is now set first
+  for every switch from the exe, the lock's catch-up drop after it (lock off never reached it: the same tracking).
+  Logged (cap 60) "the level's lead: X (its switch, from, who leads)". LV2-1's keg is event 0348 (4801, with the
+  lock dropped as "nobody in the level's hands"). Autotests lvllead21 (S_FLAGEV 0348 -> lead Obelix; switch button
+  to Obelix; Obelix glided into 01E0 -> lead Asterix, HUD "LEADER: OBELIX LVL LEAD: ASTERIX"; P2 Start -> Asterix
+  takes the lead, P2 joins as Obelix) and lvllead21j (0348, P2 Start with Asterix leading -> Obelix leads).
