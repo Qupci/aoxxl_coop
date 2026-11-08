@@ -7768,6 +7768,35 @@ const Step kSpSwitch2[] = {
 	SHOT(11500, "obelix_again"),
 	END(12000),
 };
+
+// lvllead21 (level 2, the user's ini: sp_hero_switch + lock, show_leader): the
+// level's lead (LVL LEAD) and co-op's start. LV2-1's keg (event 0348, "Obelix
+// leads": the lock drops it, the level's lead is Obelix); the switch button to
+// Obelix; Obelix into zone 01E0 at -793.3 526.2 -989.6 (Obelix's: "Asterix leads"
+// + "the sidekick may move", dropped as Obelix's own catch-up -- the level's lead
+// is Asterix all the same); player 2 joins: co-op starts with Asterix leading.
+// lvllead21j: the keg, then player 2 joins with Asterix leading: Obelix leads.
+const Step kLvlLead21[] = {
+	MARK(0, "lvllead21"),
+	{ 2000, S_FLAGEV, 0x348, 0, 0, 0, 0, "the keg (0348)" },
+	SHOT(3000, "lvllead21_keg"),
+	{ 4000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	PLACEAT(5500, HERO_ASTERIX, -785.0f, 527.0f, -987.0f),
+	PLACEAT(5500, HERO_OBELIX, -786.0f, 526.8f, -989.0f),
+	GLIDEAT(6000, HERO_OBELIX, -793.3f, 526.3f, -989.6f, 1500),
+	SHOT(9000, "lvllead21_zone"),
+	VPAD(10000, 1, PAD_START, 0, 0, "p2 start"), VPAD(10200, 1, 0, 0, 0, "p2 release"),
+	SHOT(12000, "lvllead21_coop"),
+	END(13000),
+};
+const Step kLvlLead21J[] = {
+	MARK(0, "lvllead21j"),
+	{ 2000, S_FLAGEV, 0x348, 0, 0, 0, 0, "the keg (0348)" },
+	SHOT(3000, "lvllead21j_keg"),
+	VPAD(4000, 1, PAD_START, 0, 0, "p2 start"), VPAD(4200, 1, 0, 0, 0, "p2 release"),
+	SHOT(6000, "lvllead21j_coop"),
+	END(7000),
+};
 // sptorch2 (level 2, XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_LIFTLOG=1): Asterix
 // carries a lit torch; switched to Obelix with Asterix following, it burns on;
 // Asterix told to wait (trio 0x4802, parked), it is held; free again (0x4803),
@@ -9379,6 +9408,8 @@ struct Scenario { const char* name; const Step* steps; int count; };
 const Scenario kScenarios[] = {
 	SCENARIO("idle", kIdle),
 	SCENARIO("spswitch2", kSpSwitch2),
+	SCENARIO("lvllead21", kLvlLead21),
+	SCENARIO("lvllead21j", kLvlLead21J),
 	SCENARIO("sptorch2", kSpTorch2),
 	SCENARIO("sptorchthrow2", kSpTorchThrow2),
 	SCENARIO("sptorchthrowo2", kSpTorchThrowO2),

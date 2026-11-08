@@ -828,6 +828,20 @@ void TryJoin(Trio t) {
 			Log("coop: %s pressed Start but co-op cannot start now (%s)", PadName(pad), why);
 			return;
 		}
+		// Single player with sp_hero_switch: the leader may be the hero you switched
+		// to, not the level's. Co-op goes on from the level's lead (its zones, its
+		// later orders are that hero's), unless the other hero is the level's or down.
+		{
+			int ll = CoopSoloLevelLead(), l = t.Leader();
+			if ((ll == HERO_ASTERIX || ll == HERO_OBELIX) && (l == HERO_ASTERIX || l == HERO_OBELIX) && ll != l) {
+				Hero h = t.GetHero(ll);
+				if (h && h.Order() == AI_FOLLOW_LEADER && !*(uint8_t*)(h.raw() + 0x1A) && !IndivFallen(ll))
+					CoopGiveLead(ll, "co-op starts: the level's lead, not the single player switch's");
+				else
+					Log("coop: co-op starts with %s leading -- the level's lead %s is held (AI order %d) or down, kept",
+					    HeroName(l), HeroName(ll), h ? (int)h.Order() : -1);
+			}
+		}
 		g.p2Joined = true;
 		g.p2Pad    = pad;
 		// Player 2 plays Obelix (ini p2_hero), whoever leads right now: after the
@@ -5011,7 +5025,6 @@ static bool SoloDropsSwitch(int ev) {
 	if (g.p2Joined || !IsLeaderSwitch(ev)) return false;
 	Trio t = GetTrio();
 	if (!t) return false;
-	if (SoloSwitchLockOn() && SoloOwnCatchUp(t, ev & 0xFFFF) >= 0) return true;
 	extern void* g_trioEventCaller;
 	uintptr_t from = (uintptr_t)g_trioEventCaller;
 	int to = (ev & 0xFFFF) == 0x4800 || (ev & 0xFFFF) == 0x48B7 ? HERO_ASTERIX : HERO_OBELIX;
@@ -5025,8 +5038,18 @@ static bool SoloDropsSwitch(int ev) {
 		s_exeHi = s_exeLo + ((IMAGE_NT_HEADERS*)(m + ((IMAGE_DOS_HEADER*)m)->e_lfanew))->OptionalHeader.SizeOfImage;
 	}
 	if (from < s_exeLo || from >= s_exeHi) return false;
+	if (g_solo.levelLeader != to && g_config.spHeroSwitch) {
+		static int s_lead = 0;
+		if (s_lead++ < 60)
+			Log("coop: the level's lead: %s (its switch %04X, from %08X; %s leads)", HeroName(to), ev & 0xFFFF, (unsigned)from,
+			    HeroName(t.Leader()));
+	}
 	g_solo.levelLeader = to;   // (the leader the level means from now, given or not -- the level's lead)
 	if (!SoloSwitchLockOn()) return false;
+	// (After the level's lead: LV2-1's 01E0 at -793.3 526.2 -989.6, Obelix's zone,
+	// "Asterix leads" + "the sidekick may move" -- dropped as Obelix's own catch-up,
+	// it still means Asterix.)
+	if (SoloOwnCatchUp(t, ev & 0xFFFF) >= 0) return true;
 	// A trio launcher's landing (CKHkTrioCatapult tick 0x4C2AB0: its +0x15 bit 1,
 	// the launcher's own hero +0x14 bit 2 -- 4800 / 4801 if the other leads; LV5-3's
 	// at -341.2 14.1 151.5 is Asterix's): it comes mid-flight, deferred to the
