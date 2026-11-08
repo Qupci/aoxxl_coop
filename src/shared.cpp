@@ -38,6 +38,64 @@ struct State {
 	int      logActions = -1;               // XXL_ACTIONLOG
 } g;
 
+// The who-does-what hint of the machine gun, the boat and the belly slide is
+// the first one's of the game's run (in co-op): that gun / boat / slide, by its
+// spot, keeps it for as long as its level stays loaded -- each time the heroes
+// take it -- and every other one has none, the same one after a load too.
+enum HintKind { HK_GUN, HK_BOAT, HK_SLIDE, HK_COUNT };
+const char* const kHintKindName[HK_COUNT] = { "machine gun", "boat", "belly slide" };
+struct HintSpot {
+	bool    set = false;
+	int     load = 0;      // the level load it was taken in
+	Vector3 at = {};
+};
+HintSpot g_hintSpot[HK_COUNT];
+int      g_load = 0;              // level loads seen (same level too)
+int      g_loadLevel = -2;
+void*    g_loadTrio = nullptr;
+void*    g_loadLevelObj = nullptr;
+
+// A level load: another level, a next level asked for (the same one again too),
+// or a new trio / level object.
+void NoteLevelLoad(Trio t) {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	int level = gm ? *(int*)(gm + ax::kGM_currentLevel) : -1;
+	int next = gm ? *(int*)(gm + ax::kGM_nextLevel) : -1;
+	void* lvl = gm ? *(void**)(gm + ax::kGM_levelObject) : nullptr;
+	void* trio = t ? t.raw() : nullptr;
+	bool load = level != g_loadLevel || next >= 0 || (trio && trio != g_loadTrio) || (lvl && lvl != g_loadLevelObj);
+	g_loadLevel = level;
+	if (trio) g_loadTrio = trio;
+	if (lvl) g_loadLevelObj = lvl;
+	if (load) g_load++;
+}
+
+// Does mode `m`'s hint go up? Only at the first one's spot (taken here when none
+// is yet): the heroes' hero in the mode (Asterix on the gun / boat, Obelix alone
+// on the gun or on the slide) where it started.
+bool ModeHintHere(SharedMode m, Trio t) {
+	int k = m == SHARED_BOAT ? HK_BOAT : m == SHARED_SLIDE ? HK_SLIDE : HK_GUN;
+	Hero h = t.GetHero(m == SHARED_SLIDE || m == SHARED_GUN_OBELIX ? HERO_OBELIX : HERO_ASTERIX);
+	if (!h) return false;
+	Vector3 p = h.Pos();
+	HintSpot& s = g_hintSpot[k];
+	if (!s.set) {
+		s = { true, g_load, p };
+		Log("shared: the %s's hint stays with this one (%.1f %.1f %.1f, load %d)", kHintKindName[k], p.x, p.y, p.z, g_load);
+		return true;
+	}
+	Vector3 d = p - s.at;
+	bool here = s.load == g_load && d.x * d.x + d.z * d.z < 25.0f * 25.0f && fabsf(d.y) < 10.0f;
+	static int s_logged = 0;
+	if (s_logged < 20) {
+		s_logged++;
+		Log("shared: %s at %.1f %.1f %.1f, load %d: %s", kHintKindName[k], p.x, p.y, p.z, g_load,
+		    here ? "the hint's own -- shown" : "not the first one -- no hint");
+	}
+	return here;
+}
+
 int MapOf(const char* view) {
 	for (int m = 0; m < MAP_COUNT; m++)
 		if (g.base[m] && view >= g.base[m] && view < g.end[m]) return m;
@@ -175,6 +233,8 @@ void ShowModeHint(SharedMode m) {
 	if (m == SHARED_NONE) { HintHide(HINT_MODE); return; }
 	bool gun = m == SHARED_GUN || m == SHARED_GUN_SOLO || m == SHARED_GUN_OBELIX;
 	if (gun && !g_config.hintMachineGun) { HintHide(HINT_MODE); return; }   // [hints] hint_machine_gun off
+	Trio t = GetTrio();
+	if (m != SHARED_FUSION && (!t || !ModeHintHere(m, t))) { HintHide(HINT_MODE); return; }
 	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
 	wchar_t ta[96] = {}, to[96] = {};
 	switch (m) {
@@ -235,6 +295,7 @@ void SharedFrame() {
 	g.owner[HERO_ASTERIX] = CoopP1Hero() == HERO_ASTERIX ? 0 : 1;
 	g.owner[HERO_OBELIX] = CoopP1Hero() == HERO_OBELIX ? 0 : 1;
 	Trio t = GetTrio();
+	NoteLevelLoad(t);
 	SharedMode m = g.joined && t ? DetectMode(t) : SHARED_NONE;
 	if (g.logActions > 0 && t) {   // the machine on offer (trio +0x48, +0x3F4 bits 3, 10-11)
 		static uint32_t lastOffer = 0;

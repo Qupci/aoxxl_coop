@@ -1428,6 +1428,88 @@ const Step kMgun33A[] = {
 	END(13000),
 };
 
+// gunlist3 (-Level 3): every machine gun of the level (CKHkMachinegun 2,31) with
+// its spot, sectors 3 and 6 loaded.
+const Step kGunList3[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 3), LOADSECTOR(1500, 6),
+	{ 4000, S_NEAROBJ, HERO_ASTERIX, 31, 0, 1.5f, 0, "guns" },
+	END(5000),
+};
+// hintgun3 (-Level 3): the machine gun's hint stays with the run's first gun:
+// the LV3-3 gun twice (hint both times), the LV3-6 gun (-172.1 5.7 -196.7: none),
+// level 3 loaded again and the LV3-3 gun (none).
+#define HINTGUN33(t, shot) \
+	PLACEAT(t, HERO_ASTERIX, 284.4f, 31.92f, -325.9f), PLACEAT(t, HERO_OBELIX, 289.3f, 31.92f, -325.6f), \
+	VPAD(t + 1500, 1, PAD_X, 0, 0, "p2 X"), VPAD(t + 1700, 1, 0, 0, 0, "p2 release"), \
+	SHOT(t + 3000, shot), \
+	VPAD(t + 5000, 1, PAD_A, 0, 0, "p2 A (leave)"), VPAD(t + 5200, 1, 0, 0, 0, "p2 release")
+const Step kHintGun3[] = {
+	MGUN33_SETUP,
+	HINTGUN33(4000, "hintgun_33_first"),
+	HINTGUN33(11000, "hintgun_33_again"),
+	LOADSECTOR(17500, 6),
+	PLACEAT(19000, HERO_ASTERIX, -176.0f, 5.7f, -196.7f), PLACEAT(19000, HERO_OBELIX, -173.2f, 5.7f, -196.7f),
+	VPAD(20500, 1, PAD_X, 0, 0, "p2 X"), VPAD(20700, 1, 0, 0, 0, "p2 release"),
+	SHOT(22500, "hintgun_36"),
+	VPAD(24000, 1, PAD_A, 0, 0, "p2 A (leave)"), VPAD(24200, 1, 0, 0, 0, "p2 release"),
+	{ 26000, S_RELOAD, 0, 0, 0, 0, 0, "reload" },
+	CINE_SKIP(36000), CINE_SKIP(38000),
+	LOADSECTOR(40000, 3),
+	HINTGUN33(43000, "hintgun_33_reloaded"),   // (player 2 stays in through the same level's load)
+	END(50000),
+};
+
+// hintboat (-Level 4): the boat's hint stays with the run's first boat: LV4-9's
+// (hint), then level 5's LV5-4 boat (the user's spot 352.8 12.7 22.6: none).
+const Step kHintBoat[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 9),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	SECTORS(3500),
+	PLACEAT(3000, HERO_ASTERIX, -165.4f, 6.0f, -652.0f), PLACEAT(3000, HERO_OBELIX, -162.0f, 6.0f, -650.0f),
+	P1(5000, PAD_X, 0, 0, "p1 X"), P1(5200, 0, 0, 0, "p1 release"),
+	SHOT(7500, "hintboat_49"),
+	{ 12000, S_RELOAD, 5, 0, 0, 0, 0, "level 5" },
+	CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000), CINE_SKIP(30000),
+	LOADSECTOR(32000, 4),
+	VPAD(33000, 1, PAD_START, 0, 0, "p2 start"), VPAD(33200, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(35000, HERO_ASTERIX, 352.846f, 12.687f, 22.624f), PLACEAT(35000, HERO_OBELIX, 350.0f, 12.687f, 25.0f),
+	P1(37000, PAD_X, 0, 0, "p1 X"), P1(37200, 0, 0, 0, "p1 release"),
+	SHOT(39500, "hintboat_54"),
+	END(42000),
+};
+
+// hintslide29 (-Level 2): LV2-9's belly slide twice as the run's first (the
+// user's way: 214.6 50.5 -213.1 to z -219.5 starts it): the hint both times.
+// hintslide2 (-Level 2): LV2-2's slide first (slide22s, hint), then LV2-9's (none).
+#define HINTSLIDE29(t, shot) \
+	GLIDEAT(t, HERO_ASTERIX, 218.312f, 50.0f, -179.413f, 300), PLACEAT(t, HERO_OBELIX, 219.8f, 50.0f, -179.413f), \
+	PLACEAT(t + 1000, HERO_ASTERIX, 218.312f, 50.0f, -179.413f), PLACEAT(t + 1000, HERO_OBELIX, 219.8f, 50.0f, -179.413f), \
+	GLIDEAT(t + 2000, HERO_ASTERIX, 214.634f, 50.6f, -211.5f, 3000), GLIDEAT(t + 2000, HERO_OBELIX, 214.634f, 50.542f, -213.081f, 3000), \
+	PLACEAT(t + 5500, HERO_ASTERIX, 214.634f, 50.6f, -211.5f), PLACEAT(t + 5500, HERO_OBELIX, 214.634f, 50.542f, -213.081f), \
+	GLIDEAT(t + 6000, HERO_OBELIX, 214.634f, 50.542f, -222.0f, 1500), GLIDEAT(t + 6000, HERO_ASTERIX, 214.634f, 50.6f, -221.0f, 1500), \
+	SHOT(t + 9000, shot), \
+	{ t + 15000, S_TRIOEV, 0x4806, 0, 0, 0, 0, "slide over (its end zone's 4806)" }
+const Step kHintSlide29[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 9),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	HINTSLIDE29(6000, "hintslide29_first"),
+	HINTSLIDE29(25000, "hintslide29_again"),
+	END(42000),
+};
+const Step kHintSlide2[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2000, HERO_ASTERIX, -905.7f, 527.9f, -938.4f), PLACEAT(2000, HERO_OBELIX, -903.7f, 527.9f, -938.4f),
+	GLIDEAT(3000, HERO_ASTERIX, -911.0f, 528.2f, -913.4f, 2500),
+	CINE_SKIP(6000), CINE_SKIP(8000), CINE_SKIP(10000), CINE_SKIP(12000), CINE_SKIP(14000), CINE_SKIP(16000), CINE_SKIP(18000), CINE_SKIP(20000), CINE_SKIP(22000), CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000),
+	GLIDEAT(31000, HERO_ASTERIX, -907.3f, 526.8f, -903.6f, 1500),
+	SHOT(35000, "hintslide2_22"),
+	{ 42000, S_TRIOEV, 0x4806, 0, 0, 0, 0, "slide over (its end zone's 4806)" },
+	LOADSECTOR(45000, 9),
+	HINTSLIDE29(48000, "hintslide2_29"),
+	END(65000),
+};
+
 // boat49o / boat49a (-Level 4): sector 9's boat (the user's spot -165.4 6.0
 // -652.0); player 2's Obelix (o) or player 1's Asterix (a) presses X there, the
 // other hero beside; then player 2 steers left, player 1 presses A.
@@ -9515,6 +9597,11 @@ const Scenario kScenarios[] = {
 	SCENARIO("mgun3a", kMgun3A),
 	SCENARIO("mgun3n", kMgun3N),
 	SCENARIO("mgun3o", kMgun3O),
+	SCENARIO("gunlist3", kGunList3),
+	SCENARIO("hintgun3", kHintGun3),
+	SCENARIO("hintboat", kHintBoat),
+	SCENARIO("hintslide29", kHintSlide29),
+	SCENARIO("hintslide2", kHintSlide2),
 	SCENARIO("mgun33o", kMgun33O),
 	SCENARIO("mgun33a", kMgun33A),
 	SCENARIO("mgun33j", kMgun33J),
@@ -12399,8 +12486,9 @@ void RunStep(const Step& s) {
 		char* gm = yp ? (char*)yp->gameManager : nullptr;
 		if (!gm) break;
 		int cur = *(int*)(gm + ax::kGM_currentLevel);
-		Log("autotest: level %d loaded again", cur);
-		*(int*)(gm + ax::kGM_nextLevel) = cur;
+		if (s.a > 0) Log("autotest: level %d -> level %d", cur, s.a);   // a > 0: level a instead
+		else Log("autotest: level %d loaded again", cur);
+		*(int*)(gm + ax::kGM_nextLevel) = s.a > 0 ? s.a : cur;
 		break;
 	}
 	case S_GIVE: {   // hero a gets a shield (b = 1) or x health points (b = 0), as a bonus gives them
