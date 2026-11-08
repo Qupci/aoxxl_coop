@@ -663,6 +663,38 @@ const Step kSkip1[] = {
 	SHOT(4000, "skip1_0"), SHOT(12000, "skip1_1"),
 	END(15000),
 };
+// holdskip (-Level 1, skip_cutscenes on): the intro skipped only after its
+// button is held 3 s. A tap of A shows "Hold A to skip" (5 s after the last
+// press), Enter held 1.5 s fills half the box and lets go (not skipped), then A
+// held 4 s: the box fills white to green and the intro ends at 3 s. (Pad A
+// on XInput slot 0: the game's own value is only a press's edge.)
+const Step kHoldSkip[] = {
+	MARK(0, "baseline"),
+	VPAD(1500, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1650, "hs_tap_held"), VPAD(1750, 0, 0, 0, 0, "pad 1 release"),
+	SHOT(2500, "hs_tap_released"),
+	KEY(3000, VK_RETURN, 1, "enter down"), SHOT(3800, "hs_enter_25"), SHOT(4500, "hs_enter_50"),
+	KEY(4600, VK_RETURN, 0, "enter up"), SHOT(5000, "hs_enter_let_go"),
+	SHOT(9000, "hs_still_shown"), SHOT(10200, "hs_hidden"),
+	VPAD(11000, 0, PAD_A, 0, 0, "pad 1 holds A"), SHOT(12000, "hs_a_33"), SHOT(12800, "hs_a_60"), SHOT(13700, "hs_a_90"),
+	SHOT(14080, "hs_a_full"), SHOT(14200, "hs_a_fade"),
+	VPAD(15000, 0, 0, 0, 0, "pad 1 release"),
+	SHOT(17000, "hs_after"),
+	END(20000),
+};
+// revivebar (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2): spsecond2's
+// revive with the box filling as the hold bar.
+const Step kReviveBar[] = {
+	MARK(0, "revivebar"),
+	P1(4500, 0, 0, 1.0f, "p1 forward (obelix)"), P1(6500, 0, 0, 0, "p1 stop"),
+	{ 7200, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: asterix down; sp_hero_switch on)" },
+	GLIDEBY(7500, HERO_OBELIX, 1.0f, 0.0f, 600),
+	SHOT(8300, "rb_prompt"),
+	P1(8500, PAD_B, 0, 0, "p1 holds B"), SHOT(8900, "rb_20"), SHOT(9500, "rb_50"), SHOT(10100, "rb_80"),
+	SHOT(10530, "rb_full"), SHOT(10650, "rb_fade"),
+	P1(11500, 0, 0, 0, "p1 release"),
+	SHOT(12500, "rb_revived"),
+	END(13000),
+};
 const Step kIntro1[] = {
 	MARK(0, "baseline"),
 	SHOT(30000, "intro1_0"), SHOT(90000, "intro1_1"),
@@ -9564,6 +9596,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("boot2", kBoot2),
 	SCENARIO("bootoptwrap", kOptWrap),
 	SCENARIO("skip1", kSkip1),
+	SCENARIO("holdskip", kHoldSkip),
+	SCENARIO("revivebar", kReviveBar),
 	SCENARIO("intro1", kIntro1),
 	SCENARIO("torch", kTorch),
 	SCENARIO("torchgrab", kTorchGrab),

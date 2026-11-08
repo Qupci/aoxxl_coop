@@ -35,6 +35,7 @@
 #include "shared.h"
 #include "hints.h"
 #include "combohints.h"
+#include "cutskip.h"
 #include "icons.h"
 
 namespace {
@@ -69,6 +70,7 @@ void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	StallRegisterGameThread();
 	AutotestFrame();
 	CoopFrame();
+	CutSkipFrame();
 	SharedFrame();
 	ComboHintsFrame();
 	HintsFrame();

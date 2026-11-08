@@ -1836,16 +1836,16 @@ void IndivFrame() {
 		float hold = HoldSeconds(h.Pos());
 		if (holding) {
 			g.revive[i] += dt;
-			wchar_t text[128], bar[24];
-			int n = (int)(g.revive[i] / hold * 20.0f);
-			if (n > 20) n = 20;
-			// The game's font has '=' and '-' (no '|', '#' or '%').
-			for (int k = 0; k < 20; k++) bar[k] = k < n ? L'=' : L'-';
-			bar[20] = 0;
-			swprintf(text, 128, L"Reviving %s\n%s", HintHeroName(i), bar);
+			// The box itself is the bar (hints.cpp HintProgress).
+			wchar_t text[128];
+			swprintf(text, 128, L"Reviving %s", HintHeroName(i));
 			HintShow(HINT_REVIVE, PlayerOf(up), text, 500);
+			HintProgress(HINT_REVIVE, PlayerOf(up), g.revive[i] / hold);
 			if (g.revive[i] >= hold) {
 				Revive(i, h, hold < g_config.reviveHold ? "revived by a catapult" : "revived", true);
+				// The full bar's fade-out (Revive hid the hint).
+				HintShow(HINT_REVIVE, PlayerOf(up), text, 400);
+				HintProgress(HINT_REVIVE, PlayerOf(up), 1.0f);
 				continue;
 			}
 		} else {

@@ -44,6 +44,10 @@ bool HintBoxRect(int player, float* left, float* right, float* bottom, float* to
 // the hint's last line, with the combo bar's level sound
 // (`sound`).
 void HintSpark(int key, int player, int n, bool sound);
+// A hold's progress on hint (`key`, `player`), 0..1 (below 0: none): its box's
+// plate fills from the left, white turning green (#00FF0E), fading out once full
+// (the user's Figma design). Kept while the hint is shown again.
+void HintProgress(int key, int player, float progress);
 
 enum HintKey {
 	HINT_JOIN = 1,      // level start: how player 2 joins / leaves
@@ -54,6 +58,7 @@ enum HintKey {
 	HINT_REVIVE,        // a fallen hero: how to revive it, the revive under way
 	HINT_COMBO,         // a combo to try (combohints.cpp)
 	HINT_FUSE,          // both heroes spinning together: X fuses them
+	HINT_SKIP,          // a cutscene: hold A / Enter to skip it (cutskip.cpp), also over a cutscene
 };
 
 enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_Y, HB_RB, HB_COUNT };

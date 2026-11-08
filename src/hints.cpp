@@ -39,7 +39,7 @@ const uintptr_t kInGameTick = 0x5180E0;
 InterfaceTickFn g_origInterfaceTick = nullptr;
 const unsigned  kPromptNone = 0xE;
 
-struct Hint { int key; int player; wchar_t text[kTextLen]; DWORD until; DWORD since; };
+struct Hint { int key; int player; wchar_t text[kTextLen]; DWORD until; DWORD since; float progress; };
 Hint g_hints[24];
 int  g_nHints = 0;
 bool g_loggedKinds = false;
@@ -170,9 +170,13 @@ struct Slot {
 	bool     button[kMaxWords] = {};  // a button of the last line: any word but ">"
 	Burst    bursts[8] = {};
 	int      nBursts = 0;
+	float    progress = -1.0f;       // a hold's bar (HintProgress), below 0 none
+	DWORD    fullAt = 0;             // when it was full (its fade-out)
 };
 Slot   g_slots[2];
 char*  g_itf = nullptr;
+DWORD  g_tickAt = 0;        // the interface's last tick
+DWORD  g_cineDrawAt = 0;    // the last draw of the skip prompt over a cutscene
 alignas(16) char g_glyphObj[8][kText2dSize];   // spark0..3, glow0..3, each one glyph
 bool   g_glyphLaid[8] = {};
 float  g_glyphW[8] = {}, g_glyphY[8] = {}, g_glyphSize[8] = {};
@@ -313,9 +317,16 @@ Place PlaceOf(int p) {
 }
 
 // What a box should show: kind (0 nothing, 1 the prompt, 2 a hint), ident, text.
-void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text) {
+void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, float* progress) {
 	static wchar_t prompt[2][kTextLen];
-	*kind = 0; *ident = 0; *text = L"";
+	*kind = 0; *ident = 0; *text = L""; *progress = -1.0f;
+	// A cutscene's skip prompt before anything.
+	for (int i = 0; i < g_nHints; i++) {
+		const Hint& h = g_hints[i];
+		if (h.key != HINT_SKIP || h.player != p || (int)(h.until - GetTickCount()) <= 0) continue;
+		*kind = 2; *ident = HINT_SKIP; *text = h.text; *progress = h.progress;
+		return;
+	}
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	unsigned gameKind = gm ? (*(uint32_t*)(gm + 0xCC) >> 4) & 0xF : kPromptNone;
@@ -335,7 +346,7 @@ void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text) 
 	} else if (p == 0 && gameKind != kPromptNone) {
 		return;   // player 1 alone: the game's own prompt comes first (the left box has no prompt)
 	}
-	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; }
+	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; *progress = h->progress; }
 }
 
 void UpdateSlot(int p, char* itf, float dt) {
@@ -345,13 +356,16 @@ void UpdateSlot(int p, char* itf, float dt) {
 	int kind;
 	uint32_t ident;
 	const wchar_t* text;
-	Choose(p, itf, &kind, &ident, &text);
+	float progress;
+	Choose(p, itf, &kind, &ident, &text, &progress);
 	Place pl = PlaceOf(p);
 	bool right = false;   // every box's lines left-aligned (the left box's right-aligned lines read oddly: user)
 	DWORD now = GetTickCount();
 	if (kind == s.kind && ident == s.ident) {
 		s.pendKind = -1;
 		s.leaving = false;
+		if (progress >= 1.0f && s.progress < 1.0f) s.fullAt = now;
+		s.progress = progress;
 		if (kind && (wcscmp(text, s.text) != 0 || right != s.rightAligned || !s.laid)) {
 			wcsncpy(s.text, text, kTextLen - 1);
 			s.rightAligned = right;
@@ -369,6 +383,8 @@ void UpdateSlot(int p, char* itf, float dt) {
 			s.leaving = false;
 			s.pendKind = -1;
 			s.nBursts = 0;
+			s.progress = progress;
+			s.fullAt = progress >= 1.0f ? now : 0;
 			wcsncpy(s.text, text, kTextLen - 1);
 			s.rightAligned = right;
 			s.in = 0.0f;
@@ -462,6 +478,70 @@ void DrawGlyph(int gi, float cx, float cy, float size, void* arg) {
 
 const DWORD kBurstMs = 500;
 
+// The hold bar (the user's Figma design): the plate filled from its left edge
+// to the hold's share of its width, its colour cross-faded with an ease-in-out
+// (cubic-bezier 0.5, 0, 0.5, 1) from white to green #00FF0E, each at 33% over
+// the box; once full it fades out in 0.25 s. Drawn as a second pass of the
+// game's plate (a CBillboard2d, its own billboard at +0x20: +8 the Rt2d brush
+// it is filled with, +0xC that fill's RGBA, +0x10 a border's RGBA drawn when
+// +0x1D = 1), its brush coloured for the bar (Rt2dBrushSetRGBA 0x5F9280,
+// cdecl(brush, four corners' RGBA): floats up to +0x6C) and put back.
+const DWORD kBarFadeMs = 250;
+typedef void*(__cdecl* BrushSetRgbaFn)(float* brush, const uint8_t* c0, const uint8_t* c1, const uint8_t* c2, const uint8_t* c3);
+const uintptr_t kBrushSetRgba = 0x5F9280;
+const int kBrushFloats = 0x20;
+
+float EaseInOut(float x) {
+	// cubic-bezier(0.5, 0, 0.5, 1): x(t) = 1.5 t (1 - t)^2 + 1.5 t^2 (1 - t) + t^3, y alike with 0 / 1.
+	float lo = 0.0f, hi = 1.0f, t = x;
+	for (int i = 0; i < 20; i++) {
+		t = 0.5f * (lo + hi);
+		float bx = 1.5f * t * (1 - t) * (1 - t) + 1.5f * t * t * (1 - t) + t * t * t;
+		if (bx < x) lo = t; else hi = t;
+	}
+	return 3.0f * t * t * (1 - t) + t * t * t;
+}
+
+void DrawBar(const Slot& s, float* plate, float left, float width, void* arg) {
+	float pr = s.progress > 1.0f ? 1.0f : s.progress;
+	float fade = 1.0f;
+	if (s.progress >= 1.0f && s.fullAt) {
+		DWORD age = GetTickCount() - s.fullAt;
+		fade = age >= kBarFadeMs ? 0.0f : 1.0f - age / (float)kBarFadeMs;
+	}
+	if (fade <= 0.0f || pr <= 0.0f) return;
+	float e = EaseInOut(pr);
+	float aw = 0.33f * (1.0f - e), ag = 0.33f * e;   // white under green
+	float a = ag + aw * (1.0f - ag);
+	if (a <= 0.0f) return;
+	float r = (255.0f * aw * (1.0f - ag)) / a, gr = (255.0f * ag + 255.0f * aw * (1.0f - ag)) / a,
+	      b = (14.0f * ag + 255.0f * aw * (1.0f - ag)) / a;
+	uint8_t* pb = (uint8_t*)plate;
+	float* brush = *(float**)(pb + 0x28);
+	if (!brush || IsBadWritePtr(brush, sizeof(float) * kBrushFloats)) return;
+	float saved[kBrushFloats];
+	memcpy(saved, brush, sizeof(saved));
+	uint8_t mode = pb[0x3D], al = pb[6];
+	float sx = plate[5], sw = plate[13];
+	static int logs = 0;
+	if (logs < 2) {
+		logs++;
+		Log("hints: hold bar on the plate (its fill %02X %02X %02X %02X, border %d)", pb[0x2C], pb[0x2D], pb[0x2E], pb[0x2F], mode);
+	}
+	uint8_t c[4] = { (uint8_t)(r + 0.5f), (uint8_t)(gr + 0.5f), (uint8_t)(b + 0.5f), (uint8_t)(255.0f * a * fade + 0.5f) };
+	((BrushSetRgbaFn)kBrushSetRgba)(brush, c, c, c, c);
+	pb[0x3D] = 0;   // (no border)
+	pb[6] = 0;
+	plate[5] = left;
+	plate[13] = width * pr;
+	((DrawFn)(*(void***)plate)[23])((char*)plate, nullptr, arg);
+	memcpy(brush, saved, sizeof(saved));
+	pb[0x3D] = mode;
+	pb[6] = al;
+	plate[5] = sx;
+	plate[13] = sw;
+}
+
 void DrawSlot(int p, char* itf, void* arg) {
 	Slot& s = g_slots[p];
 	if (!s.kind || !s.laid || s.in <= 0.0f) return;
@@ -499,6 +579,7 @@ void DrawSlot(int p, char* itf, void* arg) {
 		}
 		if (record) record(0);
 		((DrawFn)(*(void***)plate)[23])((char*)plate, nullptr, arg);
+		if (s.progress > 0.0f) DrawBar(s, plate, x - kMargin, (w + 2.0f * kMargin) / PlateDrawScale(), arg);
 		if (record) record(1);
 		pb[5] = f5;
 		pb[6] = f6;
@@ -588,10 +669,26 @@ void __fastcall Draw2dHook(char* m2d, void* edx, void* arg) {
 		HideGamePrompt hide(up ? itf : nullptr);
 		((Draw2dFn)kDraw2d)(m2d, edx, arg);
 	}
-	if (!up || (CoopP2Joined() && !OwnBoxes())) return;
+	// Over a cutscene (the HUD down): the skip prompt alone, its box moved on
+	// here while the interface does not tick.
+	bool cine = !up && itf && itf == (char*)GetLvlObject(2, 132, 0) && HintShown(HINT_SKIP);
+	DWORD now = GetTickCount();
+	if (cine) {
+		if (now - g_tickAt > 100) {
+			float dt = g_cineDrawAt && now - g_cineDrawAt < 200 ? (now - g_cineDrawAt) / 1000.0f : 0.016f;
+			for (int p = 0; p < 2; p++) UpdateSlot(p, itf, dt);
+		}
+		g_cineDrawAt = now;
+		static int logs = 0;
+		if (logs < 10 && now - g_tickAt > 100) { logs++; Log("hints: the skip prompt over a cutscene (the interface not ticking)"); }
+	} else {
+		g_cineDrawAt = 0;
+	}
+	if (!(up || cine) || (CoopP2Joined() && !OwnBoxes() && !cine)) return;
 	char* game = *(char**)(itf + 0x15C);
 	if (game && *(uintptr_t*)game == 0x623B6C) LayOutGlyphs(game);
-	for (int p = 0; p < 2; p++) DrawSlot(p, itf, arg);
+	for (int p = 0; p < 2; p++)
+		if (!cine || (g_slots[p].kind == 2 && g_slots[p].ident == HINT_SKIP)) DrawSlot(p, itf, arg);
 }
 
 void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
@@ -617,6 +714,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	float dt = time ? *(float*)((char*)time + 0xC) : 0.016f;
 	if (!(dt >= 0.0f && dt < 0.5f)) dt = 0.016f;
 	for (int p = 0; p < 2; p++) UpdateSlot(p, self, dt);
+	g_tickAt = GetTickCount();
 }
 
 } // namespace
@@ -708,14 +806,21 @@ void HintShow(int key, int player, const wchar_t* text, DWORD ms) {
 			h = &g_hints[g_nHints++];
 		}
 		h->since = now;
+		h->progress = -1.0f;
 	} else if ((int)(h->until - now) <= 0) {
 		h->since = now;
+		h->progress = -1.0f;
 	}
 	h->key = key;
 	h->player = player;
 	wcsncpy(h->text, text, kTextLen - 1);
 	h->text[kTextLen - 1] = 0;
 	h->until = now + ms;
+}
+
+void HintProgress(int key, int player, float progress) {
+	for (int i = 0; i < g_nHints; i++)
+		if (g_hints[i].key == key && g_hints[i].player == player) g_hints[i].progress = progress;
 }
 
 void HintHide(int key) {
