@@ -4574,4 +4574,19 @@ both halves).
   0.3 s (SoloTorchThrowSoon) and not while throwing (CoopSoloTorchThrowing); a flying torch (state 2) is ticked as
   Asterix's then. Autotest sptorchthrowo2: field 13 / animation 39 -> 40 (torch gone) -> field 14 -> 0, the AI
   again 0.7 s later (f18 03, order follow, +0x1A 0); shots throw_0..4 match sptorchthrow2's (Asterix leading).
-  sptorch2 / sptorchhud2 unchanged.
+  sptorch2 / sptorchhud2 unchanged.- Round 243 (user: the who-does-what hints of the machine gun, boat and belly slide on every use -> only the first
+  one's). shared.cpp ShowModeHint / ModeHintHere: per kind (gun -- all three gun modes --, boat, slide) the first
+  co-op use since the game started is remembered by its spot (the riding hero's +kHero_pos at the mode change:
+  Asterix on gun / boat, Obelix alone on the gun or on the slide) and the level load it was in. The hint shows when
+  the mode starts within 25 units (10 up/down) of that spot in that same load -- each time --, never elsewhere, never
+  after any load. NoteLevelLoad counts loads: level number change, gm +0x08 (next level) >= 0 seen (-1 in play; the
+  same level again sets it), a new trio or gm +0x20 level object. Twister Fusion not touched. Logs "the X's hint
+  stays with this one (...)" once, then capped 20 lines "X at ..., load N: the hint's own / not the first one".
+  Autotests (S_RELOAD a > 0 now loads level a): hintgun3 (-Level 3: LV3-3 gun twice shown, LV3-6 gun -172.1 5.7
+  -196.7 none, level 3 again + LV3-3 none; this gun is taken by Obelix alone, P2 A leaves; a same-level load keeps
+  player 2 in), hintboat (-Level 4: LV4-9 shown, level 5 + LV5-4 boat 352.8 12.7 22.6 none), hintslide2 (LV2-2
+  shown, LV2-9 none), hintslide29 (LV2-9 first: shown). LV2-9's slide start (cross line z -219.48 at x 214.6) is
+  armed by walking in from 218.3 50.0 -179.4 (user); its start spot 214.6 50.5 -217.1/-217.2 in two runs. A slide
+  runs 60+ s with nobody steering; trio 0x4806 by hand ends the mode but leaves Asterix at 0 0 0 -- no second ride
+  of the same slide in one run (left to the pad test). Placing the leader with one PLACEAT right after level 2's
+  start / into an unloaded spot does not stick (a short GLIDEAT does). gunlist3 lists level 3's guns (2,31).
