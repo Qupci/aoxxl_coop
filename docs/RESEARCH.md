@@ -4624,3 +4624,18 @@ both halves).
   bar; after Revive the full bar shown 0.4 s. Autotests holdskip (-Level 1: tap / Enter 1.6 s / pad A 4 s on virtual
   XInput slot 0 -> skipped at 3.0 s; the autotest's P1() writes the game's values only, not seen as held) and
   revivebar (-Level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2).
+- Round 246 (Nov 8, commit 69e0276; user: with force_level -1 the game's intro has no hold prompt; the film's own
+  skip ~15 s later must stay a press). Level 0's scenes (S_WATCHCINE): 0 the intro D801 -> D901 (0x1000 from
+  skip_cutscenes), 1 the film 5900 (the game's own 0x1000), 2 kind 0x80, 3 the title 5000 -> 5100 (skipped with
+  "Press Validate"), 4 5200 -> 5300. MakeCutscenesSkippable keeps the scenes it gave 0x1000 (CoopSkipAdded); cutskip's
+  hold scenes: any skippable one in levels > 0, in level 0 only scenes[0] when skip_cutscenes gave it the flag; a read
+  with no hold scene playing gets the game's value (film and title on a press, the intro's chain to the film --
+  g_level0SkipAt -- unchanged). Level 0 has no CKHkInterfaceInGame (2/132); present: CKHkInterfaceOption 2/133,
+  CKHkInterfaceMain 2/136 (vt 0x6286B4: +0x30/+0x34/+0x38 plates -- +0x38 the bottom bar 1.0 x 0.09 at y 0.075 --,
+  +0x4C/+0x50/+0x54/+0x58 texts, +0x50 bottom right at 0.965 0.080), LoadSave 2/138; the HUD's 2D layer (0x4140F4)
+  is drawn there. hints.cpp: UpdateSlot(p, itf, dt, tpl) / DrawSlot(p, text, plate, arg) take the templates; Choose
+  with no interface shows hints only; Draw2dHook's level 0 path (HINT_SKIP shown, Level0Templates) lays the boxes
+  out afresh from +0x50 (its font a little larger) and draws on +0x38. Autotests (XXL_LEVEL=-1): boothold (pad 1
+  A tap: box; held from 2.5 s on XInput slot 0: intro skipped at 3.0 s, film chained, title; P1 A there validates
+  it, no box), bootfilm (P1 A tap in the intro: no skip -- P1() reaches only the game's values, so no box either;
+  tap 17 s in: the film skipped at once, title). holdskip (level 1) unchanged.
