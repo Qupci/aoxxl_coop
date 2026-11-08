@@ -1,9 +1,9 @@
-// A cutscene is skipped by holding the skip button (pad A, Enter) for 3 s.
+// A cutscene is skipped by holding the skip button (pad A, Enter) for 2 s.
 //
 // The game skips a playing scene with flag 0x1000 the moment its cinematic
 // service (CKSrvCinematic::vf17, 0x46AC10) reads its input view's action 0 as
 // pressed (FUN_00461A80). That read (InputView_GetAction, hooked in shared.cpp)
-// is answered 0 until the button has been held 3 s; a press shows "Hold [A] to
+// is answered 0 until the button has been held 2 s; a press shows "Hold [A] to
 // skip" in the presser's hint box, its plate filling as the hold goes on (the
 // hold bar of hints.cpp), gone 5 s after the last press. Level 0: its intro
 // (skippable through [debug] skip_cutscenes) the same, the box laid out from the

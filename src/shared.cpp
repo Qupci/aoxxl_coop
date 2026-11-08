@@ -191,7 +191,7 @@ int Route(int map, uint32_t action) {
 uint8_t __fastcall GetActionHook(char* view, void* edx, uint32_t action) {
 	uint8_t v = g_origGetAction(view, edx, action);
 	if (g.logActions > 0) LogAction(view, action, v, _ReturnAddress());
-	// A cutscene's skip: only after its button is held 3 s (cutskip.cpp).
+	// A cutscene's skip: only after its button is held 2 s (cutskip.cpp).
 	if (action == 0 && CutSkipReader((uintptr_t)_ReturnAddress())) return CutSkipRead(v);
 	// Single player: Obelix alone on the machine gun, Asterix on his way to it
 	// (coop.cpp SoloGunFrame) -- he turns it, nobody fires (user; the game's X,

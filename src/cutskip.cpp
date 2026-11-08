@@ -11,7 +11,7 @@
 
 namespace {
 
-const DWORD kHoldMs = 3000;      // held this long, the scene is skipped
+const DWORD kHoldMs = 2000;      // held this long, the scene is skipped
 const DWORD kShowMs = 5000;      // the prompt stays this long after the last press
 const DWORD kDoneMs = 400;       // the full bar stays this long (its fade-out: hints.cpp)
 

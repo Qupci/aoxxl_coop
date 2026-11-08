@@ -624,17 +624,17 @@ const Step kBoot0[] = {
 #define BOOT_SKIP(at, n) 	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" }, 	CINE_ENTER(at), 	SHOT(at + 1500, n "_a"), SHOT(at + 4000, n "_b"), SHOT(at + 7000, n "_c"), SHOT(at + 12000, n "_d"), 	END(at + 16000)
 const Step kBoot1[] = { BOOT_SKIP(2000, "boot1") };
 // boothold / bootfilm (XXL_LEVEL=-1): level 0's intro is skipped by holding the
-// button 3 s (skippable through skip_cutscenes: the "Hold A to skip" box, on the
+// button 2 s (skippable through skip_cutscenes: the "Hold A to skip" box, on the
 // main menu's text and plate), its film after it on a press (the game's own).
 // boothold: A tapped (the box), then held from 2.5 s (pad 1 on XInput): the
-// intro skipped at 5.5 s, the film with it, the title; A there validates it (no
+// intro skipped at 4.5 s, the film with it, the title; A there validates it (no
 // box). bootfilm: player 1's A
 // tapped in the intro (no skip, the box), then in the film, 17 s in: at once.
 const Step kBootHold[] = {
 	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" },
 	VPAD(1000, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1150, "bh_tap"), VPAD(1250, 0, 0, 0, 0, "pad 1 release"),
 	SHOT(2000, "bh_tapped"),
-	VPAD(2500, 0, PAD_A, 0, 0, "pad 1 holds A"), SHOT(3500, "bh_33"), SHOT(4700, "bh_73"), SHOT(5530, "bh_full"),
+	VPAD(2500, 0, PAD_A, 0, 0, "pad 1 holds A"), SHOT(3200, "bh_35"), SHOT(4000, "bh_75"), SHOT(4530, "bh_full"),
 	VPAD(6500, 0, 0, 0, 0, "pad 1 release"),
 	SHOT(8000, "bh_after"), SHOT(12000, "bh_title"),
 	P1(12500, PAD_A, 0, 0, "p1 A tap (title)"), P1(12650, 0, 0, 0, "p1 release"),
@@ -691,19 +691,19 @@ const Step kSkip1[] = {
 	END(15000),
 };
 // holdskip (-Level 1, skip_cutscenes on): the intro skipped only after its
-// button is held 3 s. A tap of A shows "Hold A to skip" (5 s after the last
-// press), Enter held 1.5 s fills half the box and lets go (not skipped), then A
-// held 4 s: the box fills white to green and the intro ends at 3 s. (Pad A
+// button is held 2 s. A tap of A shows "Hold A to skip" (5 s after the last
+// press), Enter held 1.6 s fills 80% of the box and lets go (not skipped), then A
+// held 4 s: the box fills white to green and the intro ends at 2 s. (Pad A
 // on XInput slot 0: the game's own value is only a press's edge.)
 const Step kHoldSkip[] = {
 	MARK(0, "baseline"),
 	VPAD(1500, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1650, "hs_tap_held"), VPAD(1750, 0, 0, 0, 0, "pad 1 release"),
 	SHOT(2500, "hs_tap_released"),
-	KEY(3000, VK_RETURN, 1, "enter down"), SHOT(3800, "hs_enter_25"), SHOT(4500, "hs_enter_50"),
+	KEY(3000, VK_RETURN, 1, "enter down"), SHOT(3800, "hs_enter_40"), SHOT(4500, "hs_enter_75"),
 	KEY(4600, VK_RETURN, 0, "enter up"), SHOT(5000, "hs_enter_let_go"),
 	SHOT(9000, "hs_still_shown"), SHOT(10200, "hs_hidden"),
-	VPAD(11000, 0, PAD_A, 0, 0, "pad 1 holds A"), SHOT(12000, "hs_a_33"), SHOT(12800, "hs_a_60"), SHOT(13700, "hs_a_90"),
-	SHOT(14080, "hs_a_full"), SHOT(14200, "hs_a_fade"),
+	VPAD(11000, 0, PAD_A, 0, 0, "pad 1 holds A"), SHOT(11700, "hs_a_35"), SHOT(12300, "hs_a_65"), SHOT(12800, "hs_a_90"),
+	SHOT(13080, "hs_a_full"), SHOT(13200, "hs_a_fade"),
 	VPAD(15000, 0, 0, 0, 0, "pad 1 release"),
 	SHOT(17000, "hs_after"),
 	END(20000),
