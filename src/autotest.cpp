@@ -623,6 +623,33 @@ const Step kBoot0[] = {
 // either lands on the title, its logo shown ("Press Validate").
 #define BOOT_SKIP(at, n) 	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" }, 	CINE_ENTER(at), 	SHOT(at + 1500, n "_a"), SHOT(at + 4000, n "_b"), SHOT(at + 7000, n "_c"), SHOT(at + 12000, n "_d"), 	END(at + 16000)
 const Step kBoot1[] = { BOOT_SKIP(2000, "boot1") };
+// boothold / bootfilm (XXL_LEVEL=-1): level 0's intro is skipped by holding the
+// button 3 s (skippable through skip_cutscenes: the "Hold A to skip" box, on the
+// main menu's text and plate), its film after it on a press (the game's own).
+// boothold: A tapped (the box), then held from 2.5 s (pad 1 on XInput): the
+// intro skipped at 5.5 s, the film with it, the title; A there validates it (no
+// box). bootfilm: player 1's A
+// tapped in the intro (no skip, the box), then in the film, 17 s in: at once.
+const Step kBootHold[] = {
+	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" },
+	VPAD(1000, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1150, "bh_tap"), VPAD(1250, 0, 0, 0, 0, "pad 1 release"),
+	SHOT(2000, "bh_tapped"),
+	VPAD(2500, 0, PAD_A, 0, 0, "pad 1 holds A"), SHOT(3500, "bh_33"), SHOT(4700, "bh_73"), SHOT(5530, "bh_full"),
+	VPAD(6500, 0, 0, 0, 0, "pad 1 release"),
+	SHOT(8000, "bh_after"), SHOT(12000, "bh_title"),
+	P1(12500, PAD_A, 0, 0, "p1 A tap (title)"), P1(12650, 0, 0, 0, "p1 release"),
+	SHOT(14500, "bh_menu"),
+	END(16000),
+};
+const Step kBootFilm[] = {
+	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" },
+	P1(1000, PAD_A, 0, 0, "p1 A tap (intro)"), SHOT(1150, "bf_tap"), P1(1250, 0, 0, 0, "p1 release"),
+	SHOT(4000, "bf_intro_on"),
+	SHOT(16500, "bf_film"),
+	P1(17000, PAD_A, 0, 0, "p1 A tap (film)"), P1(17150, 0, 0, 0, "p1 release"),
+	SHOT(18500, "bf_after"), SHOT(23000, "bf_title"),
+	END(26000),
+};
 const Step kBoot2[] = { BOOT_SKIP(17000, "boot2") };
 
 // bootoptwrap (XXL_LEVEL=-1; "boot": the run starts at level 0's intro): the intro skipped, the title validated, the main menu's
@@ -9597,6 +9624,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("bootoptwrap", kOptWrap),
 	SCENARIO("skip1", kSkip1),
 	SCENARIO("holdskip", kHoldSkip),
+	SCENARIO("boothold", kBootHold),
+	SCENARIO("bootfilm", kBootFilm),
 	SCENARIO("revivebar", kReviveBar),
 	SCENARIO("intro1", kIntro1),
 	SCENARIO("torch", kTorch),

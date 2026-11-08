@@ -1477,7 +1477,17 @@ static void WatchSectors(Trio t, DWORD now) {
 // finished) when its input view's action 0 -- Enter -- is pressed, if the scene
 // has flag 0x1000 ("end on pressing Enter") and not 0x180 == 0x80. Level 1's
 // long intro (scene 1, flags 0x4F16) has no 0x1000. [debug] skip_cutscenes
-// gives it to every scene.
+// gives it to every scene. The scenes it gave it to are kept: level 0's intro
+// is skipped by holding the button (cutskip.cpp), its film on a press as the
+// game has it.
+static char* g_skipAdded[64];
+static unsigned g_nSkipAdded = 0;
+bool CoopSkipAdded(const char* scene) {
+	for (unsigned i = 0; i < g_nSkipAdded; i++)
+		if (g_skipAdded[i] == scene) return true;
+	return false;
+}
+
 static void MakeCutscenesSkippable() {
 	if (!g_config.skipCutscenes) return;
 	CKYellowPages* yp = YellowPages();
@@ -1490,9 +1500,14 @@ static void MakeCutscenesSkippable() {
 	doneFor = scenes;
 	doneN = n;
 	unsigned changed = 0;
+	g_nSkipAdded = 0;
 	for (unsigned i = 0; i < n && i < 512; i++) {
 		uint16_t& f = *(uint16_t*)(scenes[i] + 0x20);
-		if ((f & 0x1000) == 0 && (f & 0x180) != 0x80) { f |= 0x1000; changed++; }
+		if ((f & 0x1000) == 0 && (f & 0x180) != 0x80) {
+			f |= 0x1000;
+			changed++;
+			if (g_nSkipAdded < 64) g_skipAdded[g_nSkipAdded++] = scenes[i];
+		}
 	}
 	Log("coop: skip_cutscenes: %u of %u cutscenes now end on Enter", changed, n);
 }

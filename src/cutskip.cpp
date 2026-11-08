@@ -43,8 +43,13 @@ int LevelNow() {
 }
 
 // The first playing scene the cinematic service would skip on its button
-// (flag 0x1000, not of kind 0x80, +0x30 not negative).
+// (flag 0x1000, not of kind 0x80, +0x30 not negative) that is skipped by a
+// hold: every one, but in level 0 only its intro (scene 0, made skippable by
+// skip_cutscenes) -- its film (the game's own skip) and the title (skipped as
+// "Press Validate" is pressed) on a press, as before.
 char* SkippableScene() {
+	int level = LevelNow();
+	if (level < 0) return nullptr;
 	CKYellowPages* yp = YellowPages();
 	char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
 	char** scenes = cin ? *(char***)(cin + 0x10) : nullptr;
@@ -53,7 +58,8 @@ char* SkippableScene() {
 		char* sc = scenes[i];
 		if (!sc) continue;
 		uint16_t f = *(uint16_t*)(sc + 0x20);
-		if ((f & 1) && (f & 0x1000) && (f & 0x180) != 0x80 && *(int8_t*)(sc + 0x30) >= 0) return sc;
+		if (!((f & 1) && (f & 0x1000) && (f & 0x180) != 0x80 && *(int8_t*)(sc + 0x30) >= 0)) continue;
+		if (level > 0 || (i == 0 && CoopSkipAdded(sc))) return sc;
 	}
 	return nullptr;
 }
@@ -80,7 +86,7 @@ void Hide() {
 } // namespace
 
 uint8_t CutSkipRead(uint8_t v) {
-	if (LevelNow() == 0) return v;   // level 0's films: at once (no in-game HUD for the prompt)
+	if (!SkippableScene()) return v;   // none skipped by a hold: the game's own (level 0's film on a press)
 	if (g.fire) {
 		g.fire = false;
 		Log("cutskip: scene %p skipped (held %.1f s)", g.scene, g.heldMs / 1000.0f);
@@ -93,7 +99,7 @@ void CutSkipFrame() {
 	DWORD now = GetTickCount();
 	DWORD dtMs = g.lastAt && now - g.lastAt < 200 ? now - g.lastAt : 0;
 	g.lastAt = now;
-	char* sc = LevelNow() > 0 ? SkippableScene() : nullptr;
+	char* sc = SkippableScene();
 	if (sc != g.scene) {
 		if (g.logs < 40 && (sc || g.scene)) { g.logs++; Log("cutskip: skippable scene %p -> %p", g.scene, sc); }
 		g.scene = sc;

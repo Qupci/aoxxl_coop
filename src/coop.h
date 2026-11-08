@@ -30,6 +30,8 @@ void CoopLogState(const char* tag);
 // switches): the leader only decides what scripts, the HUD and a single camera
 // follow. Input is routed per hero, never per leader.
 bool CoopP2Joined();
+// Cutscene `scene` was made skippable by [debug] skip_cutscenes (not the game's own skip).
+bool CoopSkipAdded(const char* scene);
 int  CoopP2Hero();
 int  CoopP1Hero();
 void CoopNoteZoneHero(int heroIndex);

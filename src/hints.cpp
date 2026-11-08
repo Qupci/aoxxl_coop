@@ -317,6 +317,7 @@ Place PlaceOf(int p) {
 }
 
 // What a box should show: kind (0 nothing, 1 the prompt, 2 a hint), ident, text.
+// `itf` null: no in-game interface (level 0) -- hints only.
 void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, float* progress) {
 	static wchar_t prompt[2][kTextLen];
 	*kind = 0; *ident = 0; *text = L""; *progress = -1.0f;
@@ -330,7 +331,8 @@ void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, 
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	unsigned gameKind = gm ? (*(uint32_t*)(gm + 0xCC) >> 4) & 0xF : kPromptNone;
-	if (CoopP2Joined()) {
+	if (!itf) {
+	} else if (CoopP2Joined()) {
 		unsigned k = CoopPromptKindFor(p);
 		void* loc = LocOf(*(char**)(itf + 0x15C));
 		if (k < 15 && k != kPromptNone && loc) {
@@ -349,9 +351,10 @@ void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, 
 	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; *progress = h->progress; }
 }
 
-void UpdateSlot(int p, char* itf, float dt) {
+// `tpl`: the text the box is a copy of, else the in-game interface's prompt.
+void UpdateSlot(int p, char* itf, float dt, char* tpl = nullptr) {
 	Slot& s = g_slots[p];
-	char* game = *(char**)(itf + 0x15C);
+	char* game = tpl ? tpl : itf ? *(char**)(itf + 0x15C) : nullptr;
 	if (!game || *(uintptr_t*)game != 0x623B6C) return;
 	int kind;
 	uint32_t ident;
@@ -407,7 +410,7 @@ void UpdateSlot(int p, char* itf, float dt) {
 	if (p == HINT_LEFT_BOX && !CoopP2Joined()) {
 		float l, r, b, t, want = 0.0f;
 		if (SidekickViewRect(&l, &r, &b, &t)) want = r + 0.01f - (kEdge - kMargin);
-		float speed = *(float*)(itf + 0x278);   // (the flask's, a share of the screen a second)
+		float speed = itf ? *(float*)(itf + 0x278) : 1.0f;   // (the flask's, a share of the screen a second)
 		if (!(speed > 0.1f && speed < 10.0f)) speed = 1.0f;
 		bool entering = s.kind && !s.leaving && s.in < 1.0f;
 		float was = g_leftAside;
@@ -542,11 +545,11 @@ void DrawBar(const Slot& s, float* plate, float left, float width, void* arg) {
 	plate[13] = sw;
 }
 
-void DrawSlot(int p, char* itf, void* arg) {
+// `game` / `plate`: the prompt's text and plate the box is drawn after (the
+// in-game interface's +0x15C / +0x140, level 0's: the main menu's).
+void DrawSlot(int p, char* game, float* plate, void* arg) {
 	Slot& s = g_slots[p];
 	if (!s.kind || !s.laid || s.in <= 0.0f) return;
-	char* game = *(char**)(itf + 0x15C);
-	float* plate = *(float**)(itf + 0x140);
 	if (!game) return;
 	Place pl = PlaceOf(p);
 	float a = Aspect();
@@ -662,6 +665,36 @@ char __fastcall Draw2dListsHook(char* m2d, void* edx, void* arg) {
 	return ((Draw2dListsFn)kDraw2dLists)(m2d, edx, arg);
 }
 
+// Level 0 (the game's intro and menus) has no in-game interface: the skip
+// prompt's box is laid out from the main menu's (CKHkInterfaceMain, 2/136)
+// bottom-right text (+0x50) and drawn on its bottom bar's plate (+0x38).
+bool Level0Templates(char** text, float** plate) {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	if (!gm || *(int*)(gm + ax::kGM_currentLevel) != 0) return false;
+	char* m = (char*)GetLvlObject(2, 136, 0);
+	if (!m || *(uintptr_t*)m != 0x6286B4) return false;
+	*text = *(char**)(m + 0x50);
+	*plate = *(float**)(m + 0x38);
+	return *text && *(uintptr_t*)*text == 0x623B6C && *plate && *(uintptr_t*)*plate == 0x6235C0;
+}
+char* g_level0Text = nullptr;   // the template level 0's boxes were laid out from
+
+// The skip prompt drawn where the HUD is down (a cutscene, level 0): its box
+// moved on here while no interface ticks.
+void MoveOnForSkip(char* itf, char* tpl, DWORD now) {
+	if (now - g_tickAt > 100) {
+		float dt = g_cineDrawAt && now - g_cineDrawAt < 200 ? (now - g_cineDrawAt) / 1000.0f : 0.016f;
+		for (int p = 0; p < 2; p++) UpdateSlot(p, itf, dt, tpl);
+	}
+	g_cineDrawAt = now;
+	static bool told[2];
+	if (!told[!itf] && now - g_tickAt > 100) {
+		told[!itf] = true;
+		Log("hints: the skip prompt over a cutscene (%s)", itf ? "the interface not ticking" : "level 0: the main menu's text and plate");
+	}
+}
+
 void __fastcall Draw2dHook(char* m2d, void* edx, void* arg) {
 	char* itf = g_itf;
 	bool up = itf && itf == (char*)GetLvlObject(2, 132, 0) && HudUp(itf);
@@ -669,26 +702,26 @@ void __fastcall Draw2dHook(char* m2d, void* edx, void* arg) {
 		HideGamePrompt hide(up ? itf : nullptr);
 		((Draw2dFn)kDraw2d)(m2d, edx, arg);
 	}
-	// Over a cutscene (the HUD down): the skip prompt alone, its box moved on
-	// here while the interface does not tick.
+	// Over a cutscene (the HUD down): the skip prompt alone.
 	bool cine = !up && itf && itf == (char*)GetLvlObject(2, 132, 0) && HintShown(HINT_SKIP);
+	char* l0text = nullptr;
+	float* l0plate = nullptr;
+	bool level0 = !up && !cine && HintShown(HINT_SKIP) && Level0Templates(&l0text, &l0plate);
 	DWORD now = GetTickCount();
-	if (cine) {
-		if (now - g_tickAt > 100) {
-			float dt = g_cineDrawAt && now - g_cineDrawAt < 200 ? (now - g_cineDrawAt) / 1000.0f : 0.016f;
-			for (int p = 0; p < 2; p++) UpdateSlot(p, itf, dt);
-		}
-		g_cineDrawAt = now;
-		static int logs = 0;
-		if (logs < 10 && now - g_tickAt > 100) { logs++; Log("hints: the skip prompt over a cutscene (the interface not ticking)"); }
-	} else {
-		g_cineDrawAt = 0;
+	if (level0 && l0text != g_level0Text) {   // laid out afresh from it
+		g_level0Text = l0text;
+		for (Slot& s : g_slots) { s.laid = false; s.kind = 0; s.in = 0.0f; s.nBursts = 0; }
+		for (bool& b : g_glyphLaid) b = false;
 	}
-	if (!(up || cine) || (CoopP2Joined() && !OwnBoxes() && !cine)) return;
-	char* game = *(char**)(itf + 0x15C);
+	if (cine) MoveOnForSkip(itf, nullptr, now);
+	else if (level0) MoveOnForSkip(nullptr, l0text, now);
+	else g_cineDrawAt = 0;
+	if (!(up || cine || level0) || (CoopP2Joined() && !OwnBoxes() && !cine)) return;
+	char* game = level0 ? l0text : *(char**)(itf + 0x15C);
+	float* plate = level0 ? l0plate : *(float**)(itf + 0x140);
 	if (game && *(uintptr_t*)game == 0x623B6C) LayOutGlyphs(game);
 	for (int p = 0; p < 2; p++)
-		if (!cine || (g_slots[p].kind == 2 && g_slots[p].ident == HINT_SKIP)) DrawSlot(p, itf, arg);
+		if (up || (g_slots[p].kind == 2 && g_slots[p].ident == HINT_SKIP)) DrawSlot(p, game, plate, arg);
 }
 
 void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
@@ -698,6 +731,7 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 	memcpy(g_promptIds, self + 0x1A4, sizeof(g_promptIds));
 	if (self != g_itf) {   // another level's interface: the boxes laid out afresh
 		g_itf = self;
+		g_level0Text = nullptr;
 		for (Slot& s : g_slots) { s.laid = false; s.kind = 0; s.in = 0.0f; s.nBursts = 0; }
 		for (bool& b : g_glyphLaid) b = false;
 	}

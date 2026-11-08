@@ -5,8 +5,9 @@
 // pressed (FUN_00461A80). That read (InputView_GetAction, hooked in shared.cpp)
 // is answered 0 until the button has been held 3 s; a press shows "Hold [A] to
 // skip" in the presser's hint box, its plate filling as the hold goes on (the
-// hold bar of hints.cpp), gone 5 s after the last press. Level 0's films (no
-// in-game HUD for the box) still skip at once.
+// hold bar of hints.cpp), gone 5 s after the last press. Level 0: its intro
+// (skippable through [debug] skip_cutscenes) the same, the box laid out from the
+// main menu's text and plate; its film after it (the game's own skip) on a press.
 
 #pragma once
 #include <cstdint>
