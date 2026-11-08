@@ -4639,3 +4639,6 @@ both halves).
   A tap: box; held from 2.5 s on XInput slot 0: intro skipped at 3.0 s, film chained, title; P1 A there validates
   it, no box), bootfilm (P1 A tap in the intro: no skip -- P1() reaches only the game's values, so no box either;
   tap 17 s in: the film skipped at once, title). holdskip (level 1) unchanged.
+- Round 247 (Nov 8, commit 984daf1; user: rounds 245-246 confirmed on the pad; the skip's hold 2 s instead of 3).
+  cutskip.cpp kHoldMs 3000 -> 2000 (the bar fills over 2 s). Autotests holdskip (-Level 1: skipped at 2.0 s; Enter
+  held 1.6 s still not) and boothold (XXL_LEVEL=-1: the intro at 2.0 s, the film chained, title on a press).
