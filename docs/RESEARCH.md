@@ -4603,3 +4603,24 @@ both halves).
   lock dropped as "nobody in the level's hands"). Autotests lvllead21 (S_FLAGEV 0348 -> lead Obelix; switch button
   to Obelix; Obelix glided into 01E0 -> lead Asterix, HUD "LEADER: OBELIX LVL LEAD: ASTERIX"; P2 Start -> Asterix
   takes the lead, P2 joins as Obelix) and lvllead21j (0348, P2 Start with Asterix leading -> Obelix leads).
+
+- Round 245 (Nov 8, commit d1a0e55; user: cutscene skip by holding A 3 s with a "Hold [A] to skip" prompt and a
+  loading bar in the box itself, Figma "progress bar" 4966:830; the revive's bar the same). (1) CKSrvCinematic::vf17
+  (0x46AC10..0x46AD3F) reads InputView_GetAction(0) on its view (yp +0x80 +0x18): value 44, a combined action whose
+  value is a press's edge (255 one frame) and whose binding has no hold time (+0x18 stays 0 with Enter held;
+  CKInput_UpdateBinding 0x435A50: +6 the device's raw byte, +0x14 press time, +0x18 held time, 0 when raw is 0).
+  shared.cpp's GetAction hook hands that read to cutskip.cpp (CutSkipRead): 0 until held 3 s, then 1 once (the game's
+  own skip path, coop.cpp's run-on still fires). Held = Enter (GetAsyncKeyState, game focused) or any XInput pad's A
+  (player 2's pad: player 2's box); a button held into the scene counts only after a release. Skippable = a playing
+  scene with 0x1000, (f & 0x180) != 0x80, +0x30 >= 0 (vf17's test). Level 0 untouched (no in-game HUD). Prompt
+  HINT_SKIP: pad_a_unpressed / pad_a, IconKeyGlyph(VK_RETURN) unpressed / pressed; 5 s after the last press;
+  the full bar 0.4 s after the skip. The in-game interface ticks during level 1's intro (the box shows over it;
+  Draw2dHook's fallback for a non-ticking interface not needed there). (2) hints.cpp HintProgress(key, player, p):
+  Choose/UpdateSlot carry it, DrawBar draws the plate (interface +0x140, CBillboard2d, own billboard at +0x20: +8 Rt2d
+  brush, +0xC fill RGBA, +0x10 border RGBA drawn when +0x1D = 1 -- the 5-vertex outline) a second time from the box's
+  left edge, p of its width, brush set by Rt2dBrushSetRGBA 0x5F9280 (cdecl(brush, 4 corner RGBA*); 0x20 floats saved
+  and put back), border off. Colour: white a=.33(1-e) under #00FF0E a=.33e, e = cubic-bezier(.5,0,.5,1)(p); fade-out
+  0.25 s once full. The game plate's fill is 00 00 00 99. Revive: "Reviving X" + HintProgress instead of the =/- text
+  bar; after Revive the full bar shown 0.4 s. Autotests holdskip (-Level 1: tap / Enter 1.6 s / pad A 4 s on virtual
+  XInput slot 0 -> skipped at 3.0 s; the autotest's P1() writes the game's values only, not seen as held) and
+  revivebar (-Level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2).
