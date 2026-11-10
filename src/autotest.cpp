@@ -8480,6 +8480,59 @@ const Step kSpTele36[] = {
 	SHOT(14000, "riding_2"), SHOT(22000, "landed"),
 	END(24000),
 };
+// spobtele53 (-Level 5, XXL_SPISOLATION=0 XXL_SPSWITCH=1): the user's LV5-3
+// automatic cable car (CKHkTelepher, -336.198 16.820 373.618): you switch to
+// Obelix and he stands on it -- it stays (was: he rode it); switched back,
+// Asterix on it rides it.
+// (the user's ground by the car: -339.570 18.010 378.275)
+const Step kSpObTele53[] = {
+	MARK(0, "spobtele53"), LOADSECTOR(200, 3),
+	PLACEAT(2500, HERO_ASTERIX, -339.570f, 18.010f, 378.275f), PLACEAT(2700, HERO_OBELIX, -339.570f, 18.010f, 378.275f),
+	{ 3500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(4000, HERO_ASTERIX, 1),
+	PLACEAT(4200, HERO_OBELIX, -339.570f, 18.010f, 378.275f), GLIDEAT(4500, HERO_OBELIX, -336.198f, 16.820f, 373.618f, 1000),   // walks onto the car
+	SHOT(6500, "obelix_on"), SHOT(11000, "obelix_on_2"),
+	GLIDEAT(11500, HERO_OBELIX, -339.570f, 18.010f, 378.275f, 1000), FORCE(12600, HERO_ASTERIX, 0),
+	{ 13000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to asterix" },
+	FORCE(13300, HERO_OBELIX, 1),
+	PLACEAT(13500, HERO_ASTERIX, -339.570f, 18.010f, 378.275f), GLIDEAT(13800, HERO_ASTERIX, -336.198f, 16.820f, 373.618f, 1000),
+	SHOT(16000, "asterix_rides"), SHOT(22000, "asterix_rides_2"),
+	FORCE(23000, HERO_OBELIX, 0),
+	END(24000),
+};
+// cotele53 (-Level 5): co-op, the same car -- player 2's Obelix walks onto it
+// (Asterix leading, then Obelix leading after trio 4801): it stays; Asterix
+// walks onto it (not leading): he rides it.
+const Step kCoTele53[] = {
+	MARK(0, "cotele53"), LOADSECTOR(200, 3),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -339.570f, 18.010f, 378.275f), PLACEAT(2700, HERO_OBELIX, -339.570f, 18.010f, 378.275f),
+	GLIDEAT(4000, HERO_OBELIX, -336.198f, 16.820f, 373.618f, 1000),   // walks onto the car
+	SHOT(6500, "obelix_on"),
+	{ 7000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	SHOT(9000, "obelix_leads_on"), SHOT(12000, "obelix_leads_on_2"),
+	GLIDEAT(12500, HERO_OBELIX, -339.570f, 18.010f, 378.275f, 1000),
+	GLIDEAT(13800, HERO_ASTERIX, -336.198f, 16.820f, 373.618f, 1000),
+	SHOT(16000, "asterix_rides"), SHOT(22000, "asterix_rides_2"),
+	END(24000),
+};
+// spgunuse33 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=0): single player, Obelix
+// leading by LV3-3's machine gun: its "Use" shows for him (was: none), gone 10
+// units off, back by it; X takes it (spgun33's flow).
+const Step kSpGunUse33[] = {
+	MARK(0, "spgunuse33"), LOADSECTOR(200, 3),
+	FORCE(2800, HERO_OBELIX, 1), PLACEAT(3000, HERO_ASTERIX, 284.4f, 31.92f, -325.9f), PLACEAT(3000, HERO_OBELIX, 289.3f, 31.92f, -325.6f),
+	FORCE(3400, HERO_OBELIX, 0), SECTORS(3500),
+	{ 4000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	FORCE(4300, HERO_ASTERIX, 1), PLACEAT(4500, HERO_ASTERIX, 276.0f, 31.92f, -326.0f), PLACEAT(4500, HERO_OBELIX, 289.3f, 31.92f, -325.6f),
+	SHOT(5500, "by_the_gun"),
+	PLACEAT(6000, HERO_OBELIX, 289.3f, 31.92f, -315.6f), SHOT(7000, "away"),
+	PLACEAT(7500, HERO_OBELIX, 289.3f, 31.92f, -325.6f), SHOT(8500, "back"),
+	P1(9000, PAD_X, 0, 0, "p1 X: obelix takes the gun"), P1(9200, 0, 0, 0, "p1 release"),
+	SHOT(10000, "obelix_on"),
+	FORCE(10500, HERO_ASTERIX, 0),
+	END(14000),
+};
 // spguard41 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_DOWNAT=0:13000
 // XXL_OBELIXPOTION=0): guard41a in single player -- Asterix down among LV4-1's
 // lock fight Romans at 13 s; Obelix (now leading, healed every 2.5 s) 12 units
@@ -9542,6 +9595,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("spbump2b", kSpBump2B),
 	SCENARIO("splock21", kSpLock21),
 	SCENARIO("sptele36", kSpTele36),
+	SCENARIO("spobtele53", kSpObTele53),
+	SCENARIO("cotele53", kCoTele53),
+	SCENARIO("spgunuse33", kSpGunUse33),
 	SCENARIO("spguard41", kSpGuard41),
 	SCENARIO("spmod2", kSpMod2),
 	SCENARIO("sphud2", kSpHud2),

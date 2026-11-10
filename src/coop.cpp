@@ -2404,6 +2404,69 @@ static void WatchTelepherRider(Trio t) {
 	GiveLead(t, who);
 }
 
+// Obelix never rides the automatic cable car (user: the game's levels never let
+// him lead by one; the rope car CKHkTowedTelepher is his, its own tick). The car's
+// tick (CKHkTelepher::vf15, thiscall, dt, ret 4) takes the trio's leader of its
+// tick -- its +0x1C rider = trio vf25, +0x20 its ground (trio vf29; later hero
+// event 0xB00) -- and goes (vf27, 0x0C0D while boarding: +0x7C bit 0x80) while that
+// ground is its own (+0x84), else stops (vf28). Obelix leading (single player's
+// hero switch; co-op's proximity has the nearest player's hero pose as the leader)
+// took it. Now its tick with Obelix as the leader runs with Asterix posing as the
+// leader: his ground decides (co-op: he rides it as before, WatchTelepherRider);
+// Obelix is never kept as its rider. Single player, the AI Asterix on it too (he
+// follows Obelix): that tick is skipped, unless the car is under way on its own
+// (+0x7C bit 0x20: it goes whoever is on it) -- he does not ride it for Obelix.
+typedef void(__fastcall* AutoCarTickFn)(char* car, void* edx, void* dt);
+const uintptr_t kTelepherVtbl = 0x6293D4;   // CKHkTelepher (2,158)
+AutoCarTickFn g_origAutoCarTick = nullptr;
+
+static char* HeroGround(Hero h) {   // (trio vf29's: none in the air)
+	return (*(uint32_t*)(h.raw() + 0x384) & 7) ? nullptr : *(char**)(h.raw() + 0x280);
+}
+
+static void __fastcall AutoCarTickHook(char* car, void* edx, void* dt) {
+	Trio t = GetTrio();
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	if (!a || !o || *(uintptr_t*)car != kTelepherVtbl) { g_origAutoCarTick(car, edx, dt); return; }
+	uint8_t* tr = (uint8_t*)t.raw();
+	char*& rider = *(char**)(car + 0x1C);
+	bool asterixPlayer = g.p2Joined && (g.p1Hero == HERO_ASTERIX || g.p2Hero == HERO_ASTERIX);
+	static int s_told = 0;
+	auto Drop = [&](const char* why) {
+		if (rider == o.raw() || (!asterixPlayer && tr[0x2C] == HERO_OBELIX && rider == a.raw() && Situation(a) != 0x02)) {
+			if (s_told++ < 20) Log("coop: automatic cable car %p: %s let go as its rider (%s)", car, HeroName(rider == o.raw() ? HERO_OBELIX : HERO_ASTERIX), why);
+			rider = nullptr;
+			*(char**)(car + 0x20) = nullptr;
+		}
+	};
+	Drop("before its tick");
+	if (rider || tr[0x2C] != HERO_OBELIX) {
+		g_origAutoCarTick(car, edx, dt);
+		Drop("after its tick");
+		return;
+	}
+	char* own = *(char**)(car + 0x84);
+	if (!asterixPlayer && HeroGround(a) == own && !(*(uint32_t*)(car + 0x7C) & 0x20)) {
+		static char* s_skipped = nullptr;
+		if (s_skipped != car && s_told++ < 20) Log("coop: automatic cable car %p: Obelix leads with the AI Asterix on it -- it stays", car);
+		s_skipped = car;
+		return;
+	}
+	static char* s_on = nullptr;   // (logged when Obelix stands on it)
+	char* onCar = HeroGround(o) == own ? car : nullptr;
+	if (onCar != s_on && onCar && s_told++ < 20) Log("coop: automatic cable car %p: Obelix on it -- not its rider (Asterix's ground decides)", car);
+	s_on = onCar;
+	uint8_t leader = tr[0x2C], companion = tr[0x2D];
+	tr[0x2C] = HERO_ASTERIX;
+	tr[0x2D] = HERO_OBELIX;
+	g_origAutoCarTick(car, edx, dt);
+	if (tr[0x2C] == HERO_ASTERIX && tr[0x2D] == HERO_OBELIX) {
+		tr[0x2C] = leader;
+		tr[0x2D] = companion;
+	}
+	Drop("after its tick");
+}
+
 // No-lock mode, the rotary beam's catch: trio 0x0C02 from the beam (0x53F348;
 // FUN_00481d50 case 2) hangs the companion on it (AI order 8) only while its order
 // is 3, "wait here", and it is within the trio's +0x50 of the beam. The circle's
@@ -4134,6 +4197,24 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	// machine's "Use" the trio's gun leaves up is no one's.
 	if (gm && CoopSoloGunAlone() && ((*(uint32_t*)(gm + 0xCC) >> 4) & 0xF) == kPromptMachine)
 		*(uint32_t*)(gm + 0xCC) = (*(uint32_t*)(gm + 0xCC) & ~0xF0u) | (kPromptNone << 4);
+	// Single player, Obelix leading (sp_isolation off): the gun offered to him (trio
+	// +0x48, kind 2, free) is his X's to take (SoloNoteMachineUse), but the machine's
+	// "Use" is written by Asterix's call alone -- the AI companion's, which never
+	// runs: no prompt. Obelix's call writes it where it wrote nothing.
+	if (gm && t && !g.p2Joined && g_config.SoloMod() && !g_soloGun.on && t.Leader() == HERO_OBELIX &&
+	    hero == t.GetHero(HERO_OBELIX).raw()) {
+		char* gun = TrioGun(t);
+		bool offered = gun && ((*(uint32_t*)(t.raw() + 0x3F4) >> 10) & 3) == 2 && !*(uint32_t*)(t.raw() + 0x4C) &&
+		               !(*(uint8_t*)(gun + 0x10C) & 1);
+		uint32_t& cc = *(uint32_t*)(gm + 0xCC);
+		bool wrote = offered && ((cc >> 4) & 0xF) == kPromptNone;
+		if (wrote) cc = (cc & ~0xF0u) | (kPromptMachine << 4);
+		static bool s_was = false;
+		static int s_told = 0;
+		if (wrote != s_was && s_told++ < 20)
+			Log("coop: single player: the machine gun's \"Use\" %s Obelix (leading)", wrote ? "shown for" : "gone from");
+		s_was = wrote;
+	}
 	if (!gm || !t || !g.p2Joined || g.suspended) return;
 	int idx = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
 	if (idx < 0) return;
@@ -5984,6 +6065,8 @@ void CoopInit() {
 	PatchVtableSlot(0x625A8C, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent,
 	                "CKHkAsterix::sendEvent (who died)");
 	PatchVtableSlot(0x625BB0, 5, 0x48BC70, (void*)HeroSendEventHook, (void**)&g_origHeroSendEvent2, "CKHkObelix::sendEvent (who died)");
+	PatchVtableSlot(kTelepherVtbl, 15, 0x5485F0, (void*)AutoCarTickHook, (void**)&g_origAutoCarTick,
+	                "CKHkTelepher::vf15 (the automatic cable car: never Obelix's)");
 	InstallDetour(kHit, (void*)HitHook, (void**)&g_origHit, kHitPrologue, sizeof(kHitPrologue),
 	              "hero hit (the hit hero's own health: the trio's area hits)");
 	PadsInit();
