@@ -4706,3 +4706,19 @@ both halves).
   swim, mode != 0, the switch is refused; on the deck the zone walks the AI Obelix, order 1, refused too), load
   sector 9, Asterix in the water -162 6 -650, Obelix on the deck from -165.2 7.5 -651.7: "Use" shown, X -> Asterix
   leads, 0x4807, the boat sails. spgunuse33 unchanged.
+
+- Round 253 (Nov 11, commits 7dfe01e + 956cdb3; user: QoL windowed_mode = off): (1) xxl_widescreen2d.asi had no
+  effect on level 0 in fullscreen (fine after a level load). The 2D manager's aspect (yp+0x34 -> +4) is summed by
+  FUN_0042A2A0 (frame buffer raster yp+8 -> +4 -> +8 -> +4, +0xC / +0x10) only while its flag +0x40 is set: its
+  deserialize (level load), FUN_00429FD0, FUN_0042A260 (from FUN_00414A90, the WndProc's resize check). Fullscreen
+  boots at 800x600 and goes to the saved 1920x1080 without either -> 4:3 aspect kept (asi log: "frame buffer
+  1920x1080, 2D manager's 1333"). The asi's watch thread (KeepAspectFresh) sets +0x40 whenever aspect != w / h;
+  logs each change (24 max). Also covers a resolution picked in the options. (2) force_level started its level
+  before CKAsterixGameManager::vf10(6) (vtable 0x627F6C slot 10 = 0x5037A0, thiscall(state), ret 4), which applies
+  the saved options: resolution gm+0x170/174/178 (FUN_005038D0), anti-aliasing +0x17C (FUN_005039A0), slot 0x84
+  (+0x180), pad preset (FUN_00503AA0 -> 3 at 0x503AED) -- the root of the old wrong-preset sessions and the
+  xxl_coop_padlayout.txt workaround. Levels ran at 800x600 without AA. main.cpp HookGmState wraps the slot;
+  ForceLevel waits for state 6 (10 s at most; seen ~2 s after level 0 is up). (3) shot.cpp: in exclusive
+  fullscreen (swap chain !Windowed) shots come from the back buffer (StretchRect to a plain RT, GetRenderTargetData)
+  -- PrintWindow gave black. Autotests boot1 (fullscreen, aspect 1777 on the title) and idle -Level 2 (1920x1080, AA,
+  preset 3 from the game itself).
