@@ -1,4 +1,5 @@
 #include "experimental.h"
+#include "levelforge.h"
 #include "nolock.h"
 #include "config.h"
 #include "coop.h"
@@ -669,6 +670,10 @@ void GateFrame(Mode m) {
 // overlaps its own and whose numbers are scaled. Checked once the level is in.
 void CheckSharedPools() {
 	if (g_config.squadAliveFactor == 1.0f) return;
+	// Pools filled up to the factor (levelforge.cpp): enough Romans for both squads.
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	if (gm && LevelForgePoolsFilled(*(int*)(gm + ax::kGM_currentLevel))) return;
 	struct Sq { char* sq; SquadOrig* o; };
 	Sq all[128];
 	int nAll = 0;

@@ -1,0 +1,3 @@
+// romanforge: the editor's asserts throw (caught by the forge) instead of aborting the game.
+#pragma once
+#include "assert.h"

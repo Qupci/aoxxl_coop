@@ -18,6 +18,7 @@
 #include "individual.h"
 #include "hud2.h"
 #include "experimental.h"
+#include "levelforge.h"
 #include "nolock.h"
 #include "guard.h"
 #include "vtprofile.h"
@@ -201,6 +202,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID) {
 			Log("config: force_level %d from XXL_LEVEL", g_config.forceLevel);
 		}
 		AutotestInit();
+		if (g_config.enabled) LevelForgeInstall();   // before the game opens its first level
 		if (!g_config.enabled) {
 			Log("startup: disabled in xxl_coop.ini");
 			return TRUE;

@@ -4446,6 +4446,16 @@ const Step kRules4T[] = {
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	RULES4A(PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f), MARK(4000, "fight")), RULES4B,
 };
+// atonce41 (-Level 4, XXL_ATONCE=3): rules4t with the Romans watched -- LV4-1's
+// lock fight with both heroes there, at three times the level's six at once:
+// 18, its pool (18 basic Romans in the level file, 54 rebuilt: levelforge.cpp)
+// no longer the limit.
+const Step kAtOnce41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 800, S_WATCHENEMIES, 0, 0, 0, -288.15f, 0.5f, "watch romans", 117.27f },
+	RULES4A(PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f), MARK(4000, "fight")), RULES4B,
+};
 const Step kRules4P[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -9906,6 +9916,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("rules4d", kRules4D),
 	SCENARIO("rules4n", kRules4N),
 	SCENARIO("rules4t", kRules4T),
+	SCENARIO("atonce41", kAtOnce41),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),
 	SCENARIO("lock34", kLock34),

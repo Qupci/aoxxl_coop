@@ -181,13 +181,16 @@ void CoopConfig::Load(const char* iniPath) {
 		if (kb[0]) keys[i] = ParseKey(kb);
 	}
 
+	auto readFactorText = [](const char* fb) {
+		if (!_stricmp(fb, "off")) return 1.0f;
+		float f = (float)atof(fb);
+		return f < 0.1f ? 1.0f : f > 10.0f ? 10.0f : f;
+	};
 	auto readFactor = [&](const char* key, float def) {
 		char fb[32] = {};
 		GetPrivateProfileStringA("coop_difficulty", key, "", fb, sizeof(fb), full);
 		if (!fb[0]) return def;
-		if (!_stricmp(fb, "off")) return 1.0f;
-		float f = (float)atof(fb);
-		return f < 0.1f ? 1.0f : f > 10.0f ? 10.0f : f;
+		return readFactorText(fb);
 	};
 	squadAliveFactor = readFactor("squad_romans_at_once", squadAliveFactor);
 	squadCountFactor = readFactor("squad_romans_to_defeat", squadCountFactor);
@@ -195,6 +198,7 @@ void CoopConfig::Load(const char* iniPath) {
 	comboFactor      = readFactor("combo_bar_fill", comboFactor);
 	comboDrainFactor = readFactor("combo_bar_drain", comboDrainFactor);
 	comboFullDrainFactor = readFactor("combo_bar_full_drain", comboFullDrainFactor);
+	if (getenv("XXL_ATONCE")) squadAliveFactor = readFactorText(getenv("XXL_ATONCE"));   // autotests
 	if (getenv("XXL_FACTORS1"))   // autotests: every squad and combo bar factor the game's own
 		squadAliveFactor = squadCountFactor = comboFactor = comboDrainFactor = comboFullDrainFactor = 1.0f;
 	coopOnly = ReadBool("coop_difficulty", "difficulty_coop_only", coopOnly, full);
