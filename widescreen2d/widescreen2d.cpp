@@ -568,6 +568,41 @@ float ReadAspect() {
 	}
 }
 
+// The 2D manager takes its aspect (+4) from the main frame buffer raster's width
+// / height (yellow pages +8 -> +4 -> +8 -> +4, raster +0xC / +0x10) in FUN_0042A2A0,
+// run before its 2D pass only while its flag +0x40 is set: by a level load (its
+// deserialize) and by a window resize (FUN_00414A90 from the window procedure). A
+// fullscreen start goes to the saved resolution without either, so level 0 kept
+// the boot's 4:3 (800 x 600) until the next level load, and so did a resolution
+// picked in the options: the 2D layer stretched, the asi reading 4:3 too. The flag
+// is set whenever the aspect and the raster disagree, and the game sums it again.
+void KeepAspectFresh() {
+	static int told = 0;
+	static int lastW = -1, lastH = -1;
+	static bool lastStale = false;
+	__try {
+		char* yp = *(char**)kYellowPages;
+		char* m2d = yp ? *(char**)(yp + 0x34) : nullptr;
+		char* gfx = yp ? *(char**)(yp + 8) : nullptr;
+		char* a = gfx ? *(char**)(gfx + 4) : nullptr;
+		char* rend = a ? *(char**)(a + 8) : nullptr;
+		char* raster = rend ? *(char**)(rend + 4) : nullptr;
+		if (!m2d || !raster) return;
+		int w = *(int*)(raster + 0x0C), h = *(int*)(raster + 0x10);
+		if (w <= 0 || h <= 0) return;
+		float aspect = *(float*)(m2d + 4);
+		float want = (float)w / (float)h;
+		bool stale = fabsf(aspect - want) > 0.001f;
+		if ((w != lastW || h != lastH || stale != lastStale) && told++ < 24)
+			Log("aspect: frame buffer %dx%d (%d x1000), 2D manager's %d x1000%s", w, h, (int)(want * 1000),
+			    (int)(aspect * 1000), stale ? " -- stale, summed again" : "");
+		lastW = w;
+		lastH = h;
+		lastStale = stale;
+		if (stale) *(uint8_t*)(m2d + 0x40) = 1;
+	} __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
 // The aspect follows the resolution, so it is watched rather than read once.
 DWORD WINAPI WatchThread(LPVOID) {
 	float* scale = (float*)kGlyphScale;
@@ -577,6 +612,7 @@ DWORD WINAPI WatchThread(LPVOID) {
 	bool listsWrapped = false;
 	for (;;) {
 		if (!listsWrapped) listsWrapped = WrapHudLists();
+		KeepAspectFresh();
 		float aspect = ReadAspect();
 		if (aspect > 0.5f && aspect < 8.0f && *scale != 1.0f / aspect) *scale = 1.0f / aspect;
 		Sleep(10);
