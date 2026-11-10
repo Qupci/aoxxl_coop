@@ -4750,3 +4750,19 @@ both halves).
   atonce41 (-Level 4, rules4t + WATCHENEMIES): XXL_ATONCE=3 -> lock squad 18 alive (pool 54, 6 hiding still
   placed), x2 -> 12. romanforge\build\romanforge.exe <game dir> <out dir> <level> [factor] builds one level as the
   asi does. Not cloned: archers, jumping Romans (their pools keep the level's size).
+- Round 255 (Nov 11, commit 920a04d; user: round 254 works on the pad; clone archers + jumping Romans, not jetpacks;
+  more crates/helmets for two views): romanforge 2 fills CKHkRomanArcher (2,95) and CKHkJumpingRoman (2,75) pools too
+  (LV2/LV3 archers 2 -> 6, LV4 jumping 3 -> 9 at x3). Bonuses: CKGrpAsterixBonusPool (4,63) members = CKHkBasicBonus
+  (2,114); the free list is the pool's nextBonusHook chain through nextBonus (all members, in the file); each bonus
+  refs the pool's bonusCpnt. Crates: CKGrpCrate members CKHkCrate (2,112): a CDynamicGround (cloned, added to the
+  mesh klusters by the duplicator) and the group's CKCrateCpnt. Both x2 (kViewObjects) in every rebuilt level,
+  whatever the factor: clones keep the component (Duplicator::keepShared = cloneMap[obj] = obj; the duplicator
+  clones components otherwise), bonuses pushed on the nextBonus chain. LV1 +90 bonuses / +60 crates; helmets 50 ->
+  100 (LV4 pool "free 100"); LV4 crate objects 59 -> 118. The forge runs at any factor now (Romans only above 1).
+  New limit found: CKSrvAvoidance keeps 50 entries at +0x10, count +0xD8 right after; add 0x4600A0 (thiscall(entry),
+  ret 4; entry +0x14..+0x1C push vector, +0x20) has no bound, remove 0x4600E0 swaps the last in and skips an entry
+  it can't find; vf17 (0x45FDF0, its tick) iterates the count. With >50 Romans awake (LV4 x3, crates44 teleport to
+  sector 4 at 9.2 s) the 51st wrote over the count -> crash 0x41CB56 writing 0x14. experimental.cpp AvoidAddHook:
+  past 50 the Roman is left out (push cleared as the add does; "avoidance service full" log, cap 10). Tests:
+  crates44 (118 objects, 0 in view without one; crashed before the cap), crate (iron 4 -> 0 pieces, wood 3), helmets12,
+  pass22 (archer in the cloned LV2), atonce41 (18 at once). Jumping Romans not seen in a test yet.
