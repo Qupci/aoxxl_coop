@@ -1660,6 +1660,23 @@ const Step kBoat49A[] = {
 	SHOT(11800, "boat49_3"),
 	END(14000),
 };
+// spboat49 (-Level 4, XXL_SPISOLATION=0 XXL_SPSWITCH=1): single player, you
+// switch to Obelix and he stands on sector 9's boat deck: its "Use" shows for him
+// (was: none); his X -- Asterix takes it from his spot and the lead (kept: the
+// hero you play), trio 0x4807; player 1 steers left.
+const Step kSpBoat49[] = {
+	MARK(0, "spboat49"),
+	{ 1500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix (at the level's start, both standing)" },
+	LOADSECTOR(2000, 9),
+	PLACEAT(4000, HERO_ASTERIX, -162.0f, 6.0f, -650.0f), PLACEAT(4000, HERO_OBELIX, -165.2f, 7.5f, -651.7f),   // Obelix on the deck
+	SECTORS(4500),
+	SHOT(7000, "on_deck"),
+	P1(7500, PAD_X, 0, 0, "p1 X (obelix): the boat"), P1(7700, 0, 0, 0, "p1 release"),
+	SHOT(9500, "boat"),
+	P1(10000, 0, -1.0f, 0.5f, "p1 stick left"), P1(12000, 0, 0, 0, "p1 release"),
+	SHOT(12500, "steered"),
+	END(15000),
+};
 // iconsboat49 (-Level 4, XXL_ICONP2KB=1 XXL_ICONLOG=1): the LV4-9 boat's "Use"
 // prompt with player 2's Obelix on its deck (the user's spot -165.2 5.4 -651.7,
 // dropped from 7.5; placed at 5.4 he sticks in the hull): Asterix 12 units off on
@@ -9843,6 +9860,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("mgun33d", kMgun33D),
 	SCENARIO("boat49o", kBoat49O),
 	SCENARIO("boat49a", kBoat49A),
+	SCENARIO("spboat49", kSpBoat49),
 	SCENARIO("iconsboat49", kIconsBoat49),
 	SCENARIO("hintjoin", kHintJoin),
 	SCENARIO("spy3n", kSpy3N),

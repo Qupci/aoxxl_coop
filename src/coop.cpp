@@ -56,6 +56,8 @@ static bool SoloDropsSwitch(int ev);
 static bool SoloCatchUpOrder(int ev);
 static void ModCheats(uint16_t pressed, int me, const char* player);
 static void SoloGunFrame(Trio t);                        // below: Obelix's machine gun in single player
+static void SoloBoatFrame(Trio t);                       // below: Obelix's X at the boat in single player
+static void SoloHandOver(int to, const char* why);       // below: sp_hero_switch_lock, the hero you play from now
 static void PlaySound(Hero h, uint32_t bankOffset);
 static void WatchLifterHint(Trio t);
 static bool GunSolo(Trio t);
@@ -3296,6 +3298,7 @@ void CoopFrame() {
 		SoloHeroSwitch(t);
 		SoloSwitchLockWatch(t);
 		SoloGunFrame(t);
+		SoloBoatFrame(t);
 		WatchPendingLead(t);   // (an undone lock's lead back: R3 + B, second chance)
 		GuardFrame();          // (second chance: romans_guard_downed)
 		ShowJoinHint(t);
@@ -3845,8 +3848,72 @@ static void SoloGunCall(Trio t) {
 		    s_pos.z, s_dir.x, s_dir.y, s_dir.z, (int)t.GetHero(HERO_ASTERIX).Order());
 }
 
+// Single player ([single_player] sp_isolation off), Obelix leading on the boat's
+// deck: the boat offers itself to him (trio 0x4901: +0x48 = boat, +0x3F4 kind 1),
+// but X takes it only from Asterix (FUN_0049A080), and the "Use" is written by
+// Asterix's call alone (PromptHook writes it for Obelix). The boat is Asterix's
+// (trio 0x4807 acts on him, Obelix the AI companion going to his place), so his X
+// is Asterix's taking it, as in co-op (ServeMachineRequest): the AI Asterix is put
+// at Obelix's spot and takes the lead -- a real switch, kept (user: as the belly
+// slide's switch to Obelix stays, the boat's to Asterix stays; sp_hero_switch_lock:
+// the hero you play from now) -- and the next frame, the switch done, 0x4807.
+const uintptr_t kBoatVtbl = 0x627EB8;   // CKHkBoat (2,39)
+struct SoloBoat { char* boat = nullptr; DWORD at = 0; } g_soloBoat;
+
+static char* SoloBoatOffered(Trio t) {
+	char* m = t ? *(char**)(t.raw() + 0x48) : nullptr;
+	if (!m || *(uintptr_t*)m != kBoatVtbl || ((*(uint32_t*)(t.raw() + 0x3F4) >> 10) & 3) != 1 || *(uint32_t*)(t.raw() + 0x4C) ||
+	    (*(uint32_t*)(t.raw() + 0x3F4) & 4))
+		return nullptr;
+	return m;
+}
+
+static void SoloBoatTake(Trio t, Hero a, Hero o, char* boat) {
+	*(uint32_t*)(o.raw() + 0x3EC) &= ~0x10u;   // no swing
+	Vector3 dst = o.Pos();
+	const char* no = IndivFallen(HERO_ASTERIX) ? "he is down"
+	               : *(uint8_t*)(a.raw() + 0x1A) || g.held[HERO_ASTERIX] || !HeroModePlayable(a.Flags18()) ? "the level holds him"
+	               : (a.Pos() - dst).len2() > 40.0f * 40.0f ? "he is too far" : nullptr;
+	if (no) {
+		PlaySound(a, 0x200);
+		Log("coop: Obelix's X at the boat refused: Asterix can't come (%s)", no);
+		return;
+	}
+	a.Pos() = dst;
+	if (a.hook->node && a.hook->node->matrix) {
+		float* hp = (float*)((char*)a.hook->node->matrix + 0x40);
+		hp[0] = dst.x; hp[1] = dst.y; hp[2] = dst.z;
+	}
+	CoopGiveLead(HERO_ASTERIX, "Obelix's X at the boat: it is Asterix's");
+	SoloHandOver(HERO_ASTERIX, "the boat is Asterix's");
+	g_soloBoat.boat = boat;
+	g_soloBoat.at = GetTickCount();
+	Log("coop: Obelix's X at the boat: Asterix takes it from Obelix's spot (%.1f %.1f %.1f)", dst.x, dst.y, dst.z);
+}
+
+static void SoloBoatFrame(Trio t) {
+	SoloBoat& s = g_soloBoat;
+	if (!s.boat) return;
+	Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero(), o = t ? t.GetHero(HERO_OBELIX) : Hero();
+	if (!a || !o || g.p2Joined) { s = SoloBoat(); return; }
+	if (t.Leader() != HERO_ASTERIX || !HeroIsPlayerVariant(a.Flags18()) || HeroIsPlayerVariant(o.Flags18())) {
+		if (GetTickCount() - s.at > 2000) { Log("coop: Asterix did not take the lead for the boat"); s = SoloBoat(); }
+		return;
+	}
+	uint8_t* tr = (uint8_t*)t.raw();
+	*(char**)(tr + 0x48) = s.boat;
+	*(uint32_t*)(tr + 0x3F4) = (*(uint32_t*)(tr + 0x3F4) & ~0xC00u) | (1u << 10) | 8u;
+	typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+	g.machineSending = true;
+	((SendFn)(*(void***)t.raw())[5])(t.raw(), nullptr, 0x4807, nullptr);
+	g.machineSending = false;
+	Log("coop: Asterix leads at the boat -- trio 0x4807: the boat's mode (Asterix %02X, Obelix %02X order %d)", a.Flags18(),
+	    o.Flags18(), (int)o.Order());
+	s = SoloBoat();
+}
+
 static void SoloNoteMachineUse(char* hero) {
-	if (!g_config.SoloMod() || g_soloGun.on) return;
+	if (!g_config.SoloMod() || g_soloGun.on || g_soloBoat.boat) return;
 	Trio t = GetTrio();
 	Hero o = t ? t.GetHero(HERO_OBELIX) : Hero(), a = t ? t.GetHero(HERO_ASTERIX) : Hero();
 	if (!o || !a || hero != o.raw() || t.Leader() != HERO_OBELIX) return;
@@ -3854,6 +3921,10 @@ static void SoloNoteMachineUse(char* hero) {
 	if (!(ec & 0x10) || (ec & 0xC0000) || (f0 & 0x804129) || (*(uint32_t*)(hero + 0x384) & 0x200000) ||
 	    *(uint8_t*)(hero + 0x3E9) != 0)
 		return;
+	if (char* boat = SoloBoatOffered(t)) {
+		if (HeroModePlayable(o.Flags18())) SoloBoatTake(t, a, o, boat);
+		return;
+	}
 	char* gun = TrioGun(t);
 	int kind = (*(uint32_t*)(t.raw() + 0x3F4) >> 10) & 3;
 	if (!gun || kind != 2 || *(uint32_t*)(t.raw() + 0x4C) || (*(uint8_t*)(gun + 0x10C) & 1) || !HeroModePlayable(o.Flags18()))
@@ -4114,7 +4185,6 @@ struct { uint32_t frame = 0; unsigned kind = kPromptNone; bool leader = false; i
 // deck (hero +0x280 = boat +0x120, on its feet: the boat's own test through
 // trio 0xB00) the prompt is both players'.
 const unsigned  kPromptMachine = 9;
-const uintptr_t kBoatVtbl = 0x627EB8;   // CKHkBoat (2,39)
 static int MachinePromptHero(Trio t, bool* both) {
 	char* m = *(char**)(t.raw() + 0x48);
 	*both = false;
@@ -4198,22 +4268,26 @@ static void __fastcall PromptHook(char* hero, void* edx) {
 	if (gm && CoopSoloGunAlone() && ((*(uint32_t*)(gm + 0xCC) >> 4) & 0xF) == kPromptMachine)
 		*(uint32_t*)(gm + 0xCC) = (*(uint32_t*)(gm + 0xCC) & ~0xF0u) | (kPromptNone << 4);
 	// Single player, Obelix leading (sp_isolation off): the gun offered to him (trio
-	// +0x48, kind 2, free) is his X's to take (SoloNoteMachineUse), but the machine's
-	// "Use" is written by Asterix's call alone -- the AI companion's, which never
-	// runs: no prompt. Obelix's call writes it where it wrote nothing.
-	if (gm && t && !g.p2Joined && g_config.SoloMod() && !g_soloGun.on && t.Leader() == HERO_OBELIX &&
+	// +0x48, kind 2, free) or the boat (kind 1, he on its deck) is his X's to take
+	// (SoloNoteMachineUse), but the machine's "Use" is written by Asterix's call
+	// alone -- the AI companion's, which never runs: no prompt. Obelix's call writes
+	// it where it wrote nothing.
+	if (gm && t && !g.p2Joined && g_config.SoloMod() && !g_soloGun.on && !g_soloBoat.boat && t.Leader() == HERO_OBELIX &&
 	    hero == t.GetHero(HERO_OBELIX).raw()) {
 		char* gun = TrioGun(t);
-		bool offered = gun && ((*(uint32_t*)(t.raw() + 0x3F4) >> 10) & 3) == 2 && !*(uint32_t*)(t.raw() + 0x4C) &&
-		               !(*(uint8_t*)(gun + 0x10C) & 1);
+		bool gunOffered = gun && ((*(uint32_t*)(t.raw() + 0x3F4) >> 10) & 3) == 2 && !*(uint32_t*)(t.raw() + 0x4C) &&
+		                  !(*(uint8_t*)(gun + 0x10C) & 1);
+		bool boatOffered = SoloBoatOffered(t) != nullptr;
 		uint32_t& cc = *(uint32_t*)(gm + 0xCC);
-		bool wrote = offered && ((cc >> 4) & 0xF) == kPromptNone;
+		bool wrote = (gunOffered || boatOffered) && ((cc >> 4) & 0xF) == kPromptNone;
 		if (wrote) cc = (cc & ~0xF0u) | (kPromptMachine << 4);
-		static bool s_was = false;
+		static int s_was = 0;   // (0 none, 1 gun, 2 boat)
 		static int s_told = 0;
-		if (wrote != s_was && s_told++ < 20)
-			Log("coop: single player: the machine gun's \"Use\" %s Obelix (leading)", wrote ? "shown for" : "gone from");
-		s_was = wrote;
+		int now = !wrote ? 0 : gunOffered ? 1 : 2;
+		if (now != s_was && s_told++ < 20)
+			Log("coop: single player: the %s's \"Use\" %s Obelix (leading)", (now ? now : s_was) == 1 ? "machine gun" : "boat",
+			    now ? "shown for" : "gone from");
+		s_was = now;
 	}
 	if (!gm || !t || !g.p2Joined || g.suspended) return;
 	int idx = hero == t.GetHero(g.p1Hero).raw() ? g.p1Hero : hero == t.GetHero(g.p2Hero).raw() ? g.p2Hero : -1;
