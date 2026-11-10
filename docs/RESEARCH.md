@@ -4668,3 +4668,21 @@ both halves).
   IconsRewrite'd only in co-op or with sp_coop_icons (as LocStringHook does). HintBoxRect counts in single player too
   (the flask, hud2.cpp, is at the left: unaffected). Autotest promptsp (-Level 2: Asterix at sector 1's merchant,
   "Open X": plate 126x48 at 960x540, ink 20/20 left/right, 14/13 top/bottom; no second box); hintalign unchanged.
+- Round 250 (Nov 10, commit e119dbf; user saw spobtele53 work): (1) single player (sp_isolation off), Obelix leading
+  by a machine gun had no "Use": FUN_0049A1A0 writes kind 9 only from Asterix's call (hero vtable +0x3C == 0, trio
+  +0x48 set), and the AI companion's never runs. PromptHook writes 9 for leading Obelix where his call left none,
+  while the gun is offered (TrioGun, trio +0x3F4 bits 10-11 == 2, +0x4C 0, gun +0x10C bit 0 clear) and his solo
+  gun is not on. Co-op unchanged (round 162). (2) Obelix rode LV5-3's automatic cable car (CKHkTelepher 2,158,
+  -336.198 16.820 373.618) -- in SP after a hero switch, in co-op whenever proximity ticked it with him posing as
+  leader. CKHkTelepher::vf15 (0x5485F0, thiscall dt, ret 4; vtable 0x6293D4 slot 15; rope car CKHkTowedTelepher has
+  its own 0x4BC970): +0x1C rider = trio vf25 (leader hero), +0x20 = its ground (trio vf29 = leader +0x280 unless
+  +0x384 & 7; later hero event 0xB00); +0x20 == +0x84 (own ground) -> vf27 go (+0x7C 0x80: 0x0C0D boarding), else
+  rider cleared + vf28 stop; +0x7C 0x20 = going regardless; 0x40 = skip the mismatch once. AutoCarTickHook: a tick
+  with Obelix as leader runs with Asterix posing (trio +0x2C/+0x2D, restored if unchanged), Obelix never kept as
+  +0x1C (nor, in SP with Obelix leading, the AI Asterix outside situation 2); SP with the AI Asterix on it too and
+  no +0x7C 0x20: tick skipped. Autotests spobtele53 (-Level 5, XXL_SPISOLATION=0 XXL_SPSWITCH=1: Obelix on it
+  5.4-11 s, no ride; Asterix after the switch back rides at ~4 s), cotele53 (-Level 5: P2 Obelix on it, Asterix
+  leading then Obelix leading -- stays; Asterix boarding with Obelix leading rides, 0C09 jump off at the end),
+  spgunuse33 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=0: "Use" by the gun, gone 10 units off, back, X takes it).
+  Ground by the LV5-3 car (user): -339.570 18.010 378.275 (-337.172 16.939 374.286 is by the lava cliff: PLACEAT
+  there fell in). PLACEAT/GLIDEAT can't take a coordinate macro (one argument to the preprocessor).
