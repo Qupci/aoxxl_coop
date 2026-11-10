@@ -723,6 +723,18 @@ const Step kReviveTimer[] = {
 	SHOT(33500, "rt_revived"),
 	END(34500),
 };
+// promptsp (-Level 2, single player): the game's own prompt in player 1's box
+// at the game's place, centred as the mod's (round 249; the game's box left
+// out): Asterix at sector 1's merchant, then away (the box goes).
+const Step kPromptSp[] = {
+	MARK(0, "promptsp"),
+	GLIDEAT(1500, HERO_ASTERIX, -764.3f, 509.0f, -1011.0f, 1500),
+	{ 3200, S_NEAROBJ, HERO_ASTERIX, 172, 0, 1.6f, 0, "asterix at the merchant" },
+	SHOT(4500, "psp_prompt"),
+	GLIDEAT(5000, HERO_ASTERIX, -755.0f, 509.0f, -1000.0f, 800),
+	SHOT(7000, "psp_away"),
+	END(7500),
+};
 const Step kHoldSkip[] = {
 	MARK(0, "baseline"),
 	VPAD(1500, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1650, "hs_tap_held"), VPAD(1750, 0, 0, 0, 0, "pad 1 release"),
@@ -9653,6 +9665,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("skip1", kSkip1),
 	SCENARIO("holdskip", kHoldSkip),
 	SCENARIO("hintalign", kHintAlign),
+	SCENARIO("promptsp", kPromptSp),
 	SCENARIO("revivetimer", kReviveTimer),
 	SCENARIO("boothold", kBootHold),
 	SCENARIO("bootfilm", kBootFilm),

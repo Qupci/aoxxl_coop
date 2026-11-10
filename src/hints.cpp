@@ -375,25 +375,21 @@ void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, 
 		*kind = 2; *ident = HINT_SKIP; *text = h.text; *bar = h.bar;
 		return;
 	}
-	CKYellowPages* yp = YellowPages();
-	char* gm = yp ? (char*)yp->gameManager : nullptr;
-	unsigned gameKind = gm ? (*(uint32_t*)(gm + 0xCC) >> 4) & 0xF : kPromptNone;
-	if (!itf) {
-	} else if (CoopP2Joined()) {
-		unsigned k = CoopPromptKindFor(p);
+	// The prompt ("Use", "Push / Pull"...) of the player's hero -- single player's
+	// too, the game's own box left out: the boxes' layout (centred) for both (user).
+	if (itf) {
+		unsigned k = CoopPromptKindFor(p);   // (single player: player 1's box the game's prompt, the left box none)
 		void* loc = LocOf(*(char**)(itf + 0x15C));
 		if (k < 15 && k != kPromptNone && loc) {
 			uint32_t id = *(uint32_t*)(itf + 0x1A4 + k * 4);
 			const wchar_t* s = g_origLocString(loc, nullptr, id);
 			if (s) {
-				wcsncpy(prompt[p], IconsRewrite(s, p), kTextLen - 1);
+				wcsncpy(prompt[p], CoopP2Joined() || g_config.spCoopIcons ? IconsRewrite(s, p) : s, kTextLen - 1);
 				prompt[p][kTextLen - 1] = 0;
 				*kind = 1; *ident = id; *text = prompt[p];
 				return;
 			}
 		}
-	} else if (p == 0 && gameKind != kPromptNone) {
-		return;   // player 1 alone: the game's own prompt comes first (the left box has no prompt)
 	}
 	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; *bar = h->bar; }
 }
@@ -697,7 +693,7 @@ void DrawSlot(int p, char* game, float* plate, void* arg) {
 }
 
 // The HUD's 2D layer (FUN_0042A470, thiscall(the 2D manager, arg), ret 4,
-// called from FUN_00414070 at 0x4140F4): with player 2 in, the game's prompt
+// called from FUN_00414070 at 0x4140F4): the game's prompt
 // box is left out (its text and plate shown flags cleared for the draw); the
 // players' boxes after it.
 typedef void(__fastcall* Draw2dFn)(char* m2d, void* edx, void* arg);
@@ -705,10 +701,10 @@ const uintptr_t kDraw2dCall = 0x4140F4;
 const uint8_t   kDraw2dCallBytes[5] = { 0xE8, 0x77, 0x63, 0x01, 0x00 };
 const uintptr_t kDraw2d = 0x42A470;
 
-// The players' boxes are drawn with player 2 in -- not while a hero shops: the
-// HUD's pass is then drawn in the shopper's half (splitscreen.cpp), the game's
-// prompt as before.
-bool OwnBoxes() { return CoopP2Joined() && CoopShopper() < 0; }
+// The players' boxes stand for the game's prompt box (single player too: player
+// 1's at its place) -- not while a hero shops in co-op: the HUD's pass is then
+// drawn in the shopper's half (splitscreen.cpp), the game's prompt as before.
+bool OwnBoxes() { return CoopShopper() < 0; }
 
 // The game's prompt box, left out of a 2D pass with player 2 in (its text's
 // and plate's shown flags, +5 bit 1, cleared for the pass).
@@ -794,7 +790,7 @@ void __fastcall Draw2dHook(char* m2d, void* edx, void* arg) {
 	if (cine) MoveOnForSkip(itf, nullptr, now);
 	else if (level0) MoveOnForSkip(nullptr, l0text, now);
 	else g_cineDrawAt = 0;
-	if (!(up || cine || level0) || (CoopP2Joined() && !OwnBoxes() && !cine)) return;
+	if (!(up || cine || level0) || (!OwnBoxes() && !cine)) return;
 	char* game = level0 ? l0text : *(char**)(itf + 0x15C);
 	float* plate = level0 ? l0plate : *(float**)(itf + 0x140);
 	if (game && *(uintptr_t*)game == 0x623B6C) LayOutGlyphs(game);
@@ -980,7 +976,7 @@ bool HintOnScreen(int key, int player) {
 bool HintBoxRect(int player, float* left, float* right, float* bottom, float* top) {
 	if (player < 0 || player > 1 || !g_itf || g_itf != (char*)GetLvlObject(2, 132, 0)) return false;
 	const Slot& s = g_slots[player];
-	if (!s.kind || !s.laid || s.in <= 0.0f || (CoopP2Joined() && !OwnBoxes()) || !HudUp(g_itf)) return false;
+	if (!s.kind || !s.laid || s.in <= 0.0f || !OwnBoxes() || !HudUp(g_itf)) return false;
 	float* plate = *(float**)(g_itf + 0x140);
 	if (!plate || *(uintptr_t*)plate != 0x6235C0) return false;
 	// As DrawSlot places it.

@@ -10,8 +10,8 @@
 // player's hero's prompt ("Use", "Talk"...) or else that player's newest hint.
 // The boxes are copies of the game's text object (CText2d, 0x6DC bytes) laid out
 // with a private string id and drawn after the HUD's 2D layer (FUN_0042A470),
-// with the game's plate. Without player 2, hints use player 1's box at the
-// game's place while the game shows no prompt.
+// with the game's plate. Without player 2, player 1's box stands at the game's
+// place for its prompt too (the game's box left out) and its hints.
 
 #pragma once
 #include <windows.h>
