@@ -26,6 +26,8 @@ struct Duplicator : MemberListener {
 public:
 	Duplicator(KEnvironment& kenv, EditorUI::EditorInterface* ui) : kenv(kenv), ui(ui) {}
 	void doClone(CKObject* object);
+	// romanforge: `obj` is referenced as it is by the clones (a shared component), not cloned.
+	void keepShared(CKObject* obj) { cloneMap[obj] = obj; }
 	void doExport(CKObject* object, const std::filesystem::path& path);
 	void doImport(const std::filesystem::path& path, CKGroup* parentGroup);
 

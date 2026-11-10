@@ -10,6 +10,12 @@
 // kept in Game Files\coop_levels\ (made once, again when the factor or the
 // game's files change) and the game reads them instead (CreateFileA).
 //
+// Bonuses (helmets...) and crates are objects handed to the spots in view the
+// same way (a bonus pool's chain, a crate group's hooks): two views see more
+// spots than one, so the rebuilt levels have twice the level's, whatever the
+// factor (romanforge 2; archers and jumping Romans cloned too, not the jetpack
+// Romans).
+//
 // They are in XXL-Editor's moddable format: the original PC levels keep their
 // class header and some values in the game module, which is patched in memory
 // (the editor's game patcher's patches) to read them from the level file -- so
@@ -17,8 +23,8 @@
 #pragma once
 
 // From DllMain, after the config: patches the module, hooks the file opens,
-// starts building what the cache lacks. Nothing with squad_romans_at_once <= 1
-// or a game module the conversion does not know.
+// starts building what the cache lacks. Nothing with a game module the
+// conversion does not know (Romans cloned only with squad_romans_at_once > 1).
 void LevelForgeInstall();
-// The level loaded has its Roman pools filled (Romans were added to it).
+// The level loaded has its Roman pools filled (squad_romans_at_once > 1).
 bool LevelForgePoolsFilled(int level);

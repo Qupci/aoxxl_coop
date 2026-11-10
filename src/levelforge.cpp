@@ -17,7 +17,7 @@ namespace {
 namespace fs = std::filesystem;
 
 // Bumped when what the forge writes changes: rebuilds every cached level.
-const char* const kForgeVersion = "romanforge 1";
+const char* const kForgeVersion = "romanforge 2";   // 2: archers, jumping Romans, bonuses and crates
 const int kLevels = 9;
 
 std::vector<unsigned char> g_exe;
@@ -30,7 +30,7 @@ struct Level {
 	volatile LONG state = LV_PENDING;
 	HANDLE done = nullptr;
 	bool ok = false;      // a rebuilt level file to serve
-	int cloned = 0;       // Romans added (its sectors rebuilt too)
+	int cloned = 0;       // objects added (its sectors rebuilt too)
 };
 Level g_lv[kLevels];
 
@@ -104,7 +104,7 @@ void Build(int lvl) {
 	DWORD t0 = GetTickCount();
 	if (CacheValid(lvl, &L.cloned)) {
 		L.ok = true;
-		Log("levelforge: level %d from the cache (%d Romans added)", lvl, L.cloned);
+		Log("levelforge: level %d from the cache (%d objects added)", lvl, L.cloned);
 		LeaveCriticalSection(&g_lock);
 		return;
 	}
@@ -258,15 +258,12 @@ bool HookCreateFileA() {
 } // namespace
 
 bool LevelForgePoolsFilled(int level) {
-	return level >= 0 && level < kLevels && g_lv[level].state == LV_DONE && g_lv[level].ok && g_lv[level].cloned > 0;
+	return g_factor > 1.0f && level >= 0 && level < kLevels && g_lv[level].state == LV_DONE && g_lv[level].ok &&
+	       g_lv[level].cloned > 0;
 }
 
 void LevelForgeInstall() {
-	g_factor = g_config.squadAliveFactor;
-	if (g_factor <= 1.0f) {
-		Log("levelforge: off (squad_romans_at_once %.2f): the levels as they are", g_factor);
-		return;
-	}
+	g_factor = g_config.squadAliveFactor > 1.0f ? g_config.squadAliveFactor : 1.0f;
 	char exePath[MAX_PATH];
 	GetModuleFileNameA(nullptr, exePath, sizeof(exePath));
 	FILE* f = fopen(exePath, "rb");
@@ -279,7 +276,7 @@ void LevelForgeInstall() {
 		fclose(f);
 	}
 	if (g_exe.empty() || !ForgeModuleKnown(g_exe.data(), g_exe.size())) {
-		Log("levelforge: %s is not the game module the level conversion knows -- Roman pools as the levels have them", exePath);
+		Log("levelforge: %s is not the game module the level conversion knows -- the levels as they are", exePath);
 		g_exe.clear();
 		return;
 	}
@@ -288,7 +285,7 @@ void LevelForgeInstall() {
 	for (size_t i = 0; i < np; i++) {   // the bytes in memory must be the file's (no other patch there)
 		const ForgePatch& p = patches[i];
 		if (p.offset + p.size > g_exe.size() || memcmp((void*)(0x400000 + p.offset), g_exe.data() + p.offset, p.size) != 0) {
-			Log("levelforge: the game module differs at %08X from %s -- Roman pools as the levels have them",
+			Log("levelforge: the game module differs at %08X from %s -- the levels as they are",
 			    (unsigned)(0x400000 + p.offset), exePath);
 			g_exe.clear();
 			return;
@@ -302,7 +299,7 @@ void LevelForgeInstall() {
 	InitializeCriticalSection(&g_lock);
 	for (Level& L : g_lv) L.done = CreateEventA(nullptr, TRUE, FALSE, nullptr);
 	if (!HookCreateFileA()) {
-		Log("levelforge: kernel32!CreateFileA not imported by the game module -- Roman pools as the levels have them");
+		Log("levelforge: kernel32!CreateFileA not imported by the game module -- the levels as they are");
 		return;
 	}
 	for (size_t i = 0; i < np; i++) {
@@ -314,7 +311,8 @@ void LevelForgeInstall() {
 		VirtualProtect(at, p.size, old, &old);
 	}
 	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
-	Log("levelforge: Roman pools of basic Romans and leaders filled up to x%.2f; the levels are read from %s "
+	Log("levelforge: Roman pools (basic Romans, leaders, archers, jumping Romans) filled up to x%.2f, bonuses and "
+	    "crates x2; the levels are read from %s "
 	    "(the module reads XXL-Editor's format: %u patches)", g_factor, g_cacheDir.c_str(), (unsigned)np);
 	CloseHandle(CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr));
 }

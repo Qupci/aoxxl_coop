@@ -185,6 +185,29 @@ int __fastcall SquadDeserializeHook(char* self, void* edx, void* file, int pass)
 	return r;
 }
 
+// The avoidance service (CKSrvAvoidance, Romans stepping aside from each
+// other) keeps 50 entries at +0x10 and their count right after them (+0xD8);
+// its add (0x4600A0, thiscall(entry), ret 4) has no bound. With more Romans
+// awake than any level had (pools filled up, levelforge.cpp) a 51st wrote over
+// the count and the service's tick (vf17) read garbage (crash at 0x41CB56, LV4
+// at x3). Past 50 a Roman is left out (it does not step aside; its push is
+// cleared as the add would); the remove (0x4600E0) skips one it can't find.
+const uintptr_t kAvoidAdd = 0x4600A0;
+const uint8_t   kAvoidAddPrologue[10] = { 0x8B, 0x91, 0xD8, 0x00, 0x00, 0x00, 0x8B, 0x44, 0x24, 0x04 };
+typedef void(__fastcall* AvoidAddFn)(char* self, void* edx, char* entry);
+AvoidAddFn g_origAvoidAdd = nullptr;
+
+void __fastcall AvoidAddHook(char* self, void* edx, char* entry) {
+	if (*(uint32_t*)(self + 0xD8) < 50) {
+		g_origAvoidAdd(self, edx, entry);
+		return;
+	}
+	memcpy(entry + 0x14, (const void*)0x6621D8, 12);   // the zero vector the add writes
+	*(uint32_t*)(entry + 0x20) = 0;
+	static int s_told = 0;
+	if (s_told++ < 10) Log("experimental: avoidance service full (50): Roman %p left out", entry);
+}
+
 int __fastcall ShopDeserializeHook(char* self, void* edx, void* file, int pass) {
 	int r = g_origShopDeserialize(self, edx, file, pass);
 	if (pass == 0) {
@@ -838,6 +861,8 @@ bool ExperimentalInstallHooks() {
 		ok &= PatchVtableSlot(0x626A6C, 25, 0x4C7F80, (void*)JetCmdHook, (void**)&g_origJetCmd,
 		                      "CKGrpSquadJetPack::vf25 (squad script numbers)");
 	}
+	ok &= InstallDetour(kAvoidAdd, (void*)AvoidAddHook, (void**)&g_origAvoidAdd, kAvoidAddPrologue,
+	                    sizeof(kAvoidAddPrologue), "avoidance add (at most its 50 entries)");
 	if (g_config.priceFactor != 1.0f)
 		ok &= InstallDetour(kShopDeserialize, (void*)ShopDeserializeHook, (void**)&g_origShopDeserialize,
 		                    kShopDeserializePrologue, sizeof(kShopDeserializePrologue),
