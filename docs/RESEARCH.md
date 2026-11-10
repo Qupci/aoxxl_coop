@@ -4642,3 +4642,21 @@ both halves).
 - Round 247 (Nov 8, commit 984daf1; user: rounds 245-246 confirmed on the pad; the skip's hold 2 s instead of 3).
   cutskip.cpp kHoldMs 3000 -> 2000 (the bar fills over 2 s). Autotests holdskip (-Level 1: skipped at 2.0 s; Enter
   held 1.6 s still not) and boothold (XXL_LEVEL=-1: the intro at 2.0 s, the film chained, title on a press).
+- Round 248 (Nov 10, commit 1cbbe26; user + their designer, Figma 4966-780). (1) Level 0's intro on a press again:
+  cutskip.cpp kHoldLevel0Intro (false) -- a source switch, no ini. (2) Revive countdown bar: hints.cpp Bar {share,
+  style BAR_HOLD / BAR_TIMER, secs}; HintTimerBar(key, player, share, secondsLeft): red FF0000 at 33%, from 10 s left
+  33% + 33% (0.5 - 0.5 cos(2 pi t / 1 s)); no fade when full. individual.cpp TimeLimit: limitAll (the limit as set:
+  SetLimit / the fall) -> share = 1 - left / all every frame (user: fills left to right like the hold bars; first
+  version shrank). (3) Text centred on the plate: in DrawSlot the text's y = plate middle + 1 - wy0 - kInkMid * size
+  + step * (lines - 1) / 2, kInkMid = 1.23 (a line's ink middle above its place, text y - 1 + word y; measured --
+  0.5 put the text above the plate). Plate geometry unchanged (single line 0.09 high; x - kMargin .. x + w + kMargin).
+  (4) Heroes: HintHeroName = the icon alone; LayOutSlot swaps each hero glyph for a blank (icons.cpp
+  hero_slot_asterix / _obelix: the icon's ink width -- asterix 49, obelix 51 of 64 px, columns 7-55 / 7-57 -- times
+  1.5) and records its x / width / line; DrawSlot draws the hero glyph over it at 1.5x the font size (g_glyphObj 8 /
+  9, strings 10 / 11; kNumStrings 12), raised 0.06 of the size (kHeroDy). (5) Autotest FitWindowOnScreen: the
+  1920x1080 window's client reached 31 px past a 1080 screen; PrintWindow left those rows white (the shots' last
+  15 rows). Autotests: hintalign (-Level 2: S_HINTTEST cases 4-8 added; XXL_HINTLOG=1 logs each box's plate rect,
+  tools/hint_pad.py prints the ink paddings per shot -- single line 20-22 px left/right, 13-14 top/bottom (7/7 with
+  a hero icon); pad icons' dark rims read a few px short), revivetimer (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000
+  XXL_REVIVEHOLD=2: 31 s limit, the bar from the left, pulsing from 10 s, revived at 30 s); holdskip 2.0 s, bootfilm
+  (intro + film skipped at the first tap) unchanged otherwise.
