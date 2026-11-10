@@ -70,6 +70,8 @@ bool     g_fuseUp = false;
 DWORD    g_spent[2] = {};          // FUN_00493810: a combo done, by hero
 int      g_spentKind[2] = { -1, -1 };
 int      g_logs = 0;
+const char* g_skipped[16];         // no-combos pools logged this level (squad + pool)
+int      g_skipN = 0;
 
 CKYellowPages* YP() { return YellowPages(); }
 char* GM() { CKYellowPages* yp = YP(); return yp ? (char*)yp->gameManager : nullptr; }
@@ -129,7 +131,23 @@ void Pop(Player& pl, int c) {
 // The nearest Roman of an awake squad (4,26: +0x152 bit 2; member lists per pool
 // record +0x144, 0x1C each, +0x14C of them; members chained from record +8 by
 // +0x50; done +8 bit 0, knocked out +0x24 bit 1; place: node +0x10 -> frame +4,
-// LTM position +0x80), squared, within 3 units up or down.
+// LTM position +0x80), squared, within 3 units up or down. Not the turtles or the
+// mobile tower (pool record +4, the enemy type's component, by vtable): no combo
+// works on them.
+bool NoCombos(const char* rec) {
+	const char* cpnt = *(char* const*)(rec + 4);
+	if (!cpnt) return false;
+	switch (*(const uintptr_t*)cpnt) {
+	case 0x627D20:   // CKMobileTowerCpnt
+	case 0x627D50:   // CKTriangularTurtleCpnt
+	case 0x627DB8:   // CKSquareTurtleCpnt
+	case 0x627DEC:   // CKDonutTurtleCpnt
+	case 0x627E20:   // CKPyramidalTurtleCpnt
+		return true;
+	}
+	return false;
+}
+
 float NearestRoman2(const Vector3& at) {
 	float best = 1e30f;
 	for (unsigned i = 0, n = GetNumLvlClassInstances(4, 26); i < n; i++) {
@@ -138,6 +156,17 @@ float NearestRoman2(const Vector3& at) {
 		char* recs = *(char**)(sq + 0x144);
 		unsigned nr = *(unsigned*)(sq + 0x14C);
 		for (unsigned r = 0; recs && r < nr && r < 8; r++) {
+			const char* rec = recs + 0x1C * r;
+			if (NoCombos(rec)) {
+				bool told = false;
+				for (int k = 0; k < g_skipN && !told; k++) told = g_skipped[k] == rec;
+				if (!told && g_skipN < 16) {
+					g_skipped[g_skipN++] = rec;
+					Log("combohints: squad %p pool %u: no combos on its enemies (cpnt vtable %08X), never a Roman near", sq, r,
+					    (unsigned)**(uintptr_t**)(rec + 4));
+				}
+				continue;
+			}
 			int guard = 0;
 			for (char* m = *(char**)(recs + 0x1C * r + 8); m && guard++ < 256; m = *(char**)(m + 0x50)) {
 				if ((*(uint8_t*)(m + 8) & 1) || (*(uint32_t*)(m + 0x24) & 2)) continue;
@@ -254,6 +283,7 @@ void Press(Player& pl, int p, const Seq& s, unsigned pressed, int key) {
 
 void ResetLevel(int level) {
 	g_level = level;
+	g_skipN = 0;
 	for (Player& pl : g_p) pl = Player();
 	g_fused = false;
 	g_bitsKnown = false;

@@ -7711,6 +7711,20 @@ const Step kComboHint2B[] = {
 	SHOT(10500, "club_hint"),
 	END(11500),
 };
+// comboturtle22 (-Level 2): the user's LV2-2 spot by the donut turtle
+// (-184.287 5.491 -540.223): every combo learned, player 2's Obelix there with a
+// full combo bar -- no combo hint (none works on turtles or the mobile tower).
+// Asterix stays at the start (by the turtle it knocks him down).
+const Step kComboTurtle22[] = {
+	MARK(0, "comboturtle22"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	PLACEAT(3000, HERO_OBELIX, -184.287f, 5.491f, -540.223f),
+	SECTORS(3500),
+	{ 4500, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	SHOT(5500, "turtle_1"), SHOT(8000, "turtle_2"),
+	END(9000),
+};
 
 // crowd36 (-Level 3): LV3-6's fight (200 Romans to beat in co-op), the Twister
 // learned earlier (no hint line of its own): player 2's Obelix's combo bar
@@ -9655,6 +9669,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("combohint2", kComboHint2),
 	SCENARIO("combohint2b", kComboHint2B),
 	SCENARIO("combohint2l", kComboHint2L),
+	SCENARIO("comboturtle22", kComboTurtle22),
 	SCENARIO("crowd36", kCrowd36),
 	SCENARIO("flaskbox", kFlaskBox),
 	SCENARIO("launchboth", kLaunchBoth),
