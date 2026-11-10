@@ -65,17 +65,54 @@ bool VerifyGameBuild() {
 // Same technique XXL-Editor's GameLauncher uses from outside the process --
 // wait for the yellow pages and game manager to exist, then write the level
 // number into CKGameManager::nextLevel.
+// Level 0's start (CKAsterixGameManager::vf10, thiscall(state), ret 4; vtable
+// 0x627F6C slot 10) in state 6 puts the saved options to work: the resolution
+// (gm +0x170.., FUN_005038D0), anti-aliasing (FUN_005039A0), the slot 0x84 value
+// and the pad layout (FUN_00503AA0). A level forced before it ran on the boot's
+// 800 x 600 without anti-aliasing (and the keyboard's preset 1): it never comes
+// in a level. ForceLevel waits for it.
+typedef int(__fastcall* GmStateFn)(char* gm, void* edx, int state);
+const uintptr_t kGmVf10Slot = 0x627F6C + 10 * 4;
+GmStateFn g_origGmState = nullptr;
+volatile LONG g_savedOptionsApplied = 0;
+
+int __fastcall GmStateHook(char* gm, void* edx, int state) {
+	int r = g_origGmState(gm, edx, state);
+	if (state == 6) InterlockedExchange(&g_savedOptionsApplied, 1);
+	return r;
+}
+
+void HookGmState() {
+	void** slot = (void**)kGmVf10Slot;
+	if ((uintptr_t)*slot != 0x5037A0) {
+		Log("forceLevel: game manager vf10 is %p, not 005037A0 -- not hooked", *slot);
+		return;
+	}
+	DWORD old;
+	if (!VirtualProtect(slot, sizeof(void*), PAGE_EXECUTE_READWRITE, &old)) return;
+	g_origGmState = (GmStateFn)*slot;
+	*slot = (void*)GmStateHook;
+	VirtualProtect(slot, sizeof(void*), old, &old);
+}
+
 void ForceLevel(int level) {
 	// The request only sticks once the menu level (0) has finished loading:
 	// written any earlier, the boot sequence overwrites nextLevel with 0 itself.
 	// Left alone on the menu, the game eventually starts its attract-mode demo.
+	// It also waits for level 0's saved options (state 6, ~0.5 s after; 10 s at most).
 	Log("forceLevel: waiting for the menu...");
+	int optionsWait = 0;
 	for (int attempt = 0; attempt < 3; attempt++) {
 		bool requested = false;
 		for (int i = 0; i < 480 && !requested; i++) {   // up to ~120 s
 			CKYellowPages* yp = YellowPages();
 			void* gm = yp ? yp->gameManager : nullptr;
-			if (gm && *(int*)((char*)gm + ax::kGM_currentLevel) == 0) {
+			bool optionsIn = !g_origGmState || g_savedOptionsApplied || optionsWait >= 40;
+			if (gm && *(int*)((char*)gm + ax::kGM_currentLevel) == 0 && !optionsIn) {
+				if (optionsWait++ == 0) Log("forceLevel: menu is up -- waiting for its saved options (resolution, pad layout)");
+				Sleep(250);
+			} else if (gm && *(int*)((char*)gm + ax::kGM_currentLevel) == 0) {
+				if (optionsWait) Log("forceLevel: saved options %s", g_savedOptionsApplied ? "applied" : "not seen in 10 s -- going on");
 				Log("forceLevel: menu is up (gameManager=%p), requesting level %d", gm, level);
 				*(int*)((char*)gm + ax::kGM_nextLevel) = level;
 				requested = true;
@@ -139,7 +176,10 @@ DWORD WINAPI StartupThread(LPVOID) {
 	WatchdogStart();
 	Log("startup: ready");
 
-	if (g_config.forceLevel >= 0) ForceLevel(g_config.forceLevel);
+	if (g_config.forceLevel >= 0) {
+		HookGmState();
+		ForceLevel(g_config.forceLevel);
+	}
 	return 0;
 }
 

@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <objidl.h>
 #include <gdiplus.h>
+#include <d3d9.h>
 #include <cstdio>
 #include <cwchar>
 
@@ -33,6 +34,51 @@ static bool PngEncoder(CLSID* out) {
 	return found;
 }
 
+// Fullscreen (exclusive) D3D9 shows nothing to PrintWindow -- the shots came out
+// black. There the back buffer (the last frame, before the next one is drawn) is
+// copied instead: resolved into a plain render target (the anti-aliased buffer is
+// multisampled), read back to system memory and put into the bitmap. Called on
+// the game's thread (the autotest steps), the one that drives the device.
+static const uintptr_t kD3DDevicePtr = 0x668978;   // IDirect3DDevice9* (RenderWare's)
+
+static bool DeviceFullscreen(IDirect3DDevice9* dev) {
+	IDirect3DSwapChain9* sc = nullptr;
+	if (FAILED(dev->GetSwapChain(0, &sc)) || !sc) return false;
+	D3DPRESENT_PARAMETERS pp = {};
+	bool full = SUCCEEDED(sc->GetPresentParameters(&pp)) && !pp.Windowed;
+	sc->Release();
+	return full;
+}
+
+static bool BackBufferToDc(IDirect3DDevice9* dev, HDC dc, int w, int h) {
+	IDirect3DSurface9 *bb = nullptr, *rt = nullptr, *sys = nullptr;
+	bool ok = false;
+	D3DSURFACE_DESC d = {};
+	if (SUCCEEDED(dev->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &bb)) && SUCCEEDED(bb->GetDesc(&d)) &&
+	    (d.Format == D3DFMT_X8R8G8B8 || d.Format == D3DFMT_A8R8G8B8) &&
+	    SUCCEEDED(dev->CreateRenderTarget(d.Width, d.Height, d.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &rt, nullptr)) &&
+	    SUCCEEDED(dev->StretchRect(bb, nullptr, rt, nullptr, D3DTEXF_NONE)) &&
+	    SUCCEEDED(dev->CreateOffscreenPlainSurface(d.Width, d.Height, d.Format, D3DPOOL_SYSTEMMEM, &sys, nullptr)) &&
+	    SUCCEEDED(dev->GetRenderTargetData(rt, sys))) {
+		D3DLOCKED_RECT lr;
+		if (SUCCEEDED(sys->LockRect(&lr, nullptr, D3DLOCK_READONLY))) {
+			BITMAPINFO bi = {};
+			bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+			bi.bmiHeader.biWidth = lr.Pitch / 4;
+			bi.bmiHeader.biHeight = -(int)d.Height;
+			bi.bmiHeader.biPlanes = 1;
+			bi.bmiHeader.biBitCount = 32;
+			SetStretchBltMode(dc, HALFTONE);
+			ok = StretchDIBits(dc, 0, 0, w, h, 0, 0, d.Width, d.Height, lr.pBits, &bi, DIB_RGB_COLORS, SRCCOPY) != 0;
+			sys->UnlockRect();
+		}
+	}
+	if (sys) sys->Release();
+	if (rt) rt->Release();
+	if (bb) bb->Release();
+	return ok;
+}
+
 bool CaptureWindowPng(void* hwndPtr, const char* path, int scaleDiv) {
 	HWND hwnd = (HWND)hwndPtr;
 	if (!IsWindow(hwnd)) return false;
@@ -51,7 +97,14 @@ bool CaptureWindowPng(void* hwndPtr, const char* path, int scaleDiv) {
 	HDC full = CreateCompatibleDC(wnd);
 	HBITMAP fullBmp = CreateCompatibleBitmap(wnd, w, h);
 	HGDIOBJ oldFull = SelectObject(full, fullBmp);
-	BOOL ok = PrintWindow(hwnd, full, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+	IDirect3DDevice9* dev = *(IDirect3DDevice9**)kD3DDevicePtr;
+	BOOL ok = FALSE;
+	if (dev && DeviceFullscreen(dev)) {
+		ok = BackBufferToDc(dev, full, w, h);
+		static int told = 0;
+		if (told++ < 1) Log("autotest: fullscreen -- screenshots from the back buffer (%s)", ok ? "ok" : "FAILED");
+	}
+	if (!ok) ok = PrintWindow(hwnd, full, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
 
 	HDC smallDc = CreateCompatibleDC(wnd);
 	HBITMAP smallBmp = CreateCompatibleBitmap(wnd, ow, oh);
