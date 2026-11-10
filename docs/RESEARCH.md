@@ -4686,3 +4686,10 @@ both halves).
   spgunuse33 (-Level 3, XXL_SPISOLATION=0 XXL_SPSECOND=0: "Use" by the gun, gone 10 units off, back, X takes it).
   Ground by the LV5-3 car (user): -339.570 18.010 378.275 (-337.172 16.939 374.286 is by the lava cliff: PLACEAT
   there fell in). PLACEAT/GLIDEAT can't take a coordinate macro (one argument to the preprocessor).
+- Round 251 (Nov 10, commit b41e029; user: LV2-2 -184.287 5.491 -540.223, CKHkDonutTurtle): combo hints came up by
+  turtles though no combo works on them. NearestRoman2 (combohints.cpp, squads 4,26) skips pools whose component
+  (pool record +4) vtable is CKMobileTowerCpnt 0x627D20 or a turtle's (Triangular 0x627D50, Square 0x627DB8, Donut
+  0x627DEC, Pyramidal 0x627E20) -- the same list as experimental.cpp KeptAsIs, minus the jetpack Romans. LV2-2 has
+  three donut-turtle squads (pool 0 each). Autotest comboturtle22 (-Level 2: P2 Obelix inside the donut, every
+  combo learned, bar full): before, "Try your new combo: Club"; after, no hint (log: "no combos on its enemies");
+  combohint2 still gives the Club / Power Hammer by basic Romans. Putting Asterix there too gets him knocked down.
