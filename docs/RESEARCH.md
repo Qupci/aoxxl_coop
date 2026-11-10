@@ -4660,3 +4660,11 @@ both halves).
   a hero icon); pad icons' dark rims read a few px short), revivetimer (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000
   XXL_REVIVEHOLD=2: 31 s limit, the bar from the left, pulsing from 10 s, revived at 30 s); holdskip 2.0 s, bootfilm
   (intro + film skipped at the first tap) unchanged otherwise.
+- Round 249 (Nov 10, commit f80929a; user: round 248 confirmed on the pad; the game's own prompt box -- single player's
+  "Push / Pull X" -- sits high with a wide left padding, as the mod's did). hints.cpp: Choose takes the prompt
+  (CoopPromptKindFor: single player = player 1's box, the game's kind) for any mode with an in-game interface;
+  OwnBoxes() = no co-op shopper (single player always), so HideGamePrompt / Draw2dListsHook leave the game's prompt
+  text and plate out and player 1's box (at the game's place, right) draws it -- centred (round 248). The text is
+  IconsRewrite'd only in co-op or with sp_coop_icons (as LocStringHook does). HintBoxRect counts in single player too
+  (the flask, hud2.cpp, is at the left: unaffected). Autotest promptsp (-Level 2: Asterix at sector 1's merchant,
+  "Open X": plate 126x48 at 960x540, ink 20/20 left/right, 14/13 top/bottom; no second box); hintalign unchanged.
