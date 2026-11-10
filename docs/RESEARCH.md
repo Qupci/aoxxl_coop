@@ -4693,3 +4693,16 @@ both halves).
   three donut-turtle squads (pool 0 each). Autotest comboturtle22 (-Level 2: P2 Obelix inside the donut, every
   combo learned, bar full): before, "Try your new combo: Club"; after, no hint (log: "no combos on its enemies");
   combohint2 still gives the Club / Power Hammer by basic Romans. Putting Asterix there too gets him knocked down.
+- Round 252 (Nov 10, commit ff6f390; user: round 250 confirmed on the pad): single player (sp_isolation off), Obelix
+  leading on the boat's deck had no "Use" and his X did nothing -- the boat offers itself to him (trio 0x4901: +0x48
+  = CKHkBoat 0x627EB8, +0x3F4 bits 10-11 = 1), but FUN_0049A080 takes a machine and FUN_0049A1A0 writes kind 9 only for
+  Asterix (vtable +0x3C == 0). PromptHook writes 9 for leading Obelix while the boat is offered (SoloBoatOffered:
+  kind 1, +0x4C 0, +0x3F4 bit 2 clear), as for the gun (round 250). His X (SoloNoteMachineUse -> SoloBoatTake): the
+  AI Asterix (not down, f1A 0, not held, mode playable -- swimming is mode 4 --, within 40 units) put at Obelix's
+  spot, CoopGiveLead(Asterix) + SoloHandOver (the hero you play: the boat's switch kept, as the belly slide's 4801
+  to Obelix is -- user); next frame (Asterix leading, player variant) SoloBoatFrame sets +0x48 / kind 1 | 8 and
+  sends 0x4807 (machineSending): both heroes mode 1, Obelix in the water pushing, Asterix steers. Autotest spboat49
+  (-Level 4, XXL_SPISOLATION=0 XXL_SPSWITCH=1): switch at the level start (both standing -- after LOADSECTOR 9 they
+  swim, mode != 0, the switch is refused; on the deck the zone walks the AI Obelix, order 1, refused too), load
+  sector 9, Asterix in the water -162 6 -650, Obelix on the deck from -165.2 7.5 -651.7: "Use" shown, X -> Asterix
+  leads, 0x4807, the boat sails. spgunuse33 unchanged.
