@@ -25,10 +25,10 @@ const uintptr_t kLocString = 0x411780;
 const uint8_t   kLocStringPrologue[8] = { 0x8B, 0x54, 0x24, 0x04, 0x56, 0x83, 0xFA, 0xFF };
 LocStringFn g_origLocString = nullptr;
 // The mod's own strings (no table of the game's goes that far): the players'
-// boxes (0, 1), then the sparkles' glyphs (2..9).
+// boxes (0, 1), then the sparkles' glyphs (2..9), the big hero icons (10, 11).
 const uint32_t kStringId = 0x3F00C0DE;
 const int      kTextLen = 200;
-const int      kNumStrings = 10;
+const int      kNumStrings = 12;
 wchar_t        g_strings[kNumStrings][kTextLen];
 
 // The in-game interface's tick (thiscall(this, time), ret 4); time +0xC = dt.
@@ -39,7 +39,11 @@ const uintptr_t kInGameTick = 0x5180E0;
 InterfaceTickFn g_origInterfaceTick = nullptr;
 const unsigned  kPromptNone = 0xE;
 
-struct Hint { int key; int player; wchar_t text[kTextLen]; DWORD until; DWORD since; float progress; };
+// A box's bar (HintProgress / HintTimerBar): its share of the plate (below 0:
+// none), the hold's or the countdown's look, the countdown's seconds left.
+enum BarStyle { BAR_HOLD, BAR_TIMER };
+struct Bar { float share = -1.0f; int style = BAR_HOLD; float secs = 0.0f; };
+struct Hint { int key; int player; wchar_t text[kTextLen]; DWORD until; DWORD since; Bar bar; };
 Hint g_hints[24];
 int  g_nHints = 0;
 bool g_loggedKinds = false;
@@ -149,6 +153,10 @@ const DWORD  kHoldMs = 120;           // a change of what a box shows counts onc
 const DWORD  kPromptHoldMs = 300;     // ... away from a prompt
 const float  kInTime = 0.18f, kOutTime = 0.12f;
 const float  kEdge = 0.05f, kMargin = 0.02f;
+// A line's letters have their middle this far (shares of the font's size) above
+// the line's place (the text's y - 1 + the word's y) -- measured on the boxes'
+// shots; the lines are centred on the plate by it.
+const float  kInkMid = 1.23f;
 
 struct Burst { int button; DWORD at; };   // the n-th button of the last line, when
 struct Slot {
@@ -170,16 +178,26 @@ struct Slot {
 	bool     button[kMaxWords] = {};  // a button of the last line: any word but ">"
 	Burst    bursts[8] = {};
 	int      nBursts = 0;
-	float    progress = -1.0f;       // a hold's bar (HintProgress), below 0 none
-	DWORD    fullAt = 0;             // when it was full (its fade-out)
+	Bar      bar;                    // the hint's bar
+	DWORD    fullAt = 0;             // when a hold's bar was full (its fade-out)
+	// The heroes' icons, drawn half as big again as the text over a blank glyph
+	// as wide as their ink (IconGlyph("hero_slot_asterix")...): the hero, the slot's x and width (text
+	// units, from the box's left) and its line's y.
+	int      nHeroes = 0;
+	int      hero[4] = {};
+	float    heroX[4] = {}, heroW[4] = {}, heroY[4] = {};
 };
 Slot   g_slots[2];
 char*  g_itf = nullptr;
 DWORD  g_tickAt = 0;        // the interface's last tick
 DWORD  g_cineDrawAt = 0;    // the last draw of the skip prompt over a cutscene
-alignas(16) char g_glyphObj[8][kText2dSize];   // spark0..3, glow0..3, each one glyph
-bool   g_glyphLaid[8] = {};
-float  g_glyphW[8] = {}, g_glyphY[8] = {}, g_glyphSize[8] = {};
+const int kGlyphs = 10;   // spark0..3, glow0..3, Asterix, Obelix, each one glyph
+const int kHeroGlyph = 8;
+const float kHeroScale = 1.5f;   // the heroes' icons to the text (the user's Figma: 72 to 48)
+const float kHeroDy = 0.06f;     // ... raised this much (of the font's size) to the text's middle (measured)
+alignas(16) char g_glyphObj[kGlyphs][kText2dSize];
+bool   g_glyphLaid[kGlyphs] = {};
+float  g_glyphW[kGlyphs] = {}, g_glyphY[kGlyphs] = {}, g_glyphSize[kGlyphs] = {};
 
 float Aspect() {
 	CKYellowPages* yp = YellowPages();
@@ -241,7 +259,17 @@ bool LayOut(char* obj, const char* game, int si, const wchar_t* text, unsigned l
 
 void LayOutSlot(Slot& s, int si, const char* game) {
 	unsigned lineWord[8];
-	s.laid = LayOut(s.obj, game, si, s.text, lineWord, &s.nLines);
+	// Each hero's icon laid out as the blank slot, its icon drawn over it.
+	wchar_t text[kTextLen];
+	wchar_t slots[2] = { IconGlyph("hero_slot_asterix"), IconGlyph("hero_slot_obelix") };
+	wchar_t heroG[2] = { IconGlyph("asterix"), IconGlyph("obelix") };
+	s.nHeroes = 0;
+	wcsncpy(text, s.text, kTextLen - 1);
+	text[kTextLen - 1] = 0;
+	for (int k = 0; text[k]; k++)
+		for (int hr = 0; hr < 2; hr++)
+			if (heroG[hr] && slots[hr] && text[k] == heroG[hr] && s.nHeroes < 4) { text[k] = slots[hr]; s.hero[s.nHeroes++] = hr; }
+	s.laid = LayOut(s.obj, game, si, text, lineWord, &s.nLines);
 	if (!s.laid) return;
 	char* t20 = s.obj + 0x20;
 	unsigned n = *(uint32_t*)(t20 + 0x2D4);
@@ -279,13 +307,32 @@ void LayOutSlot(Slot& s, int si, const char* game) {
 	}
 	s.lastLineWord = (int)lineWord[s.nLines - 1];
 	s.longest = longest;
+	// The slots' places: the width of the word up to each.
+	void* font = *(void**)(t20 + 0x660);
+	uint32_t size = *(uint32_t*)(t20 + 0x664);
+	int found = 0;
+	for (unsigned i = 0; i < n && font && found < s.nHeroes; i++) {
+		const wchar_t* w = *(const wchar_t**)(t20 + 0x2D8 + 4 * i);
+		wchar_t pre[kTextLen];
+		for (int k = 0; w && w[k] && w[k] != L' ' && k < kTextLen - 1 && found < s.nHeroes; k++) {
+			if (w[k] != slots[0] && w[k] != slots[1]) continue;
+			wcsncpy(pre, w, k);
+			pre[k] = 0;
+			wchar_t one[2] = { w[k], 0 };
+			s.heroX[found] = s.wx[i] + (k ? GlyphWidthScale() * ((WidthFn)0x5FDAB0)(font, pre, size) : 0.0f);
+			s.heroW[found] = GlyphWidthScale() * ((WidthFn)0x5FDAB0)(font, one, size);
+			s.heroY[found] = s.wy[i];
+			found++;
+		}
+	}
+	s.nHeroes = found;
 }
 
-// The sparkles' glyphs, each laid out once per interface.
+// The sparkles' and the heroes' glyphs, each laid out once per interface.
 void LayOutGlyphs(const char* game) {
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < kGlyphs; i++) {
 		if (g_glyphLaid[i]) continue;
-		wchar_t c = i < 4 ? IconSparkGlyph(i) : IconGlowGlyph(i - 4);
+		wchar_t c = i < 4 ? IconSparkGlyph(i) : i < 8 ? IconGlowGlyph(i - 4) : IconGlyph(i == kHeroGlyph ? "asterix" : "obelix");
 		if (!c) continue;
 		wchar_t t[2] = { c, 0 };
 		unsigned lw[8];
@@ -318,14 +365,14 @@ Place PlaceOf(int p) {
 
 // What a box should show: kind (0 nothing, 1 the prompt, 2 a hint), ident, text.
 // `itf` null: no in-game interface (level 0) -- hints only.
-void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, float* progress) {
+void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, Bar* bar) {
 	static wchar_t prompt[2][kTextLen];
-	*kind = 0; *ident = 0; *text = L""; *progress = -1.0f;
+	*kind = 0; *ident = 0; *text = L""; *bar = Bar();
 	// A cutscene's skip prompt before anything.
 	for (int i = 0; i < g_nHints; i++) {
 		const Hint& h = g_hints[i];
 		if (h.key != HINT_SKIP || h.player != p || (int)(h.until - GetTickCount()) <= 0) continue;
-		*kind = 2; *ident = HINT_SKIP; *text = h.text; *progress = h.progress;
+		*kind = 2; *ident = HINT_SKIP; *text = h.text; *bar = h.bar;
 		return;
 	}
 	CKYellowPages* yp = YellowPages();
@@ -348,7 +395,7 @@ void Choose(int p, char* itf, int* kind, uint32_t* ident, const wchar_t** text, 
 	} else if (p == 0 && gameKind != kPromptNone) {
 		return;   // player 1 alone: the game's own prompt comes first (the left box has no prompt)
 	}
-	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; *progress = h->progress; }
+	if (const Hint* h = NewestFor(p)) { *kind = 2; *ident = (uint32_t)h->key; *text = h->text; *bar = h->bar; }
 }
 
 // `tpl`: the text the box is a copy of, else the in-game interface's prompt.
@@ -359,16 +406,16 @@ void UpdateSlot(int p, char* itf, float dt, char* tpl = nullptr) {
 	int kind;
 	uint32_t ident;
 	const wchar_t* text;
-	float progress;
-	Choose(p, itf, &kind, &ident, &text, &progress);
+	Bar bar;
+	Choose(p, itf, &kind, &ident, &text, &bar);
 	Place pl = PlaceOf(p);
 	bool right = false;   // every box's lines left-aligned (the left box's right-aligned lines read oddly: user)
 	DWORD now = GetTickCount();
 	if (kind == s.kind && ident == s.ident) {
 		s.pendKind = -1;
 		s.leaving = false;
-		if (progress >= 1.0f && s.progress < 1.0f) s.fullAt = now;
-		s.progress = progress;
+		if (bar.style == BAR_HOLD && bar.share >= 1.0f && !(s.bar.share >= 1.0f)) s.fullAt = now;
+		s.bar = bar;
 		if (kind && (wcscmp(text, s.text) != 0 || right != s.rightAligned || !s.laid)) {
 			wcsncpy(s.text, text, kTextLen - 1);
 			s.rightAligned = right;
@@ -386,8 +433,8 @@ void UpdateSlot(int p, char* itf, float dt, char* tpl = nullptr) {
 			s.leaving = false;
 			s.pendKind = -1;
 			s.nBursts = 0;
-			s.progress = progress;
-			s.fullAt = progress >= 1.0f ? now : 0;
+			s.bar = bar;
+			s.fullAt = bar.style == BAR_HOLD && bar.share >= 1.0f ? now : 0;
 			wcsncpy(s.text, text, kTextLen - 1);
 			s.rightAligned = right;
 			s.in = 0.0f;
@@ -464,7 +511,7 @@ void BoxPlace(int p, const Slot& s, const float* plate, float* x, float* up) {
 }
 
 void DrawGlyph(int gi, float cx, float cy, float size, void* arg) {
-	if (gi < 0 || gi >= 8 || !g_glyphLaid[gi]) return;
+	if (gi < 0 || gi >= kGlyphs || !g_glyphLaid[gi]) return;
 	char* o = g_glyphObj[gi];
 	float a = Aspect();
 	float s0 = g_glyphSize[gi] > 0.0f ? g_glyphSize[gi] : size;
@@ -490,6 +537,8 @@ const DWORD kBurstMs = 500;
 // +0x1D = 1), its brush coloured for the bar (Rt2dBrushSetRGBA 0x5F9280,
 // cdecl(brush, four corners' RGBA): floats up to +0x6C) and put back.
 const DWORD kBarFadeMs = 250;
+const float kTimerUrgentS = 10.0f;   // a countdown's bar pulses from this many seconds left
+const DWORD kTimerPulseMs = 1000;
 typedef void*(__cdecl* BrushSetRgbaFn)(float* brush, const uint8_t* c0, const uint8_t* c1, const uint8_t* c2, const uint8_t* c3);
 const uintptr_t kBrushSetRgba = 0x5F9280;
 const int kBrushFloats = 0x20;
@@ -506,19 +555,28 @@ float EaseInOut(float x) {
 }
 
 void DrawBar(const Slot& s, float* plate, float left, float width, void* arg) {
-	float pr = s.progress > 1.0f ? 1.0f : s.progress;
+	float pr = s.bar.share > 1.0f ? 1.0f : s.bar.share;
 	float fade = 1.0f;
-	if (s.progress >= 1.0f && s.fullAt) {
+	if (s.bar.style == BAR_HOLD && s.bar.share >= 1.0f && s.fullAt) {
 		DWORD age = GetTickCount() - s.fullAt;
 		fade = age >= kBarFadeMs ? 0.0f : 1.0f - age / (float)kBarFadeMs;
 	}
 	if (fade <= 0.0f || pr <= 0.0f) return;
-	float e = EaseInOut(pr);
-	float aw = 0.33f * (1.0f - e), ag = 0.33f * e;   // white under green
-	float a = ag + aw * (1.0f - ag);
-	if (a <= 0.0f) return;
-	float r = (255.0f * aw * (1.0f - ag)) / a, gr = (255.0f * ag + 255.0f * aw * (1.0f - ag)) / a,
-	      b = (14.0f * ag + 255.0f * aw * (1.0f - ag)) / a;
+	float a, r, gr, b;
+	if (s.bar.style == BAR_TIMER) {
+		// The countdown: red at 33%; its last 10 s pulsing 33% -> 66% -> 33% each second.
+		r = 255.0f; gr = 0.0f; b = 0.0f;
+		a = 0.33f;
+		if (s.bar.secs <= kTimerUrgentS) a += 0.33f * (0.5f - 0.5f * cosf(6.2831853f * (GetTickCount() % kTimerPulseMs) / kTimerPulseMs));
+	} else {
+		float e = EaseInOut(pr);
+		float aw = 0.33f * (1.0f - e), ag = 0.33f * e;   // white under green
+		a = ag + aw * (1.0f - ag);
+		if (a <= 0.0f) return;
+		r = (255.0f * aw * (1.0f - ag)) / a;
+		gr = (255.0f * ag + 255.0f * aw * (1.0f - ag)) / a;
+		b = (14.0f * ag + 255.0f * aw * (1.0f - ag)) / a;
+	}
 	uint8_t* pb = (uint8_t*)plate;
 	float* brush = *(float**)(pb + 0x28);
 	if (!brush || IsBadWritePtr(brush, sizeof(float) * kBrushFloats)) return;
@@ -568,6 +626,22 @@ void DrawSlot(int p, char* game, float* plate, void* arg) {
 		plate[13] = (w + 2.0f * kMargin) / PlateDrawScale();
 		plate[14] = sv[3] * s.nLines + 0.015f;
 		plate[6] = sv[1] - 0.012f * (s.nLines - 1) + up;
+		// The text's lines centred on the plate, up and down.
+		float ph = plate[14];
+		uint8_t ay = pb[7];
+		float bottom = ay == 0 ? plate[6] - ph : ay == 2 ? plate[6] : plate[6] - ph * 0.5f;
+		float wy0 = s.nWords ? s.wy[0] : 0.0f;
+		y = bottom + ph * 0.5f + 1.0f - wy0 - kInkMid * s.size + s.step * (s.nLines - 1) * 0.5f;
+		// (XXL_HINTLOG: the plate as drawn, once a box is in place -- the autotests'
+		// paddings are measured from it.)
+		static const bool hintLog = getenv("XXL_HINTLOG") != nullptr;
+		static uint32_t told[2];
+		uint32_t sum = (uint32_t)s.nWords * 31u + (uint32_t)(s.longest * 1e5f) + s.ident;
+		if (hintLog && s.in >= 1.0f && told[p & 1] != sum) {
+			told[p & 1] = sum;
+			Log("hints: player %d's box plate at x %.4f-%.4f, y %.4f-%.4f (shares; y from the bottom), %d lines", p + 1,
+			    x - kMargin, x + w + kMargin, bottom, bottom + ph, s.nLines);
+		}
 		// Not one of xxl_widescreen2d.asi's plates (a HUD model over it -- the
 		// potion's flask rising over the box -- was pulled towards its anchor, off
 		// the screen as the box slid out); an older asi without the switch: as before.
@@ -582,7 +656,7 @@ void DrawSlot(int p, char* game, float* plate, void* arg) {
 		}
 		if (record) record(0);
 		((DrawFn)(*(void***)plate)[23])((char*)plate, nullptr, arg);
-		if (s.progress > 0.0f) DrawBar(s, plate, x - kMargin, (w + 2.0f * kMargin) / PlateDrawScale(), arg);
+		if (s.bar.share > 0.0f) DrawBar(s, plate, x - kMargin, (w + 2.0f * kMargin) / PlateDrawScale(), arg);
 		if (record) record(1);
 		pb[5] = f5;
 		pb[6] = f6;
@@ -596,6 +670,10 @@ void DrawSlot(int p, char* game, float* plate, void* arg) {
 	*(uint8_t*)(s.obj + 5) |= 2;
 	*(uint8_t*)(s.obj + 6) = 0;
 	((DrawFn)(*(void***)s.obj)[23])(s.obj, nullptr, arg);
+	// The heroes' icons over their slots, half as big again, on their line's middle.
+	for (int j = 0; j < s.nHeroes; j++)
+		DrawGlyph(kHeroGlyph + s.hero[j], x + (s.heroX[j] + s.heroW[j] * 0.5f) / a, y - 1.0f + s.heroY[j] + s.size * (0.5f + kHeroDy),
+		          s.size * kHeroScale, arg);
 	// Sparkles: a glow shrinking and six sparks flying out, over the button.
 	DWORD now = GetTickCount();
 	for (int b = 0; b < s.nBursts;) {
@@ -804,7 +882,8 @@ const wchar_t* HintHeroName(int hero) {
 	wchar_t* out = buf[n++ & 3];
 	wchar_t g = IconGlyph(hero == HERO_ASTERIX ? "asterix" : "obelix");
 	const wchar_t* name = hero == HERO_ASTERIX ? L"Asterix" : L"Obelix";
-	if (g) swprintf(out, 24, L"%c%s", g, name);
+	// With its icon, the icon alone (drawn bigger than the text: the user's designer).
+	if (g) swprintf(out, 24, L"%c", g);
 	else swprintf(out, 24, L"%s", name);
 	return out;
 }
@@ -840,10 +919,10 @@ void HintShow(int key, int player, const wchar_t* text, DWORD ms) {
 			h = &g_hints[g_nHints++];
 		}
 		h->since = now;
-		h->progress = -1.0f;
+		h->bar = Bar();
 	} else if ((int)(h->until - now) <= 0) {
 		h->since = now;
-		h->progress = -1.0f;
+		h->bar = Bar();
 	}
 	h->key = key;
 	h->player = player;
@@ -854,7 +933,16 @@ void HintShow(int key, int player, const wchar_t* text, DWORD ms) {
 
 void HintProgress(int key, int player, float progress) {
 	for (int i = 0; i < g_nHints; i++)
-		if (g_hints[i].key == key && g_hints[i].player == player) g_hints[i].progress = progress;
+		if (g_hints[i].key == key && g_hints[i].player == player) { g_hints[i].bar.share = progress; g_hints[i].bar.style = BAR_HOLD; }
+}
+
+void HintTimerBar(int key, int player, float share, float secondsLeft) {
+	for (int i = 0; i < g_nHints; i++)
+		if (g_hints[i].key == key && g_hints[i].player == player) {
+			g_hints[i].bar.share = share < 0.0f ? 0.0f : share > 1.0f ? 1.0f : share;
+			g_hints[i].bar.style = BAR_TIMER;
+			g_hints[i].bar.secs = secondsLeft;
+		}
 }
 
 void HintHide(int key) {

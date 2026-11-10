@@ -304,6 +304,29 @@ void LoadSparkles() {
 		wchar_t code = AddBitmap(chev);
 		if (code) g_byName["next"] = code;
 	}
+	// Each hero's blank (hero_slot_asterix...): as wide as its icon's ink (its
+	// transparent sides left out) drawn half as big again -- hints.cpp draws the
+	// icon over it, so it stands as far from the words as they do from each other.
+	for (const char* hero : { "asterix", "obelix" }) {
+		auto it = g_byName.find(hero);
+		if (it == g_byName.end()) continue;
+		const Glyph* gl = nullptr;
+		for (const Glyph& g : g_glyphs) if (g.code == it->second) gl = &g;
+		if (!gl) continue;
+		int x0 = gl->w, x1 = -1;
+		for (int y = 0; y < kCell; y++)
+			for (int x = 0; x < gl->w; x++)
+				if ((g_atlas[(gl->y + y) * kAtlasW + gl->x + x] >> 24) > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+		int ink = x1 >= x0 ? x1 - x0 + 1 : gl->w;
+		Gdiplus::Bitmap blank(ink * 3 / 2, kCell, PixelFormat32bppARGB);
+		{
+			Gdiplus::Graphics g(&blank);
+			g.Clear(Gdiplus::Color(0, 0, 0, 0));
+		}
+		wchar_t code = AddBitmap(blank);
+		if (code) g_byName[std::string("hero_slot_") + hero] = code;
+		Log("icons: %s's icon: ink %d of %d px wide (columns %d-%d)", hero, ink, gl->w, x0, x1);
+	}
 }
 
 // Every PNG of coop_icons but the keycap templates (key, key_wide and their

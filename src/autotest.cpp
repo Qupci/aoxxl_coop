@@ -623,13 +623,15 @@ const Step kBoot0[] = {
 // either lands on the title, its logo shown ("Press Validate").
 #define BOOT_SKIP(at, n) 	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" }, 	CINE_ENTER(at), 	SHOT(at + 1500, n "_a"), SHOT(at + 4000, n "_b"), SHOT(at + 7000, n "_c"), SHOT(at + 12000, n "_d"), 	END(at + 16000)
 const Step kBoot1[] = { BOOT_SKIP(2000, "boot1") };
-// boothold / bootfilm (XXL_LEVEL=-1): level 0's intro is skipped by holding the
+// boothold / bootfilm (XXL_LEVEL=-1): (boothold needs cutskip.cpp's
+// kHoldLevel0Intro, off since round 248) level 0's intro is skipped by holding the
 // button 2 s (skippable through skip_cutscenes: the "Hold A to skip" box, on the
 // main menu's text and plate), its film after it on a press (the game's own).
 // boothold: A tapped (the box), then held from 2.5 s (pad 1 on XInput): the
 // intro skipped at 4.5 s, the film with it, the title; A there validates it (no
-// box). bootfilm: player 1's A
-// tapped in the intro (no skip, the box), then in the film, 17 s in: at once.
+// box). bootfilm: player 1's A tapped in the intro -- with kHoldLevel0Intro no
+// skip (the box), without (round 248) the intro and film skipped at once, the
+// title --, then again 17 s in (the film's own skip, at once, with the hold).
 const Step kBootHold[] = {
 	MARK(0, "level 0"), { 0, S_WATCHCINE, 0, 0, 0, 0, 0, "watch scenes" },
 	VPAD(1000, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1150, "bh_tap"), VPAD(1250, 0, 0, 0, 0, "pad 1 release"),
@@ -695,6 +697,32 @@ const Step kSkip1[] = {
 // press), Enter held 1.6 s fills 80% of the box and lets go (not skipped), then A
 // held 4 s: the box fills white to green and the intro ends at 2 s. (Pad A
 // on XInput slot 0: the game's own value is only a press's edge.)
+// hintalign (-Level 2, single player): the boxes' text centred on their plates
+// (round 248): each test hint in player 1's box (bottom right) and the left box,
+// a shot each -- the Figma example "Hold B to revive (Asterix)" first.
+#define HA(t, box, k, n) { t, S_HINTTEST, box, k, 0, 0, 1400, n }, SHOT(t + 900, n)
+const Step kHintAlign[] = {
+	MARK(0, "hintalign"),
+	HA(2000, 0, 4, "ha_revive"), HA(3500, 0, 8, "ha_skip_a"), HA(5000, 0, 5, "ha_skip_enter"),
+	HA(6500, 0, 1, "ha_jump"), HA(8000, 0, 7, "ha_pass"), HA(9500, 0, 0, "ha_down"),
+	HA(11000, 0, 2, "ha_combo"), HA(12500, 0, 3, "ha_three"),
+	HA(14000, 1, 6, "ha_left_count"), HA(15500, 1, 4, "ha_left_revive"), HA(17000, 1, 7, "ha_left_pass"),
+	END(19000),
+};
+// revivetimer (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2): the
+// revive countdown's bar in the left box -- red, filling with the time gone,
+// pulsing 33-66% in its last 10 s; Obelix revives Asterix before it runs out.
+const Step kReviveTimer[] = {
+	MARK(0, "revivetimer"),
+	P1(4500, 0, 0, 1.0f, "p1 forward (obelix)"), P1(6500, 0, 0, 0, "p1 stop"),
+	{ 7200, S_SPSWITCH, 0, 0, 0, 0, 0, "switch (refused: asterix down)" },
+	GLIDEBY(7500, HERO_OBELIX, 1.0f, 0.0f, 600),
+	SHOT(9000, "rt_9"), SHOT(17000, "rt_17"), SHOT(25000, "rt_25"),
+	SHOT(29000, "rt_pulse_a"), SHOT(29250, "rt_pulse_b"), SHOT(29500, "rt_pulse_c"), SHOT(29750, "rt_pulse_d"),
+	P1(30000, PAD_B, 0, 0, "p1 holds B"), SHOT(31000, "rt_reviving"), P1(33000, 0, 0, 0, "p1 release"),
+	SHOT(33500, "rt_revived"),
+	END(34500),
+};
 const Step kHoldSkip[] = {
 	MARK(0, "baseline"),
 	VPAD(1500, 0, PAD_A, 0, 0, "pad 1 A tap"), SHOT(1650, "hs_tap_held"), VPAD(1750, 0, 0, 0, 0, "pad 1 release"),
@@ -9624,6 +9652,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("bootoptwrap", kOptWrap),
 	SCENARIO("skip1", kSkip1),
 	SCENARIO("holdskip", kHoldSkip),
+	SCENARIO("hintalign", kHintAlign),
+	SCENARIO("revivetimer", kReviveTimer),
 	SCENARIO("boothold", kBootHold),
 	SCENARIO("bootfilm", kBootFilm),
 	SCENARIO("revivebar", kReviveBar),
@@ -10044,6 +10074,25 @@ LRESULT CALLBACK AutotestWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 	return CallWindowProcA(at.prevProc, h, m, w, l);
 }
 
+// The window's client area moved up onto its monitor when it reaches past the
+// bottom (1920 x 1080 with its title bar on a 1080-high desktop): PrintWindow
+// leaves what is off the screen blank -- the shots' last 15 rows were white.
+void FitWindowOnScreen(HWND hwnd) {
+	RECT rc;
+	POINT tl = { 0, 0 };
+	if (!GetClientRect(hwnd, &rc) || !ClientToScreen(hwnd, &tl)) return;
+	MONITORINFO mi = { sizeof(mi) };
+	if (!GetMonitorInfoA(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) return;
+	int over = tl.y + rc.bottom - mi.rcMonitor.bottom;
+	int room = tl.y - mi.rcMonitor.top;   // (the title bar may leave the screen, not the client)
+	int d = over < room ? over : room;
+	if (d <= 0) return;
+	RECT wr;
+	GetWindowRect(hwnd, &wr);
+	SetWindowPos(hwnd, nullptr, wr.left, wr.top - d, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+	Log("autotest: window moved up %d px (its client's bottom was %d px past the screen's)", d, over);
+}
+
 void SubclassWindow() {
 	if (at.prevProc) return;
 	HWND hwnd = GameStartInfo()->hwnd;
@@ -10052,6 +10101,7 @@ void SubclassWindow() {
 	at.prevProc = (WNDPROC)SetWindowLongPtrA(hwnd, GWLP_WNDPROC, (LONG_PTR)AutotestWndProc);
 	bool fg = GetForegroundWindow() == hwnd;
 	Log("autotest: window %p subclassed (foreground=%d)", hwnd, fg);
+	FitWindowOnScreen(hwnd);
 	if (!fg) {
 		SetForegroundWindow(hwnd);
 		CallWindowProcA(at.prevProc, hwnd, WM_ACTIVATEAPP, TRUE, 0);
@@ -12605,7 +12655,8 @@ void RunStep(const Step& s) {
 		IndivLeave(prev);
 		break;
 	}
-	case S_HINTTEST: {   // a hint on player a's box (-1 both): b 0 revive, 1 one line, 2 combo buttons (x lit), 3 three lines
+	case S_HINTTEST: {   // a hint on player a's box (-1 both): b 0 revive, 1 one line, 2 combo buttons (x lit), 3 three lines,
+	                     // 4 "Hold B to revive (Asterix)", 5 "Hold Enter to skip", 6 countdown, 7 LB pass, 8 "Hold A to skip"
 		wchar_t text[200];
 		int p = s.a < 0 ? 0 : s.a;
 		switch (s.b) {
@@ -12622,6 +12673,11 @@ void RunStep(const Step& s) {
 			swprintf(text, 200, L"%c So many Romans: Twister!\n%s", ic ? ic : L' ', keys);
 			break;
 		}
+		case 4: swprintf(text, 200, L"Hold %s to revive %s", HintButtonName(p, HB_B), HintHeroName(HERO_ASTERIX)); break;
+		case 5: swprintf(text, 200, L"Hold %s to skip", HintKeyName(VK_RETURN)); break;
+		case 6: swprintf(text, 200, L"Revive %s\n27 s left", HintHeroName(HERO_OBELIX)); break;
+		case 7: swprintf(text, 200, L"%s passes the Roman\nto %s", HintButtonName(p, HB_LB), HintHeroName(HERO_OBELIX)); break;
+		case 8: swprintf(text, 200, L"Hold %s to skip", HintButtonName(p, HB_A)); break;
 		default: swprintf(text, 200, L"Line one of three\nline two is a bit longer\nthree"); break;
 		}
 		HintShow(HINT_COMBO, s.a, text, (DWORD)(s.y > 0 ? s.y : 6000));

@@ -48,6 +48,10 @@ void HintSpark(int key, int player, int n, bool sound);
 // plate fills from the left, white turning green (#00FF0E), fading out once full
 // (the user's Figma design). Kept while the hint is shown again.
 void HintProgress(int key, int player, float progress);
+// A countdown's bar on hint (`key`, `player`): the plate filled from the left to
+// `share` (the time gone of the whole: 0 at the start, 1 at its end) in red
+// #FF0000 at 33%, pulsing between 33% and 66% in its last 10 s (`secondsLeft`).
+void HintTimerBar(int key, int player, float share, float secondsLeft);
 
 enum HintKey {
 	HINT_JOIN = 1,      // level start: how player 2 joins / leaves
@@ -71,7 +75,8 @@ const wchar_t* HintKeyName(int vk);
 // " > " between a combo's buttons: the mod's chevron icon (the game's font has
 // no '>').
 const wchar_t* HintNext();
-// With the co-op icons: the hero's icon and name ("Asterix"), the hero and its
+// With the co-op icons: the hero's icon alone (drawn half as big again as the
+// text over a blank as wide), else its name ("Asterix"); the hero and its
 // player's icon ("Asterix (P1)" without), player's icon ("Player 2:" without).
 // (The hints name heroes only: each player's box is on its own side. The
 // player tags stay for later use.)

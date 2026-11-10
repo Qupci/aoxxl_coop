@@ -103,6 +103,7 @@ struct State {
 	// while the other hero is known to have a way to it.
 	bool     limitSet[2] = {};
 	float    limitLeft[2] = {};
+	float    limitAll[2] = {};         // the whole of it (its bar: the share gone)
 	DWORD    limitHintAt = 0;
 	// It ran out: the hero still standing (its own health kept for its own
 	// business through the game over -- not a second death), the game's place
@@ -935,6 +936,7 @@ void KeepBodyOnGround(int down, Hero h, DWORD now) {
 
 void SetLimit(int down, float way, const char* what) {
 	g.limitLeft[down] = way / kWalkSpeed + g_config.reviveGrace;
+	g.limitAll[down] = g.limitLeft[down];
 	g.limitSet[down] = true;
 	Log("indiv: %s has %.0f s to revive %s (%s: %.0f units, %.0f s; + %.0f s)", HeroName(Other(down)), g.limitLeft[down],
 	    HeroName(down), what, way, way / kWalkSpeed, g_config.reviveGrace);
@@ -1164,6 +1166,12 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 		TimeOut(down, h, up);
 		return true;
 	}
+	// The countdown's bar, every frame: the share of the time gone, filling from
+	// the left as the hold bars do (user) -- red, pulsing in its last 10 s.
+	int box = g.solo ? HINT_LEFT_BOX : PlayerOf(down);
+	float left = g.limitLeft[down] > 0.0f ? g.limitLeft[down] : 0.0f;
+	float gone = g.limitAll[down] > 0.0f ? 1.0f - left / g.limitAll[down] : 1.0f;
+	HintTimerBar(HINT_REVIVE, box, gone, left);
 	if (now - g.limitHintAt < 250) return false;
 	g.limitHintAt = now;
 	wchar_t text[160];
@@ -1171,7 +1179,8 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	else swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
 	// (Single player: in the left box -- in player 1's, with the revive's own
 	// hints and bar there, the two took turns every 250 ms: user.)
-	HintShow(HINT_REVIVE, g.solo ? HINT_LEFT_BOX : PlayerOf(down), text, 600);
+	HintShow(HINT_REVIVE, box, text, 600);
+	HintTimerBar(HINT_REVIVE, box, gone, left);
 	return false;
 }
 
@@ -1580,6 +1589,7 @@ bool IndivHeroDown(int hero, const char* how) {
 	// known (WayToFallen).
 	g.limitSet[hero] = g_config.reviveLimit > 0.0f;
 	g.limitLeft[hero] = g_config.reviveLimit;
+	g.limitAll[hero] = g_config.reviveLimit;
 	if (g.limitSet[hero]) Log("indiv: %s has %.0f s to revive %s", HeroName(other), g.limitLeft[hero], HeroName(hero));
 	Vector3 spot;
 	if (OnDeathGround(h) && SafeSpotFor(hero, &spot)) {

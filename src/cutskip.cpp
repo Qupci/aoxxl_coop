@@ -11,7 +11,11 @@
 
 namespace {
 
-const DWORD kHoldMs = 2000;      // held this long, the scene is skipped
+const DWORD kHoldMs = 2000;
+// Level 0's intro (the game's start, force_level -1) skipped by the hold too
+// (round 246); off: on a press, as the game has its film after it (user: the
+// game's start is quicker so).
+const bool  kHoldLevel0Intro = false;      // held this long, the scene is skipped
 const DWORD kShowMs = 5000;      // the prompt stays this long after the last press
 const DWORD kDoneMs = 400;       // the full bar stays this long (its fade-out: hints.cpp)
 
@@ -59,7 +63,7 @@ char* SkippableScene() {
 		if (!sc) continue;
 		uint16_t f = *(uint16_t*)(sc + 0x20);
 		if (!((f & 1) && (f & 0x1000) && (f & 0x180) != 0x80 && *(int8_t*)(sc + 0x30) >= 0)) continue;
-		if (level > 0 || (i == 0 && CoopSkipAdded(sc))) return sc;
+		if (level > 0 || (kHoldLevel0Intro && i == 0 && CoopSkipAdded(sc))) return sc;
 	}
 	return nullptr;
 }
