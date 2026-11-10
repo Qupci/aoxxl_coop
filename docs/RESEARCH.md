@@ -4722,3 +4722,31 @@ both halves).
   fullscreen (swap chain !Windowed) shots come from the back buffer (StretchRect to a plain RT, GetRenderTargetData)
   -- PrintWindow gave black. Autotests boot1 (fullscreen, aspect 1777 on the title) and idle -Level 2 (1920x1080, AA,
   preset 3 from the game itself).
+- Round 254 (Nov 11, commit b7e0428; user: squad_romans_at_once 3 should work, level limit): a squad's Romans at once
+  are capped by its pool's hooks -- CKGrpPoolSquad's member list (+0x20 via vf12, chained +4) is the free list,
+  FUN_00530380 moves one to the squad (FUN_00408b50(hook, to, from, life), FUN_00408e60 life active) and
+  FUN_00530460 back. Per level (class (2,93) / pools): LV1 18; LV2 8+12; LV3 6/4/9/10/6; LV4 18 (lock fight 6 at
+  once + 6 hiding Romans) + 4; LV5 10/7/7; LV6 5/8/14; leaders 1-6 per pool. Lending between pools can't reach x3
+  (LV4 has 22 basic Romans in all), so Romans are cloned in the level files: romanforge/ = XXL-Editor core
+  (KEnvironment, ClassRegister, Duplicator, GamePatcher; MIT) built as romanforge.lib with shims for json/fmt/
+  squish/zlib/GUI, linked into the asi (types Vector3/CNode/CKService renamed by /D to stay apart from ours;
+  asserts throw). Original PC levels: class header + "DRM" member values live in axxl.exe (Ipatix build: DRM sig
+  at file 0x2E933C, 8 level headers from 0x2E97AD); GamePatcher converts a level to the "Asterix " format and the
+  module needs 5 patches (file offsets = VA - 0x400000): 0xC1EB loader reads/validates the header (MessageBox +
+  ExitProcess(0xF5) otherwise -- exit code 245 = a level not converted), 0xCE7F, 0x1018C9 NOP 0x1F (DRM pointer
+  check), 0x229C60 message, 0x510D NOP 5 (DRM level number). So every level 0-8 is served converted; levels with
+  Roman pools also cloned (pools of CKHkBasicEnemy / CKHkBasicEnemyLeader to ceil(n x factor)) and saved with
+  their sectors (sector object ids follow the level's counts). Each Roman clone: +1 collision life, +33 tests,
+  CAnimatedClone + 4 CClone + 7 particle nodes + fog box + bounding shapes; ~1-2.5 s per level, ~10 s for all.
+  levelforge.cpp: in DllMain (before level 0's open) reads axxl.exe, checks the patch sites hold the file's bytes,
+  points the 4 call/jmp [0x622118] (CreateFileA import: 0x555F64, 0x5CC683, 0x615248, jmp 0x6176CA) at its own
+  pointer -- the import slot itself is rewritten after our DllMain (ASI loader), a slot hook saw no open -- then
+  patches the module; a worker builds levels into Game Files\coop_levels\LVLnnn (forge.key: forge version, factor,
+  exe size, the level's LVL/STR sizes + times; rebuilt on change); an open waits for / builds its level. Game opens
+  "./LVL004\LVL04.KWN". Editor round trip differs only in RW chunk-size fields of CCloneManager / 2D elements.
+  Editor bug: KObjectList::getFirst<CLightSet>() indexed past XXL1's category-13 class table (garbage -> random
+  crash in Duplicator::cloneNode); guarded. experimental.cpp CheckSharedPools skipped on rebuilt levels.
+  XXL_ATONCE=<f> overrides squad_romans_at_once (autotests); XXL_FORGEOPENS=1 logs CreateFileA opens. Autotest
+  atonce41 (-Level 4, rules4t + WATCHENEMIES): XXL_ATONCE=3 -> lock squad 18 alive (pool 54, 6 hiding still
+  placed), x2 -> 12. romanforge\build\romanforge.exe <game dir> <out dir> <level> [factor] builds one level as the
+  asi does. Not cloned: archers, jumping Romans (their pools keep the level's size).
