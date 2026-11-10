@@ -28,3 +28,7 @@ void ComboHintsFrame();
 // Autotests: combo `kind` for both players as if just bought (-1: the crowd's
 // Twister hint is told again).
 void ComboHintsQueue(int kind);
+// Autotests: combo `kind`'s hint text (0 Club, 1 Power Hammer, 2 Twister, 3
+// Twister Fusion, 4 Mole, 5 Rage; `crowd`: the crowd's Twister) for player
+// `player`, its first `lit` buttons lit.
+void ComboHintsText(wchar_t* out, int n, int player, int kind, bool crowd, int lit);

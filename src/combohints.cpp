@@ -444,6 +444,11 @@ void FuseFrame(Trio t) {
 
 } // namespace
 
+void ComboHintsText(wchar_t* out, int n, int player, int kind, bool crowd, int lit) {
+	if (kind < 0 || kind >= C_COUNT) { out[0] = 0; return; }
+	Compose(out, n, player, kind, crowd, lit, kind == C_FUSION);
+}
+
 void ComboHintsQueue(int kind) {
 	if (kind == -2) {   // the Twister learned quietly (no line): the crowd's hint alone
 		char* gm = GM();
