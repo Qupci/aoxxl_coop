@@ -4782,3 +4782,16 @@ both halves).
   env XXL_REBUILT): off = no levelforge at all. Autotest stack21 (-Level 2, XXL_COOPONLY=0 XXL_ATONCE=3; the watch
   now logs "stacked pairs N of M": shown Romans within 0.3 x/z, 1 y): before 121 of 27, after 0; atonce41 0, 18 at
   once; XXL_REBUILT=0 atonce41: 12 alive + 6 queued (the old pool limit).
+- Round 257 (Nov 11, commit 17a0267; user: crash in xxl_coop.log, userlogs 20261111-crash-shadow-xxl_coop.log, single
+  player, Obelix leading up LV4 sector 5's lift to -917.2 20.9 -337.6 at x3): CKSrvShadow (vt 0x62520C) has
+  +0xC slots (30 in LV4: 0x14-byte nodes {next, shadow (vt 0x625268, 0x50), node?, caster, def}, free list +0x2C,
+  in use +0x30 (def +0x28 == 0) / +0x34 (== 1)) and waiting nodes (0x10: {next, def, node, caster}, pool +0x3C, 33;
+  waiting +0x40 / +0x44). Register FUN_00471050, remove FUN_004712E0 (promotes the first waiting one into the freed
+  slot), out of range FUN_00471160 (thiscall(srv; node, def), ret 8; from the tick 0x470A70 when the shadow's
+  update returns 1). Game bug: FUN_00471160 with the waiting pool empty skips the unlink but still pushes the slot
+  on +0x2C -- the slot sits in both lists, its shadow +8 nulled; the next tick's update read +8 -> +0x2A: crash
+  0x46F9B7 (all 30 +0x34 slots chained into the free list in the diagnostic). Needs 63+ casters: only with the
+  rebuilt levels at x3 (x1 / x2 no crash). splitscreen.cpp ShadowWaitHook: pool empty -> the shadow keeps its slot
+  (its +0x4C cleared by the tick, so it retries once drawn again). A first stopgap (skip a shadow with +8 null,
+  result 3) froze the game in the corrupted lists -- removed. Autotest shadow45 (-Level 4, XXL_ATONCE=3): crash at
+  8.9 s before, "keeps its slot" at 8.0 s and through to the end after.
