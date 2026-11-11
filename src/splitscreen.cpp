@@ -556,6 +556,29 @@ int __fastcall ShadowUpdateHook(char* self, void* edx, void* a, void* b, void* c
 	return r;
 }
 
+// A shadow out of its camera's range gives its slot back and waits
+// (FUN_00471160, thiscall(service; node, def), ret 8): a node from the service's
+// pool of waiting nodes (+0x3C) takes it to the waiting list, the slot is
+// unlinked from its list (+0x30 / +0x34) and put on the free list (+0x2C). With
+// the pool empty the game skips the unlink but still frees the slot: then it is
+// in both lists, emptied, and the next tick crashed on it (0x46F9B7, shadow +8
+// null). The pool (33) and the slots (30) were never all taken before the rebuilt
+// levels' Romans (LV4 sector 5's lift at x3, user's log). Now with the pool empty
+// the shadow keeps its slot; it tries again next frame.
+const uintptr_t kShadowWait = 0x471160;
+const uint8_t   kShadowWaitPrologue[9] = { 0x53, 0x55, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x14 };
+typedef void(__fastcall* ShadowWaitFn)(char* srv, void* edx, char* node, char* def);
+ShadowWaitFn g_origShadowWait = nullptr;
+
+void __fastcall ShadowWaitHook(char* srv, void* edx, char* node, char* def) {
+	if (!*(char**)(srv + 0x3C)) {
+		static int s_told = 0;
+		if (s_told++ < 10) Log("split: shadow of node %p keeps its slot -- no waiting node left (the game would free it twice)", node);
+		return;
+	}
+	g_origShadowWait(srv, edx, node, def);
+}
+
 // --- viewport override ---------------------------------------------------------
 // RenderWare's D3D9 camera begin-update sets the viewport from the camera's
 // raster; the main camera's own beginUpdate pointer is wrapped so a half-screen
@@ -1434,6 +1457,8 @@ bool SplitInstallHooks() {
 	ok &= PatchVtableSlot(kSkyVtbl, kWalkSlot, kSkyWalk, (void*)SkyWalkHook, (void**)&g_origSkyWalk, "CSkyNodeFx::walk");
 	ok &= PatchVtableSlot(kShadowSrvVtbl, kShadowUpdateSlot, kShadowUpdate, (void*)ShadowUpdateHook,
 	                      (void**)&g_origShadowUpdate, "CKSrvShadow::update");
+	ok &= InstallDetour(kShadowWait, (void*)ShadowWaitHook, (void**)&g_origShadowWait, kShadowWaitPrologue,
+	                    sizeof(kShadowWaitPrologue), "shadow to the waiting list (slot kept with no waiting node left)");
 	ok &= PatchVtableSlot(kAnimNodeVtbl, kWalkSlot, kAnimNodeWalk, (void*)AnimNodeWalkHook, (void**)&g_origAnimNodeWalk, "CAnimatedNode::walk");
 	ok &= PatchVtableSlot(kAnimCloneVtbl, kWalkSlot, kAnimCloneWalk, (void*)AnimCloneWalkHook, (void**)&g_origAnimCloneWalk, "CAnimatedClone::walk");
 	ok &= PatchVtableSlot(kFogVtbl, kWalkSlot, kFogWalk, (void*)FogWalkHook, (void**)&g_origFogWalk, "CFogBoxNodeFx::walk");

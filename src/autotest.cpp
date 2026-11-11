@@ -4465,6 +4465,18 @@ const Step kStack21[] = {
 	{ 1000, S_WATCHENEMIES, 0, 0, 0, 0.0f, 0.0f, "watch romans", 0.0f },
 	SHOT(4000, "stack21_1"), SHOT(9000, "stack21_2"), SHOT(15000, "stack21_3"), END(16000),
 };
+// shadow45 (-Level 4, XXL_ATONCE=3; user's crash, userlogs 20261111-crash-shadow: single
+// player, Obelix leading up LV4 sector 5's lift to -917.2 20.9 -337.6): a squad there
+// woke with its Romans tripled and the shadow service's tick crashed (0x46F9B7,
+// shadow +8 null) in the same frame. Heroes put at the lift's foot, then its top.
+const Step kShadow45[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 5),
+	PLACEAT(2000, HERO_OBELIX, -919.4f, 5.6f, -328.0f), PLACEAT(2000, HERO_ASTERIX, -917.8f, 5.6f, -331.2f),
+	{ 2500, S_WATCHENEMIES, 0, 0, 0, -917.2f, 20.9f, "watch romans", -337.6f },
+	SECTORS(3000), SHOT(5000, "shadow45_1"),
+	PLACEAT(8000, HERO_OBELIX, -915.0f, 21.0f, -335.0f), PLACEAT(8000, HERO_ASTERIX, -917.2f, 21.0f, -337.6f),
+	SHOT(10000, "shadow45_2"), SHOT(15000, "shadow45_3"), SHOT(25000, "shadow45_4"), END(30000),
+};
 const Step kRules4P[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -9927,6 +9939,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("rules4t", kRules4T),
 	SCENARIO("atonce41", kAtOnce41),
 	SCENARIO("stack21", kStack21),
+	SCENARIO("shadow45", kShadow45),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),
 	SCENARIO("lock34", kLock34),
