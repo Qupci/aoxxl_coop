@@ -202,6 +202,8 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_FACTORS1"))   // autotests: every squad and combo bar factor the game's own
 		squadAliveFactor = squadCountFactor = comboFactor = comboDrainFactor = comboFullDrainFactor = 1.0f;
 	coopOnly = ReadBool("coop_difficulty", "difficulty_coop_only", coopOnly, full);
+	rebuiltLevels = ReadBool("coop_difficulty", "rebuilt_levels", rebuiltLevels, full);
+	if (getenv("XXL_REBUILT")) rebuiltLevels = atoi(getenv("XXL_REBUILT")) != 0;   // autotests
 	rulesStatic = ReadBool("coop_difficulty", "difficulty_static", rulesStatic, full);
 	apartByPath = ReadBool("coop_difficulty", "difficulty_pathfinding", apartByPath, full);
 	toDefeatStays = ReadBool("coop_difficulty", "difficulty_to_defeat_stays", toDefeatStays, full);

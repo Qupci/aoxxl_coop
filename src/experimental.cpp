@@ -10,7 +10,9 @@
 #include "pathfind.h"
 #include "trio.h"
 #include <windows.h>
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
@@ -206,6 +208,58 @@ void __fastcall AvoidAddHook(char* self, void* edx, char* entry) {
 	*(uint32_t*)(entry + 0x20) = 0;
 	static int s_told = 0;
 	if (s_told++ < 10) Log("experimental: avoidance service full (50): Roman %p left out", entry);
+}
+
+// A squad's formation (its current choreography key: FUN_0052C780(squad); key
+// +4 spots of 0x1C -- +0 position, +0xC facing, +0x18 pool or -1 -- +0xC their
+// count) has a spot per Roman the level placed. The squad's tick (FUN_0052B860)
+// hands the spots out; a Roman left over gets FUN_0052B670(squad; Roman, key,
+// -1) (thiscall, ret 0xC): the formation's centre (node +0x30), and the squad's
+// wake (vf33) places such Romans on the centre too (FUN_0052EC30) -- with more
+// Romans at once than spots, the extras stood inside each other for good
+// (LV2-1). Extra n now gets spot n % spots shifted sideways by a row: row 1 on
+// one side, 2 on the other, 3 further out on the first... (ExtraSpot); its
+// target (Roman component 0x46: +0 spot, +0xC facing, +0x18 step = (spot -
+// Roman) x/z / max(distance, squad +0xC0)) set after the game's.
+typedef char*(__fastcall* KeyFn)(char* squad, void* edx);
+typedef void(__cdecl* XformFn)(float* out, const float* in, int count, char* node);
+typedef void(__fastcall* SlotFn)(char* squad, void* edx, char* roman, char* key, int spot);
+typedef void(__fastcall* FormationFn)(char* squad, void* edx);
+const uintptr_t kSlot = 0x52B670, kFormation = 0x52B860;
+const uint8_t   kSlotPrologue[6] = { 0x83, 0xEC, 0x24, 0x53, 0x56, 0x57 };
+const uint8_t   kFormationPrologue[6] = { 0x83, 0xEC, 0x0C, 0x53, 0x55, 0x56 };
+SlotFn g_origSlot = nullptr;
+FormationFn g_origFormation = nullptr;
+char* g_extraSquad = nullptr;   // the squad whose formation is being handed out
+int   g_extraN = 0;             // ... its extras so far
+
+void __fastcall FormationHook(char* squad, void* edx) {
+	char* prevSquad = g_extraSquad;
+	int prevN = g_extraN;
+	g_extraSquad = squad;
+	g_extraN = 0;
+	g_origFormation(squad, edx);
+	g_extraSquad = prevSquad;
+	g_extraN = prevN;
+}
+
+void __fastcall SlotHook(char* squad, void* edx, char* roman, char* key, int spot) {
+	g_origSlot(squad, edx, roman, key, spot);
+	if (spot >= 0 || squad != g_extraSquad) return;
+	float pos[3], dir[3];
+	if (!ExperimentalExtraSpot(squad, g_extraN++, pos, dir)) return;
+	typedef char*(__fastcall* CpntFn)(char* self, void* edx, int id);
+	char* c = ((CpntFn)(*(void***)roman)[12])(roman, nullptr, 0x46);
+	char* node = *(char**)(roman + 0x10);
+	char* fr = node ? *(char**)(node + 4) : nullptr;
+	if (!c || !fr) return;
+	float* t = (float*)c;
+	memcpy(t, pos, 12);
+	memcpy(t + 3, dir, 12);
+	const float* rp = (const float*)(fr + 0x80);
+	float dx = pos[0] - rp[0], dz = pos[2] - rp[2], len = sqrtf(dx * dx + dz * dz);
+	float k = len > 0.01f ? 1.0f / (len > *(float*)(squad + 0xC0) ? len : *(float*)(squad + 0xC0)) : 0.0f;
+	t[6] = dx * k; t[7] = 0.0f; t[8] = dz * k;
 }
 
 int __fastcall ShopDeserializeHook(char* self, void* edx, void* file, int pass) {
@@ -824,6 +878,34 @@ void ComboFrame(Mode m) {
 
 bool EnemyKindKeptAsIs(char* cpnt) { return KeptAsIs(cpnt); }
 
+bool ExperimentalExtraSpot(char* squad, int n, float* pos, float* dir) {
+	char* node = squad ? *(char**)(squad + 0x30) : nullptr;
+	if (!node || n < 0) return false;
+	char* key = ((KeyFn)0x52C780)(squad, nullptr);
+	unsigned spots = key ? *(unsigned*)(key + 0xC) : 0;
+	char* list = key ? *(char**)(key + 4) : nullptr;
+	float p[3], d[3];
+	int row;
+	if (spots && list && spots < 256) {
+		const float* s = (const float*)(list + (n % spots) * 0x1C);
+		((XformFn)0x5918B0)(p, s, 1, node);
+		((XformFn)0x591910)(d, s + 3, 1, node);
+		row = n / (int)spots + 1;
+	} else {   // no formation: round the centre
+		memcpy(p, node + 0x30, 12);
+		memcpy(d, node + 0x20, 12);
+		row = n + 1;
+	}
+	float len = sqrtf(d[0] * d[0] + d[2] * d[2]);
+	float sx = len > 0.001f ? -d[2] / len : 1.0f, sz = len > 0.001f ? d[0] / len : 0.0f;   // sideways
+	float off = 1.5f * ((row + 1) / 2) * ((row & 1) ? 1.0f : -1.0f);
+	pos[0] = p[0] + sx * off;
+	pos[1] = p[1];
+	pos[2] = p[2] + sz * off;
+	memcpy(dir, d, 12);
+	return true;
+}
+
 void ExperimentalFrame() {
 	ApartFrame();
 	Mode m = ModeNow();
@@ -861,6 +943,10 @@ bool ExperimentalInstallHooks() {
 		ok &= PatchVtableSlot(0x626A6C, 25, 0x4C7F80, (void*)JetCmdHook, (void**)&g_origJetCmd,
 		                      "CKGrpSquadJetPack::vf25 (squad script numbers)");
 	}
+	ok &= InstallDetour(kFormation, (void*)FormationHook, (void**)&g_origFormation, kFormationPrologue,
+	                    sizeof(kFormationPrologue), "squad formation tick (extra Romans' spots)");
+	ok &= InstallDetour(kSlot, (void*)SlotHook, (void**)&g_origSlot, kSlotPrologue, sizeof(kSlotPrologue),
+	                    "squad formation spot (extra Romans beside the spots, not on the centre)");
 	ok &= InstallDetour(kAvoidAdd, (void*)AvoidAddHook, (void**)&g_origAvoidAdd, kAvoidAddPrologue,
 	                    sizeof(kAvoidAddPrologue), "avoidance add (at most its 50 entries)");
 	if (g_config.priceFactor != 1.0f)

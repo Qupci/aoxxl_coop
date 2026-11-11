@@ -52,6 +52,7 @@ struct CoopConfig {
 	bool  apartByPath      = true;  // the heroes are apart too where neither can walk to the other (pathfinding)
 	bool  toDefeatStays    = false; // a fight begun with the heroes apart keeps the level's Romans to defeat
 	float squadAliveFactor = 2.0f;  // Romans of a squad alive at once
+	bool  rebuiltLevels    = true;  // levels rebuilt (coop_levels\): Roman pools for the factor, crates and bonuses x2
 	float squadCountFactor = 2.0f;  // Romans of each squad pool (phase) to defeat
 	float priceFactor      = 2.0f;  // the merchant's prices
 	float comboFactor      = 0.5f;  // combo bar hits counted per Roman hit

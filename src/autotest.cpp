@@ -4456,6 +4456,15 @@ const Step kAtOnce41[] = {
 	{ 800, S_WATCHENEMIES, 0, 0, 0, -288.15f, 0.5f, "watch romans", 117.27f },
 	RULES4A(PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f), MARK(4000, "fight")), RULES4B,
 };
+// stack21 (-Level 2, XXL_COOPONLY=0 XXL_ATONCE=3; user: LV2-1): single player with
+// the rules on from the start: the level's first squads wake with three times
+// their Romans -- those beyond their formation's spots must not stand inside each
+// other (the watch's "stacked pairs"), at the wake or after.
+const Step kStack21[] = {
+	MARK(0, "baseline"),
+	{ 1000, S_WATCHENEMIES, 0, 0, 0, 0.0f, 0.0f, "watch romans", 0.0f },
+	SHOT(4000, "stack21_1"), SHOT(9000, "stack21_2"), SHOT(15000, "stack21_3"), END(16000),
+};
 const Step kRules4P[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -9917,6 +9926,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("rules4n", kRules4N),
 	SCENARIO("rules4t", kRules4T),
 	SCENARIO("atonce41", kAtOnce41),
+	SCENARIO("stack21", kStack21),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),
 	SCENARIO("lock34", kLock34),
@@ -10606,6 +10616,23 @@ void LogTick(float t) {
 			}
 		memcpy(seen, now, nNow * sizeof(char*));
 		nSeen = nNow;
+		{   // Romans standing inside each other anywhere in the level (formation extras, round 256)
+			static float sp[512][3];
+			int ns = 0, stacked = 0;
+			for (int id : ids)
+				for (unsigned i = 0, n = GetNumLvlClassInstances(2, id); i < n && ns < 512; i++) {
+					char* e = (char*)GetLvlObject(2, id, i);
+					char* node = e ? *(char**)(e + 0x10) : nullptr;
+					char* fr = node ? *(char**)(node + 4) : nullptr;
+					if (!fr || (*(uint8_t*)(node + 0x10) & 2)) continue;
+					const float* q = (const float*)(fr + 0x80);
+					for (int k = 0; k < ns; k++)
+						if ((sp[k][0] - q[0]) * (sp[k][0] - q[0]) + (sp[k][2] - q[2]) * (sp[k][2] - q[2]) < 0.09f &&
+						    fabsf(sp[k][1] - q[1]) < 1.0f) stacked++;
+					sp[ns][0] = q[0]; sp[ns][1] = q[1]; sp[ns][2] = q[2]; ns++;
+				}
+			line.Add(" | stacked pairs %d of %d shown", stacked, ns);
+		}
 		bool primed = at.enemiesPrimed;
 		at.enemiesPrimed = true;
 		line.Add(" | romans near %d (by A %d, by O %d)", live, nearA, nearO);

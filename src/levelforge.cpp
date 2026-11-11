@@ -263,6 +263,11 @@ bool LevelForgePoolsFilled(int level) {
 }
 
 void LevelForgeInstall() {
+	if (!g_config.rebuiltLevels) {
+		Log("levelforge: off (rebuilt_levels = off): the game's own level files -- Romans at once as their pools allow, "
+		    "crates and bonuses as the levels have them");
+		return;
+	}
 	g_factor = g_config.squadAliveFactor > 1.0f ? g_config.squadAliveFactor : 1.0f;
 	char exePath[MAX_PATH];
 	GetModuleFileNameA(nullptr, exePath, sizeof(exePath));

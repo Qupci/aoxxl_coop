@@ -1,5 +1,6 @@
 #include "config.h"
 #include "proximity.h"
+#include "experimental.h"
 #include "coop.h"
 #include "individual.h"
 #include "detour.h"
@@ -996,6 +997,31 @@ const char* PlacePath(uintptr_t ret) {
 
 void __fastcall PlaceRomanHook(char* squad, void* edx, char* roman, const float* pos, const float* dir, int flag) {
 	uintptr_t ret = (uintptr_t)_ReturnAddress();
+	// The squad's wake puts the Romans beyond its formation's spots on its centre
+	// (node +0x30), one inside the other: each gets its own spot beside the
+	// formation (ExperimentalExtraSpot, as the squad's tick will send it to),
+	// made walkable as the wake does a spot's (FUN_0052B480, thiscall(pos), ret 4).
+	static char* s_wakeSquad = nullptr;
+	static DWORD s_wakeAt = 0;
+	static int s_wakeN = 0;
+	float spot[3], spotDir[3];
+	char* sqNode = squad ? *(char**)(squad + 0x30) : nullptr;
+	if (pos && sqNode && ret >= 0x52EF70 && ret < 0x52F59D && !memcmp(pos, sqNode + 0x30, 12)) {
+		DWORD now = GetTickCount();
+		if (squad != s_wakeSquad || now - s_wakeAt > 200) s_wakeN = 0;
+		s_wakeSquad = squad;
+		s_wakeAt = now;
+		if (ExperimentalExtraSpot(squad, s_wakeN++, spot, spotDir)) {
+			typedef void(__fastcall* WalkableFn)(char* squad, void* edx, float* pos);
+			((WalkableFn)0x52B480)(squad, nullptr, spot);
+			pos = spot;
+			dir = spotDir;
+			static int s_told = 0;
+			if (s_told++ < 20)
+				Log("proximity: squad %p's extra Roman %d placed beside its formation at (%.1f %.1f %.1f), not on its centre",
+				    squad, s_wakeN - 1, spot[0], spot[1], spot[2]);
+		}
+	}
 	if (pos && g_placedInView < 60) {
 		const float* eyes[4];
 		int n = KlusterViewsSeeing(pos, 1.0f, 60.0f, eyes), seen = 0;
