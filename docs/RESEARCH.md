@@ -4766,3 +4766,19 @@ both halves).
   past 50 the Roman is left out (push cleared as the add does; "avoidance service full" log, cap 10). Tests:
   crates44 (118 objects, 0 in view without one; crashed before the cap), crate (iron 4 -> 0 pieces, wood 3), helmets12,
   pass22 (archer in the cloned LV2), atonce41 (18 at once). Jumping Romans not seen in a test yet.
+- Round 256 (Nov 11, commit 972b674; user: round 255 works; LV2-1 with difficulty_coop_only off: Romans of a
+  formation 3 in one spot, even moving; wants an ini switch for coop_levels): a squad's current choreography key
+  (FUN_0052C780(squad), thiscall, no args; key +4 spots 0x1C each: +0 position, +0xC facing, +0x18 pool or -1, +0xC
+  count; transformed by its node +0x30 with FUN_005918B0 / FUN_00591910, cdecl(out, in, count, node)) has as many
+  spots as the level's Romans. The squad tick FUN_0052B860 (thiscall, vf31) hands them out with FUN_0052B670
+  (thiscall(squad; Roman, key, spot), ret 0xC: Roman vf12(0x46) component +0 spot, +0xC facing, +0x18 step = (spot -
+  Roman) x/z / max(dist, squad +0xC0), zero within 0.01; attack/movement bits +0x24); Romans left over get spot -1 =
+  the squad node's +0x30 / +0x20 (centre). vf33's wake places the same ones on the centre too (0x52F416 branch, no
+  FUN_0052B480 walkable snap) via FUN_0052EC30. Fix: FormationHook (0x52B860) numbers a squad's extras per tick,
+  SlotHook (0x52B670) sets extra n's target to ExperimentalExtraSpot (spot n % spots + 1.5 x ceil(row/2) sideways,
+  rows alternating sides; no key: round the centre); proximity.cpp PlaceRomanHook moves a wake (vf33) placement on
+  the centre to the same spot (snapped by FUN_0052B480, thiscall(float* pos), ret 4). Romans sent in later come at
+  spawn markers (the user saw no stacking after the first group). [coop_difficulty] rebuilt_levels (default on;
+  env XXL_REBUILT): off = no levelforge at all. Autotest stack21 (-Level 2, XXL_COOPONLY=0 XXL_ATONCE=3; the watch
+  now logs "stacked pairs N of M": shown Romans within 0.3 x/z, 1 y): before 121 of 27, after 0; atonce41 0, 18 at
+  once; XXL_REBUILT=0 atonce41: 12 alive + 6 queued (the old pool limit).
