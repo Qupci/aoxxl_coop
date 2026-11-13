@@ -64,6 +64,11 @@ enum IconDirs { DIRS_MOVE, DIRS_INTERFACE, DIRS_CAMERA };
 // general is_* ones when they are on a mix. Returns `s` itself when nothing
 // changes; otherwise a string kept for good.
 const wchar_t* IconsRewrite(const wchar_t* s, int who, int dirs = DIRS_INTERFACE);
-// `s` with player 1's icon of game action `action` after it ("Centre Camera"
-// -> "Centre Camera [R3]"); `s` when there is none. Kept for good.
-const wchar_t* IconsAppendAction(const wchar_t* s, int action);
+// `s` with player `who`'s icon of game action `action` after it ("Centre
+// Camera" -> "Centre Camera [R3]"; player 2's 15 is its HUD button); `s` when
+// there is none. Kept for good.
+const wchar_t* IconsAppendAction(const wchar_t* s, int action, int who = 0);
+// A pad button's icon (XInput bit: pad_a, dpad_up...), 0 if none.
+wchar_t IconPadButtonGlyph(uint16_t bit, int look = ICON_PLAIN);
+// IconActionGlyph's player 2 HUD button (D-pad down; [keyboard] hud).
+const int ICON_P2_HUD = 100;

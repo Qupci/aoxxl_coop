@@ -8246,11 +8246,38 @@ const Step kP2Menu[] = {
 	P2TAP(8000, PAD_DPAD_DOWN, "p2 down"), P2TAP(8600, PAD_DPAD_DOWN, "p2 down"), P2TAP(9200, PAD_A, "p2 a (options)"),
 	SHOT(10500, "pm_options"),
 	P2TAP(11000, PAD_DPAD_DOWN, "p2 down"), P2TAP(11600, PAD_DPAD_DOWN, "p2 down"), P2TAP(12200, PAD_A, "p2 a (controls)"),
-	SHOT(13500, "pm_controls1"), P2TAP(14000, PAD_DPAD_RIGHT, "p2 right"), SHOT(15000, "pm_controls2"),
-	P2TAP(15500, PAD_DPAD_RIGHT, "p2 right"), SHOT(16500, "pm_controls3"),
-	P2TAP(17000, PAD_B, "p2 b"), P2TAP(18000, PAD_B, "p2 b"), SHOT(19000, "pm_back"),
-	P2TAP(19500, PAD_BACK, "p2 back (resume)"), SHOT(21000, "pm_resumed"),
-	END(22000),
+	SHOT(13500, "pm_controls1"),
+	P2TAP(14000, PAD_DPAD_RIGHT, "p2 right"), SHOT(14800, "pm_controls2"),
+	P2TAP(15200, PAD_DPAD_RIGHT, "p2 right"), SHOT(16000, "pm_controls3"),
+	P2TAP(16400, PAD_DPAD_RIGHT, "p2 right"), SHOT(17200, "pm_controls4"),
+	P2TAP(17600, PAD_DPAD_RIGHT, "p2 right (page 1)"),
+	// Targeted attack (the row above the page button) on LB: Launch Obelix takes Y.
+	P2TAP(18200, PAD_DPAD_UP, "p2 up (targeted attack)"), P2TAP(18800, PAD_A, "p2 a (rebind)"), SHOT(19400, "pm_waiting"),
+	P2TAP(20000, PAD_LB, "p2 lb"), SHOT(20800, "pm_rebound"),
+	P2TAP(21400, PAD_A, "p2 a (rebind)"), P2TAP(22000, PAD_Y, "p2 y (back)"),
+	// The Current Configuration (up from Up): the keyboard's, then the controller's again.
+	P2TAP(22600, PAD_DPAD_UP, "p2 up"), P2TAP(23000, PAD_DPAD_UP, "p2 up"), P2TAP(23400, PAD_DPAD_UP, "p2 up"),
+	P2TAP(23800, PAD_DPAD_UP, "p2 up"), P2TAP(24200, PAD_DPAD_UP, "p2 up"), P2TAP(24600, PAD_DPAD_UP, "p2 up"),
+	P2TAP(25000, PAD_DPAD_UP, "p2 up"), P2TAP(25400, PAD_DPAD_UP, "p2 up"), P2TAP(25800, PAD_DPAD_UP, "p2 up (configuration)"),
+	SHOT(26500, "pm_cfg_focus"), P2TAP(27000, PAD_A, "p2 a (keyboard)"), SHOT(27800, "pm_keyboard"),
+	P2TAP(28400, PAD_A, "p2 a (controller)"),
+	P2TAP(29000, PAD_DPAD_DOWN, "p2 down"),
+	P2TAP(29500, PAD_B, "p2 b"), P2TAP(30500, PAD_B, "p2 b"), SHOT(31500, "pm_back"),
+	P2TAP(32000, PAD_BACK, "p2 back (resume)"), SHOT(33500, "pm_resumed"),
+	END(34500),
+};
+// p1coop (level 2): player 2 joins; player 1 opens the pause menu: the
+// controls are player 1's, "[P1] Controls" on the bottom bar.
+const Step kP1Coop[] = {
+	MARK(0, "p1coop"),
+	VPAD(2000, 1, PAD_START, 0, 0, "p2 start"), VPAD(2200, 1, 0, 0, 0, "p2 release"),
+	{ 4000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	OPT_PRESS(5000, 17, 33, 53, "down"), OPT_PRESS(5600, 17, 33, 53, "down"),
+	OPT_PRESS(6200, 20, 44, 56, "confirm (options)"),
+	OPT_PRESS(8000, 17, 33, 53, "down"), OPT_PRESS(8600, 17, 33, 53, "down"),
+	OPT_PRESS(9200, 20, 44, 56, "confirm (controls)"), SHOT(10500, "pc_page1"),
+	{ 11500, S_BIND, 21, 0, 0, 0, 0, "cancel" }, { 12500, S_BIND, 21, 0, 0, 0, 0, "cancel" },
+	END(14000),
 };
 #undef P2TAP
 const Step kCtrlIconsKb[] = {
@@ -9792,6 +9819,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("rumble", kRumble),
 	SCENARIO("rumble2", kRumble2),
 	SCENARIO("p2menu", kP2Menu),
+	SCENARIO("p1coop", kP1Coop),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),

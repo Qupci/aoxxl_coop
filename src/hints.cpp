@@ -93,8 +93,9 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	// the camera's; every other string's directions are the menus'. Display/Hide
 	// Interface (action 15) and Centre Camera (50) get their button too.
 	int dirs = id >= 0x391 && id <= 0x394 ? DIRS_MOVE : id >= 0x3A3 && id <= 0x3A6 ? DIRS_CAMERA : DIRS_INTERFACE;
-	if (id == 0x39C) return IconsAppendAction(s, 15);
-	if (id == 0x3A9) return IconsAppendAction(s, 50);
+	int owner = CoopP2Joined() ? CtrlOptsMenuOwner() : 0;
+	if (id == 0x39C) return IconsAppendAction(s, 15, owner);
+	if (id == 0x3A9) return IconsAppendAction(s, 50, owner);
 	// Single player ([single_player] sp_coop_icons): every text player 1's.
 	if (!CoopP2Joined()) return IconsRewrite(s, 0, dirs);
 	void** ra = (void**)_AddressOfReturnAddress();
@@ -1034,6 +1035,18 @@ uint32_t HintsModString(int slot, const wchar_t* text) {
 	return kStringId + i;
 }
 
+static bool g_refreshTexts = false;
+void HintsRefreshTexts() { g_refreshTexts = true; }
+
+float HintsTextWidth(char* text) {
+	char* t20 = text + 0x20;
+	unsigned n = *(unsigned*)(t20 + 0x2D4);
+	if (!n || n > 30) return 0.0f;
+	float x0 = *(float*)(t20 + 0x3C8), x1 = *(float*)(t20 + 0x3C8 + 8 * (n - 1)) + WordWidth(t20, n - 1);
+	float a = Aspect();
+	return a > 0.0f ? (x1 - x0) / a : 0.0f;
+}
+
 void HintsFrame() {
 	DWORD now = GetTickCount();
 	for (int i = 0; i < g_nHints;)
@@ -1052,11 +1065,13 @@ void HintsFrame() {
 	if (!gm || !m2d || *(uintptr_t*)m2d != 0x623A28) return;
 	bool paused = (*(uint8_t*)(gm + 0xCC) & 3) == 2;
 	int ctx = !CoopP2Joined() ? 0 : 1 | (paused ? 2 : 0) | (paused ? 0 : (CoopShopper() + 1) << 2) |
-	          (CoopP2Pad() == kKeyboardPad ? 0x10 : 0) | (paused && CtrlOptsMenuOwner() ? 0x20 : 0);
+	          (CoopP2Pad() == kKeyboardPad ? 0x10 : 0) | (paused && CtrlOptsMenuOwner() ? 0x20 : 0) |
+	          ((CtrlOptsP2Device() + 1) << 6);
 	InputManager im = GetInputManager();
 	if (im) ctx |= (*(uint8_t*)(im.raw() + 0x64) + 1) << 8;
 	static int lastCtx = 0;
-	if (ctx == lastCtx) return;
+	if (ctx == lastCtx && !g_refreshTexts) return;
+	g_refreshTexts = false;
 	lastCtx = ctx;
 	((void(__fastcall*)(char*, void*, int, int))0x42A220)(m2d, nullptr, 3, 0);
 	LogV("hints: texts refreshed for whose buttons are due (%X)", ctx);

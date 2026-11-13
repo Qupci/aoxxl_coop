@@ -926,7 +926,7 @@ uint8_t* CoopP2CameraValues() {
 		if (v > 1.0f) v = 1.0f;
 		g.p2CamValues[b] = v > 0.0f ? (uint8_t)(v * 255.0f + 0.5f) : 0;
 	};
-	float rx = p.rx * CtrlOptsCamX(), ry = p.ry * CtrlOptsCamY();   // the options' Invert Camera X / Y
+	float rx = p.rx * CtrlOptsCamX(1), ry = p.ry * CtrlOptsCamY(1);   // the options' Invert Camera X / Y
 	put(0, ry);  put(1, -ry);
 	put(2, rx);  put(3, -rx);
 	put(4, (p.pressed & PAD_RTHUMB) ? 1.0f : 0.0f);
@@ -3320,7 +3320,7 @@ void CoopFrame() {
 	bool inCutscene = g.cutsceneHold > 0 || CutsceneBars() || g.shopping;
 	// ... and leaving waits for the end of a scripted ride (the belly slide, the
 	// boat): handed back in the middle of it, both heroes stood stuck.
-	if (!inCutscene && (p.pressed & PAD_START)) {
+	if (!inCutscene && (p.pressed & PAD_START) && !CtrlOptsGamePaused()) {   // (in the pause menu: nothing)
 		if (g.suspended) {
 			static DWORD s_told = 0;
 			if (GetTickCount() - s_told > 3000) { s_told = GetTickCount(); Log("coop: player 2's Start ignored -- a scripted ride is on"); }

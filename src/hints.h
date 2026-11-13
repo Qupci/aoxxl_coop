@@ -74,6 +74,10 @@ const wchar_t* HintButtonName(int player, HintButton b, int look = ICON_PLAIN);
 // A string id the game's text objects can show (localisation lookups answer
 // it with `text`): slots 0-31 for other modules (ctrlopts.cpp's rows).
 uint32_t HintsModString(int slot, const wchar_t* text);
+// A text element's (CText2d) laid-out width, as a share of the screen's.
+float HintsTextWidth(char* text);
+// Every text of the game fetched again next frame (their action icons changed).
+void HintsRefreshTexts();
 // A keyboard key's name ("Space", "K"), or its keycap icon.
 const wchar_t* HintKeyName(int vk);
 // " > " between a combo's buttons: the mod's chevron icon (the game's font has

@@ -1,6 +1,7 @@
 #include "icons.h"
 #include "coop.h"
 #include "config.h"
+#include "ctrlopts.h"
 #include "detour.h"
 #include "inputmgr.h"
 #include "log.h"
@@ -659,6 +660,15 @@ int ActionOfIcon(wchar_t c) {
 }
 bool IsDirIcon(wchar_t c) { return c >= 0xE005 && c <= 0xE008; }
 
+// Player 2's icons as its keyboard's (else its pad's): the controls' view of
+// player 2's configuration when it is up, else the device it joined on.
+bool P2OnKeyboard() {
+	static bool kbTest = getenv("XXL_ICONP2KB") != nullptr;   // autotest: player 2's icons as on the keyboard
+	int view = CtrlOptsP2Device();
+	if (view >= 0) return view == 1;
+	return CoopP2Pad() == kKeyboardPad || kbTest;
+}
+
 // The CKInput actions of a kind of directions, up / down / left / right.
 const int kDirActions[3][4] = { { 0, 1, 2, 3 }, { 16, 17, 18, 19 }, { 47, 46, 48, 49 } };
 
@@ -670,9 +680,8 @@ const int kDirActions[3][4] = { { 0, 1, 2, 3 }, { 16, 17, 18, 19 }, { 47, 46, 48
 const char* DirDevice(int player, int dirs, int bound[4]) {
 	for (int d = 0; d < 4; d++) bound[d] = d;
 	if (player == 1) {
-		bool kb = CoopP2Pad() == kKeyboardPad || getenv("XXL_ICONP2KB");
-		if (dirs == DIRS_MOVE) return kb ? "kb" : "ls";
-		return kb ? "is" : dirs == DIRS_CAMERA ? "rs" : "dpad";
+		if (P2OnKeyboard()) return "kb";
+		return dirs == DIRS_MOVE ? "ls" : dirs == DIRS_CAMERA ? "rs" : "dpad";
 	}
 	static const char* const kPads[3] = { "ls", "rs", "dpad" };
 	static const int kFirst[3] = { 6, 10, 26 };   // each one's up byte (up, down, left, right)
@@ -818,34 +827,62 @@ wchar_t PadGlyph(const char* name, int look) {
 }
 } // namespace
 
+wchar_t IconPadButtonGlyph(uint16_t bit, int look) {
+	static const struct { uint16_t bit; const char* icon; } kIcons[] = {
+		{ 0x0001, "dpad_up" }, { 0x0002, "dpad_down" }, { 0x0004, "dpad_left" }, { 0x0008, "dpad_right" },
+		{ 0x0010, "pad_start" }, { 0x0020, "pad_back" }, { 0x0040, "pad_l3" }, { 0x0080, "pad_r3" },
+		{ 0x0100, "pad_lb" }, { 0x0200, "pad_rb" }, { 0x1000, "pad_a" }, { 0x2000, "pad_b" },
+		{ 0x4000, "pad_x" }, { 0x8000, "pad_y" },
+	};
+	for (const auto& k : kIcons) if (k.bit == bit) return PadGlyph(k.icon, look);
+	return 0;
+}
+
 wchar_t IconActionGlyph(int player, int action, int look) {
-	static bool kbTest = getenv("XXL_ICONP2KB") != nullptr;   // autotest: player 2's icons as on the keyboard
 	if (player == 1) {
-		if (CoopP2Pad() == kKeyboardPad || kbTest) {
+		// Player 2: its keys ([keyboard]), or its pad's layout ([p2_pad]). The
+		// interface's directions are its moves (keys) / its D-pad, the camera's
+		// its look keys / right stick; 12 its menu button, ICON_P2_HUD its HUD's,
+		// 50 centre the camera; 15 is Start (joining).
+		typedef CoopConfig C;
+		if (P2OnKeyboard()) {
 			int key;
 			switch (action) {
-			case 0: key = CoopConfig::KEY_UP; break;      case 1: key = CoopConfig::KEY_DOWN; break;
-			case 2: key = CoopConfig::KEY_LEFT; break;    case 3: key = CoopConfig::KEY_RIGHT; break;
-			case 4: case 20: key = CoopConfig::KEY_JUMP; break;
-			case 5: key = CoopConfig::KEY_ATTACK; break;
-			case 6: case 21: key = CoopConfig::KEY_GRAB; break;
-			case 7: key = CoopConfig::KEY_DASH; break;    case 8: key = CoopConfig::KEY_LB; break;
-			case 10: key = CoopConfig::KEY_RB; break;     case 15: key = CoopConfig::KEY_START; break;
+			case 0: case 16: key = C::KEY_UP; break;      case 1: case 17: key = C::KEY_DOWN; break;
+			case 2: case 18: key = C::KEY_LEFT; break;    case 3: case 19: key = C::KEY_RIGHT; break;
+			case 4: case 20: key = C::KEY_JUMP; break;
+			case 5: key = C::KEY_ATTACK; break;
+			case 6: case 21: key = C::KEY_GRAB; break;
+			case 7: key = C::KEY_DASH; break;    case 8: key = C::KEY_LB; break;
+			case 10: key = C::KEY_RB; break;     case 15: key = C::KEY_START; break;
+			case 12: key = C::KEY_BACK; break;   case ICON_P2_HUD: key = C::KEY_HUD; break;
+			case 50: key = C::KEY_CENTER_CAMERA; break;
+			case 47: key = C::KEY_LOOK_UP; break;    case 46: key = C::KEY_LOOK_DOWN; break;
+			case 48: key = C::KEY_LOOK_LEFT; break;  case 49: key = C::KEY_LOOK_RIGHT; break;
 			default: return 0;
 			}
 			return IconKeyGlyph(g_config.keys[key], look);
 		}
-		const char* name;
+		int b = -1;
+		const char* name = nullptr;
 		switch (action) {
 		case 0: name = "ls_up"; break;    case 1: name = "ls_down"; break;
 		case 2: name = "ls_left"; break;  case 3: name = "ls_right"; break;
-		case 4: case 20: name = "pad_a"; break;
-		case 5: name = "pad_x"; break;
-		case 6: case 21: name = "pad_b"; break;
-		case 7: name = "pad_y"; break;    case 8: name = "pad_lb"; break;
-		case 10: name = "pad_rb"; break;  case 15: name = "pad_start"; break;
+		case 16: name = "dpad_up"; break; case 17: name = "dpad_down"; break;
+		case 18: name = "dpad_left"; break; case 19: name = "dpad_right"; break;
+		case 47: name = "rs_up"; break;   case 46: name = "rs_down"; break;
+		case 48: name = "rs_left"; break; case 49: name = "rs_right"; break;
+		case 15: name = "pad_start"; break;
+		case 4: case 20: b = C::P2B_JUMP; break;
+		case 5: b = C::P2B_ATTACK; break;
+		case 6: case 21: b = C::P2B_GRAB; break;
+		case 7: b = C::P2B_DASH; break;   case 8: b = C::P2B_LB; break;
+		case 10: b = C::P2B_RB; break;    case 12: b = C::P2B_MENU; break;
+		case ICON_P2_HUD: b = C::P2B_HUD; break;
+		case 50: b = C::P2B_CENTER; break;
 		default: return 0;
 		}
+		if (b >= 0) return IconPadButtonGlyph(g_config.p2Pad[b], look);
 		return PadGlyph(name, look);
 	}
 	int off;
@@ -899,8 +936,8 @@ const wchar_t* IconsRewrite(const wchar_t* s, int who, int dirs) {
 	return it->second->c_str();
 }
 
-const wchar_t* IconsAppendAction(const wchar_t* s, int action) {
-	wchar_t g = s && g_texture ? IconActionGlyph(0, action) : 0;
+const wchar_t* IconsAppendAction(const wchar_t* s, int action, int who) {
+	wchar_t g = s && g_texture ? IconActionGlyph(who, who == 1 && action == 15 ? ICON_P2_HUD : action) : 0;
 	if (!g) return s;
 	std::wstring out = std::wstring(s) + L" " + g;
 	static std::unordered_map<std::wstring, std::wstring*> kept;

@@ -282,6 +282,7 @@ void ShowPage(bool page4) {
 		}
 }
 
+void BarOut();
 void TakeOut() {
 	if (!g_page) return;
 	ShowPage(false);
@@ -289,14 +290,25 @@ void TakeOut() {
 		if (InList(g_values, g_value[i])) Unlink(g_values, g_value[i]);
 		if (InList(g_labels, g_label[i])) Unlink(g_labels, g_label[i]);
 	}
+	BarOut();
 	Log("ctrlopts: the mod's rows taken out of the controls");
 	g_page = g_labels = g_values = g_pageButton = nullptr;
 	g_page4 = false;
 	g_binding = -1;
 }
 
-// The page's Current Configuration: 1 the controller, 0 the keyboard (+0x208).
-bool OnPad(char* opt) { return *(uint8_t*)(opt + 0x208) == 1; }
+// Whose controls the page shows: the pause menu's owner in co-op (player 2's
+// Back opened it), else player 1's. Player 2's view: its device as the
+// Current Configuration row toggles it (g_p2Dev 0 the controller, 1 the
+// keyboard -- the game's own +0x208 stays player 1's), the 23 game rows'
+// values its buttons (rebound here: confirm, then the button / key), the mod's
+// rows its own settings.
+int g_view = 0;
+int g_p2Dev = 0;
+
+// The page's Current Configuration for the view: the controller or the
+// keyboard (player 1: the game's +0x208, 1 the controller).
+bool OnPad(char* opt) { return g_view ? g_p2Dev == 0 : *(uint8_t*)(opt + 0x208) == 1; }
 
 const char* PadButtonName(uint16_t bit) {
 	for (int i = 0; i < CoopConfig::kNumPadButtons; i++)
@@ -315,16 +327,136 @@ const wchar_t* PadButtonTitle(uint16_t bit) {
 	}
 	return L"None";
 }
-// The icon of a pad button (coop_icons pad_a, dpad_up...).
-wchar_t PadButtonGlyph(uint16_t bit) {
-	static const struct { uint16_t bit; const char* icon; } kIcons[] = {
-		{ 0x0001, "dpad_up" }, { 0x0002, "dpad_down" }, { 0x0004, "dpad_left" }, { 0x0008, "dpad_right" },
-		{ 0x0010, "pad_start" }, { 0x0020, "pad_back" }, { 0x0040, "pad_l3" }, { 0x0080, "pad_r3" },
-		{ 0x0100, "pad_lb" }, { 0x0200, "pad_rb" }, { 0x1000, "pad_a" }, { 0x2000, "pad_b" },
-		{ 0x4000, "pad_x" }, { 0x8000, "pad_y" },
-	};
-	for (const auto& k : kIcons) if (k.bit == bit) return IconGlyph(k.icon);
-	return 0;
+
+// The game's 23 binding rows (labels +0x10C + i*4, values +0x168 + i*4): Up,
+// Down, Left, Right, Action, Jump, Pause, Grab, Targeted attack | Launch
+// Obelix, Launch Dogmatix, Display/Hide Interface, Interface up / down / left /
+// right, Confirm, Cancel | Camera up / down / left / right, Centre Camera.
+// Player 2's: the pad action each is ([p2_pad], -1 fixed) and the key
+// ([keyboard], -1 fixed).
+typedef CoopConfig C;
+const int kGameRows = 23;
+const int kP2PadOf[kGameRows] = { -1, -1, -1, -1, C::P2B_ATTACK, C::P2B_JUMP, C::P2B_MENU, C::P2B_GRAB, C::P2B_DASH,
+                                  C::P2B_LB, C::P2B_RB, C::P2B_HUD, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, C::P2B_CENTER };
+const int kP2KeyOf[kGameRows] = { C::KEY_UP, C::KEY_DOWN, C::KEY_LEFT, C::KEY_RIGHT, C::KEY_ATTACK, C::KEY_JUMP, C::KEY_BACK,
+                                  C::KEY_GRAB, C::KEY_DASH, C::KEY_LB, C::KEY_RB, C::KEY_HUD, -1, -1, -1, -1, -1, -1,
+                                  C::KEY_LOOK_UP, C::KEY_LOOK_DOWN, C::KEY_LOOK_LEFT, C::KEY_LOOK_RIGHT, C::KEY_CENTER_CAMERA };
+
+void KeyTitle(int vk, wchar_t* out, int n) {
+	if (vk) IconsKeyName(vk, out, n);
+	else wcsncpy(out, L"None", n - 1);
+}
+
+// Player 2's value of game row `i`.
+void P2RowText(int i, wchar_t* out, int n) {
+	static const wchar_t* const kDir[4] = { L"Up", L"Down", L"Left", L"Right" };
+	out[0] = 0;
+	if (g_p2Dev == 1) {
+		int k = kP2KeyOf[i];
+		if (k < 0 && i >= 12 && i <= 15) k = C::KEY_UP + (i - 12);   // the interface: the moves' keys
+		if (k < 0 && i == 16) k = C::KEY_JUMP;                        // confirm / cancel: jump's / grab's
+		if (k < 0 && i == 17) k = C::KEY_GRAB;
+		KeyTitle(k >= 0 ? g_config.keys[k] : 0, out, n);
+		return;
+	}
+	int b = kP2PadOf[i];
+	if (b >= 0) { wcsncpy(out, PadButtonTitle(g_config.p2Pad[b]), n - 1); return; }
+	if (i <= 3) swprintf(out, n, L"Left Stick %s", kDir[i]);
+	else if (i >= 12 && i <= 15) swprintf(out, n, L"D-pad %s", kDir[i - 12]);
+	else if (i == 16) wcsncpy(out, PadButtonTitle(g_config.p2Pad[C::P2B_JUMP]), n - 1);
+	else if (i == 17) wcsncpy(out, PadButtonTitle(g_config.p2Pad[C::P2B_GRAB]), n - 1);
+	else if (i >= 18 && i <= 21) swprintf(out, n, L"Right Stick %s", kDir[i - 18]);
+}
+
+uint32_t g_gameRowIds[kGameRows];
+bool     g_p1Texts = true;   // the game rows show player 1's (the game's own) values
+
+// Player 2's view: the game rows' values and the Current Configuration's put
+// right whenever the game set its own (string id at the text's +0x34).
+void P2Values(char* opt) {
+	if (g_view != 1) {
+		if (!g_p1Texts) {
+			((void(__fastcall*)(char*, void*))0x526540)(opt, nullptr);   // the game's own values again
+			g_p1Texts = true;
+		}
+		return;
+	}
+	g_p1Texts = false;
+	for (int i = 0; i < kGameRows; i++) {
+		char* t = *(char**)(opt + 0x168 + i * 4);
+		if (!t || *(uintptr_t*)t != kVtText) continue;
+		wchar_t s[64];
+		P2RowText(i, s, 64);
+		if (g_binding == 100 + i) wcsncpy(s, L"...", 63);
+		uint32_t id = HintsModString(8 + i, s);
+		if (*(uint32_t*)(t + 0x34) != id || wcscmp((const wchar_t*)(t + 0x38), s) != 0) ((SetTextFn)0x42E590)(t + 0x20, nullptr, id);
+		g_gameRowIds[i] = id;
+	}
+	char* cfg = *(char**)(opt + 0x1F4);
+	uint32_t want = *(uint32_t*)(opt + 0x1F8 + (g_p2Dev == 0 ? 4 : 0));   // 0x40A the controller, 0x408 the keyboard
+	if (cfg && *(uintptr_t*)cfg == kVtText && *(uint32_t*)(cfg + 0x34) != want) ((SetTextFn)0x42E590)(cfg + 0x20, nullptr, want);
+}
+
+// The bottom bar's "[P1] Controls" / "[P2] Controls" (co-op): a copy of its
+// right-hand text (+0x60, "Setting" / "Confirm"; right-aligned: it ends just
+// left of its place, 0.01) centred by its width, linked into the same list
+// while the controls are up (a copy of the left-hand "Back" in its list was
+// never drawn).
+alignas(16) char g_bar[0x6E0];
+alignas(16) char g_barColour[0x80];
+char* g_barList = nullptr;
+char* g_opt = nullptr;
+
+void BarOut() {
+	if (g_barList && InList(g_barList, g_bar)) Unlink(g_barList, g_bar);
+	g_barList = nullptr;
+}
+
+void BarIn(char* opt) {
+	BarOut();
+	if (!CoopP2Joined()) return;
+	char* right = *(char**)(opt + 0x60);
+	uintptr_t vt = right ? *(uintptr_t*)right : 0;
+	if (vt != kVtText && vt != kVtTextButton) return;
+	CKYellowPages* yp = YellowPages();
+	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	char* menus = m2d ? *(char**)(m2d + 0x3C) : nullptr;
+	char* all = menus ? *(char**)(menus + 4) : nullptr;
+	char* list = nullptr;
+	int k = 0;
+	for (char* c = all ? *(char**)(all + 4) : nullptr; c && !list && k < 60; c = *(char**)(c + 0x10), k++)
+		for (int o = 0x24; o <= 0x28 && !list; o += 4) {
+			char* l = *(uintptr_t*)c == 0x623978 ? *(char**)(c + o) : nullptr;
+			if (l && InList(l, right)) list = l;
+		}
+	if (!list) {
+		static int logs = 0;
+		if (logs++ < 3) Log("ctrlopts: the bottom bar's text is in no list -- no [P1]/[P2] Controls");
+		return;
+	}
+	static int barLogs = 0;
+	if (barLogs++ < 2) {
+		char* left = *(char**)(opt + 0x5C);
+		Log("ctrlopts: bottom bar right %p at %.3f %.3f align %d %d; left %p vt %06X at %.3f %.3f align %d %d", right,
+		    *(float*)(right + 0x14), *(float*)(right + 0x18), right[6], right[7], left, left ? *(uint32_t*)left : 0,
+		    left ? *(float*)(left + 0x14) : 0.0f, left ? *(float*)(left + 0x18) : 0.0f, left ? left[6] : 0, left ? left[7] : 0);
+	}
+	memcpy(g_bar, right, vt == kVtText ? 0x6DC : 0x6E0);
+	char*& colour = *(char**)(g_bar + 0x68C);
+	if (colour) { memcpy(g_barColour, colour, sizeof(g_barColour)); colour = g_barColour; }
+	g_bar[5] &= ~4;
+	wchar_t text[40];
+	wchar_t g = IconGlyph(g_view ? "p2" : "p1");
+	if (g) swprintf(text, 40, L"%c Controls", g);
+	else swprintf(text, 40, L"P%d Controls", g_view + 1);
+	((SetTextFn)0x42E590)(g_bar + 0x20, nullptr, HintsModString(31, text));
+	float w = HintsTextWidth(g_bar);
+	*(float*)(g_bar + 0x14) = 0.5f + 0.5f * w + 0.01f;   // the middle of the bar
+	static int wLogs = 0;
+	((SetTextFn)0x42E590)(g_bar + 0x20, nullptr, HintsModString(31, text));   // laid out again where it now is
+	if (wLogs++ < 3) Log("ctrlopts: [P%d] Controls %.3f wide, at %.3f", g_view + 1, w, *(float*)(g_bar + 0x14));
+	LinkAfter(list, right, g_bar);
+	g_barList = list;
 }
 
 // A row's label and value texts (the label with its button's icon, as the game's rows).
@@ -332,21 +464,27 @@ void RowTexts(char* opt, int i, wchar_t* label, wchar_t* value, int n) {
 	wcsncpy(label, kRows[i].name, n - 1);
 	label[n - 1] = 0;
 	value[0] = 0;
+	bool pad = OnPad(opt);
 	switch (i) {
 	case R_SWITCH: {
-		bool pad = OnPad(opt);
-		wchar_t g = pad ? PadButtonGlyph(g_config.spSwitchButton) : IconKeyGlyph(g_config.spSwitchKey);
+		uint16_t bit = g_view ? g_config.p2Pad[C::P2B_SWITCH] : g_config.spSwitchButton;
+		int vk = g_view ? g_config.keys[C::KEY_SWITCH] : g_config.spSwitchKey;
+		wchar_t g = pad ? IconPadButtonGlyph(bit) : IconKeyGlyph(vk);
 		if (g) swprintf(label, n, L"%s %c", kRows[i].name, g);
 		if (g_binding == i) wcsncpy(value, L"...", n - 1);
-		else if (pad) wcsncpy(value, PadButtonTitle(g_config.spSwitchButton), n - 1);
-		else if (g_config.spSwitchKey) IconsKeyName(g_config.spSwitchKey, value, n);
-		else wcsncpy(value, L"None", n - 1);
+		else if (pad) wcsncpy(value, PadButtonTitle(bit), n - 1);
+		else KeyTitle(vk, value, n);
 		break;
 	}
 	case R_DEADZONE:
-		swprintf(value, n, L"%.2f", g_config.p1Deadzone);
+		swprintf(value, n, L"%.2f", g_view ? g_config.deadzone : g_config.p1Deadzone);
 		break;
 	}
+}
+
+bool& Toggle(int i) {
+	if (g_view) return i == R_INVX ? g_config.p2InvertCamX : g_config.p2InvertCamY;
+	return i == R_INVX ? g_config.invertCamX : g_config.invertCamY;
 }
 
 void ShowRow(char* opt, int i) {
@@ -355,9 +493,12 @@ void ShowRow(char* opt, int i) {
 	g_ids[i][0] = HintsModString(i * 2, label);
 	((SetTextFn)0x42E590)(g_label[i] + 0x20, nullptr, g_ids[i][0]);
 	uint32_t vid;
-	if (kRows[i].kind == RK_TOGGLE) vid = (i == R_INVX ? g_config.invertCamX : g_config.invertCamY) ? kYes : kNo;
+	if (kRows[i].kind == RK_TOGGLE) vid = Toggle(i) ? kYes : kNo;
 	else vid = g_ids[i][1] = HintsModString(i * 2 + 1, value);
 	((SetTextFn)0x42E590)(g_value[i] + 0x20, nullptr, vid);
+}
+void ShowRows(char* opt) {
+	for (int i = 0; i < kNumRows; i++) ShowRow(opt, i);
 }
 
 void WriteIni(const char* section, const char* key, const char* value) {
@@ -377,59 +518,100 @@ void MenuSound(char* opt) {
 	((void(__fastcall*)(char*, void*, int))(*(void***)opt)[0x54 / 4])(opt, nullptr, 0);
 }
 
+// The wait for a button / key: g_binding the mod row, or 100 + a game row
+// (player 2's view). The pad read is the physical one (player 2's layout is
+// what is being set); Start never (joining / leaving).
+void StartBinding(char* opt, int what) {
+	g_binding = what;
+	int p = g_view ? CoopP2Pad() : RumblePad(0);
+	g_bindPrev = p >= 0 ? (g_view ? PadsRawButtons(p) : PadGet(p).buttons) : 0xFFFF;
+	for (int vk = 0; vk < 256; vk++) g_keysPrev[vk] = (GetAsyncKeyState(vk) & 0x8000) != 0;
+	Log("ctrlopts: player %d's %s %d waits for a %s", g_view + 1, what >= 100 ? "game row" : "row", what >= 100 ? what - 100 : what,
+	    OnPad(opt) ? "button" : "key");
+}
+
 // Left (-1), right (+1) or confirm (0) on row `i`.
 void ChangeRow(char* opt, int i, int dir) {
 	switch (kRows[i].kind) {
 	case RK_TOGGLE: {
-		bool& v = i == R_INVX ? g_config.invertCamX : g_config.invertCamY;
+		bool& v = Toggle(i);
 		v = !v;
-		WriteIni("controls", i == R_INVX ? "invert_camera_x" : "invert_camera_y", v ? "on" : "off");
-		Log("ctrlopts: %ls %s", kRows[i].name, v ? "on" : "off");
+		const char* key = i == R_INVX ? (g_view ? "p2_invert_camera_x" : "invert_camera_x") : (g_view ? "p2_invert_camera_y" : "invert_camera_y");
+		WriteIni("controls", key, v ? "on" : "off");
+		Log("ctrlopts: %s %s", key, v ? "on" : "off");
 		break;
 	}
 	case RK_NUMBER: {
 		if (!dir) return;
-		float v = g_config.p1Deadzone + 0.02f * dir;
+		float& dz = g_view ? g_config.deadzone : g_config.p1Deadzone;
+		float v = dz + 0.02f * dir;
 		v = v < 0.0f ? 0.0f : v > 0.9f ? 0.9f : v;
 		v = floorf(v * 50.0f + 0.5f) / 50.0f;
-		if (v == g_config.p1Deadzone) return;
-		g_config.p1Deadzone = v;
+		if (v == dz) return;
+		dz = v;
 		char b[16];
 		snprintf(b, sizeof(b), "%.2f", v);
-		WriteIni("controls", "p1_deadzone", b);
-		Log("ctrlopts: %ls %s", kRows[i].name, b);
+		if (g_view) WriteIni("coop", "deadzone", b); else WriteIni("controls", "p1_deadzone", b);
+		Log("ctrlopts: player %d's deadzone %s", g_view + 1, b);
 		break;
 	}
-	case RK_BIND: {
+	case RK_BIND:
 		if (dir) return;
-		g_binding = i;
-		int p = RumblePad(0);
-		g_bindPrev = p >= 0 ? PadGet(p).buttons : 0xFFFF;
-		for (int vk = 0; vk < 256; vk++) g_keysPrev[vk] = (GetAsyncKeyState(vk) & 0x8000) != 0;
-		Log("ctrlopts: %ls waits for a %s", kRows[i].name, OnPad(opt) ? "button" : "key");
+		StartBinding(opt, i);
 		break;
-	}
 	}
 	MenuSound(opt);
 	ShowRow(opt, i);
 }
 
+// Player 2's pad action `b` on `bit`: an action already on it takes the old one.
+void SetP2Pad(int b, uint16_t bit) {
+	uint16_t old = g_config.p2Pad[b];
+	for (int k = 0; k < C::P2B_COUNT; k++)
+		if (k != b && g_config.p2Pad[k] == bit) {
+			g_config.p2Pad[k] = old;
+			WriteIni("p2_pad", C::kP2PadNames[k], PadButtonName(old));
+		}
+	g_config.p2Pad[b] = bit;
+	WriteIni("p2_pad", C::kP2PadNames[b], PadButtonName(bit));
+	Log("ctrlopts: player 2's %s -> %s", C::kP2PadNames[b], PadButtonName(bit));
+}
+// Player 2's key `k` on `vk`: a key already on it takes the old one.
+void SetP2Key(int k, int vk) {
+	int old = g_config.keys[k];
+	char b[16];
+	for (int j = 0; j < C::KEY_COUNT; j++)
+		if (j != k && g_config.keys[j] == vk) {
+			g_config.keys[j] = old;
+			KeyIniName(old, b, sizeof(b));
+			WriteIni("keyboard", C::kKeyNames[j], b);
+		}
+	g_config.keys[k] = vk;
+	KeyIniName(vk, b, sizeof(b));
+	WriteIni("keyboard", C::kKeyNames[k], b);
+	Log("ctrlopts: player 2's key %s -> %s", C::kKeyNames[k], b);
+}
+
 // The wait for a button or key: the first new press after it began.
 void BindFrame(char* opt) {
 	if (g_binding < 0) return;
-	int i = g_binding;
+	int what = g_binding;
 	bool done = false;
 	if (OnPad(opt)) {
-		int p = RumblePad(0);
-		uint16_t now = p >= 0 ? PadGet(p).buttons : 0;
-		uint16_t fresh = (uint16_t)(now & ~g_bindPrev);
+		int p = g_view ? CoopP2Pad() : RumblePad(0);
+		uint16_t now = p >= 0 ? (g_view ? PadsRawButtons(p) : PadGet(p).buttons) : 0;
+		uint16_t fresh = (uint16_t)(now & ~g_bindPrev & ~PAD_START);
 		g_bindPrev &= now;   // released buttons count again
 		if (fresh & PAD_B) done = true;   // B: keep the old one
 		else if (fresh) {
 			uint16_t bit = (uint16_t)(fresh & (0x10000 - fresh));
-			g_config.spSwitchButton = bit;
-			WriteIni("single_player", "sp_hero_switch_button", PadButtonName(bit));
-			Log("ctrlopts: %ls -> %s", kRows[i].name, PadButtonName(bit));
+			if (!g_view) {
+				g_config.spSwitchButton = bit;
+				WriteIni("single_player", "sp_hero_switch_button", PadButtonName(bit));
+				Log("ctrlopts: player 1's Switch hero -> %s", PadButtonName(bit));
+			} else {
+				SetP2Pad(what >= 100 ? kP2PadOf[what - 100] : C::P2B_SWITCH, bit);
+			}
 			done = true;
 		}
 	} else {
@@ -440,11 +622,15 @@ void BindFrame(char* opt) {
 			g_keysPrev[vk] = down;
 			if (!fresh) continue;
 			if (vk != VK_ESCAPE) {
-				g_config.spSwitchKey = vk;
-				char b[16];
-				KeyIniName(vk, b, sizeof(b));
-				WriteIni("single_player", "sp_hero_switch_key", b);
-				Log("ctrlopts: %ls -> key %s", kRows[i].name, b);
+				if (!g_view) {
+					g_config.spSwitchKey = vk;
+					char b[16];
+					KeyIniName(vk, b, sizeof(b));
+					WriteIni("single_player", "sp_hero_switch_key", b);
+					Log("ctrlopts: player 1's Switch hero -> key %s", b);
+				} else {
+					SetP2Key(what >= 100 ? kP2KeyOf[what - 100] : C::KEY_SWITCH, vk);
+				}
 			}
 			done = true;
 		}
@@ -453,7 +639,8 @@ void BindFrame(char* opt) {
 	if (!done) return;
 	g_binding = -1;
 	MenuSound(opt);
-	ShowRow(opt, i);
+	ShowRows(opt);
+	HintsRefreshTexts();   // the labels' icons
 }
 
 // Page 3 with the mod's rows: copies of the Vibration label and value, linked
@@ -491,6 +678,8 @@ void PutIn(char* opt) {
 	g_page = page;
 	g_page4 = false;
 	g_binding = -1;
+	g_view = CoopP2Joined() ? CtrlOptsMenuOwner() : 0;
+	g_p2Dev = CoopP2Pad() == kKeyboardPad ? 1 : 0;
 	char* afterLabel = vibLabel;
 	char* afterValue = vibValue;
 	for (int i = 0; i < kNumRows; i++) {
@@ -527,7 +716,10 @@ void PutIn(char* opt) {
 	for (char* c = *(char**)(values + 4); c && top >= 0.0f; c = *(char**)(c + 0x10))
 		if (*(uintptr_t*)c == kVtText) *(float*)(c + 0x18) = IsPage4(c) ? top - kPage4Step * v4++ : top - kPage3Step * v3++;
 	SetLoc(kLocPageCur, *(int*)(opt + 0x20C) + 1);   // the counter's text again, with 4 pages
-	Log("ctrlopts: the mod's rows put in the controls (page 3: %d rows, page 4: %d, from %.3f)", n3, n4, top);
+	BarIn(opt);
+	HintsRefreshTexts();
+	Log("ctrlopts: the mod's rows put in the controls (player %d's; page 3: %d rows, page 4: %d, from %.3f)", g_view + 1, n3, n4,
+	    top);
 }
 
 // Page 4 in or out, the counter with it.
@@ -551,6 +743,28 @@ int __fastcall CtrlPageHook(char* opt, void* edx, uint32_t arg) {
 	int page = *(int*)(opt + 0x20C);
 	char* pageButtonNow = page >= 0 && page < 3 ? *(char**)(opt + 0x1D0 + page * 4) : nullptr;
 	bool onPageButton = pageButtonNow && (pageButtonNow[5] & 4);
+	// Player 2's view: its Current Configuration (the game's is player 1's) and
+	// its game rows' rebinding, not the game's.
+	if (g_view == 1 && (left || right || confirm)) {
+		char* cfgButton = *(char**)(opt + 0x1F0);
+		if (cfgButton && (cfgButton[5] & 4)) {
+			g_p2Dev ^= 1;
+			*(uint32_t*)(opt + 0x21C) = 1;
+			MenuSound(opt);
+			ShowRows(opt);
+			HintsRefreshTexts();
+			Log("ctrlopts: player 2's controls: the %s", g_p2Dev ? "keyboard" : "controller");
+			left = right = confirm = false;
+		}
+		for (int i = 0; i < kGameRows && confirm; i++) {
+			char* l = *(char**)(opt + 0x10C + i * 4);
+			if (!l || !(l[5] & 4)) continue;
+			*(uint32_t*)(opt + 0x21C) = 1;   // not the game's wait for player 1's key
+			bool can = g_p2Dev ? kP2KeyOf[i] >= 0 : kP2PadOf[i] >= 0;
+			if (can) { MenuSound(opt); StartBinding(opt, 100 + i); }
+			confirm = false;
+		}
+	}
 	// The page button: 3 -> 4 -> 1 rightwards, 1 -> 4 -> 3 leftwards.
 	bool toPage4After = false;
 	if (onPageButton && page == 2 && !g_page4 && right) { SetPage4(opt, true); *(uint32_t*)(opt + 0x21C) = 1; }
@@ -564,6 +778,7 @@ int __fastcall CtrlPageHook(char* opt, void* edx, uint32_t arg) {
 	// The game shows a page's every child when it goes to it: keep page 3's or page 4's.
 	if (*(int*)(opt + 0x20C) == 2) ShowPage(g_page4);
 	else g_page4 = false;
+	P2Values(opt);
 	if (focused >= 0 && (g_label[focused][5] & 4) && (left || right || confirm))
 		ChangeRow(opt, focused, left ? -1 : right ? 1 : 0);
 	return r;
@@ -684,6 +899,8 @@ void CtrlOptsMenuAsk(int player) {
 	Log("ctrlopts: player %d asks for the pause menu", player + 1);
 }
 int CtrlOptsMenuOwner() { return g_menuOwner; }
+int CtrlOptsP2Device() { return g_page && g_view == 1 ? g_p2Dev : -1; }
+bool CtrlOptsGamePaused() { return GamePaused(); }
 
 const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s) {
 	static const wchar_t kVar[] = L"%CtrlPage_Nb%";
@@ -695,8 +912,8 @@ const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s) {
 	return buf;
 }
 
-float CtrlOptsCamX() { return g_config.invertCamX ? -1.0f : 1.0f; }
-float CtrlOptsCamY() { return g_config.invertCamY ? -1.0f : 1.0f; }
+float CtrlOptsCamX(int player) { return (player ? g_config.p2InvertCamX : g_config.invertCamX) ? -1.0f : 1.0f; }
+float CtrlOptsCamY(int player) { return (player ? g_config.p2InvertCamY : g_config.invertCamY) ? -1.0f : 1.0f; }
 
 void CtrlOptsFrame() {
 	InvertFrame();

@@ -22,6 +22,8 @@ bool CtrlOptsInstallHooks();
 void CtrlOptsMenuAsk(int player);
 // Whose the pause menu is (0 player 1, 1 player 2: it opened it in co-op).
 int CtrlOptsMenuOwner();
+// The game in its pause menu (or a page under it).
+bool CtrlOptsGamePaused();
 // Once per frame, right after the game's input update: the camera actions
 // swapped, the rumble's motors, the rows taken out when the controls are gone.
 void CtrlOptsFrame();
@@ -29,5 +31,10 @@ void CtrlOptsFrame();
 // The localised string `id` as the controls show it: the page counter's
 // ("Page %CtrlPage_Cur%/%CtrlPage_Nb%", 0x390) with 4 pages while the mod's rows are in.
 const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s);
-float CtrlOptsCamX();
-float CtrlOptsCamY();
+// -1 when that camera axis is inverted for player `player` (0, 1), else 1
+// (the mod's own cameras, player 2's stick).
+float CtrlOptsCamX(int player);
+float CtrlOptsCamY(int player);
+// The controls' view of player 2's configuration while player 2's controls
+// are up: 1 the keyboard, 0 the controller; -1 otherwise.
+int CtrlOptsP2Device();
