@@ -4869,3 +4869,15 @@ both halves).
   player 2's hero's hits not routed). Autotests: ctrlicons (page 3 up into the rows, Y on by right, X on by confirm,
   Vibration toggled, both back off, cancel -> "taken out"), rumble (S_RUMBLE: motor 0 200 for 0.6 s, motor 1 120
   for 0.3 s -> "pad 0 motors 51400 / 30840", off on time; user felt it).
+- Round 261 (Nov 13, commit 5b316d6; user: round 260 confirmed -- invert and vibration work; route player 2's hero's
+  rumble to player 2's pad). The game rumbles pad 0 only (FUN_00437E60/EA0/EE0 with pad 0). Callers: Asterix life
+  FUN_004A4090 (states 0/1/4/7/8/9) and FUN_004A3EF0 (vf19 / InitOnce, off), Obelix life FUN_004A7430 and
+  FUN_004A72A0 (the same); the trio CKGrpTrioLife FUN_0047DE80 (potion start: gm +0x40 +0x9C > 0, motor 1 255 for
+  0.3 s) / FUN_00480290 (on and off) / FUN_0047FA90; machine gun FUN_004C6130 (via FUN_004C51F0), boat FUN_004F8CC0
+  / FUN_004FCC40 path, mobile tower FUN_004E8DD0, FUN_004F1C50. ctrlopts.cpp: the caller's return address in a
+  hero life's range -> that hero's player, else the leader's player (single player: player 1); motors kept per
+  player; off clears both players' motor; player 2's pad = CoopP2Pad() (XInput only); player 1's pad before
+  identification = the first connected pad that is not player 2's (it was none in co-op). Autotest rumble2 (player
+  2 on virtual pad 2; S_RUMBLE with Asterix leading -> "player 1's pad 0 motors 51400 / 0", after trio 4801
+  Obelix leading -> "player 2's pad 1 motors 0 / 38550", both off on time; the virtual pad is not told). The hero
+  life ranges are not exercised by the autotest (its calls come from the asi): pad test with a second pad pending.
