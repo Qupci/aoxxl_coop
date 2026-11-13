@@ -450,14 +450,75 @@ void KeyLabel(int vk, wchar_t* out, int n) {
 	case VK_RIGHT: wcscpy(out, L"\x2192"); return;
 	case VK_BACK:  wcscpy(out, L"Bksp"); return;
 	case VK_RETURN: wcscpy(out, L"Enter"); return;
+	case VK_LSHIFT: wcscpy(out, L"L Shift"); return;
+	case VK_RSHIFT: wcscpy(out, L"R Shift"); return;
+	case VK_LCONTROL: wcscpy(out, L"L Ctrl"); return;
+	case VK_RCONTROL: wcscpy(out, L"R Ctrl"); return;
+	case VK_LMENU: wcscpy(out, L"L Alt"); return;
+	case VK_RMENU: wcscpy(out, L"R Alt"); return;
 	}
 	IconsKeyName(vk, out, n);
 }
 
-// A keycap: key.png (one character) or key_wide.png with the key's name on it.
-// Unpressed (a combo hint's button not pressed yet): key_unpressed.png /
-// key_wide_unpressed.png, else the pressed template darkened, and a grey name.
-wchar_t AddKeycap(int vk, bool unpressed) {
+// The designer's keycap of a key in coop_icons\kb (the Figma export's names:
+// "/" came out as key_.png, "\" in a folder key_, "*" as key__.png), plain and
+// pressed; null when it has none.
+struct KbCap { int vk; const char* plain; const char* pressed; };
+const KbCap kKbOdd[] = {
+	{ VK_OEM_2, "key_.png", "key_\\_press-1.png" },  { VK_DIVIDE, "key_.png", "key_\\_press-1.png" },
+	{ VK_OEM_5, "key_\\_.png", "key_\\_press.png" }, { VK_OEM_102, "key_\\_.png", "key_\\_press.png" },
+	{ VK_MULTIPLY, "key__.png", "key___press.png" },
+};
+const char* KbName(int vk) {
+	static char buf[16];
+	if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) { snprintf(buf, sizeof(buf), "key_%c", tolower(vk)); return buf; }
+	if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) { snprintf(buf, sizeof(buf), "key_%d", vk - VK_NUMPAD0); return buf; }
+	if (vk >= VK_F1 && vk <= VK_F12) { snprintf(buf, sizeof(buf), "key_F%d", vk - VK_F1 + 1); return buf; }
+	switch (vk) {
+	case VK_UP: return "arrow_up";          case VK_DOWN: return "arrow_down";
+	case VK_LEFT: return "arrow_left";      case VK_RIGHT: return "arrow_right";
+	case VK_SPACE: return "key_space";      case VK_RETURN: return "key_enter";
+	case VK_ESCAPE: return "key_esc";       case VK_TAB: return "key_tab";
+	case VK_BACK: return "key_bksp";        case VK_CAPITAL: return "key_caps";
+	case VK_DELETE: return "key_del";       case VK_INSERT: return "key_insert";
+	case VK_HOME: return "key_home";        case VK_END: return "key_end";
+	case VK_PRIOR: return "key_pgup";       case VK_NEXT: return "key_pgdn";
+	case VK_PAUSE: return "key_pausebreak"; case VK_SNAPSHOT: return "key_printscreen";
+	case VK_SCROLL: return "key_scrolllock";
+	case VK_LSHIFT: return "key_lshift";    case VK_RSHIFT: return "key_rshift";
+	case VK_LCONTROL: return "key_lctrl";   case VK_RCONTROL: return "key_rctrl";
+	case VK_LMENU: return "key_lalt";       case VK_RMENU: return "key_ralt";
+	case VK_LWIN: case VK_RWIN: return "key_win";
+	case VK_OEM_7: return "key_'";          case VK_OEM_COMMA: return "key_,";
+	case VK_OEM_MINUS: case VK_SUBTRACT: return "key_-";
+	case VK_OEM_PERIOD: case VK_DECIMAL: return "key_.";
+	case VK_OEM_1: return "key_;";          case VK_OEM_PLUS: return "key_=";
+	case VK_ADD: return "key_+";            case VK_OEM_4: return "key_[";
+	case VK_OEM_6: return "key_]";          case VK_OEM_3: return "key_`";
+	}
+	return nullptr;
+}
+wchar_t AddKbPng(int vk, bool pressed) {
+	char file[64];
+	file[0] = 0;
+	for (const KbCap& k : kKbOdd)
+		if (k.vk == vk) snprintf(file, sizeof(file), "kb\\%s", pressed ? k.pressed : k.plain);
+	const char* name = file[0] ? nullptr : KbName(vk);
+	if (name) snprintf(file, sizeof(file), "kb\\%s%s.png", name, pressed ? "_press" : "");
+	if (!file[0]) return 0;
+	wchar_t path[MAX_PATH];
+	IconsDir(path, MAX_PATH, file);
+	if (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES) return 0;
+	return AddPng(path);
+}
+
+// A keycap: coop_icons\kb's, else key.png (one character) or key_wide.png with
+// the key's name on it. Pressed (a combo hint's button done, a held key):
+// kb's *_press.png; drawn, key_unpressed.png / key_wide_unpressed.png, else the
+// plain template darkened, and a grey name.
+wchar_t AddKeycap(int vk, int look) {
+	bool unpressed = look == ICON_PRESSED;
+	if (wchar_t g = AddKbPng(vk, unpressed)) return g;
 	wchar_t label[32];
 	KeyLabel(vk, label, 32);
 	bool wide = wcslen(label) > 1 && !(label[0] >= 0x2190 && label[0] <= 0x2193);
@@ -530,8 +591,10 @@ const char* PadByteName(int off) {
 	static const char* const kButtons[10] = { "pad_a", "pad_b", "pad_x", "pad_y", "pad_lb", "pad_rb",
 	                                          "pad_back", "pad_start", "pad_l3", "pad_r3" };
 	static const char* const kLs[4] = { "ls_up", "ls_down", "ls_left", "ls_right" };
+	static const char* const kRs[4] = { "rs_up", "rs_down", "rs_left", "rs_right" };
 	static const char* const kDpad[4] = { "dpad_up", "dpad_down", "dpad_left", "dpad_right" };
 	if (off >= 6 && off <= 9) return kLs[off - 6];
+	if (off >= 10 && off <= 13) return kRs[off - 10];
 	if (off >= 14 && off <= 23) return kButtons[off - 14];
 	if (off >= 26 && off <= 29) return kDpad[off - 26];
 	return nullptr;
@@ -551,12 +614,28 @@ void MapKeyboard(char* kb) {
 	typedef void(__fastcall* KeyFn)(char* dev, void* edx, uint32_t vk, uint32_t lparam, uint32_t down);
 	KeyFn key = (KeyFn)(*(void***)kb)[5];
 	for (uint32_t vk = 1; vk < 255; vk++) {
+		// The device files a key by the scan code in the message's lparam (bits
+		// 16-23, 24 extended): F at 0xB5 = DIK_F 0x21 + 0x94. Without it every
+		// key landed on one byte and no key had a cap.
+		UINT sc = MapVirtualKeyW(vk, 0 /* MAPVK_VK_TO_VSC */);
+		if (!sc) continue;
+		uint32_t lp = 1 | sc << 16;
+		if (vk == VK_LEFT || vk == VK_RIGHT || vk == VK_UP || vk == VK_DOWN || vk == VK_PRIOR || vk == VK_NEXT ||
+		    vk == VK_HOME || vk == VK_END || vk == VK_INSERT || vk == VK_DELETE || vk == VK_DIVIDE || vk == VK_RCONTROL ||
+		    vk == VK_RMENU || vk == VK_NUMLOCK || vk == VK_LWIN || vk == VK_RWIN)
+			lp |= 1u << 24;
 		memcpy(saved, kb, sizeof(saved));
-		key(kb, nullptr, vk, 0, 1);
+		key(kb, nullptr, vk, lp, 1);
 		for (int i = 4; i < 0x3FC; i++)   // past the vtable
 			if (kb[i] != (char)saved[i] && !g_vkOfByte[i]) { g_vkOfByte[i] = (uint8_t)vk; break; }
 		memcpy(kb, saved, sizeof(saved));
 	}
+	int n = 0;
+	for (int i = 0; i < 0x400; i++) n += g_vkOfByte[i] != 0;
+	Log("icons: keyboard mapped, %d keys (Space at byte %X, F at %X, Up at %X)", n,
+	    [] { for (int i = 0; i < 0x400; i++) if (g_vkOfByte[i] == VK_SPACE) return i; return -1; }(),
+	    [] { for (int i = 0; i < 0x400; i++) if (g_vkOfByte[i] == 'F') return i; return -1; }(),
+	    [] { for (int i = 0; i < 0x400; i++) if (g_vkOfByte[i] == VK_UP) return i; return -1; }());
 }
 
 // The game's action icons and the CKInput actions they stand for.
@@ -580,35 +659,89 @@ int ActionOfIcon(wchar_t c) {
 }
 bool IsDirIcon(wchar_t c) { return c >= 0xE005 && c <= 0xE008; }
 
-// Which stick (or D-pad) a player moves with: "ls", "dpad", or null (keys).
-const char* MoveStick(int player) {
-	if (player == 1) return CoopP2Pad() == kKeyboardPad || getenv("XXL_ICONP2KB") ? nullptr : "ls";
-	int off;
-	if (P1Source(0, &off) != 1) return nullptr;
-	return off >= 26 && off <= 29 ? "dpad" : "ls";
+// The CKInput actions of a kind of directions, up / down / left / right.
+const int kDirActions[3][4] = { { 0, 1, 2, 3 }, { 16, 17, 18, 19 }, { 47, 46, 48, 49 } };
+
+// Where a player's `dirs` directions are: "ls", "rs", "dpad" (all four on that
+// stick or the D-pad, `bound` the direction 0-3 each is on there), "kb" (all on
+// keys), else "is" (a mix: the general icons). Player 2 moves with the left
+// stick or its keys; its menus and camera are not its own (the D-pad's, the
+// right stick's on a pad, the general icons on the keyboard).
+const char* DirDevice(int player, int dirs, int bound[4]) {
+	for (int d = 0; d < 4; d++) bound[d] = d;
+	if (player == 1) {
+		bool kb = CoopP2Pad() == kKeyboardPad || getenv("XXL_ICONP2KB");
+		if (dirs == DIRS_MOVE) return kb ? "kb" : "ls";
+		return kb ? "is" : dirs == DIRS_CAMERA ? "rs" : "dpad";
+	}
+	static const char* const kPads[3] = { "ls", "rs", "dpad" };
+	static const int kFirst[3] = { 6, 10, 26 };   // each one's up byte (up, down, left, right)
+	int dev = -1, keys = 0;
+	for (int d = 0; d < 4; d++) {
+		int off, src = P1Source(kDirActions[dirs][d], &off);
+		if (src == 2) { keys++; continue; }
+		int k = -1;
+		for (int i = 0; i < 3; i++) if (src == 1 && off >= kFirst[i] && off < kFirst[i] + 4) k = i;
+		if (k < 0 || (dev >= 0 && k != dev)) return "is";
+		dev = k;
+		bound[d] = off - kFirst[k];
+	}
+	if (keys == 4) return "kb";
+	return keys || dev < 0 ? "is" : kPads[dev];
 }
 
 // One player's icons for a run of direction icons ("[Left] [Right]",
 // "[Up] - [Down]"): one glyph for the pair or all four on a stick, else one
 // per direction.
-std::wstring DirRun(int player, const wchar_t* run, size_t n) {
-	unsigned mask = 0;
-	for (size_t i = 0; i < n; i++) if (IsDirIcon(run[i])) mask |= 1u << ActionOfIcon(run[i]);
-	const char* stick = MoveStick(player);
-	const char* set = mask == 3 ? "updown" : mask == 12 ? "leftright" : mask == 15 ? "all" : nullptr;
+std::wstring DirRun(int player, int dirs, const wchar_t* run, size_t n) {
 	static const char* const kOne[4] = { "up", "down", "left", "right" };
+	int bound[4];
+	const char* dev = DirDevice(player, dirs, bound);
+	if (!strcmp(dev, "kb")) {   // each key's cap, side by side
+		std::wstring out;
+		for (size_t i = 0; i < n; i++) {
+			if (!IsDirIcon(run[i])) continue;
+			wchar_t g = IconActionGlyph(player, kDirActions[dirs][ActionOfIcon(run[i])]);
+			out += g ? g : run[i];
+		}
+		return out;
+	}
+	// The directions shown, as the stick's own (the binding's: "Camera up" may
+	// be the right stick's down).
+	unsigned mask = 0;
+	for (size_t i = 0; i < n; i++) if (IsDirIcon(run[i])) mask |= 1u << bound[ActionOfIcon(run[i])];
+	const char* set = mask == 3 ? "updown" : mask == 12 ? "leftright" : mask == 15 ? "all" : nullptr;
 	for (int d = 0; d < 4 && !set; d++) if (mask == 1u << d) set = kOne[d];
-	if (stick && set) {
-		wchar_t g = IconGlyph((std::string(stick) + "_" + set).c_str());
+	if (set) {
+		wchar_t g = IconGlyph((std::string(dev) + "_" + set).c_str());
 		if (g) return std::wstring(1, g);
 	}
 	std::wstring out;
 	for (size_t i = 0; i < n; i++) {
-		if (!IsDirIcon(run[i])) { if (!stick) continue; out += run[i]; continue; }
-		wchar_t g = IconActionGlyph(player, ActionOfIcon(run[i]));
+		if (!IsDirIcon(run[i])) { out += run[i]; continue; }
+		wchar_t g = IconGlyph((std::string(dev) + "_" + kOne[bound[ActionOfIcon(run[i])]]).c_str());
 		out += g ? g : run[i];
 	}
 	return out;
+}
+
+// `s` for the log: the mod's glyphs by name ("<pad_a>"), the game's icons '#'.
+void GlyphText(const wchar_t* s, char* out, size_t n) {
+	size_t o = 0;
+	for (; *s && o + 1 < n; s++) {
+		const char* name = nullptr;
+		for (const auto& kv : g_byName) if (kv.second == *s) name = kv.first.c_str();
+		for (const auto& kv : g_byVk)
+			if (kv.second == *s && !name) {
+				static char key[16];
+				snprintf(key, sizeof(key), "vk%02X%s", kv.first & 0xFF, kv.first & 0x100 ? "_press" : "");
+				name = key;
+			}
+		if (name) o += snprintf(out + o, n - o, "<%s>", name);
+		else out[o++] = *s < 128 ? (char)*s : *s >= 0xE000 && *s < 0xE200 ? '#' : '?';
+		if (o >= n) o = n - 1;
+	}
+	out[o] = 0;
 }
 
 std::wstring One(int player, wchar_t c) {
@@ -633,7 +766,9 @@ int IconsP1Vk(int action) {
 	InputManager im = GetInputManager();
 	char* kb = *(char**)(im.raw() + 0x0C);
 	if (!g_vkMapped) MapKeyboard(kb);
-	return g_vkOfByte[off];
+	// The bindings read the device's second block (+0x90: Space at 0xCD), the
+	// message handler writes the first (Space at 0x3D).
+	return off >= 0x90 && g_vkOfByte[off - 0x90] ? g_vkOfByte[off - 0x90] : g_vkOfByte[off];
 }
 
 wchar_t IconGlyph(const char* name) {
@@ -641,12 +776,12 @@ wchar_t IconGlyph(const char* name) {
 	return it == g_byName.end() || !g_texture ? 0 : it->second;
 }
 
-wchar_t IconKeyGlyph(int vk, bool unpressed) {
+wchar_t IconKeyGlyph(int vk, int look) {
 	if (vk <= 0 || vk > 255 || !g_texture || !g_atlas) return 0;
-	int key = vk | (unpressed ? 0x100 : 0);
+	int key = vk | (look == ICON_PRESSED ? 0x100 : 0);   // a key waiting is the plain one
 	auto it = g_byVk.find(key);
 	if (it != g_byVk.end()) return it->second;
-	wchar_t g = AddKeycap(vk, unpressed);
+	wchar_t g = AddKeycap(vk, look);
 	g_byVk[key] = g;
 	if (!g) return 0;
 	AddToFonts();
@@ -673,9 +808,9 @@ wchar_t IconGlowGlyph(int fade) {
 }
 
 namespace {
-// A pad icon's unpressed variant ("pad_a" -> "pad_a_unpressed"), else itself.
-wchar_t PadGlyph(const char* name, bool unpressed) {
-	if (unpressed) {
+// A pad icon's waiting variant ("pad_a" -> "pad_a_unpressed"), else itself.
+wchar_t PadGlyph(const char* name, int look) {
+	if (look == ICON_WAITING) {
 		wchar_t g = IconGlyph((std::string(name) + "_unpressed").c_str());
 		if (g) return g;
 	}
@@ -683,7 +818,7 @@ wchar_t PadGlyph(const char* name, bool unpressed) {
 }
 } // namespace
 
-wchar_t IconActionGlyph(int player, int action, bool unpressed) {
+wchar_t IconActionGlyph(int player, int action, int look) {
 	static bool kbTest = getenv("XXL_ICONP2KB") != nullptr;   // autotest: player 2's icons as on the keyboard
 	if (player == 1) {
 		if (CoopP2Pad() == kKeyboardPad || kbTest) {
@@ -698,7 +833,7 @@ wchar_t IconActionGlyph(int player, int action, bool unpressed) {
 			case 10: key = CoopConfig::KEY_RB; break;     case 15: key = CoopConfig::KEY_START; break;
 			default: return 0;
 			}
-			return IconKeyGlyph(g_config.keys[key], unpressed);
+			return IconKeyGlyph(g_config.keys[key], look);
 		}
 		const char* name;
 		switch (action) {
@@ -711,17 +846,17 @@ wchar_t IconActionGlyph(int player, int action, bool unpressed) {
 		case 10: name = "pad_rb"; break;  case 15: name = "pad_start"; break;
 		default: return 0;
 		}
-		return PadGlyph(name, unpressed);
+		return PadGlyph(name, look);
 	}
 	int off;
 	switch (P1Source(action, &off)) {
-	case 1: { const char* n = PadByteName(off); return n ? PadGlyph(n, unpressed) : 0; }
-	case 2: return IconKeyGlyph(IconsP1Vk(action), unpressed);
+	case 1: { const char* n = PadByteName(off); return n ? PadGlyph(n, look) : 0; }
+	case 2: return IconKeyGlyph(IconsP1Vk(action), look);
 	}
 	return 0;
 }
 
-const wchar_t* IconsRewrite(const wchar_t* s, int who) {
+const wchar_t* IconsRewrite(const wchar_t* s, int who, int dirs) {
 	if (!s || !g_texture) return s;
 	const wchar_t* c = s;
 	while (*c && !(*c >= 0xE000 && *c <= 0xE00F)) c++;
@@ -738,7 +873,7 @@ const wchar_t* IconsRewrite(const wchar_t* s, int who) {
 				if (!IsDirIcon(*k)) break;
 				e = ++k;
 			}
-			for (int p = 0; p < 2; p++) u[p] = DirRun(p, c, e - c);
+			for (int p = 0; p < 2; p++) u[p] = DirRun(p, dirs, c, e - c);
 			c = e;
 		} else {
 			for (int p = 0; p < 2; p++) u[p] = One(p, *c);
@@ -757,8 +892,26 @@ const wchar_t* IconsRewrite(const wchar_t* s, int who) {
 			g_logs++;
 			char a[160] = {}, b[160] = {};
 			for (int i = 0; s[i] && i < 159; i++) a[i] = s[i] < 128 ? (char)s[i] : s[i] >= 0xE000 && s[i] < 0xE200 ? '#' : '?';
-			for (int i = 0; out[i] && i < 159; i++) b[i] = out[i] < 128 ? (char)out[i] : out[i] >= 0xE000 && out[i] < 0xE200 ? '#' : '?';
+			GlyphText(out.c_str(), b, sizeof(b));
 			Log("icons: \"%s\" -> \"%s\" (for %s)", a, b, who < 0 ? "both" : who ? "player 2" : "player 1");
+		}
+	}
+	return it->second->c_str();
+}
+
+const wchar_t* IconsAppendAction(const wchar_t* s, int action) {
+	wchar_t g = s && g_texture ? IconActionGlyph(0, action) : 0;
+	if (!g) return s;
+	std::wstring out = std::wstring(s) + L" " + g;
+	static std::unordered_map<std::wstring, std::wstring*> kept;
+	auto it = kept.find(out);
+	if (it == kept.end()) {
+		it = kept.emplace(out, new std::wstring(out)).first;
+		if (g_logs < 40) {
+			g_logs++;
+			char b[160];
+			GlyphText(out.c_str(), b, sizeof(b));
+			Log("icons: action %d's icon after its row: \"%s\"", action, b);
 		}
 	}
 	return it->second->c_str();

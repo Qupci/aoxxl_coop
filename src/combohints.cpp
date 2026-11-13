@@ -215,7 +215,7 @@ int GateRomansLeft() {
 }
 
 // The hint's text: the combo's icon and what to do, then its buttons, those
-// pressed in order lit (the rest the unpressed icons).
+// pressed in order shown pressed (a pad's lit, a key's dark), the rest waiting.
 void Compose(wchar_t* out, int n, int p, int c, bool crowd, int lit, bool fuse) {
 	wchar_t icon = IconComboGlyph(c);
 	wchar_t ic[3] = { icon, (wchar_t)(icon ? L' ' : 0), 0 };
@@ -223,7 +223,7 @@ void Compose(wchar_t* out, int n, int p, int c, bool crowd, int lit, bool fuse) 
 	const Seq& s = kSeq[c];
 	for (int i = 0; i < s.n; i++) {
 		if (i) wcscat(keys, HintNext());
-		wcscat(keys, HintButtonName(p, s.b[i], i >= lit));
+		wcscat(keys, HintButtonName(p, s.b[i], i >= lit ? ICON_WAITING : ICON_PRESSED));
 	}
 	if (fuse) {
 		swprintf(out, n, L"%sTwister Fusion:\n%s fuses the tornadoes", ic, keys);

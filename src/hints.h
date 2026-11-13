@@ -14,6 +14,7 @@
 // place for its prompt too (the game's box left out) and its hints.
 
 #pragma once
+#include "icons.h"
 #include <windows.h>
 
 bool HintsInstallHooks();
@@ -67,9 +68,9 @@ enum HintKey {
 
 enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_Y, HB_RB, HB_COUNT };
 // The name of `b` on player `player`'s (0 = player 1, 1 = player 2) controller:
-// its icon (pad button, keycap; `unpressed`: the dimmed one), else the pad
-// button's or the key's name.
-const wchar_t* HintButtonName(int player, HintButton b, bool unpressed = false);
+// its icon (pad button, keycap; `look`: an IconLook, a combo's button waiting
+// or pressed), else the pad button's or the key's name.
+const wchar_t* HintButtonName(int player, HintButton b, int look = ICON_PLAIN);
 // A keyboard key's name ("Space", "K"), or its keycap icon.
 const wchar_t* HintKeyName(int vk);
 // " > " between a combo's buttons: the mod's chevron icon (the game's font has

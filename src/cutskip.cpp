@@ -71,7 +71,7 @@ char* SkippableScene() {
 void ShowPrompt(DWORD ms, float progress) {
 	wchar_t g1 = 0;
 	bool pressed = g.held || g.doneAt;
-	if (g.keyboard) g1 = IconKeyGlyph(VK_RETURN, !pressed);
+	if (g.keyboard) g1 = IconKeyGlyph(VK_RETURN, pressed ? ICON_PRESSED : ICON_WAITING);
 	else g1 = IconGlyph(pressed ? "pad_a" : "pad_a_unpressed");
 	if (!g1 && !g.keyboard && !pressed) g1 = IconGlyph("pad_a");
 	wchar_t text[64];

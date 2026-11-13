@@ -8166,6 +8166,41 @@ const Step kSpIcons33[] = {
 	{ 8000, S_POKE8, -3, 1, 0, 0, 0, "unpause" },
 	END(9000),
 };
+// ctrlicons (level 2, single player): the pause menu, its Options (down x2,
+// confirm), Controls (down x2, confirm) and the controls' three pages (right x2):
+// each direction row's icon from its own bindings' device (left stick, right
+// stick, D-pad, keys, else the general is_*), icons on Display/Hide Interface
+// and Centre Camera. Presses: up 16/32/52, down 17/33/53, right 19/35/55,
+// confirm 20/44/56 (interface / D-pad / message box).
+const Step kCtrlIcons[] = {
+	MARK(0, "ctrlicons"),
+	SHOT(2500, "ci_game"),
+	{ 3000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	SHOT(4500, "ci_pause"),
+	OPT_PRESS(5000, 17, 33, 53, "down"), OPT_PRESS(5600, 17, 33, 53, "down"),
+	OPT_PRESS(6200, 20, 44, 56, "confirm (options)"), SHOT(7500, "ci_options"),
+	OPT_PRESS(8000, 17, 33, 53, "down"), OPT_PRESS(8600, 17, 33, 53, "down"),
+	OPT_PRESS(9200, 20, 44, 56, "confirm (controls)"), SHOT(10500, "ci_page1"),
+	OPT_PRESS(11000, 19, 35, 55, "right"), SHOT(12500, "ci_page2"),
+	OPT_PRESS(13000, 19, 35, 55, "right"), SHOT(14500, "ci_page3"),
+	END(15500),
+};
+// ctrliconskb (XXL_PRESETNOPAD=1): the same on the game's keyboard layout
+// (controller preset 1): coop_icons\kb's keycaps.
+const Step kCtrlIconsKb[] = {
+	MARK(0, "ctrliconskb"),
+	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
+	SHOT(2500, "ci_game"),
+	{ 3000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	SHOT(4500, "ci_pause"),
+	OPT_PRESS(5000, 17, 33, 53, "down"), OPT_PRESS(5600, 17, 33, 53, "down"),
+	OPT_PRESS(6200, 20, 44, 56, "confirm (options)"), SHOT(7500, "ci_options"),
+	OPT_PRESS(8000, 17, 33, 53, "down"), OPT_PRESS(8600, 17, 33, 53, "down"),
+	OPT_PRESS(9200, 20, 44, 56, "confirm (controls)"), SHOT(10500, "ci_page1"),
+	OPT_PRESS(11000, 19, 35, 55, "right"), SHOT(12500, "ci_page2"),
+	OPT_PRESS(13000, 19, 35, 55, "right"), SHOT(14500, "ci_page3"),
+	END(15500),
+};
 // sppotion2 (level 2, XXL_SPISOLATION=0, XXL_OBELIXPOTION=1 / 0): single player, Obelix leading runs
 // without, then with the magic potion; with it, by a Roman for a while (hits).
 const Step kSpPotion2[] = {
@@ -9686,6 +9721,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("splever25", kSpLever25),
 	SCENARIO("spcombo2", kSpCombo2),
 	SCENARIO("spicons33", kSpIcons33),
+	SCENARIO("ctrlicons", kCtrlIcons),
+	SCENARIO("ctrliconskb", kCtrlIconsKb),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),
@@ -12901,7 +12938,7 @@ void RunStep(const Step& s) {
 			wchar_t keys[120] = {};
 			for (int i = 0; i < 4; i++) {
 				if (i) wcscat(keys, HintNext());
-				wcscat(keys, HintButtonName(p, seq[i], i >= (int)s.x));
+				wcscat(keys, HintButtonName(p, seq[i], i >= (int)s.x ? ICON_WAITING : ICON_PRESSED));
 			}
 			wchar_t ic = IconComboGlyph(2);
 			swprintf(text, 200, L"%c So many Romans: Twister!\n%s", ic ? ic : L' ', keys);

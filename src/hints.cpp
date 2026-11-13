@@ -68,9 +68,32 @@ int PlayerOfHero(int hero) { return hero == CoopP1Hero() ? 0 : 1; }
 const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (id >= kStringId && id < kStringId + kNumStrings) return g_strings[id - kStringId];
 	const wchar_t* s = g_origLocString(loc, edx, id);
+	static bool dumped = false;
+	if (!dumped && getenv("XXL_LOCDUMP")) {   // the strings with action icons, and the controls menu's rows
+		dumped = true;
+		unsigned n = *(unsigned*)((char*)loc + 0xD0);
+		for (unsigned i = 0; i < n && i < 0x4000; i++) {
+			const wchar_t* t = g_origLocString(loc, edx, i);
+			bool icon = false;
+			for (int k = 0; t && t[k] && k < 400; k++) icon |= t[k] >= 0xE000 && t[k] <= 0xE00F;
+			if (!t || !(icon || (i >= 0x380 && i < 0x3B0))) continue;
+			char a[200] = {};
+			int o = 0;
+			for (int k = 0; t[k] && o < 190; k++)
+				o += t[k] >= 0xE000 && t[k] <= 0xE0FF ? snprintf(a + o, 200 - o, "<%X>", t[k]) : (a[o] = t[k] < 128 ? (char)t[k] : '?', 1);
+			Log("locdump: %X \"%s\"", i, a);
+		}
+	}
 	if (!s) return s;
+	if (!CoopP2Joined() && !g_config.spCoopIcons) return s;
+	// The controls menu's rows: Up..Right are the hero's moves, the Camera ones
+	// the camera's; every other string's directions are the menus'. Display/Hide
+	// Interface (action 15) and Centre Camera (50) get their button too.
+	int dirs = id >= 0x391 && id <= 0x394 ? DIRS_MOVE : id >= 0x3A3 && id <= 0x3A6 ? DIRS_CAMERA : DIRS_INTERFACE;
+	if (id == 0x39C) return IconsAppendAction(s, 15);
+	if (id == 0x3A9) return IconsAppendAction(s, 50);
 	// Single player ([single_player] sp_coop_icons): every text player 1's.
-	if (!CoopP2Joined()) return g_config.spCoopIcons ? IconsRewrite(s, 0) : s;
+	if (!CoopP2Joined()) return IconsRewrite(s, 0, dirs);
 	void** ra = (void**)_AddressOfReturnAddress();
 	uintptr_t from = (uintptr_t)ra[0];
 	if (from == kTextSetReturn) from = (uintptr_t)ra[4];
@@ -87,7 +110,7 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	if (!prompt && shopper < 0 && In(from, 0x46E940, 0x46ECF0))   // CKSekens vf17-vf21
 		who = -1;
 	static int logs = 0;
-	if (getenv("XXL_ICONLOG") && logs < 60 && IconsRewrite(s, who) != s) {
+	if (getenv("XXL_ICONLOG") && logs < 60 && IconsRewrite(s, who, dirs) != s) {
 		static uint64_t seen[60];
 		uint64_t key = (uint64_t)id << 32 | from ^ (uint32_t)(who + 1) << 30 ^ (uint32_t)paused << 29;
 		bool known = false;
@@ -98,7 +121,7 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 			    who < 0 ? "both" : who ? "player 2" : "player 1");
 		}
 	}
-	return IconsRewrite(s, who);
+	return IconsRewrite(s, who, dirs);
 }
 
 // The localisation manager: the text object's layout (+0x20) keeps it at +4.
@@ -827,11 +850,11 @@ void __fastcall InterfaceTickHook(char* self, void* edx, void* time) {
 
 } // namespace
 
-const wchar_t* HintButtonName(int player, HintButton b, bool unpressed) {
+const wchar_t* HintButtonName(int player, HintButton b, int look) {
 	static const wchar_t* const kPad[HB_COUNT] = { L"A", L"X", L"LB", L"Start", L"Back", L"B", L"Y", L"RB" };
-	static wchar_t buf[HB_COUNT][2][2][32];
-	if (b < 0 || b >= HB_COUNT) return L"?";
-	wchar_t* out = buf[b][player == 1][unpressed];
+	static wchar_t buf[HB_COUNT][2][3][32];
+	if (b < 0 || b >= HB_COUNT || look < 0 || look > ICON_PRESSED) return L"?";
+	wchar_t* out = buf[b][player == 1][look];
 	wchar_t g = 0;
 	int vk = 0;
 	if (player == 1) {
@@ -841,14 +864,14 @@ const wchar_t* HintButtonName(int player, HintButton b, bool unpressed) {
 		static const int kAction[HB_COUNT] = { 4, 5, 8, 15, -1, 6, 7, 10 };
 		if (CoopP2Pad() != kKeyboardPad && !getenv("XXL_ICONP2KB")) {
 			static const char* const kPadIcon[HB_COUNT] = { "pad_a", "pad_x", "pad_lb", "pad_start", "pad_back", "pad_b", "pad_y", "pad_rb" };
-			g = kAction[b] >= 0 ? IconActionGlyph(1, kAction[b], unpressed) : IconGlyph(kPadIcon[b]);
+			g = kAction[b] >= 0 ? IconActionGlyph(1, kAction[b], look) : IconGlyph(kPadIcon[b]);
 		} else {
-			g = IconKeyGlyph(vk = g_config.keys[kKey[b]], unpressed);
+			g = IconKeyGlyph(vk = g_config.keys[kKey[b]], look);
 		}
 	} else {
 		// Player 1: the device the game's binding for that button reads.
 		static const int kAction[HB_COUNT] = { 4, 5, 8, 15, 12, 6, 7, 10 };
-		g = IconActionGlyph(0, kAction[b], unpressed);
+		g = IconActionGlyph(0, kAction[b], look);
 		if (!g) vk = IconsP1Vk(kAction[b]);
 	}
 	if (g) { out[0] = g; out[1] = 0; return out; }
@@ -1011,7 +1034,8 @@ void HintsFrame() {
 	// a loc variable changes: CManager2d FUN_0042A220, thiscall(3, 0), ret 8 --
 	// the merchant's opening did, with whoever's buttons were due then). When
 	// whose buttons are due changes (player 2 in or out, the pause menu, a
-	// shopper), all texts are refreshed the same way.
+	// shopper) or player 1's controls do (the controller preset, CKInput +0x64:
+	// keyboard or pad), all texts are refreshed the same way.
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
@@ -1019,6 +1043,8 @@ void HintsFrame() {
 	bool paused = (*(uint8_t*)(gm + 0xCC) & 3) == 2;
 	int ctx = !CoopP2Joined() ? 0 : 1 | (paused ? 2 : 0) | (paused ? 0 : (CoopShopper() + 1) << 2) |
 	          (CoopP2Pad() == kKeyboardPad ? 0x10 : 0);
+	InputManager im = GetInputManager();
+	if (im) ctx |= (*(uint8_t*)(im.raw() + 0x64) + 1) << 8;
 	static int lastCtx = 0;
 	if (ctx == lastCtx) return;
 	lastCtx = ctx;
