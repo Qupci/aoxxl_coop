@@ -8210,6 +8210,19 @@ const Step kRumble[] = {
 	{ 5500, S_RUMBLE, 0, 255, 0, 0.5f, 0, "motor 0 (vibration back off: nothing)" },
 	END(7000),
 };
+// rumble2 (level 2): player 2 joins on virtual pad 2; the game's rumble with
+// Asterix (player 1's) leading goes to player 1's pad, with Obelix (player 2's)
+// leading to player 2's (the virtual pad is only logged, not told).
+const Step kRumble2[] = {
+	MARK(0, "rumble2"),
+	VPAD(2000, 1, PAD_START, 0, 0, "p2 start"), VPAD(2200, 1, 0, 0, 0, "p2 release"),
+	{ 4000, S_RUMBLE, 0, -1, 0, 1.0f, 0, "vibration on" },
+	{ 4500, S_RUMBLE, 0, 200, 0, 0.5f, 0, "motor 0 (asterix leads: player 1)" },
+	{ 6000, S_TRIOEV, 0x4801, 0, 0, 0, 0, "obelix leads" },
+	{ 7000, S_RUMBLE, 1, 150, 0, 0.5f, 0, "motor 1 (obelix leads: player 2)" },
+	{ 8500, S_RUMBLE, 0, -1, 0, 0.0f, 0, "vibration back" },
+	END(9500),
+};
 const Step kCtrlIconsKb[] = {
 	MARK(0, "ctrliconskb"),
 	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
@@ -9747,6 +9760,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("ctrlicons", kCtrlIcons),
 	SCENARIO("ctrliconskb", kCtrlIconsKb),
 	SCENARIO("rumble", kRumble),
+	SCENARIO("rumble2", kRumble2),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),

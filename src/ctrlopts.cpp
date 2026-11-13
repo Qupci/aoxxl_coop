@@ -8,6 +8,9 @@
 #include "log.h"
 #include "p2cam.h"
 #include "pads.h"
+#include "trio.h"
+
+#include <intrin.h>
 
 #include <windows.h>
 #include <cstring>
@@ -34,22 +37,45 @@ MotorOffFn   g_origMotorOff = nullptr;
 HasRumbleFn  g_origHasRumble = nullptr;
 
 struct Motor { uint8_t strength; bool timed; DWORD until; };
-Motor g_motors[2];
-int   g_rumblePad = -1;   // the XInput pad last told
+Motor g_motors[2][2];      // [player][motor]
+int   g_rumblePad[2] = { -1, -1 };   // the XInput pad last told, per player
 int   g_rumbleLogs = 0;
 
-void NoteMotor(const char* what, uint32_t motor, uint32_t strength, float secs) {
+// Whose rumble a call is: the hero lives' own code (Asterix FUN_004A4090 /
+// FUN_004A3EF0, Obelix FUN_004A7430 / FUN_004A72A0) is that hero's; the rest
+// (the trio's potion start FUN_0047DE80 / FUN_00480290, the machine gun, the
+// boat, the mobile tower) the leader's. Then the player who has that hero.
+struct Range { uintptr_t from, to; int hero; };
+const Range kHeroCode[] = {
+	{ 0x4A4090, 0x4A4090 + 0xCA7, HERO_ASTERIX }, { 0x4A3EF0, 0x4A3EF0 + 0x14E, HERO_ASTERIX },
+	{ 0x4A7430, 0x4A7430 + 0xCE7, HERO_OBELIX },  { 0x4A72A0, 0x4A72A0 + 0x185, HERO_OBELIX },
+};
+int PlayerOfCall(uintptr_t from) {
+	if (!CoopP2Joined()) return 0;
+	int hero = -1;
+	for (const Range& r : kHeroCode) if (from >= r.from && from < r.to) hero = r.hero;
+	if (hero < 0) {
+		Trio t = GetTrio();
+		hero = t ? t.Leader() : CoopP1Hero();
+	}
+	return hero == CoopP1Hero() ? 0 : 1;
+}
+
+void NoteMotor(const char* what, int player, uintptr_t from, uint32_t motor, uint32_t strength, float secs) {
 	if (g_rumbleLogs >= 30) return;
 	g_rumbleLogs++;
-	Log("ctrlopts: rumble %s motor %u strength %u%s (%.2f s)", what, motor, strength, secs >= 0.0f ? " timed" : "", secs);
+	Log("ctrlopts: rumble %s for player %d (from %06X) motor %u strength %u%s (%.2f s)", what, player + 1, (unsigned)from, motor,
+	    strength, secs >= 0.0f ? " timed" : "", secs);
 }
 
 int __fastcall MotorOnHook(char* in, void* edx, uint32_t pad, uint32_t motor, uint32_t strength) {
 	if (!*(uint8_t*)(in + 0x68) && (pad & 0xFF) == 0) {
-		Motor& m = g_motors[(motor & 0xFF) > 1 ? 0 : motor & 1];
+		uintptr_t from = (uintptr_t)_ReturnAddress();
+		int pl = PlayerOfCall(from);
+		Motor& m = g_motors[pl][(motor & 0xFF) > 1 ? 0 : motor & 1];
 		m.strength = (uint8_t)strength;
 		m.timed = false;
-		NoteMotor("on", motor & 0xFF, strength & 0xFF, -1.0f);
+		NoteMotor("on", pl, from, motor & 0xFF, strength & 0xFF, -1.0f);
 	}
 	return g_origMotorOn(in, edx, pad, motor, strength);
 }
@@ -58,13 +84,15 @@ int __fastcall MotorOnHook(char* in, void* edx, uint32_t pad, uint32_t motor, ui
 // timed one already running only has its end put later.
 int __fastcall MotorTimedHook(char* in, void* edx, uint32_t pad, uint32_t motor, uint32_t strength, float secs) {
 	if (!*(uint8_t*)(in + 0x68) && (pad & 0xFF) == 0) {
-		Motor& m = g_motors[(motor & 0xFF) > 1 ? 0 : motor & 1];
+		uintptr_t from = (uintptr_t)_ReturnAddress();
+		int pl = PlayerOfCall(from);
+		Motor& m = g_motors[pl][(motor & 0xFF) > 1 ? 0 : motor & 1];
 		DWORD until = GetTickCount() + (DWORD)(secs > 0.0f && secs < 60.0f ? secs * 1000.0f : 0.0f);
 		if (!m.strength) {
 			m.strength = (uint8_t)strength;
 			m.timed = true;
 			m.until = until;
-			NoteMotor("on", motor & 0xFF, strength & 0xFF, secs);
+			NoteMotor("on", pl, from, motor & 0xFF, strength & 0xFF, secs);
 		} else if (m.timed && (int)(until - m.until) > 0) {
 			m.until = until;
 		}
@@ -72,47 +100,59 @@ int __fastcall MotorTimedHook(char* in, void* edx, uint32_t pad, uint32_t motor,
 	return g_origMotorTimed(in, edx, pad, motor, strength, secs);
 }
 
+// Off for both players: a leader change between on and off must not leave one running.
 int __fastcall MotorOffHook(char* in, void* edx, uint32_t pad, uint32_t motor) {
-	if ((pad & 0xFF) == 0) g_motors[(motor & 0xFF) > 1 ? 0 : motor & 1] = Motor();
+	if ((pad & 0xFF) == 0)
+		for (int pl = 0; pl < 2; pl++) g_motors[pl][(motor & 0xFF) > 1 ? 0 : motor & 1] = Motor();
 	return g_origMotorOff(in, edx, pad, motor);
 }
 
-// An XInput pad can rumble: player 1's (the one the game reads), else any.
-int RumblePad() {
+// The XInput pad a player rumbles: player 1's the one the game reads (not
+// identified yet: the first pad that is not player 2's), player 2's its own
+// (none on the keyboard).
+int RumblePad(int player) {
+	if (player == 1) {
+		int p = CoopP2Joined() ? CoopP2Pad() : -1;
+		return p >= 0 && p < kXInputPads && PadGet(p).connected ? p : -1;
+	}
 	int p = Player1Pad();
 	if (p >= 0 && p < kXInputPads && PadGet(p).connected) return p;
-	if (CoopP2Joined()) return -1;
-	for (int i = 0; i < kXInputPads; i++) if (PadGet(i).connected) return i;
+	int p2 = CoopP2Joined() ? CoopP2Pad() : -1;
+	for (int i = 0; i < kXInputPads; i++) if (i != p2 && PadGet(i).connected) return i;
 	return -1;
 }
 
 uint32_t __fastcall HasRumbleHook(char* in, void* edx, int pad) {
 	uint32_t r = g_origHasRumble(in, edx, pad);
-	if (!(r & 0xFF) && pad == 0 && RumblePad() >= 0) r = (r & ~0xFFu) | 1;
+	if (!(r & 0xFF) && pad == 0 && RumblePad(0) >= 0) r = (r & ~0xFFu) | 1;
 	return r;
 }
 
 void RumbleFrame() {
 	InputManager im = GetInputManager();
 	DWORD now = GetTickCount();
-	for (Motor& m : g_motors)
-		if (m.strength && m.timed && (int)(now - m.until) >= 0) m = Motor();
+	for (auto& player : g_motors)
+		for (Motor& m : player)
+			if (m.strength && m.timed && (int)(now - m.until) >= 0) m = Motor();
+	if (!CoopP2Joined()) g_motors[1][0] = g_motors[1][1] = Motor();
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
 	bool on = im && *(uint8_t*)(im.raw() + 0x15) == 1 && !paused;
-	int pad = RumblePad();
-	if (pad != g_rumblePad && g_rumblePad >= 0) PadsSetRumble(g_rumblePad, 0, 0);
-	g_rumblePad = pad;
-	if (pad < 0) return;
-	uint16_t l = on ? (uint16_t)(g_motors[0].strength * 257) : 0, r = on ? (uint16_t)(g_motors[1].strength * 257) : 0;
-	static uint32_t last = 0;
-	if (((uint32_t)l << 16 | r) != last && g_rumbleLogs < 60) {
-		g_rumbleLogs++;
-		Log("ctrlopts: pad %d motors %u / %u (Vibration %s)", pad, l, r, on ? "on" : "off or paused");
+	for (int pl = 0; pl < 2; pl++) {
+		int pad = RumblePad(pl);
+		if (pad != g_rumblePad[pl] && g_rumblePad[pl] >= 0 && g_rumblePad[pl] != RumblePad(1 - pl)) PadsSetRumble(g_rumblePad[pl], 0, 0);
+		g_rumblePad[pl] = pad;
+		if (pad < 0) continue;
+		uint16_t l = on ? (uint16_t)(g_motors[pl][0].strength * 257) : 0, r = on ? (uint16_t)(g_motors[pl][1].strength * 257) : 0;
+		static uint32_t last[2];
+		if (((uint32_t)l << 16 | r) != last[pl] && g_rumbleLogs < 60) {
+			g_rumbleLogs++;
+			Log("ctrlopts: player %d's pad %d motors %u / %u (Vibration %s)", pl + 1, pad, l, r, on ? "on" : "off or paused");
+		}
+		last[pl] = (uint32_t)l << 16 | r;
+		PadsSetRumble(pad, l, r);
 	}
-	last = (uint32_t)l << 16 | r;
-	PadsSetRumble(pad, l, r);
 }
 
 // ---- Invert Camera X / Y -------------------------------------------------------

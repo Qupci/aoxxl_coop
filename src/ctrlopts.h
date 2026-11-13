@@ -4,7 +4,9 @@
 // +0xC4, an effect object), which an XInput pad never has through DirectInput,
 // so its Vibration row could not be chosen. The row is offered whenever an
 // XInput pad is in, and the game's rumble calls (CKInput FUN_00437E60 on,
-// FUN_00437EA0 timed, FUN_00437EE0 off) drive player 1's XInput motors.
+// FUN_00437EA0 timed, FUN_00437EE0 off) drive the XInput motors of the player
+// whose hero they are for: a hero life's own calls that hero's player, the
+// rest (the potion, machines) the leader's player.
 //
 // Invert Camera X / Y: two rows below Vibration, copies of its label and value
 // put into the page while it is up (taken out again when the controls close).
