@@ -1,5 +1,6 @@
 #include "hints.h"
 #include "coop.h"
+#include "ctrlopts.h"
 #include "config.h"
 #include "detour.h"
 #include "hud2.h"
@@ -26,10 +27,10 @@ const uint8_t   kLocStringPrologue[8] = { 0x8B, 0x54, 0x24, 0x04, 0x56, 0x83, 0x
 LocStringFn g_origLocString = nullptr;
 // The mod's own strings (no table of the game's goes that far): the players'
 // boxes (0, 1), then the sparkles' glyphs (2..9), the big hero icons (10, 11),
-// other modules' (12..15, HintsModString).
+// other modules' (12..43, HintsModString).
 const uint32_t kStringId = 0x3F00C0DE;
 const int      kTextLen = 200;
-const int      kNumStrings = 16;
+const int      kNumStrings = 44;
 wchar_t        g_strings[kNumStrings][kTextLen];
 
 // The in-game interface's tick (thiscall(this, time), ret 4); time +0xC = dt.
@@ -86,6 +87,7 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 		}
 	}
 	if (!s) return s;
+	s = CtrlOptsLocString(id, s);
 	if (!CoopP2Joined() && !g_config.spCoopIcons) return s;
 	// The controls menu's rows: Up..Right are the hero's moves, the Camera ones
 	// the camera's; every other string's directions are the menus'. Display/Hide

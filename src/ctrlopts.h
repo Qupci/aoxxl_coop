@@ -15,11 +15,15 @@
 // cameras turned round). Kept in xxl_coop.ini [controls].
 
 #pragma once
+#include <cstdint>
 
 bool CtrlOptsInstallHooks();
 // Once per frame, right after the game's input update: the camera actions
 // swapped, the rumble's motors, the rows taken out when the controls are gone.
 void CtrlOptsFrame();
 // -1 when that camera axis is inverted, else 1 (the mod's own cameras, player 2's stick).
+// The localised string `id` as the controls show it: the page counter's
+// ("Page %CtrlPage_Cur%/%CtrlPage_Nb%", 0x390) with 4 pages while the mod's rows are in.
+const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s);
 float CtrlOptsCamX();
 float CtrlOptsCamY();

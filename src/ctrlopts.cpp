@@ -3,6 +3,7 @@
 #include "coop.h"
 #include "detour.h"
 #include "hints.h"
+#include "icons.h"
 #include "inputmgr.h"
 #include "kal.h"
 #include "log.h"
@@ -13,7 +14,10 @@
 #include <intrin.h>
 
 #include <windows.h>
+#include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <cwchar>
 
 namespace {
 
@@ -181,7 +185,6 @@ const uintptr_t kCtrlPage = 0x527030;
 const uint8_t   kCtrlPagePrologue[8] = { 0x83, 0xEC, 0x6C, 0xA1, 0xF4, 0x21, 0x66, 0x00 };
 const uintptr_t kVtTextButton = 0x62390C, kVtText = 0x623B6C;
 const uint32_t  kYes = 0x1E, kNo = 0x1F;   // the Vibration row's values
-const float     kRowStep = 0.08f;          // page 3's rows closed up to fit two more
 CtrlPageFn g_origCtrlPage = nullptr;
 // The rows' colours after each tick (FUN_00527960, thiscall(time, focused),
 // ret 8): every row it knows (labels and values) back to the normal colour
@@ -194,14 +197,38 @@ const uintptr_t kRowColours = 0x527960;
 const uint8_t   kRowColoursPrologue[7] = { 0x83, 0xEC, 0x10, 0x53, 0x55, 0x56, 0x57 };
 RowColoursFn g_origRowColours = nullptr;
 
-alignas(16) char g_label[2][0x6E0];
-alignas(16) char g_value[2][0x6DC];
-alignas(16) char g_colour[2][2][0x80];   // [row][label, value]
+// The mod's rows. Page 3 (the game's third): Switch hero before Vibration,
+// Invert Camera X / Y after it; page 4 (the mod's, in page 3's container, its
+// rows shown instead of page 3's): Deadzone. Kinds: a toggle (YES / NO: left,
+// right, confirm), a number (left / right step it), a binding (confirm, then the
+// next button or key -- the controller or the keyboard, as the page's Current
+// Configuration says; Escape / B keeps the old one).
+enum RowKind { RK_TOGGLE, RK_NUMBER, RK_BIND };
+enum RowId { R_SWITCH, R_INVX, R_INVY, R_DEADZONE, kNumRows };
+struct RowDef { const wchar_t* name; RowKind kind; bool page4; };
+const RowDef kRows[kNumRows] = {
+	{ L"Switch hero", RK_BIND, false },
+	{ L"Invert Camera X", RK_TOGGLE, false },
+	{ L"Invert Camera Y", RK_TOGGLE, false },
+	{ L"Deadzone", RK_NUMBER, true },
+};
+const float kPage3Step = 0.075f;    // page 3's nine rows, 0.842 down to 0.242
+const float kPage4Step = 0.075f;
+const uint32_t kLocPageCur = 0x39;   // "Page %CtrlPage_Cur%/%CtrlPage_Nb%" (string 0x390; the count is the data's: CtrlOptsLocString)
+
+alignas(16) char g_label[kNumRows][0x6E0];
+alignas(16) char g_value[kNumRows][0x6DC];
+alignas(16) char g_colour[kNumRows][2][0x80];   // [row][label, value]
 char* g_page = nullptr;    // the container they are in (null: out)
 char* g_labels = nullptr;  // its child lists: the labels' (buttons), the values'
 char* g_values = nullptr;
+char* g_pageButton = nullptr;
 DWORD g_pageTick = 0;      // the controls page's last tick
-uint32_t g_labelIds[2];
+bool  g_page4 = false;     // page 4 shown (the game is on its page 3)
+int   g_binding = -1;      // the row waiting for a button / key
+uint16_t g_bindPrev = 0;   // the pad's buttons when the wait began
+bool  g_keysPrev[256];
+uint32_t g_ids[kNumRows][2];   // [row][label, value] string ids (HintsModString slots)
 
 bool InList(char* list, char* e) {
 	int k = 0;
@@ -227,24 +254,211 @@ void LinkAfter(char* list, char* at, char* e) {
 	*(int*)(list + 0xC) += 1;
 }
 
+void SetLoc(uint32_t var, int value) {
+	CKYellowPages* yp = YellowPages();
+	char* loc = yp ? *(char**)((char*)yp + 0x94) : nullptr;
+	if (loc) ((void(__fastcall*)(char*, void*, uint32_t, int))(*(void***)loc)[0x30 / 4])(loc, nullptr, var, value);
+}
+
+// Shown (+5 bit 1): drawn, and the focus stops on it.
+void Show(char* e, bool on) {
+	if (on) e[5] |= 2; else e[5] &= ~6;
+}
+
+bool IsPage4(char* e) {
+	for (int i = 0; i < kNumRows; i++) if ((e == g_label[i] || e == g_value[i]) && kRows[i].page4) return true;
+	return false;
+}
+
+// Page 3's rows or page 4's shown (the page button and the backing stay).
+void ShowPage(bool page4) {
+	if (!g_page) return;
+	char* lists[2] = { g_labels, g_values };
+	for (char* list : lists)
+		for (char* c = *(char**)(list + 4); c; c = *(char**)(c + 0x10)) {
+			uintptr_t vt = *(uintptr_t*)c;
+			if (c == g_pageButton || (vt != kVtTextButton && vt != kVtText)) continue;
+			Show(c, IsPage4(c) == page4);
+		}
+}
+
 void TakeOut() {
 	if (!g_page) return;
-	for (int i = 1; i >= 0; i--) {
+	ShowPage(false);
+	for (int i = kNumRows - 1; i >= 0; i--) {
 		if (InList(g_values, g_value[i])) Unlink(g_values, g_value[i]);
 		if (InList(g_labels, g_label[i])) Unlink(g_labels, g_label[i]);
 	}
-	Log("ctrlopts: the Invert Camera rows taken out of the controls' page 3");
-	g_page = g_labels = g_values = nullptr;
+	Log("ctrlopts: the mod's rows taken out of the controls");
+	g_page = g_labels = g_values = g_pageButton = nullptr;
+	g_page4 = false;
+	g_binding = -1;
 }
 
-bool On(int i) { return i ? g_config.invertCamY : g_config.invertCamX; }
+// The page's Current Configuration: 1 the controller, 0 the keyboard (+0x208).
+bool OnPad(char* opt) { return *(uint8_t*)(opt + 0x208) == 1; }
 
-void ShowValue(int i) {
-	((SetTextFn)0x42E590)(g_value[i] + 0x20, nullptr, On(i) ? kYes : kNo);
+const char* PadButtonName(uint16_t bit) {
+	for (int i = 0; i < CoopConfig::kNumPadButtons; i++)
+		if (CoopConfig::kPadButtons[i].bit == bit) return CoopConfig::kPadButtons[i].name;
+	return "none";
+}
+const wchar_t* PadButtonTitle(uint16_t bit) {
+	switch (bit) {
+	case 0x0001: return L"D-pad Up";    case 0x0002: return L"D-pad Down";
+	case 0x0004: return L"D-pad Left";  case 0x0008: return L"D-pad Right";
+	case 0x0010: return L"Start";       case 0x0020: return L"Back";
+	case 0x0040: return L"L3";          case 0x0080: return L"R3";
+	case 0x0100: return L"LB";          case 0x0200: return L"RB";
+	case 0x1000: return L"A";           case 0x2000: return L"B";
+	case 0x4000: return L"X";           case 0x8000: return L"Y";
+	}
+	return L"None";
+}
+// The icon of a pad button (coop_icons pad_a, dpad_up...).
+wchar_t PadButtonGlyph(uint16_t bit) {
+	static const struct { uint16_t bit; const char* icon; } kIcons[] = {
+		{ 0x0001, "dpad_up" }, { 0x0002, "dpad_down" }, { 0x0004, "dpad_left" }, { 0x0008, "dpad_right" },
+		{ 0x0010, "pad_start" }, { 0x0020, "pad_back" }, { 0x0040, "pad_l3" }, { 0x0080, "pad_r3" },
+		{ 0x0100, "pad_lb" }, { 0x0200, "pad_rb" }, { 0x1000, "pad_a" }, { 0x2000, "pad_b" },
+		{ 0x4000, "pad_x" }, { 0x8000, "pad_y" },
+	};
+	for (const auto& k : kIcons) if (k.bit == bit) return IconGlyph(k.icon);
+	return 0;
 }
 
-// Page 3 with the two rows: the Vibration label and value copied, linked in
-// after them, and the page's rows closed up from the top one.
+// A row's label and value texts (the label with its button's icon, as the game's rows).
+void RowTexts(char* opt, int i, wchar_t* label, wchar_t* value, int n) {
+	wcsncpy(label, kRows[i].name, n - 1);
+	label[n - 1] = 0;
+	value[0] = 0;
+	switch (i) {
+	case R_SWITCH: {
+		bool pad = OnPad(opt);
+		wchar_t g = pad ? PadButtonGlyph(g_config.spSwitchButton) : IconKeyGlyph(g_config.spSwitchKey);
+		if (g) swprintf(label, n, L"%s %c", kRows[i].name, g);
+		if (g_binding == i) wcsncpy(value, L"...", n - 1);
+		else if (pad) wcsncpy(value, PadButtonTitle(g_config.spSwitchButton), n - 1);
+		else if (g_config.spSwitchKey) IconsKeyName(g_config.spSwitchKey, value, n);
+		else wcsncpy(value, L"None", n - 1);
+		break;
+	}
+	case R_DEADZONE:
+		swprintf(value, n, L"%.2f", g_config.p1Deadzone);
+		break;
+	}
+}
+
+void ShowRow(char* opt, int i) {
+	wchar_t label[100], value[100];
+	RowTexts(opt, i, label, value, 100);
+	g_ids[i][0] = HintsModString(i * 2, label);
+	((SetTextFn)0x42E590)(g_label[i] + 0x20, nullptr, g_ids[i][0]);
+	uint32_t vid;
+	if (kRows[i].kind == RK_TOGGLE) vid = (i == R_INVX ? g_config.invertCamX : g_config.invertCamY) ? kYes : kNo;
+	else vid = g_ids[i][1] = HintsModString(i * 2 + 1, value);
+	((SetTextFn)0x42E590)(g_value[i] + 0x20, nullptr, vid);
+}
+
+void WriteIni(const char* section, const char* key, const char* value) {
+	if (g_config.iniPath[0]) WritePrivateProfileStringA(section, key, value, g_config.iniPath);
+}
+
+// A key's ini name: letters / digits / F-keys as such, the rest in hex.
+void KeyIniName(int vk, char* out, size_t n) {
+	if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) snprintf(out, n, "%c", vk);
+	else if (vk >= VK_F1 && vk <= VK_F12) snprintf(out, n, "F%d", vk - VK_F1 + 1);
+	else if (vk == VK_TAB) snprintf(out, n, "TAB");
+	else if (vk == VK_SPACE) snprintf(out, n, "SPACE");
+	else snprintf(out, n, "0x%02X", vk);
+}
+
+void MenuSound(char* opt) {
+	((void(__fastcall*)(char*, void*, int))(*(void***)opt)[0x54 / 4])(opt, nullptr, 0);
+}
+
+// Left (-1), right (+1) or confirm (0) on row `i`.
+void ChangeRow(char* opt, int i, int dir) {
+	switch (kRows[i].kind) {
+	case RK_TOGGLE: {
+		bool& v = i == R_INVX ? g_config.invertCamX : g_config.invertCamY;
+		v = !v;
+		WriteIni("controls", i == R_INVX ? "invert_camera_x" : "invert_camera_y", v ? "on" : "off");
+		Log("ctrlopts: %ls %s", kRows[i].name, v ? "on" : "off");
+		break;
+	}
+	case RK_NUMBER: {
+		if (!dir) return;
+		float v = g_config.p1Deadzone + 0.02f * dir;
+		v = v < 0.0f ? 0.0f : v > 0.9f ? 0.9f : v;
+		v = floorf(v * 50.0f + 0.5f) / 50.0f;
+		if (v == g_config.p1Deadzone) return;
+		g_config.p1Deadzone = v;
+		char b[16];
+		snprintf(b, sizeof(b), "%.2f", v);
+		WriteIni("controls", "p1_deadzone", b);
+		Log("ctrlopts: %ls %s", kRows[i].name, b);
+		break;
+	}
+	case RK_BIND: {
+		if (dir) return;
+		g_binding = i;
+		int p = RumblePad(0);
+		g_bindPrev = p >= 0 ? PadGet(p).buttons : 0xFFFF;
+		for (int vk = 0; vk < 256; vk++) g_keysPrev[vk] = (GetAsyncKeyState(vk) & 0x8000) != 0;
+		Log("ctrlopts: %ls waits for a %s", kRows[i].name, OnPad(opt) ? "button" : "key");
+		break;
+	}
+	}
+	MenuSound(opt);
+	ShowRow(opt, i);
+}
+
+// The wait for a button or key: the first new press after it began.
+void BindFrame(char* opt) {
+	if (g_binding < 0) return;
+	int i = g_binding;
+	bool done = false;
+	if (OnPad(opt)) {
+		int p = RumblePad(0);
+		uint16_t now = p >= 0 ? PadGet(p).buttons : 0;
+		uint16_t fresh = (uint16_t)(now & ~g_bindPrev);
+		g_bindPrev &= now;   // released buttons count again
+		if (fresh & PAD_B) done = true;   // B: keep the old one
+		else if (fresh) {
+			uint16_t bit = (uint16_t)(fresh & (0x10000 - fresh));
+			g_config.spSwitchButton = bit;
+			WriteIni("single_player", "sp_hero_switch_button", PadButtonName(bit));
+			Log("ctrlopts: %ls -> %s", kRows[i].name, PadButtonName(bit));
+			done = true;
+		}
+	} else {
+		for (int vk = 8; vk < 256 && !done; vk++) {
+			if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU) continue;
+			bool down = (GetAsyncKeyState(vk) & 0x8000) != 0;
+			bool fresh = down && !g_keysPrev[vk];
+			g_keysPrev[vk] = down;
+			if (!fresh) continue;
+			if (vk != VK_ESCAPE) {
+				g_config.spSwitchKey = vk;
+				char b[16];
+				KeyIniName(vk, b, sizeof(b));
+				WriteIni("single_player", "sp_hero_switch_key", b);
+				Log("ctrlopts: %ls -> key %s", kRows[i].name, b);
+			}
+			done = true;
+		}
+	}
+	*(uint32_t*)(opt + 0x21C) = 2;   // the menu does nothing with this press
+	if (!done) return;
+	g_binding = -1;
+	MenuSound(opt);
+	ShowRow(opt, i);
+}
+
+// Page 3 with the mod's rows: copies of the Vibration label and value, linked
+// in (Switch hero before Vibration, the rest after it), page 3's rows closed up
+// from the top one, page 4's put at the top and hidden.
 void PutIn(char* opt) {
 	CKYellowPages* yp = YellowPages();
 	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
@@ -264,18 +478,22 @@ void PutIn(char* opt) {
 		if (l && !labels && InList(l, vibLabel)) labels = l;
 		if (l && !values && InList(l, vibValue)) values = l;
 	}
-	if (!labels || !values) {
+	char* beforeLabel = *(char**)(vibLabel + 0xC);
+	char* beforeValue = *(char**)(vibValue + 0xC);
+	if (!labels || !values || !beforeLabel || !beforeValue) {
 		static int logs = 0;
-		if (logs++ < 3) Log("ctrlopts: the Vibration row is not in page 3's lists -- no Invert Camera rows");
+		if (logs++ < 3) Log("ctrlopts: the Vibration row is not in page 3's lists -- no mod rows");
 		return;
 	}
 	g_labels = labels;
 	g_values = values;
+	g_pageButton = pageButton;
 	g_page = page;
-	static const wchar_t* const kNames[2] = { L"Invert Camera X", L"Invert Camera Y" };
+	g_page4 = false;
+	g_binding = -1;
 	char* afterLabel = vibLabel;
 	char* afterValue = vibValue;
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < kNumRows; i++) {
 		memcpy(g_label[i], vibLabel, sizeof(g_label[i]));
 		memcpy(g_value[i], vibValue, sizeof(g_value[i]));
 		char* rows[2] = { g_label[i], g_value[i] };
@@ -286,50 +504,68 @@ void PutIn(char* opt) {
 			colour = g_colour[i][k];
 		}
 		g_label[i][5] &= ~4;   // not focused
-		g_labelIds[i] = HintsModString(i, kNames[i]);
-		((SetTextFn)0x42E590)(g_label[i] + 0x20, nullptr, g_labelIds[i]);
-		ShowValue(i);
-		LinkAfter(labels, afterLabel, g_label[i]);
-		LinkAfter(values, afterValue, g_value[i]);
-		afterLabel = g_label[i];
-		afterValue = g_value[i];
+		ShowRow(opt, i);
+		if (i == R_SWITCH) {
+			LinkAfter(labels, beforeLabel, g_label[i]);
+			LinkAfter(values, beforeValue, g_value[i]);
+		} else {
+			LinkAfter(labels, afterLabel, g_label[i]);
+			LinkAfter(values, afterValue, g_value[i]);
+			afterLabel = g_label[i];
+			afterValue = g_value[i];
+		}
 	}
-	// Labels and values, each in list order, from the top row down.
+	// Labels and values, each in list order: page 3's from the top row down, page 4's from the top too.
 	float top = -1.0f;
-	int nl = 0, nv = 0;
+	int n3 = 0, n4 = 0, v3 = 0, v4 = 0;
 	for (char* c = *(char**)(labels + 4); c; c = *(char**)(c + 0x10)) {
 		if (*(uintptr_t*)c != kVtTextButton || c == pageButton) continue;
 		float* y = (float*)(c + 0x18);
 		if (top < 0.0f) top = *y;
-		*y = top - kRowStep * nl++;
+		*y = IsPage4(c) ? top - kPage4Step * n4++ : top - kPage3Step * n3++;
 	}
 	for (char* c = *(char**)(values + 4); c && top >= 0.0f; c = *(char**)(c + 0x10))
-		if (*(uintptr_t*)c == kVtText) *(float*)(c + 0x18) = top - kRowStep * nv++;
-	Log("ctrlopts: Invert Camera X / Y rows put in the controls' page 3 (%d labels, %d values from %.3f; lists %s)", nl, nv, top,
-	    labels == values ? "one" : "two");
+		if (*(uintptr_t*)c == kVtText) *(float*)(c + 0x18) = IsPage4(c) ? top - kPage4Step * v4++ : top - kPage3Step * v3++;
+	SetLoc(kLocPageCur, *(int*)(opt + 0x20C) + 1);   // the counter's text again, with 4 pages
+	Log("ctrlopts: the mod's rows put in the controls (page 3: %d rows, page 4: %d, from %.3f)", n3, n4, top);
+}
+
+// Page 4 in or out, the counter with it.
+void SetPage4(char* opt, bool on) {
+	g_page4 = on;
+	ShowPage(on);
+	SetLoc(kLocPageCur, on ? 4 : *(int*)(opt + 0x20C) + 1);
+	Log("ctrlopts: page %d", on ? 4 : *(int*)(opt + 0x20C) + 1);
 }
 
 int __fastcall CtrlPageHook(char* opt, void* edx, uint32_t arg) {
 	g_pageTick = GetTickCount();
 	PutIn(opt);
-	int focused = -1;
-	for (int i = 0; i < 2 && g_page; i++) if (g_label[i][5] & 4) focused = i;
-	bool ready = !*(uint8_t*)(opt + 0x214) && !*(uint32_t*)(opt + 0x21C);
-	int r = g_origCtrlPage(opt, edx, arg);
-	if (focused < 0 || !ready || !(g_label[focused][5] & 4)) return r;
+	if (!g_page) return g_origCtrlPage(opt, edx, arg);
+	BindFrame(opt);
 	char* view = *(char**)(opt + 0x18);
 	ViewActionFn act = (ViewActionFn)0x4358B0;
-	bool flip = false;
-	static const uint32_t kFlip[5] = { 2, 0x12, 3, 0x13, 4 };   // left, right, confirm
-	for (uint32_t a : kFlip) flip |= view && act(view, nullptr, a) != 0;
-	if (!flip) return r;
-	((void(__fastcall*)(char*, void*, int))(*(void***)opt)[0x54 / 4])(opt, nullptr, 0);   // the menu's sound
-	bool& v = focused ? g_config.invertCamY : g_config.invertCamX;
-	v = !v;
-	ShowValue(focused);
-	if (g_config.iniPath[0])
-		WritePrivateProfileStringA("controls", focused ? "invert_camera_y" : "invert_camera_x", v ? "on" : "off", g_config.iniPath);
-	Log("ctrlopts: Invert Camera %c %s", focused ? 'Y' : 'X', v ? "on" : "off");
+	auto pressed = [&](uint32_t a, uint32_t b) { return view && (act(view, nullptr, a) || act(view, nullptr, b)); };
+	bool ready = !*(uint8_t*)(opt + 0x214) && !*(uint32_t*)(opt + 0x21C) && g_binding < 0;
+	bool left = ready && pressed(2, 0x12), right = ready && pressed(3, 0x13), confirm = ready && view && act(view, nullptr, 4);
+	int page = *(int*)(opt + 0x20C);
+	char* pageButtonNow = page >= 0 && page < 3 ? *(char**)(opt + 0x1D0 + page * 4) : nullptr;
+	bool onPageButton = pageButtonNow && (pageButtonNow[5] & 4);
+	// The page button: 3 -> 4 -> 1 rightwards, 1 -> 4 -> 3 leftwards.
+	bool toPage4After = false;
+	if (onPageButton && page == 2 && !g_page4 && right) { SetPage4(opt, true); *(uint32_t*)(opt + 0x21C) = 1; }
+	else if (onPageButton && page == 2 && g_page4 && left) { SetPage4(opt, false); *(uint32_t*)(opt + 0x21C) = 1; }
+	else if (onPageButton && page == 2 && g_page4 && right) { g_page4 = false; ShowPage(false); }   // the game goes on to page 1
+	else if (onPageButton && page == 0 && left) toPage4After = true;   // the game goes to page 3: page 4 instead
+	int focused = -1;
+	for (int i = 0; i < kNumRows; i++) if (g_label[i][5] & 4) focused = i;
+	int r = g_origCtrlPage(opt, edx, arg);
+	if (toPage4After && *(int*)(opt + 0x20C) == 2) SetPage4(opt, true);
+	// The game shows a page's every child when it goes to it: keep page 3's or page 4's.
+	if (*(int*)(opt + 0x20C) == 2) ShowPage(g_page4);
+	else g_page4 = false;
+	if (focused >= 0 && (g_label[focused][5] & 4) && (left || right || confirm))
+		ChangeRow(opt, focused, left ? -1 : right ? 1 : 0);
 	return r;
 }
 
@@ -338,7 +574,7 @@ void __fastcall RowColoursHook(char* opt, void* edx, void* time, char* focused) 
 	if (!g_page || !focused) return;
 	uint32_t pulse = *((uint32_t*(__fastcall*)(char*, void*))0x461A00)(opt + 0xB4, nullptr);
 	uint32_t normal = *(uint32_t*)(opt + 0xB0);
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < kNumRows; i++) {
 		char* layout = g_value[i] + 0x20;
 		((SetColourFn)(*(void***)layout)[0x28 / 4])(layout, nullptr, focused == g_label[i] ? pulse : normal);
 		// The label: the game resets only the rows it knows (FUN_00527D40) -- a
@@ -350,17 +586,44 @@ void __fastcall RowColoursHook(char* opt, void* edx, void* time, char* focused) 
 	}
 }
 
-// The camera's actions (the game's bindings 46 / 47 the right stick's up /
-// down, 48 / 49 right / left) swapped for player 1.
+// Player 1's sticks through the deadzone (p1_deadzone; the movement's actions
+// 0-3 up / down / left / right, the camera's 46-49), then the camera's actions
+// (the game's bindings 46 / 47 the right stick's up / down, 48 / 49 right /
+// left) swapped for the Invert rows.
+void Deadzone(uint8_t* v, int up, int down, int left, int right) {
+	float x = (v[right] - v[left]) / 255.0f, y = (v[up] - v[down]) / 255.0f;
+	float m = sqrtf(x * x + y * y);
+	float dz = g_config.p1Deadzone;
+	if (m <= 0.0f) return;
+	float k = m <= dz ? 0.0f : ((m > 1.0f ? 1.0f : m) - dz) / (1.0f - dz) / m;
+	x *= k; y *= k;
+	v[right] = x > 0 ? (uint8_t)(x * 255.0f + 0.5f) : 0; v[left] = x < 0 ? (uint8_t)(-x * 255.0f + 0.5f) : 0;
+	v[up] = y > 0 ? (uint8_t)(y * 255.0f + 0.5f) : 0;   v[down] = y < 0 ? (uint8_t)(-y * 255.0f + 0.5f) : 0;
+}
+
 void InvertFrame() {
 	InputManager im = GetInputManager();
 	uint8_t* v = im ? im.Values() : nullptr;
 	if (!v || im.NumActions() < 50) return;
+	if (g_config.p1Deadzone > 0.0f) {
+		Deadzone(v, 0, 1, 2, 3);
+		Deadzone(v, 46, 47, 49, 48);
+	}
 	if (g_config.invertCamY) { uint8_t t = v[46]; v[46] = v[47]; v[47] = t; }
 	if (g_config.invertCamX) { uint8_t t = v[48]; v[48] = v[49]; v[49] = t; }
 }
 
 } // namespace
+
+const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s) {
+	static const wchar_t kVar[] = L"%CtrlPage_Nb%";
+	if (id != 0x390 || !g_page || !s) return s;
+	const wchar_t* at = wcsstr(s, kVar);
+	if (!at) return s;
+	static wchar_t buf[200];
+	swprintf(buf, 200, L"%.*s4%s", (int)(at - s), s, at + wcslen(kVar));
+	return buf;
+}
 
 float CtrlOptsCamX() { return g_config.invertCamX ? -1.0f : 1.0f; }
 float CtrlOptsCamY() { return g_config.invertCamY ? -1.0f : 1.0f; }

@@ -8184,18 +8184,29 @@ const Step kCtrlIcons[] = {
 	OPT_PRESS(11000, 19, 35, 55, "right"), SHOT(12500, "ci_page2"),
 	OPT_PRESS(13000, 19, 35, 55, "right"), SHOT(14500, "ci_page3"),
 	{ 14700, S_OPTDUMP, 2, 0, 0, 0, 0, "options dump" },
-	// Page 3's Invert Camera rows (the "Page 3/3" button is focused): up to Y,
-	// right turns it on; up to X, confirm turns it on; up to Vibration, right
-	// twice; then both back off (down, confirm; down, left) and out.
-	OPT_PRESS(15500, 16, 32, 52, "up (invert y)"), SHOT(16200, "ci_inv_y_focus"),
-	OPT_PRESS(16700, 19, 35, 55, "right (invert y on)"), SHOT(17400, "ci_inv_y_on"),
-	OPT_PRESS(17900, 16, 32, 52, "up (invert x)"), OPT_PRESS(18500, 20, 44, 56, "confirm (invert x on)"), SHOT(19200, "ci_inv_x_on"),
-	OPT_PRESS(19700, 16, 32, 52, "up (vibration)"), SHOT(20400, "ci_vib_focus"),
-	OPT_PRESS(20900, 19, 35, 55, "right (vibration)"), SHOT(21600, "ci_vib_toggled"), OPT_PRESS(22100, 19, 35, 55, "right (vibration back)"),
-	OPT_PRESS(22600, 17, 33, 53, "down (invert x)"), OPT_PRESS(23100, 20, 44, 56, "confirm (invert x off)"),
-	OPT_PRESS(23600, 17, 33, 53, "down (invert y)"), OPT_PRESS(24100, 18, 34, 54, "left (invert y off)"), SHOT(24800, "ci_inv_off"),
-	{ 25300, S_BIND, 21, 0, 0, 0, 0, "cancel (out of the controls)" }, SHOT(26500, "ci_out"),
-	END(27500),
+	// Page 4 (the "Page 3/4" button is focused): right to it, up to Deadzone,
+	// right twice (0.04), left twice (back); down, right to page 1, left back to
+	// page 4, left to page 3.
+	OPT_PRESS(15200, 19, 35, 55, "right (page 4)"), SHOT(16000, "ci_page4"),
+	OPT_PRESS(16400, 16, 32, 52, "up (deadzone)"), OPT_PRESS(16900, 19, 35, 55, "right"), OPT_PRESS(17400, 19, 35, 55, "right"),
+	SHOT(18000, "ci_deadzone_up"), OPT_PRESS(18400, 18, 34, 54, "left"), OPT_PRESS(18900, 18, 34, 54, "left"),
+	OPT_PRESS(19400, 17, 33, 53, "down (page button)"), OPT_PRESS(19900, 19, 35, 55, "right (page 1)"), SHOT(20600, "ci_p4_to_p1"),
+	OPT_PRESS(21000, 18, 34, 54, "left (page 4)"), SHOT(21700, "ci_p1_to_p4"),
+	OPT_PRESS(22100, 18, 34, 54, "left (page 3)"), SHOT(22800, "ci_p4_to_p3"),
+	// Page 3's Invert Camera rows: up to Y, right turns it on; up to X, confirm
+	// turns it on; up to Vibration, right twice; then both back off (down,
+	// confirm; down, left) and out.
+	OPT_PRESS(23500, 16, 32, 52, "up (invert y)"), SHOT(24200, "ci_inv_y_focus"),
+	OPT_PRESS(24700, 19, 35, 55, "right (invert y on)"), SHOT(25400, "ci_inv_y_on"),
+	OPT_PRESS(25900, 16, 32, 52, "up (invert x)"), OPT_PRESS(26500, 20, 44, 56, "confirm (invert x on)"), SHOT(27200, "ci_inv_x_on"),
+	OPT_PRESS(27700, 16, 32, 52, "up (vibration)"), SHOT(28400, "ci_vib_focus"),
+	OPT_PRESS(28900, 19, 35, 55, "right (vibration)"), SHOT(29600, "ci_vib_toggled"), OPT_PRESS(30100, 19, 35, 55, "right (vibration back)"),
+	OPT_PRESS(30600, 16, 32, 52, "up (switch hero)"), SHOT(31300, "ci_switch_focus"),
+	OPT_PRESS(31800, 17, 33, 53, "down (vibration)"), OPT_PRESS(32300, 17, 33, 53, "down (invert x)"),
+	OPT_PRESS(32800, 20, 44, 56, "confirm (invert x off)"),
+	OPT_PRESS(33300, 17, 33, 53, "down (invert y)"), OPT_PRESS(33800, 18, 34, 54, "left (invert y off)"), SHOT(34500, "ci_inv_off"),
+	{ 35000, S_BIND, 21, 0, 0, 0, 0, "cancel (out of the controls)" }, SHOT(36200, "ci_out"),
+	END(37200),
 };
 // ctrliconskb (XXL_PRESETNOPAD=1): the same on the game's keyboard layout
 // (controller preset 1): coop_icons\kb's keycaps.

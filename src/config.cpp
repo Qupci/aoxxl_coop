@@ -10,6 +10,13 @@
 
 CoopConfig g_config;
 
+// The pad buttons by their ini names (XInput bits).
+const CoopConfig::PadButton CoopConfig::kPadButtons[CoopConfig::kNumPadButtons] = {
+	{ "dpad_up", 0x0001 }, { "dpad_down", 0x0002 }, { "dpad_left", 0x0004 }, { "dpad_right", 0x0008 },
+	{ "start", 0x0010 }, { "back", 0x0020 }, { "l3", 0x0040 }, { "r3", 0x0080 }, { "lb", 0x0100 }, { "rb", 0x0200 },
+	{ "a", 0x1000 }, { "b", 0x2000 }, { "x", 0x4000 }, { "y", 0x8000 }, { "none", 0 },
+};
+
 static bool ReadBool(const char* section, const char* key, bool def, const char* path) {
 	char buf[64] = {};
 	GetPrivateProfileStringA(section, key, def ? "on" : "off", buf, sizeof(buf), path);
@@ -51,6 +58,13 @@ void CoopConfig::Load(const char* iniPath) {
 	strncpy(this->iniPath, full, sizeof(this->iniPath) - 1);
 	invertCamX = ReadBool("controls", "invert_camera_x", invertCamX, full);
 	invertCamY = ReadBool("controls", "invert_camera_y", invertCamY, full);
+	{
+		char db[32] = {};
+		GetPrivateProfileStringA("controls", "p1_deadzone", "0", db, sizeof(db), full);
+		p1Deadzone = (float)atof(db);
+		if (p1Deadzone < 0.0f) p1Deadzone = 0.0f;
+		if (p1Deadzone > 0.9f) p1Deadzone = 0.9f;
+	}
 
 	enabled     = ReadBool("coop", "enabled", enabled, full);
 	splitScreen = ReadBool("coop", "split_screen", splitScreen, full);
@@ -132,11 +146,8 @@ void CoopConfig::Load(const char* iniPath) {
 	{
 		char sb[32] = {};
 		GetPrivateProfileStringA("single_player", "sp_hero_switch_button", "dpad_up", sb, sizeof(sb), full);
-		static const struct { const char* name; uint16_t bit; } kButtons[] = {
-			{ "dpad_up", 0x0001 }, { "dpad_down", 0x0002 }, { "dpad_left", 0x0004 }, { "dpad_right", 0x0008 },
-			{ "back", 0x0020 }, { "l3", 0x0040 }, { "none", 0 },
-		};
-		for (const auto& b : kButtons) if (!_stricmp(sb, b.name)) spSwitchButton = b.bit;
+		for (int i = 0; i < CoopConfig::kNumPadButtons; i++)
+			if (!_stricmp(sb, CoopConfig::kPadButtons[i].name)) spSwitchButton = CoopConfig::kPadButtons[i].bit;
 		GetPrivateProfileStringA("single_player", "sp_hero_switch_key", "", sb, sizeof(sb), full);
 		if (sb[0]) spSwitchKey = ParseKey(sb);
 	}

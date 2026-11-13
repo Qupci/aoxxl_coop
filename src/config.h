@@ -24,6 +24,7 @@ struct CoopConfig {
 	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect
 	bool  invertCamX    = false;  // [controls] invert_camera_x / _y: the options' Invert Camera X / Y rows (ctrlopts.cpp)
 	bool  invertCamY    = false;
+	float p1Deadzone    = 0.0f;   // [controls] p1_deadzone: player 1's sticks (the game's input), 0 = the game's own
 	char  iniPath[260]  = {};     // the ini's full path (the options write [controls] back)
 	int   dropHoldMs    = 1500;
 	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix (single player: Obelix leading, SoloMod())
@@ -73,6 +74,9 @@ struct CoopConfig {
 	bool  spCoopIcons    = true;   // sp_coop_icons: the mod's button icons (pad or keyboard) in the game's texts
 	bool  spHeroSwitch   = true;   // sp_hero_switch: a button gives the lead to the other hero
 	uint16_t spSwitchButton = 0x0001;   // ... its pad button (PAD_*: D-pad up)
+	struct PadButton { const char* name; uint16_t bit; };
+	static const int kNumPadButtons = 15;
+	static const PadButton kPadButtons[kNumPadButtons];   // ini names of the pad buttons (config.cpp)
 	int   spSwitchKey    = 0x09;   // ... its key with player 1 on the keyboard (TAB)
 	bool  spSwitchLock   = true;   // sp_hero_switch_lock: the level's lead switches ignored, a lock's switch undone at its end
 	bool  spSecondChance = false;  // sp_second_chance: each hero its own health; a fallen one waits to be revived
