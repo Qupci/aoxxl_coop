@@ -4881,3 +4881,17 @@ both halves).
   2 on virtual pad 2; S_RUMBLE with Asterix leading -> "player 1's pad 0 motors 51400 / 0", after trio 4801
   Obelix leading -> "player 2's pad 1 motors 0 / 38550", both off on time; the virtual pad is not told). The hero
   life ranges are not exercised by the autotest (its calls come from the asi): pad test with a second pad pending.
+- Round 262 (Nov 13, commit b72f18c; user: new Controls rows -- page 3 Switch hero (binding), Vibration, Invert X/Y; Deadzone
+  on a page 4; later phases: player 2 in the menus with its own controls, a CO-OP Options pause entry, a co-op hero
+  swap). Page 4 is the mod's: the game cycles its pages % 3 (opt +0x20C; FUN_00527030 on the page button
+  +0x1D0 + page*4 with left / right), so page 4 lives in page 3's container: its rows linked in but hidden
+  (+5 bit 1 cleared), page 3's hidden instead while it is up; right on page 3's button -> page 4 (the game's tick
+  skipped by +0x21C = 1), right on page 4 -> the game's own 3 -> 1, left on page 1 -> the game's 1 -> 3 then page
+  4, left on page 4 -> 3. The game shows every child of a page it goes to, so the rows' shown bits are put right
+  after each tick. Counter: loc variable 0x39 = the page (yp +0x94 vf12(var, value) also refreshes the texts); the
+  count %CtrlPage_Nb% is not set in code (variable 0x3A is something else -- set once by mistake, removed), so
+  CtrlOptsLocString serves string 0x390 with "4" while the rows are in. Current Configuration: opt +0x208 (1 the
+  controller, 0 the keyboard). Binding capture: XInput edges on player 1's pad (B cancels) or GetAsyncKeyState
+  edges (Escape cancels), the menu held off with +0x21C = 2 meanwhile. p1_deadzone: radial on the game's byte
+  values (0-3 move, 46-49 camera) before the invert swap. Autotest ctrlicons (page 4/4, Deadzone 0.00 -> 0.04 -> 0.00,
+  4 -> 1 -> 4 -> 3, Invert/Vibration as before); the binding itself needs a real press (pad test).
