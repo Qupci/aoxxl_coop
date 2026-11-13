@@ -4834,3 +4834,38 @@ both halves).
   1: arrow / F / SPACE / P / G / D / ESC caps, drawn Shift/Ctrl, V), ctrliconskb (S_SETPRESET 1 -- the menu shows
   the options' configuration, not the preset: use the real unplug), hintcatalog with XXL_ICONP2KB and no pad
   (crowd Twister 2 lit: SPACE F dark, G D / G H glowing).
+- Round 260 (Nov 13, commit d7c4098; user: round 259 works; Invert Camera X / Y rows wanted below Vibration on the
+  controls' page 3 -- their reverted camera bindings had stood in for it --; Vibration could not be chosen on the
+  XInput pad). Options interface CKHkInterfaceOption (2/133, vtable 0x628764): vf18 0x526630 switches on +0xF0
+  (page kind) -- 1 the controls, FUN_00527030 (thiscall(arg), ret 4; returns the focused element) then
+  FUN_00527960(time, focused) (ret 8; FUN_00527D40 first sets every known row's label/value text layout colour to
+  +0xB0, then the focused row's label (vf26 = button +0x6DC) and value get the pulse, FUN_00461A00(+0xB4)). Fields:
+  +0x18 input view (InputView_GetAction 0x4358B0: 0/0x10 up, 1/0x11 down, 2/0x12 left, 3/0x13 right, 4 confirm,
+  5 cancel), +0x4C Vibration label, +0x58 its value (YES 0x1E / NO 0x1F = +0x88/+0x8C; FUN_004FE9F0 sets gm +0x5C
+  bit 5 and CKInput +0x15), +0x10C.. the 23 binding labels, +0x168.. their values, +0x1C4.. page element ids 10/11/12,
+  +0x1D0.. the "Page n/3" buttons, +0x1F0 Current Configuration, +0x20C page, +0x214 waiting for a key, +0x21C
+  frames to ignore input. Menu elements: yellow pages +0x34 -> +0x3C -> +4 the list (FUN_0042A720(id) = index; +4
+  first, +0xC count); an element +4 kind byte (2 = button), +5 bits (2 shown/selectable, 4 focus), +8 its list,
+  +0xC / +0x10 prev / next, +0x14 / +0x18 place; containers +0x24 the buttons' list, +0x28 the texts' (list +4
+  first, +8 last, +0xC count); text layout embedded at +0x20 (+0x34 string id, +0x38 string; FUN_0042E590 on it
+  sets the string and remakes its word pointers +0x2F8..), vf10 (+0x28) of the layout = colour by value;
+  CColorTextButton2d 0x6E0 bytes, CText2d 0x6DC; +0x68C an RwBrush-like 0x80-byte colour object (each row its
+  own; focus vf24 -> +0x6DC colour, unfocus vf25 -> +0x690; sharing it lit copies with Vibration), FUN_005F9280 sets
+  its RGBA. Page 3: labels Camera up/down/left/right (3A3-3A6), Centre Camera (3A9), Vibration (0x2F), the Page
+  button, the backing plate; values (3AF.., 1F). Zoom in/out (3A7/3A8) have no rows. ctrlopts.cpp: while the
+  page ticks, the Vibration label/value copied (own brush), linked after them in their lists, labels "Invert Camera
+  X/Y" (HintsModString slots 12-13), rows closed up 0.08 from the top; unlinked within 100 ms of the page's last
+  tick (no teardown ever sees them); left/right/confirm on a copy toggles, the menu sound vf21 (+0x54)(0),
+  [controls] invert_camera_x / _y written back; FUN_00527960 hooked to colour the copies' labels/values. Invert:
+  CKInput values 46<->47 / 48<->49 right after the input update (camera view CKSrvCamera +0x580 reads them); player
+  2's CoopP2CameraValues and p2cam.cpp follow cameras multiply rx/ry. Vibration: CKInput FUN_00437E60(pad, motor,
+  strength) on / FUN_00437EA0(pad, motor, strength, float secs) timed / FUN_00437EE0(pad, motor) off (thiscall, ret
+  0xC/0x10/8; skip when CKInput +0x68) -> pad device slots 10/11/12 (FUN_00432EF0 timed: an idle motor starts, a
+  running timed one is extended); the device plays its DirectInput effect (+0xC4) only, so an XInput pad (no FF
+  through DirectInput) never rumbled and FUN_00438B30(pad) (+0xC4 != 0) made the controls page skip the row. Now
+  FUN_00438B30 also says yes with an XInput pad in, the three calls keep two motors (strength, end) and each frame
+  player 1's XInput pad (Player1Pad, else the only one) gets them (x257) while CKInput +0x15 = 1 and not paused
+  (pads.cpp PadsSetRumble, XInputSetState, told on change). Co-op: only pad 0's rumble is mirrored (player 1's pad;
+  player 2's hero's hits not routed). Autotests: ctrlicons (page 3 up into the rows, Y on by right, X on by confirm,
+  Vibration toggled, both back off, cancel -> "taken out"), rumble (S_RUMBLE: motor 0 200 for 0.6 s, motor 1 120
+  for 0.3 s -> "pad 0 motors 51400 / 30840", off on time; user felt it).
