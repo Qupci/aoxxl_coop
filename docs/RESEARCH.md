@@ -4811,3 +4811,26 @@ both halves).
   bare (fixed particles shared). Autotests: shine41 (-Level 4, S_SHINE: bonuses near a point with a particle node
   on them -- 2-6 of ~65, originals and clones alike: not per-helmet nodes), shine51 (-Level 5, XXL_ATONCE=3,
   Twister at the user's spot): "a bonus on its copy 1", no "all full", the field's helmets all shining.
+- Round 259 (Nov 13, commit 65e5b41; user: Snipaste_2026-11-12_01-18-49 / 01-20-42 / 01-22-59 / 01-30-09, Pasted
+  image 20261113050057 -- the controls menu's direction icons all the left stick's, Display/Hide Interface and
+  Centre Camera without one; keyboard: new keycaps coop_icons\kb, a combo's key waiting = the glowing cap, pressed
+  = *_press). Strings with the game's direction icons (XXL_LOCDUMP dumps every string with an action icon and ids
+  0x380-0x3AF): 22/4B/4C/38A/372 "Selection", 374 "Setting", 390 "Page", 3F-42 single icons, C0-C5 save menu --
+  all the interface's; 391-394 Up..Right (moves, actions 0-3), 39D-3A0 Interface up..right (16-19), 3A3-3A6 Camera
+  up/down/left/right = actions 47/46/48/49 (preset 3: right stick down/up/right/left -- the menu's own text),
+  39C Display/Hide Interface (15, Start / I), 3A9 Centre Camera (50, R3 / V), 3A7/3A8 Zoom in/out (not shown on the
+  pad pages; left alone). LocStringHook passes the kind (IconDirs) to IconsRewrite: all four actions on one of
+  left stick (pad bytes 6-9) / right stick (10-13) / D-pad (26-29) -> that prefix with each action's bound
+  direction (pairs/all as one glyph), all on keys -> keycaps, else is_*; rows 39C/3A9 get IconsAppendAction. Pad
+  byte names gained rs_*. Keyboard bug: player 1's keys never got a cap -- the device's key handler (vf5
+  0x433900, switch on vk) writes block 1 (Space 0x3D, F 0x25, Up 0x7D) and the bindings read block 2 (+0x90: Space
+  0xCD), so MapKeyboard's byte -> vk table missed every binding; IconsP1Vk reads off - 0x90. Keycaps: kb\<name>.png
+  / <name>_press.png (key_a, key_0, key_F1, arrow_up, key_space, key_enter, key_esc..., Figma's odd names: "/" =
+  key_.png + key_\_press-1.png, "\" = key_\_.png + key_\_press.png, "*" = key__.png + key___press.png; modifiers
+  key_lshift/rshift/lctrl/rctrl/lalt/ralt not drawn yet -> drawn caps "L Shift"...). IconLook (PLAIN / WAITING /
+  PRESSED) replaces the unpressed flag: pad waiting = *_unpressed, key pressed = *_press. HintsFrame also refreshes
+  all texts on a controller preset change (CKInput +0x64). Autotests: ctrlicons (pause -> Options -> Controls by
+  the menus' bindings, pages 1-3; with the pad: ls_ / dpad_ / rs_down.. / pad_start / pad_r3; pad unplugged, preset
+  1: arrow / F / SPACE / P / G / D / ESC caps, drawn Shift/Ctrl, V), ctrliconskb (S_SETPRESET 1 -- the menu shows
+  the options' configuration, not the preset: use the real unplug), hintcatalog with XXL_ICONP2KB and no pad
+  (crowd Twister 2 lit: SPACE F dark, G D / G H glowing).
