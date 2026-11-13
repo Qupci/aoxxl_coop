@@ -47,6 +47,8 @@ void PadsSetKeyboardOwnedByP2(bool owned);
 bool PadsKeyPressed(int vk);
 
 bool PadsInit();               // false if no XInput DLL could be loaded
+// XInput pad `i`'s motors (0-65535 each; told again only on a change).
+void PadsSetRumble(int i, uint16_t left, uint16_t right);
 void PadsShutdown();
 void PadsPoll();               // call once per frame
 const PadState& PadGet(int i); // i in [0, kMaxPads)

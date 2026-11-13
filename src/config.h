@@ -22,6 +22,9 @@ struct CoopConfig {
 	bool  gameCamera    = true;   // split screen: each player gets a copy of the game's camera (off = the mod's follow camera)
 	float splitFov      = 15.0f;  // split screen: degrees added to each half's field of view
 	int   p1Pad         = -1;     // controller the game reads (player 1): XInput slot 0-3, 4 = keyboard; -1 = detect
+	bool  invertCamX    = false;  // [controls] invert_camera_x / _y: the options' Invert Camera X / Y rows (ctrlopts.cpp)
+	bool  invertCamY    = false;
+	char  iniPath[260]  = {};     // the ini's full path (the options write [controls] back)
 	int   dropHoldMs    = 1500;
 	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix (single player: Obelix leading, SoloMod())
 	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)

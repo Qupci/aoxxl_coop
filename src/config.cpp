@@ -48,6 +48,9 @@ void CoopConfig::Load(const char* iniPath) {
 	// GetPrivateProfileString wants a full path or it searches the Windows dir.
 	char full[MAX_PATH];
 	GetFullPathNameA(iniPath, MAX_PATH, full, nullptr);
+	strncpy(this->iniPath, full, sizeof(this->iniPath) - 1);
+	invertCamX = ReadBool("controls", "invert_camera_x", invertCamX, full);
+	invertCamY = ReadBool("controls", "invert_camera_y", invertCamY, full);
 
 	enabled     = ReadBool("coop", "enabled", enabled, full);
 	splitScreen = ReadBool("coop", "split_screen", splitScreen, full);

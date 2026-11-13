@@ -15,6 +15,7 @@
 #include "hints.h"
 #include "combohints.h"
 #include "icons.h"
+#include "ctrlopts.h"
 #include "individual.h"
 #include "hud2.h"
 #include "experimental.h"
@@ -168,6 +169,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	HintsInstallHooks();
 	ComboHintsInstallHooks();
 	IconsInstallHooks();
+	CtrlOptsInstallHooks();
 	IndivInstallHooks();
 	Hud2InstallHooks();
 	ExperimentalInstallHooks();

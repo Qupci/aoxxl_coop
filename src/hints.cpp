@@ -25,10 +25,11 @@ const uintptr_t kLocString = 0x411780;
 const uint8_t   kLocStringPrologue[8] = { 0x8B, 0x54, 0x24, 0x04, 0x56, 0x83, 0xFA, 0xFF };
 LocStringFn g_origLocString = nullptr;
 // The mod's own strings (no table of the game's goes that far): the players'
-// boxes (0, 1), then the sparkles' glyphs (2..9), the big hero icons (10, 11).
+// boxes (0, 1), then the sparkles' glyphs (2..9), the big hero icons (10, 11),
+// other modules' (12..15, HintsModString).
 const uint32_t kStringId = 0x3F00C0DE;
 const int      kTextLen = 200;
-const int      kNumStrings = 12;
+const int      kNumStrings = 16;
 wchar_t        g_strings[kNumStrings][kTextLen];
 
 // The in-game interface's tick (thiscall(this, time), ret 4); time +0xC = dt.
@@ -1022,6 +1023,13 @@ void HintSpark(int key, int player, int n, bool sound) {
 	if (s.nBursts < 8) s.bursts[s.nBursts++] = { n, GetTickCount() };
 	if (sound && g_itf && g_itf == (char*)GetLvlObject(2, 132, 0))   // the combo bar's level sound (interface sound 7)
 		((void(__fastcall*)(char*, void*, uint32_t, uint32_t))0x5153F0)(g_itf, nullptr, 7, 0);
+}
+
+uint32_t HintsModString(int slot, const wchar_t* text) {
+	int i = 12 + slot;
+	if (slot < 0 || i >= kNumStrings) return 0xFFFFFFFF;
+	wcsncpy(g_strings[i], text, kTextLen - 1);
+	return kStringId + i;
 }
 
 void HintsFrame() {

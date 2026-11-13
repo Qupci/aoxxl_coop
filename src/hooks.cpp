@@ -37,6 +37,7 @@
 #include "combohints.h"
 #include "cutskip.h"
 #include "icons.h"
+#include "ctrlopts.h"
 
 namespace {
 
@@ -66,6 +67,7 @@ namespace {
 
 void __fastcall InputUpdateHook(void* self, void* edx, void* timeInfo) {
 	g_origInputUpdate(self, edx, timeInfo);   // let the action array refresh first
+	CtrlOptsFrame();                           // the camera's inverted axes first, the rumble
 	InterlockedIncrement(&g_hookCounters.inputUpdates);
 	StallRegisterGameThread();
 	AutotestFrame();

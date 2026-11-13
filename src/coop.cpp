@@ -14,6 +14,7 @@
 //    (only its leader in a player state), then player control is re-applied.
 
 #include "coop.h"
+#include "ctrlopts.h"
 #include "gamecam.h"
 #include "crash.h"
 #include "proximity.h"
@@ -925,8 +926,9 @@ uint8_t* CoopP2CameraValues() {
 		if (v > 1.0f) v = 1.0f;
 		g.p2CamValues[b] = v > 0.0f ? (uint8_t)(v * 255.0f + 0.5f) : 0;
 	};
-	put(0, p.ry);  put(1, -p.ry);
-	put(2, p.rx);  put(3, -p.rx);
+	float rx = p.rx * CtrlOptsCamX(), ry = p.ry * CtrlOptsCamY();   // the options' Invert Camera X / Y
+	put(0, ry);  put(1, -ry);
+	put(2, rx);  put(3, -rx);
 	put(4, (p.pressed & PAD_RTHUMB) ? 1.0f : 0.0f);
 	return g.p2CamValues;
 }

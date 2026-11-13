@@ -60,7 +60,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -8183,10 +8183,33 @@ const Step kCtrlIcons[] = {
 	OPT_PRESS(9200, 20, 44, 56, "confirm (controls)"), SHOT(10500, "ci_page1"),
 	OPT_PRESS(11000, 19, 35, 55, "right"), SHOT(12500, "ci_page2"),
 	OPT_PRESS(13000, 19, 35, 55, "right"), SHOT(14500, "ci_page3"),
-	END(15500),
+	{ 14700, S_OPTDUMP, 2, 0, 0, 0, 0, "options dump" },
+	// Page 3's Invert Camera rows (the "Page 3/3" button is focused): up to Y,
+	// right turns it on; up to X, confirm turns it on; up to Vibration, right
+	// twice; then both back off (down, confirm; down, left) and out.
+	OPT_PRESS(15500, 16, 32, 52, "up (invert y)"), SHOT(16200, "ci_inv_y_focus"),
+	OPT_PRESS(16700, 19, 35, 55, "right (invert y on)"), SHOT(17400, "ci_inv_y_on"),
+	OPT_PRESS(17900, 16, 32, 52, "up (invert x)"), OPT_PRESS(18500, 20, 44, 56, "confirm (invert x on)"), SHOT(19200, "ci_inv_x_on"),
+	OPT_PRESS(19700, 16, 32, 52, "up (vibration)"), SHOT(20400, "ci_vib_focus"),
+	OPT_PRESS(20900, 19, 35, 55, "right (vibration)"), SHOT(21600, "ci_vib_toggled"), OPT_PRESS(22100, 19, 35, 55, "right (vibration back)"),
+	OPT_PRESS(22600, 17, 33, 53, "down (invert x)"), OPT_PRESS(23100, 20, 44, 56, "confirm (invert x off)"),
+	OPT_PRESS(23600, 17, 33, 53, "down (invert y)"), OPT_PRESS(24100, 18, 34, 54, "left (invert y off)"), SHOT(24800, "ci_inv_off"),
+	{ 25300, S_BIND, 21, 0, 0, 0, 0, "cancel (out of the controls)" }, SHOT(26500, "ci_out"),
+	END(27500),
 };
 // ctrliconskb (XXL_PRESETNOPAD=1): the same on the game's keyboard layout
 // (controller preset 1): coop_icons\kb's keycaps.
+// rumble (level 2, a pad in): the game's own timed rumble with Vibration on --
+// player 1's XInput motors on, then off when the time is up.
+const Step kRumble[] = {
+	MARK(0, "rumble"),
+	{ 3000, S_RUMBLE, 0, -1, 0, 1.0f, 0, "vibration on" },
+	{ 3500, S_RUMBLE, 0, 200, 0, 0.6f, 0, "motor 0" },
+	{ 3600, S_RUMBLE, 1, 120, 0, 0.3f, 0, "motor 1" },
+	{ 5000, S_RUMBLE, 0, -1, 0, 0.0f, 0, "vibration back" },
+	{ 5500, S_RUMBLE, 0, 255, 0, 0.5f, 0, "motor 0 (vibration back off: nothing)" },
+	END(7000),
+};
 const Step kCtrlIconsKb[] = {
 	MARK(0, "ctrliconskb"),
 	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
@@ -9723,6 +9746,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spicons33", kSpIcons33),
 	SCENARIO("ctrlicons", kCtrlIcons),
 	SCENARIO("ctrliconskb", kCtrlIconsKb),
+	SCENARIO("rumble", kRumble),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),
@@ -12026,6 +12050,99 @@ void RunStep(const Step& s) {
 			const void* w[1] = { e + 0x54 };
 			WatchBytes(w, 1, 0, 0);
 			Log("autotest: watching writes to Roman %p's component (+0x54 = %p)", e, *(void**)(e + 0x54));
+		}
+		break;
+	}
+	case S_RUMBLE: {   // the game's timed rumble (CKInput FUN_00437EA0): motor a, strength b, x seconds; b < 0: Vibration on (x 1) / back (x 0)
+		InputManager im = GetInputManager();
+		if (!im) break;
+		static int saved = -1;
+		if (s.b < 0) {
+			if (s.x > 0.5f) { saved = *(uint8_t*)(im.raw() + 0x15); *(uint8_t*)(im.raw() + 0x15) = 1; }
+			else if (saved >= 0) *(uint8_t*)(im.raw() + 0x15) = (uint8_t)saved;
+			Log("autotest: Vibration flag (CKInput +0x15) %u", *(uint8_t*)(im.raw() + 0x15));
+			break;
+		}
+		((int(__fastcall*)(char*, void*, uint32_t, uint32_t, uint32_t, float))0x437EA0)(im.raw(), nullptr, 0, (uint32_t)s.a,
+		                                                                                 (uint32_t)s.b, s.x);
+		Log("autotest: rumble motor %d strength %d for %.2f s asked of the game", s.a, s.b, s.x);
+		break;
+	}
+	case S_OPTDUMP: {   // the options interface (2,133): its fields and the controls page `a`'s 2D tree
+		char* io = (char*)GetLvlObject(2, 133, 0);
+		Log("autotest: options interface %p vt %08X", io, io ? *(uint32_t*)io : 0);
+		if (!io) break;
+		int* f = (int*)io;
+		for (int i = 0; i < 0x90; i += 8)
+			Log("autotest: opt[%02X] %08X %08X %08X %08X %08X %08X %08X %08X", i, f[i], f[i + 1], f[i + 2], f[i + 3], f[i + 4], f[i + 5],
+			    f[i + 6], f[i + 7]);
+		struct D {
+			static void Dump(char* p, int depth) {
+				if (!p || IsBadReadPtr(p, 0x40) || depth > 6) return;
+				uintptr_t vt = *(uintptr_t*)p;
+				float* e = (float*)p;
+				char txt[80] = {};
+				uint32_t sid = 0xFFFFFFFF;
+				char* lay = p + 0x20;   // the text layout is embedded
+				if (vt == 0x623B6C || vt == 0x62390C) {
+					sid = *(uint32_t*)(lay + 0x14);
+					const wchar_t* w = (const wchar_t*)(lay + 0x18);
+					for (int k = 0; k < 79 && w[k]; k++) txt[k] = w[k] < 128 ? (char)w[k] : '#';
+				}
+				Log("autotest: %*s%p vt %06X fl %08X at %.3f %.3f size %.3f %.3f id %X \"%s\"", depth * 2, "", p, (unsigned)vt,
+				    ((uint32_t*)p)[1], e[5], e[6], e[13], e[14], sid, txt);
+				if (vt == 0x623B3C) {
+					int k = 0;
+					for (char* c = *(char**)(p + 4); c && k < 80; c = *(char**)(c + 0x10), k++) Dump(c, depth + 1);
+					return;
+				}
+				if (vt != 0x623978) return;
+				for (int o = 0x24; o <= 0x28; o += 4) {
+					char* list = *(char**)(p + o);
+					if (!list || IsBadReadPtr(list, 8)) continue;
+					int k = 0;
+					for (char* c = *(char**)(list + 4); c && k < 60 && !IsBadReadPtr(c, 0x14); c = *(char**)(c + 0x10), k++) Dump(c, depth + 1);
+				}
+			}
+		};
+		// The Vibration row's label (opt[0x13]): fields pointing into itself or its neighbours.
+		if (char* v = (char*)f[0x13]) {
+			for (int i = 0; i < 0x6E0 / 4; i++) {
+				uintptr_t x = ((uintptr_t*)v)[i];
+				if (x >= (uintptr_t)v - 0x6E0 * 8 && x < (uintptr_t)v + 0x6E0 * 8)
+					Log("autotest: vibration +%03X -> %+d (+%03X of its own)", i * 4, (int)(x - (uintptr_t)v), (unsigned)(x - (uintptr_t)v));
+			}
+			Log("autotest: vibration links prev %p next %p, +4 %08X +8 %p", *(void**)(v + 0xC), *(void**)(v + 0x10), ((uint32_t*)v)[1],
+			    *(void**)(v + 8));
+			for (char* r = *(char**)(v + 0xC); r; r = nullptr)
+				Log("autotest: colour objects (+68C): row above %p, vibration %p, next %p; value texts' +68C %p / %p", *(void**)(r + 0x68C),
+				    *(void**)(v + 0x68C), *(char**)(v + 0x10) ? *(void**)(*(char**)(v + 0x10) + 0x68C) : nullptr,
+				    f[0x16] ? *(void**)((char*)f[0x16] + 0x68C) : nullptr,
+				    f[0x16] && *(char**)((char*)f[0x16] + 0xC) ? *(void**)(*(char**)((char*)f[0x16] + 0xC) + 0x68C) : nullptr);
+			// Against the row above (Centre Camera): fields that differ and look like pointers (each row's own objects).
+			for (int pass = 0; pass < 2; pass++) {
+				char* a = pass ? (char*)f[0x16] : v;
+				char* b = a ? *(char**)(a + 0xC) : nullptr;
+				int size = pass ? 0x6DC : 0x6E0;
+				if (!a || !b) continue;
+				for (int i = 0; i < size / 4; i++) {
+					uint32_t x = ((uint32_t*)a)[i], y = ((uint32_t*)b)[i];
+					if (x != y && x >= 0x01000000 && x < 0x7FFF0000 && y >= 0x01000000 && y < 0x7FFF0000 && i * 4 != 0xC && i * 4 != 0x10)
+						Log("autotest: %s +%03X %08X (row above %08X)", pass ? "value" : "label", i * 4, x, y);
+				}
+			}
+		}
+		CKYellowPages* yp = YellowPages();
+		char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+		char* mm = m2d ? *(char**)(m2d + 0x3C) : nullptr;
+		mm = mm ? *(char**)(mm + 4) : nullptr;   // FUN_0042A720: the element list (+4 first, +0xC count)
+		Log("autotest: menu manager %p count %d", mm, mm ? *(int*)(mm + 0xC) : 0);
+		if (mm) {
+			int k = 0;
+			for (char* c = *(char**)(mm + 4); c && k < 60; c = *(char**)(c + 0x10), k++) {
+				Log("autotest: element %d %p vt %06X fl %08X", k, c, *(uint32_t*)c, ((uint32_t*)c)[1]);
+				if (k == 3 || (k >= 10 && k <= 12)) D::Dump(c, 1);
+			}
 		}
 		break;
 	}

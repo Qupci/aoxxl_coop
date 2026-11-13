@@ -21,9 +21,13 @@ struct XI_STATE {
 };
 
 typedef uint32_t(WINAPI* PFN_XInputGetState)(uint32_t, XI_STATE*);
+struct XI_VIBRATION { uint16_t wLeftMotorSpeed, wRightMotorSpeed; };
+typedef uint32_t(WINAPI* PFN_XInputSetState)(uint32_t, XI_VIBRATION*);
 
 static HMODULE            g_xinput = nullptr;
 static PFN_XInputGetState g_getState = nullptr;
+static PFN_XInputSetState g_setState = nullptr;
+static uint32_t           g_rumble[kXInputPads];   // what each pad was last told (left << 16 | right)
 static PadState           g_pads[kMaxPads];
 static PadState           g_virtual[kMaxPads];
 static bool               g_virtualActive[kMaxPads];
@@ -36,6 +40,7 @@ bool PadsInit() {
 		g_xinput = LoadLibraryA(name);
 		if (g_xinput) {
 			g_getState = (PFN_XInputGetState)GetProcAddress(g_xinput, "XInputGetState");
+			g_setState = (PFN_XInputSetState)GetProcAddress(g_xinput, "XInputSetState");
 			if (g_getState) {
 				Log("pads: using %s", name);
 				return true;
@@ -49,8 +54,18 @@ bool PadsInit() {
 }
 
 void PadsShutdown() {
+	for (int i = 0; i < kXInputPads; i++) PadsSetRumble(i, 0, 0);
 	if (g_xinput) { FreeLibrary(g_xinput); g_xinput = nullptr; }
 	g_getState = nullptr;
+	g_setState = nullptr;
+}
+
+void PadsSetRumble(int i, uint16_t left, uint16_t right) {
+	if (i < 0 || i >= kXInputPads || !g_setState || g_virtualActive[i]) return;
+	uint32_t v = (uint32_t)left << 16 | right;
+	if (v == g_rumble[i]) return;
+	XI_VIBRATION vib = { left, right };
+	if (g_setState((uint32_t)i, &vib) == 0) g_rumble[i] = v;
 }
 
 // Radial deadzone: scales the surviving magnitude back over the full 0..1 range

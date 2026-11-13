@@ -1,0 +1,23 @@
+// The controls options (the options menu's Controls, page 3/3).
+//
+// Vibration: the game rumbles through DirectInput force feedback only (pad
+// +0xC4, an effect object), which an XInput pad never has through DirectInput,
+// so its Vibration row could not be chosen. The row is offered whenever an
+// XInput pad is in, and the game's rumble calls (CKInput FUN_00437E60 on,
+// FUN_00437EA0 timed, FUN_00437EE0 off) drive player 1's XInput motors.
+//
+// Invert Camera X / Y: two rows below Vibration, copies of its label and value
+// put into the page while it is up (taken out again when the controls close).
+// On: the camera's horizontal / vertical actions swapped (player 1's 48/49 and
+// 46/47 after each input update; player 2's right stick and the mod's follow
+// cameras turned round). Kept in xxl_coop.ini [controls].
+
+#pragma once
+
+bool CtrlOptsInstallHooks();
+// Once per frame, right after the game's input update: the camera actions
+// swapped, the rumble's motors, the rows taken out when the controls are gone.
+void CtrlOptsFrame();
+// -1 when that camera axis is inverted, else 1 (the mod's own cameras, player 2's stick).
+float CtrlOptsCamX();
+float CtrlOptsCamY();

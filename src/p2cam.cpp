@@ -1,4 +1,5 @@
 #include "p2cam.h"
+#include "ctrlopts.h"
 #include "coop.h"
 #include "gamecam.h"
 #include "config.h"
@@ -208,8 +209,8 @@ void UpdateCam(Hero hero, Hero leader, int pad, const char* seedState) {
 
 	PadState none = {};
 	const PadState& p = pad >= 0 ? PadGet(pad) : none;
-	cam.yaw   += p.rx * kYawSpeed * dt;
-	cam.pitch -= p.ry * kPitchSpeed * dt;
+	cam.yaw   += p.rx * CtrlOptsCamX() * kYawSpeed * dt;   // the options' Invert Camera X / Y
+	cam.pitch -= p.ry * CtrlOptsCamY() * kPitchSpeed * dt;
 
 	// Lazy follow, like the game's own camera: with the right stick left alone,
 	// swing round behind a moving hero. The turn rate goes with sin(angle off
