@@ -28,6 +28,8 @@ public:
 	void doClone(CKObject* object);
 	// romanforge: `obj` is referenced as it is by the clones (a shared component), not cloned.
 	void keepShared(CKObject* obj) { cloneMap[obj] = obj; }
+	// romanforge: a copy of a scene node (and its children, geometry) beside it, under the same parent.
+	CKSceneNode* doCloneNode(CKSceneNode* node);
 	void doExport(CKObject* object, const std::filesystem::path& path);
 	void doImport(const std::filesystem::path& path, CKGroup* parentGroup);
 

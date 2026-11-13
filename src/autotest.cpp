@@ -60,7 +60,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -4476,6 +4476,26 @@ const Step kShadow45[] = {
 	SECTORS(3000), SHOT(5000, "shadow45_1"),
 	PLACEAT(8000, HERO_OBELIX, -915.0f, 21.0f, -335.0f), PLACEAT(8000, HERO_ASTERIX, -917.2f, 21.0f, -337.6f),
 	SHOT(10000, "shadow45_2"), SHOT(15000, "shadow45_3"), SHOT(25000, "shadow45_4"), END(30000),
+};
+// shine41 (-Level 4, XXL_ATONCE=3; user: helmets past some number had no shine,
+// screenshots Snipaste_2026-11-13_05-12-04, LV6-4): Asterix's Twister in the
+// middle of LV4-1's field Romans (-301.1 0.7 87.5) -- a crowd of helmets; which
+// of them have a particle system on them (S_SHINE; a = the first clone's index).
+#define SHINE41(t, n) { t, S_SHINE, 98, 0, 0, -301.081f, 0.7f, n, 87.452f }, SHOT(t, n)
+const Step kShine41[] = {
+	MARK(0, "baseline"),
+	PLACEAT(1000, HERO_ASTERIX, -301.081f, 1.2f, 87.452f), POTION(1200),
+	{ 3000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, { 3500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SHINE41(9000, "shine41_1"), SHINE41(11000, "shine41_2"), SHINE41(13000, "shine41_3"), END(14000),
+};
+// shine51 (-Level 5, XXL_ATONCE=3; user: LV5-1 170.3 11.6 283.0 -- no wheat, no
+// dialogue): Asterix's Twister among the Romans there; the helmets left after it
+// (more than a bonus pool's shine has points for: 64) must all shine.
+const Step kShine51[] = {
+	MARK(0, "baseline"),
+	PLACEAT(1000, HERO_ASTERIX, 170.344f, 12.0f, 283.045f), PLACEAT(1000, HERO_OBELIX, 172.344f, 12.0f, 285.045f),
+	POTION(1200), { 3000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, { 3500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SHOT(12000, "shine51_1"), SHOT(20000, "shine51_2"), SHOT(26000, "shine51_3"), SHOT(30000, "shine51_4"), END(31000),
 };
 const Step kRules4P[] = {
 	MARK(0, "baseline"),
@@ -9940,6 +9960,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("atonce41", kAtOnce41),
 	SCENARIO("stack21", kStack21),
 	SCENARIO("shadow45", kShadow45),
+	SCENARIO("shine41", kShine41),
+	SCENARIO("shine51", kShine51),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),
 	SCENARIO("lock34", kLock34),
@@ -11968,6 +11990,39 @@ void RunStep(const Step& s) {
 			WatchBytes(w, 1, 0, 0);
 			Log("autotest: watching writes to Roman %p's component (+0x54 = %p)", e, *(void**)(e + 0x54));
 		}
+		break;
+	}
+	case S_SHINE: {   // bonuses (2,114) shown within 40 units of (x y z): which have a particle system (11,19) on them
+		Vector3 c(s.x, s.y, s.z);
+		static float pp[2048][3];
+		int np = 0, nPart = (int)GetNumLvlClassInstances(11, 19), partShown = 0;
+		for (int i = 0; i < nPart && np < 2048; i++) {
+			char* n = (char*)GetLvlObject(11, 19, i);
+			char* fr = n ? *(char**)(n + 4) : nullptr;
+			if (!fr) continue;
+			const float* q = (const float*)(fr + 0x80);
+			if (!(*(uint8_t*)(n + 0x10) & 2)) partShown++;
+			pp[np][0] = q[0]; pp[np][1] = q[1]; pp[np][2] = q[2]; np++;
+		}
+		unsigned nb = GetNumLvlClassInstances(2, 114);
+		int shown[2] = {}, lit[2] = {};
+		for (unsigned i = 0; i < nb; i++) {
+			char* b = (char*)GetLvlObject(2, 114, i);
+			char* node = b ? *(char**)(b + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr || (*(uint8_t*)(node + 0x10) & 2)) continue;
+			const float* q = (const float*)(fr + 0x80);
+			if ((Vector3(q[0], q[1], q[2]) - c).len2() > 1600.0f) continue;
+			int clone = i >= (unsigned)s.a && s.a > 0;
+			shown[clone]++;
+			for (int k = 0; k < np; k++) {
+				float dx = pp[k][0] - q[0], dy = pp[k][1] - q[1], dz = pp[k][2] - q[2];
+				if (dx * dx + dy * dy + dz * dz < 1.0f) { lit[clone]++; break; }
+			}
+		}
+		Log("autotest: %s: bonuses shown near (%.0f %.0f %.0f): originals %d (%d with a particle system on them), clones %d (%d); "
+		    "particle systems in the level %d (%d shown), bonuses %u (first clone #%d)", s.name, s.x, s.y, s.z, shown[0], lit[0],
+		    shown[1], lit[1], np, partShown, nb, s.a);
 		break;
 	}
 	case S_NODEDUMP: {   // bonuses (2,114) within 6 units of (x y z): their node trees

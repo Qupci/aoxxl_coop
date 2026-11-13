@@ -22,5 +22,7 @@ bool ForgeModuleKnown(const void* exe, size_t exeSize);
 // Builds level `lvl` into outDir (LVLnnn\LVLnn.KWN, and the sectors' STRnn_mm.KWN
 // when Romans were added): converted, Romans cloned with factor > 1. Writes a
 // short report to `report`. *cloned: Romans added. false: nothing usable written.
+// `shine`: the copies of bonus pools' shine particle systems, "pool class id,
+// pool index, particle system (11,19) indexes;" per pool.
 bool ForgeLevel(const void* exe, size_t exeSize, const char* gameDir, const char* outDir, int lvl,
-                float factor, int* cloned, char* report, size_t reportSize);
+                float factor, int* cloned, char* report, size_t reportSize, char* shine, size_t shineSize);

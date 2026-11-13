@@ -7,6 +7,9 @@
 #include "CoreClasses/CKGroup.h"
 #include "CoreClasses/CKHook.h"
 #include "GameClasses/CKGameX1.h"
+#include "CoreClasses/CKNode.h"
+#include <algorithm>
+#include <vector>
 #include <initializer_list>
 #include <stdexcept>
 #include <cmath>
@@ -39,6 +42,7 @@ bool ForgeModuleKnown(const void* exe, size_t exeSize) {
 namespace {
 
 const int kViewObjects = 2;   // bonus and crate objects: one set per view
+const int kShinePoints = 64;  // a shine particle system's points a frame (the bonus tick's cap)
 
 int CountHooks(CKGroup* g) {
 	int n = 0;
@@ -88,8 +92,9 @@ void Add(std::string& r, const char* fmt, ...) {
 }
 
 bool ForgeLevel(const void* exe, size_t exeSize, const char* gameDir, const char* outDir, int lvl,
-                float factor, int* cloned, char* report, size_t reportSize) {
+                float factor, int* cloned, char* report, size_t reportSize, char* shine, size_t shineSize) {
 	std::string r;
+	if (shineSize) shine[0] = 0;
 	*cloned = 0;
 	bool ok = false;
 	try {
@@ -150,7 +155,50 @@ bool ForgeLevel(const void* exe, size_t exeSize, const char* gameDir, const char
 				crates += Fill(kenv, group, tmpl, n * kViewObjects, { tmpl->ckhcUnk1.get() },
 				               [tmpl](CKHook* h) { h->cast<CKHkCrate>()->ckhcUnk1 = tmpl->ckhcUnk1; });
 			}
-			if (bonuses || crates) Add(r, " bonuses +%d, crates +%d;", bonuses, crates);
+			// A bonus pool's shine is one particle system (particleNode1) taking a point
+			// per bonus each frame, at most 64: pools with more bonuses get copies of it,
+			// one per 64 more (the mod's EmitShine moves on to them; their object numbers
+			// in `shine`: "pool class id, pool index, particle system indexes;").
+			std::string map;
+			int shines = 0;
+			{
+				const int classIds[2] = { CKGrpBonusPool::CLASS_ID, CKGrpAsterixBonusPool::CLASS_ID };
+				std::vector<std::pair<std::string, std::vector<CKSceneNode*>>> made;
+				for (int c = 0; c < 2; c++) {
+					auto& objs = c == 0 ? kenv.levelObjects.getClassType<CKGrpBonusPool>().objects
+					                    : kenv.levelObjects.getClassType<CKGrpAsterixBonusPool>().objects;
+					for (size_t pi = 0; pi < objs.size(); pi++) {
+						CKGrpBonusPool* pool = objs[pi]->cast<CKGrpBonusPool>();
+						CKSceneNode* sys = pool->particleNode1.get();
+						int n = CountHooks(pool);
+						if (!sys || !sys->dyncast<CParticlesNodeFx>() || n <= kShinePoints) continue;
+						std::vector<CKSceneNode*> copies;
+						for (int k = 1; k * kShinePoints < n; k++) {
+							Duplicator dup(kenv, nullptr);
+							copies.push_back(dup.doCloneNode(sys));
+						}
+						char key[32];
+						snprintf(key, sizeof(key), "%d %zu", classIds[c], pi);
+						made.push_back({ key, copies });
+						shines += (int)copies.size();
+					}
+				}
+				auto& parts = kenv.levelObjects.getClassType<CParticlesNodeFx>().objects;
+				for (auto& m : made) {
+					map += m.first;
+					for (CKSceneNode* node : m.second) {
+						auto it = std::find(parts.begin(), parts.end(), (CKObject*)node);
+						if (it == parts.end()) throw std::runtime_error("a shine copy is not among the level's particle systems");
+						char b[16];
+						snprintf(b, sizeof(b), " %d", (int)(it - parts.begin()));
+						map += b;
+					}
+					map += ";";
+				}
+			}
+			snprintf(shine, shineSize, "%s", map.c_str());
+			if (bonuses || crates) Add(r, " bonuses +%d, crates +%d, shines +%d;", bonuses, crates, shines);
+			*cloned += shines;
 			*cloned += bonuses + crates;
 			if (*cloned > 0) {
 				kenv.saveLevel(lvl);   // the level and its sectors (ids of their objects follow the level's)

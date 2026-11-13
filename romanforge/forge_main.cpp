@@ -54,9 +54,9 @@ int main(int argc, char** argv) {
 	fread(elb.data(), 1, n, f); fclose(f);
 	printf("module known: %d\n", ForgeModuleKnown(elb.data(), elb.size()));
 	int cloned = 0;
-	char report[2048];
+	char report[2048], shine[1024];
 	bool ok = ForgeLevel(elb.data(), elb.size(), argv[1], argv[2], atoi(argv[3]), argc > 4 ? (float)atof(argv[4]) : 1.0f,
-	                     &cloned, report, sizeof(report));
-	printf("ok %d, %d objects added:%s\n", ok, cloned, report);
+	                     &cloned, report, sizeof(report), shine, sizeof(shine));
+	printf("ok %d, %d objects added:%s\nshine copies: %s\n", ok, cloned, report, shine);
 	return ok ? 0 : 2;
 }

@@ -801,3 +801,18 @@ KEnvironment KFab::makeSimilarKEnv(const KEnvironment& kenv)
 	}
 	return kfab;
 }
+
+// romanforge addition: a scene node copied in the same level (a bonus pool's
+// shine particle system for the co-op mod), under the original's parent.
+CKSceneNode* Duplicator::doCloneNode(CKSceneNode* node)
+{
+	srcEnv = &kenv;
+	destEnv = &kenv;
+	cloneFunction = [this](CKObject* obj, int sector) -> CKObject* { return kenv.cloneObject(obj, sector); };
+	CKSceneNode* clone = cloneNode(node, true);
+	CSGBranch* parent = node->parent.get() ? node->parent->dyncast<CSGBranch>() : nullptr;
+	if (!parent)
+		parent = kenv.levelObjects.getFirst<CSGSectorRoot>();
+	parent->insertChild(clone);
+	return clone;
+}

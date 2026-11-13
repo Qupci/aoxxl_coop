@@ -1,6 +1,7 @@
 #include "levelforge.h"
 #include "config.h"
 #include "log.h"
+#include "kal.h"
 #include "../romanforge/forge_lib.h"
 #include <windows.h>
 #include <algorithm>
@@ -17,7 +18,7 @@ namespace {
 namespace fs = std::filesystem;
 
 // Bumped when what the forge writes changes: rebuilds every cached level.
-const char* const kForgeVersion = "romanforge 2";   // 2: archers, jumping Romans, bonuses and crates
+const char* const kForgeVersion = "romanforge 3";   // 2: archers, jumping Romans, bonuses and crates; 3: shine copies
 const int kLevels = 9;
 
 std::vector<unsigned char> g_exe;
@@ -31,6 +32,7 @@ struct Level {
 	HANDLE done = nullptr;
 	bool ok = false;      // a rebuilt level file to serve
 	int cloned = 0;       // objects added (its sectors rebuilt too)
+	char shine[256] = {}; // copies of bonus pools' shine systems (ForgeLevel: "class pool parts...;")
 };
 Level g_lv[kLevels];
 
@@ -72,7 +74,7 @@ std::string KeyPath(int lvl) {
 }
 
 // A level already built from the same files: served as it is.
-bool CacheValid(int lvl, int* cloned) {
+bool CacheValid(int lvl, int* cloned, char* shine, size_t shineSize) {
 	FILE* f = fopen(KeyPath(lvl).c_str(), "rb");
 	if (!f) return false;
 	char buf[4096] = {};
@@ -84,14 +86,23 @@ bool CacheValid(int lvl, int* cloned) {
 	*nl = 0;
 	if (LevelKey(lvl) != buf) return false;
 	*cloned = atoi(nl + 1);
+	char* nl2 = strchr(nl + 1, '\n');
+	shine[0] = 0;
+	if (nl2) {
+		char* end = strchr(nl2 + 1, '\n');
+		if (end) *end = 0;
+		snprintf(shine, shineSize, "%s", nl2 + 1);
+	}
 	char lvlFile[64];
 	snprintf(lvlFile, sizeof(lvlFile), "\\LVL%03d\\LVL%02d.KWN", lvl, lvl);
 	return GetFileAttributesA((g_cacheDir + lvlFile).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-bool ForgeSafe(int lvl, const char* outDir, float factor, int* cloned, char* report, size_t reportSize) {
+bool ForgeSafe(int lvl, const char* outDir, float factor, int* cloned, char* report, size_t reportSize, char* shine,
+               size_t shineSize) {
 	__try {
-		return ForgeLevel(g_exe.data(), g_exe.size(), g_gameDir.c_str(), outDir, lvl, factor, cloned, report, reportSize);
+		return ForgeLevel(g_exe.data(), g_exe.size(), g_gameDir.c_str(), outDir, lvl, factor, cloned, report, reportSize,
+		                  shine, shineSize);
 	} __except (EXCEPTION_EXECUTE_HANDLER) {
 		snprintf(report, reportSize, " crashed (%08X)", (unsigned)GetExceptionCode());
 		return false;
@@ -102,9 +113,9 @@ void Build(int lvl) {
 	Level& L = g_lv[lvl];
 	EnterCriticalSection(&g_lock);
 	DWORD t0 = GetTickCount();
-	if (CacheValid(lvl, &L.cloned)) {
+	if (CacheValid(lvl, &L.cloned, L.shine, sizeof(L.shine))) {
 		L.ok = true;
-		Log("levelforge: level %d from the cache (%d objects added)", lvl, L.cloned);
+		Log("levelforge: level %d from the cache (%d objects added; shine copies %s)", lvl, L.cloned, L.shine[0] ? L.shine : "none");
 		LeaveCriticalSection(&g_lock);
 		return;
 	}
@@ -112,14 +123,14 @@ void Build(int lvl) {
 	snprintf(dir, sizeof(dir), "LVL%03d", lvl);
 	fs::path cache = fs::u8path(g_cacheDir), tmp = cache / "build";
 	std::error_code ec;
-	char report[2048] = {};
+	char report[2048] = {}, shine[256] = {};
 	int cloned = 0;
 	bool ok = false;
 	for (float f : { g_factor, 1.0f }) {   // failing that, just converted (the module reads no other format)
 		fs::remove_all(tmp, ec);
 		fs::create_directories(tmp, ec);
 		cloned = 0;
-		ok = ForgeSafe(lvl, tmp.u8string().c_str(), f, &cloned, report, sizeof(report));
+		ok = ForgeSafe(lvl, tmp.u8string().c_str(), f, &cloned, report, sizeof(report), shine, sizeof(shine));
 		Log("levelforge: level %d built (factor %.2f) in %u ms: %s%s", lvl, f, GetTickCount() - t0, ok ? "" : "FAILED", report);
 		if (ok || f == 1.0f) break;
 	}
@@ -132,7 +143,7 @@ void Build(int lvl) {
 		} else {
 			FILE* f = fopen(KeyPath(lvl).c_str(), "wb");
 			if (f) {
-				fprintf(f, "%s\n%d\n", LevelKey(lvl).c_str(), cloned);
+				fprintf(f, "%s\n%d\n%s\n", LevelKey(lvl).c_str(), cloned, shine);
 				fclose(f);
 			}
 		}
@@ -140,6 +151,7 @@ void Build(int lvl) {
 	fs::remove_all(tmp, ec);
 	L.ok = ok;
 	L.cloned = ok ? cloned : 0;
+	snprintf(L.shine, sizeof(L.shine), "%s", ok ? shine : "");
 	LeaveCriticalSection(&g_lock);
 }
 
@@ -255,6 +267,87 @@ bool HookCreateFileA() {
 	return false;
 }
 
+// A bonus pool's shine is one particle system (pool +0x40, the editor's
+// particleNode1) emitting from points its bonuses add each frame -- the bonus
+// tick's end (0x54D788..0x54D812, CKHkBasicBonus::vf15): the bonus's position
+// (frame +0x80 with bonus +8 bit 0x400, else frame +0x40) into the system's
+// point buffer ((+0x44) +0x10, 12 bytes each), count byte +0x40, at most 64
+// (the buffer is that big). With the rebuilt levels' 100 helmets the ones past
+// 64 had no shine (user, LV6-4 / LV5-1 after a Twister). The forge gives such a
+// pool copies of its shine system (one per 64 more bonuses, their numbers in the
+// key file); a bonus goes to the first system with a point left, and with all
+// full takes one of the frame's points in turn.
+const uintptr_t kShineEmit = 0x54D788;   // .. 0x54D812 (EmitShineStub jumps back there)
+
+// The shine systems of `pool`: its own and the copies the forge made for it
+// (the loaded level's map: "pool class id, pool index, particle system indexes;").
+int ShineSystems(char* pool, char** out, int max) {
+	int n = 0;
+	if (char* own = *(char**)(pool + 0x40)) out[n++] = own;
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	int lvl = gm ? *(int*)(gm + ax::kGM_currentLevel) : -1;
+	if (lvl < 0 || lvl >= kLevels || g_lv[lvl].state != LV_DONE || !g_lv[lvl].shine[0]) return n;
+	for (const char* e = g_lv[lvl].shine; *e;) {
+		int cls = 0, idx = 0, used = 0;
+		if (sscanf(e, "%d %d%n", &cls, &idx, &used) != 2) break;
+		const char* p = e + used;
+		const char* semi = strchr(p, ';');
+		bool mine = (char*)GetLvlObject(4, cls, idx) == pool;
+		while (mine && *p && *p != ';' && n < max) {
+			int part = 0, u = 0;
+			if (sscanf(p, "%d%n", &part, &u) != 1) break;
+			char* sys = (char*)GetLvlObject(11, 19, part);
+			if (sys && *(uintptr_t*)sys == 0x622FCC) out[n++] = sys;   // CParticlesNodeFx
+			p += u;
+		}
+		if (!semi) break;
+		e = semi + 1;
+	}
+	return n;
+}
+
+void __cdecl EmitShine(char* bonus) {
+	char* pool = *(char**)(bonus + 0x18);
+	char* node = *(char**)(bonus + 0x10);
+	char* frame = node ? *(char**)(node + 4) : nullptr;
+	char* systems[8];
+	int ns = pool && frame ? ShineSystems(pool, systems, 8) : 0;
+	if (!ns) return;
+	const float* src = (const float*)(frame + ((*(uint32_t*)(bonus + 8) & 0x400) ? 0x80 : 0x40));
+	for (int i = 0; i < ns; i++) {   // the first with a point left
+		char* sys = systems[i];
+		char* buf = *(char**)(sys + 0x44) ? *(char**)(*(char**)(sys + 0x44) + 0x10) : nullptr;
+		uint8_t n = *(uint8_t*)(sys + 0x40);
+		if (!buf || n >= 64) continue;
+		memcpy(buf + n * 12, src, 12);
+		*(uint16_t*)(sys + 0x10) |= 0x400;
+		*(uint8_t*)(sys + 0x40) = n + 1;
+		static int s_second = 0;
+		if (i > 0 && s_second++ < 5) Log("levelforge: bonus pool %p's shine: a bonus on its copy %d (%p)", pool, i, sys);
+		return;
+	}
+	// All full: one of the frame's points in turn.
+	static unsigned s_turn = 0;
+	static int s_told = 0;
+	if (s_turn == 0 && s_told++ < 5)
+		Log("levelforge: bonus pool %p's %d shine system(s) have their 64 points this frame -- more bonuses take them in turn", pool, ns);
+	char* sys = systems[(s_turn / 64) % ns];
+	char* buf = *(char**)(sys + 0x44) ? *(char**)(*(char**)(sys + 0x44) + 0x10) : nullptr;
+	if (buf) memcpy(buf + (s_turn % 64) * 12, src, 12);
+	s_turn++;
+}
+
+__declspec(naked) void EmitShineStub() {
+	__asm {
+		push esi
+		call EmitShine
+		add esp, 4
+		mov eax, 0x54D812
+		jmp eax
+	}
+}
+
 } // namespace
 
 bool LevelForgePoolsFilled(int level) {
@@ -314,6 +407,15 @@ void LevelForgeInstall() {
 		VirtualProtect(at, p.size, PAGE_EXECUTE_READWRITE, &old);
 		memcpy(at, p.bytes, p.size);
 		VirtualProtect(at, p.size, old, &old);
+	}
+	static const uint8_t kShineEmitBytes[8] = { 0x8B, 0x46, 0x08, 0xBB, 0x00, 0x04, 0x00, 0x00 };   // mov eax,[esi+8]; mov ebx,0x400
+	if (!memcmp((void*)kShineEmit, kShineEmitBytes, sizeof(kShineEmitBytes))) {
+		DWORD old;
+		VirtualProtect((void*)kShineEmit, 5, PAGE_EXECUTE_READWRITE, &old);
+		SetImmediateJump((void*)kShineEmit, (uintptr_t)EmitShineStub);
+		VirtualProtect((void*)kShineEmit, 5, old, &old);
+	} else {
+		Log("levelforge: the bonus shine code differs at %08X -- shine past 64 bonuses left as it is", (unsigned)kShineEmit);
 	}
 	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
 	Log("levelforge: Roman pools (basic Romans, leaders, archers, jumping Romans) filled up to x%.2f, bonuses and "
