@@ -4924,3 +4924,13 @@ both halves).
   touched always followed (factors back to 1 restore the game's values), squad / merchant load hooks always in.
   Autotests coopopts (pages 1/2/5, nolock and revive_time_limit round trips, back to the pause with the item
   focused), coopswap (player 2 joined: p2_hero asterix -> "heroes swapped", split_mode horizontal live; both back).
+- Round 265 (Nov 13, commit 01535ae; user: CO-OP Options work; the item stayed lit after the Options screen, centre the
+  pause box; phase 4: the hero swap prompt in the mod's boxes with the P1/P2 icon). The pause screen's items are
+  copied while focused when the pause comes back from Options (Options focused): a CColorTextButton2d's focused
+  colour is in its brush, so the copy is unfocused with its vf25 (+0x64; sets the brush to +0x690, clears the bit).
+  Centring: every item and the backing +0.5 step (0.05), the backing a step taller. Hero swap (coop.cpp
+  HeroSwapFrame): player 1's button sp_hero_switch_button on its XInput pad (Player1Pad, else the first pad not
+  player 2's) or sp_hero_switch_key with the game window in front, its icon by the controller preset (CKInput +0x64
+  = 1 the keyboard); player 2's logical D-pad up ([p2_pad] / [keyboard] switch_hero). Hold 0.6 s -> HINT_SWAP on
+  both boxes (8 s), the other's press -> CoopSwapHeroes. Autotests heroswap (player 2 asks, player 1 on virtual pad
+  1 confirms -> swapped; player 1 asks, dropped after 8 s), pauseback (Options and back: only Options lit).
