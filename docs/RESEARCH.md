@@ -4895,3 +4895,17 @@ both halves).
   edges (Escape cancels), the menu held off with +0x21C = 2 meanwhile. p1_deadzone: radial on the game's byte
   values (0-3 move, 46-49 camera) before the invert swap. Autotest ctrlicons (page 4/4, Deadzone 0.00 -> 0.04 -> 0.00,
   4 -> 1 -> 4 -> 3, Invert/Vibration as before); the binding itself needs a real press (pad test).
+- Round 263 (Nov 13, commits 12a0ac3 + e35419a; phase 2 of the menu plan: player 2 in the menus). Pause from outside:
+  the game's Pause is binding 12 (a frame of 0xFF after the input update); the pause screen CKHkInterfacePause
+  (2/131) reads its view (+0x18; remap +8) actions 0-7 = bindings 16-23, action 6 = resume (event 0x4F01) = binding
+  22 (the keyboard's Escape, in every preset). Menu owner: the pause beginning within 0.5 s of player 2's Back.
+  Player 2 drives it by pressing the menu bindings (16-19/32-35/52-55 directions, 20/44/56 confirm, 21 cancel, 22
+  resume) from its logical pad edges. Player 2's pad layout: pads.cpp turns the physical buttons into the default
+  ones (P2Logical, before edges), PadsRawButtons keeps the physical; the keyboard pad gives D-pad down (hud) and up
+  (switch_hero). Controls page offsets: +0x10C + i*4 the 23 binding labels, +0x168 + i*4 their value texts
+  (FUN_00526540 refills them with player 1's), +0x1F0 Current Configuration button, +0x1F4 its value text,
+  +0x1F8 / +0x1FC its strings (0x408 keyboard, 0x40A controller), +0x208 player 1's configuration (1 controller),
+  +0x5C / +0x60 bottom bar left / right texts (right: x 0.965 alignment 2, its layout right-aligned -- the
+  element's alignment byte does not centre it; a copy of the left one linked into its list was never drawn).
+  Text width: layout +0x2D4 words, +0x3C8 + 8i word x (screen = aspect wide), FUN_005FDAB0 word width
+  (HintsTextWidth). Player 2's Start in the pause would have left co-op: ignored while paused.
