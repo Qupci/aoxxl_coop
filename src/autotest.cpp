@@ -8340,6 +8340,29 @@ const Step kCoopSwap[] = {
 	END(36500),
 };
 #undef COOP_IN
+// pauseback (level 2): the pause menu (centred with CO-OP Options); Options
+// and back: Options focused, CO-OP Options not lit.
+const Step kPauseBack[] = {
+	MARK(0, "pauseback"),
+	{ 3000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" }, SHOT(4500, "pb_pause"),
+	OPT_PRESS(5000, 17, 33, 53, "down"), OPT_PRESS(5500, 17, 33, 53, "down (options)"),
+	OPT_PRESS(6000, 20, 44, 56, "confirm (options)"), SHOT(7500, "pb_options"),
+	{ 8000, S_BIND, 21, 0, 0, 0, 0, "cancel (back)" }, SHOT(9500, "pb_back"),
+	END(10500),
+};
+// heroswap (level 2): player 2 joins on virtual pad 2, holds D-pad up 1 s: player
+// 1's box asks "Confirm [P2] hero switch [D-pad up]", player 2's waits; player 1
+// (virtual pad 1) presses D-pad up: the heroes swap. Then player 1 asks and
+// nobody confirms: dropped after 8 s.
+const Step kHeroSwap[] = {
+	MARK(0, "heroswap"),
+	VPAD(2000, 1, PAD_START, 0, 0, "p2 start"), VPAD(2200, 1, 0, 0, 0, "p2 release"),
+	VPAD(4000, 1, PAD_DPAD_UP, 0, 0, "p2 holds d-pad up"), VPAD(5000, 1, 0, 0, 0, "p2 release"), SHOT(5400, "hs_asked"),
+	VPAD(6000, 0, PAD_DPAD_UP, 0, 0, "p1 d-pad up (confirm)"), VPAD(6150, 0, 0, 0, 0, "p1 release"), SHOT(7500, "hs_swapped"),
+	VPAD(9000, 0, PAD_DPAD_UP, 0, 0, "p1 holds d-pad up"), VPAD(10000, 0, 0, 0, 0, "p1 release"), SHOT(10400, "hs_p1_asks"),
+	SHOT(19000, "hs_dropped"),
+	END(20000),
+};
 const Step kCtrlIconsKb[] = {
 	MARK(0, "ctrliconskb"),
 	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
@@ -9882,6 +9905,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("p1coop", kP1Coop),
 	SCENARIO("coopopts", kCoopOpts),
 	SCENARIO("coopswap", kCoopSwap),
+	SCENARIO("pauseback", kPauseBack),
+	SCENARIO("heroswap", kHeroSwap),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),

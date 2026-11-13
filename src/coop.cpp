@@ -32,6 +32,7 @@
 #include "p2cam.h"
 #include "pads.h"
 #include "hints.h"
+#include "icons.h"
 #include "individual.h"
 #include "nolock.h"
 #include "guard.h"
@@ -3176,6 +3177,99 @@ struct SoloThrow {
 static void SoloTorchThrow(Trio t);
 bool CoopSoloTorchThrowing() { return g_spThrow.phase != 0; }
 
+// The hero swap (co-op): a player holds its Switch hero button 0.6 s (player
+// 1: sp_hero_switch_button / _key; player 2: [p2_pad] / [keyboard]
+// switch_hero, D-pad up), the other player's box asks "Confirm [P1/P2] hero
+// switch [its button]" and its own says it waits; the other's press within 8 s
+// swaps the heroes (CoopSwapHeroes). Not in a cutscene, a scripted ride, the
+// pause, or with R3 held (the mod's buttons).
+struct SwapAsk {
+	int   asker = -1;
+	DWORD at = 0;
+	DWORD holdSince[2] = { 0, 0 };
+	bool  wasDown[2] = { false, false };
+	bool  needRelease[2] = { false, false };
+} g_swap;
+
+// Player 1's keyboard key counts only with the game's window in front.
+bool OurWindowInFront() {
+	DWORD pid = 0;
+	HWND fg = GetForegroundWindow();
+	if (fg) GetWindowThreadProcessId(fg, &pid);
+	return pid == GetCurrentProcessId();
+}
+
+// The icon of player `player`'s Switch hero button (the device it plays on).
+wchar_t SwitchGlyph(int player) {
+	if (player == 1) {
+		if (g.p2Pad == kKeyboardPad) return IconKeyGlyph(g_config.keys[CoopConfig::KEY_SWITCH]);
+		return IconPadButtonGlyph(g_config.p2Pad[CoopConfig::P2B_SWITCH]);
+	}
+	// Player 1: the keyboard's key with the game on its keyboard layout (controller preset 1, CKInput +0x64).
+	InputManager im = GetInputManager();
+	if (im && *(uint8_t*)(im.raw() + 0x64) == 1) return IconKeyGlyph(g_config.spSwitchKey);
+	return IconPadButtonGlyph(g_config.spSwitchButton);
+}
+
+void HeroSwapFrame(const PadState& p2, DWORD now, bool blocked) {
+	int p1pad = Player1Pad();
+	for (int i = 0; p1pad < 0 && i < kXInputPads; i++)
+		if (i != g.p2Pad && PadGet(i).connected) p1pad = i;
+	const PadState& q = PadGet(p1pad);
+	bool down[2];
+	down[0] = (p1pad >= 0 && q.connected && g_config.spSwitchButton && (q.buttons & g_config.spSwitchButton) &&
+	           !(q.buttons & PAD_RTHUMB)) ||
+	          (g.p2Pad != kKeyboardPad && g_config.spSwitchKey && (GetAsyncKeyState(g_config.spSwitchKey) & 0x8000) &&
+	           OurWindowInFront());
+	down[1] = (p2.buttons & PAD_DPAD_UP) && !(p2.buttons & PAD_RTHUMB);
+	bool pressed[2];
+	for (int k = 0; k < 2; k++) {
+		pressed[k] = down[k] && !g_swap.wasDown[k];
+		g_swap.wasDown[k] = down[k];
+	}
+	if (blocked) {
+		if (g_swap.asker >= 0) { HintHide(HINT_SWAP); g_swap.asker = -1; }
+		g_swap.holdSince[0] = g_swap.holdSince[1] = 0;
+		return;
+	}
+	if (g_swap.asker >= 0) {
+		int other = 1 - g_swap.asker;
+		if (pressed[other]) {
+			HintHide(HINT_SWAP);
+			Log("coop: player %d confirms player %d's hero swap", other + 1, g_swap.asker + 1);
+			g_swap.asker = -1;
+			g_swap.needRelease[0] = g_swap.needRelease[1] = true;
+			CoopSwapHeroes("the players' hero swap");
+		} else if (now - g_swap.at > 8000) {
+			HintHide(HINT_SWAP);
+			Log("coop: player %d's hero swap not confirmed", g_swap.asker + 1);
+			g_swap.asker = -1;
+		}
+		return;
+	}
+	for (int k = 0; k < 2; k++) {
+		if (!down[k]) { g_swap.holdSince[k] = 0; g_swap.needRelease[k] = false; continue; }
+		if (g_swap.needRelease[k]) continue;
+		if (!g_swap.holdSince[k]) { g_swap.holdSince[k] = now; continue; }
+		if (now - g_swap.holdSince[k] < 600) continue;
+		g_swap.asker = k;
+		g_swap.at = now;
+		g_swap.holdSince[k] = 0;
+		g_swap.needRelease[k] = true;
+		int other = 1 - k;
+		wchar_t asker = IconGlyph(k ? "p2" : "p1"), mate = IconGlyph(other ? "p2" : "p1"), button = SwitchGlyph(other);
+		wchar_t text[96];
+		if (asker && button) swprintf(text, 96, L"Confirm %c hero switch %c", asker, button);
+		else swprintf(text, 96, L"Confirm P%d hero switch", k + 1);
+		HintShow(HINT_SWAP, other, text, 8000);
+		if (mate) swprintf(text, 96, L"Hero switch: waiting for %c", mate);
+		else swprintf(text, 96, L"Hero switch: waiting for P%d", other + 1);
+		HintShow(HINT_SWAP, k, text, 8000);
+		Log("coop: player %d asks for a hero swap", k + 1);
+		break;
+	}
+}
+
 void CoopFrame() {
 	DWORD now = GetTickCount();
 	g.frames++;
@@ -3353,6 +3447,7 @@ void CoopFrame() {
 	} else {
 		g.p2BackHeldAt = 0;
 	}
+	HeroSwapFrame(p, now, inCutscene || g.suspended || CtrlOptsGamePaused());
 
 	Hero h1 = t ? t.GetHero(g.p1Hero) : Hero();
 	Hero h2 = t ? t.GetHero(g.p2Hero) : Hero();

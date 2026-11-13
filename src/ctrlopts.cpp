@@ -976,7 +976,10 @@ void InvertFrame() {
 // ret 4): its container is menu element +0x20, its items +0x30 Combos, +0x34
 // Options, +0x38 Forfeit, +0x3C Quit Game, +0x40 Resume, its view +0x18 (action
 // 4 confirm). The item: a copy of Options below it, the items under it and the
-// backing moved down a row while it is in (put back when the pause is gone).
+// backing moved down a row, then the whole box up half a row (centred again),
+// while it is in (put back when the pause is gone). The copy is unfocused the
+// game's way (vf25, +0x64): copied from a focused Options (back from the
+// Options screen) its colour was the focused one.
 typedef void(__fastcall* PauseTickFn)(char* pause, void* edx, uint32_t arg);
 typedef int(__fastcall* OptMainFn)(char* opt, void* edx, uint32_t arg);
 const uintptr_t kPauseTick = 0x529660, kOptMain = 0x526730;
@@ -990,7 +993,7 @@ alignas(16) char g_pItemColour[0x80];
 char* g_pList = nullptr;
 DWORD g_pauseTick = 0;
 struct Moved { char* e; float y, h; };
-Moved g_moved[16];
+Moved g_moved[24];
 int   g_nMoved = 0;
 
 void Focus(char* e) {
@@ -1040,27 +1043,27 @@ void PauseIn(char* pause) {
 	g_nMoved = 0;
 	for (int o = 0x24; o <= 0x28; o += 4) {
 		char* l = *(char**)(box + o);
-		for (char* c = l ? *(char**)(l + 4) : nullptr; c && g_nMoved < 16; c = *(char**)(c + 0x10)) {
+		for (char* c = l ? *(char**)(l + 4) : nullptr; c && g_nMoved < 24; c = *(char**)(c + 0x10)) {
 			uintptr_t vt = *(uintptr_t*)c;
 			float* y = (float*)(c + 0x18);
 			float* h = (float*)(c + 0x38);
-			if (vt == kVtTextButton && *y < y0 - 0.001f) {
+			if (vt == kVtTextButton) {   // the items: those under Options a row down; all half a row up
 				g_moved[g_nMoved++] = { c, *y, *h };
-				*y -= step;
-			} else if (vt == 0x6235C0) {   // the backing: a row taller, as far down
+				*y += (*y < y0 - 0.001f ? -step : 0.0f) + 0.5f * step;
+			} else if (vt == 0x6235C0) {   // the backing: a row taller, as far down, then half a row up
 				g_moved[g_nMoved++] = { c, *y, *h };
-				Log("ctrlopts: pause backing at %.3f height %.3f, alignment %d %d", *y, *h, c[6], c[7]);
 				float half = c[7] == 1 ? 0.5f : c[7] == 2 ? 0.0f : 1.0f;
 				*h += step;
-				*y -= step * half;
+				*y += 0.5f * step - step * half;
 			}
 		}
 	}
 	memcpy(g_pItem, options, sizeof(g_pItem));
 	char*& colour = *(char**)(g_pItem + 0x68C);
 	if (colour) { memcpy(g_pItemColour, colour, sizeof(g_pItemColour)); colour = g_pItemColour; }
+	*(float*)(g_pItem + 0x18) = y0 - 0.5f * step;   // below Options (itself half a row up)
+	if (g_pItem[5] & 4) ((void(__fastcall*)(char*, void*))(*(void***)g_pItem)[0x64 / 4])(g_pItem, nullptr);   // unfocused, its colour too
 	g_pItem[5] &= ~4;
-	*(float*)(g_pItem + 0x18) = y0 - step;
 	((SetTextFn)0x42E590)(g_pItem + 0x20, nullptr, HintsModString(128, L"CO-OP Options"));
 	LinkAfter(list, options, g_pItem);
 	g_pList = list;
