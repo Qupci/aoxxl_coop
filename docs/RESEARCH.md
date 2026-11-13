@@ -4909,3 +4909,18 @@ both halves).
   element's alignment byte does not centre it; a copy of the left one linked into its list was never drawn).
   Text width: layout +0x2D4 words, +0x3C8 + 8i word x (screen = aspect wide), FUN_005FDAB0 word width
   (HintsTextWidth). Player 2's Start in the pause would have left co-op: ignored while paused.
+- Round 264 (Nov 13, commit 5b4d25c; phase 3 of the menu plan: CO-OP Options). Pause screen CKHkInterfacePause (2/131) vf18
+  0x529660 (thiscall(arg), ret 4): +0x20 its box's element id, items +0x30 Combos (0.6), +0x34 Options (0.5), +0x38
+  Quit Game (0.25), +0x3C Forfeit (0.4), +0x40 Resume (0.7) -- all CColorTextButton2d; backing billboard at 0.475
+  height 0.65 (alignment 1 1: centred). Its confirm (view action 4) acts on the focused item; a copy of Options linked
+  after it does nothing there, so its confirm focuses Options first (element vf24 at +0x60, thiscall()) and the game
+  opens Options. Options' list (page kind 3) FUN_00526730 (ret 4): +0x100 the Controls item (its confirm: page kind 1,
+  page 0, container +0x1C4 shown, the page button focused); +0xFC Audio (kind 0), +0x104 Graphics (kind 2). The
+  co-op mode on the controls page: the game taken to its page 3 by pressing its page button rightwards (binding 19,
+  one press per tick), the co-op rows copies of the mod's rows linked after them; cancel (view action 5) leaves to
+  the list, whose tick then gets a cancel (binding 21) -- the pause again (the list's cancel applies the options as
+  the game does). coopopts.cpp: the table (section, key, kind, field, range); CoopSwapHeroes swaps p1Hero/p2Hero
+  (views, HUD, input follow), P2CamReset. experimental.cpp: g_pathCheck worked out each frame, the combo bar once
+  touched always followed (factors back to 1 restore the game's values), squad / merchant load hooks always in.
+  Autotests coopopts (pages 1/2/5, nolock and revive_time_limit round trips, back to the pause with the item
+  focused), coopswap (player 2 joined: p2_hero asterix -> "heroes swapped", split_mode horizontal live; both back).
