@@ -34,6 +34,8 @@ bool CoopP2Joined();
 bool CoopSkipAdded(const char* scene);
 int  CoopP2Hero();
 int  CoopP1Hero();
+// The players change heroes (both in co-op): views, HUD, input follow.
+void CoopSwapHeroes(const char* why);
 void CoopNoteZoneHero(int heroIndex);
 void CoopNoteStoryZone(int heroIndex);   // a zone bound to the other hero started a cutscene for this one
 void CoopNoteBossRun(int heroIndex);     // this hero woke a boss that the heroes run from

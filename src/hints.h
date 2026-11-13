@@ -72,7 +72,7 @@ enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_Y, HB_RB, HB_CO
 // or pressed), else the pad button's or the key's name.
 const wchar_t* HintButtonName(int player, HintButton b, int look = ICON_PLAIN);
 // A string id the game's text objects can show (localisation lookups answer
-// it with `text`): slots 0-31 for other modules (ctrlopts.cpp's rows).
+// it with `text`): slots 0-129 for other modules (ctrlopts.cpp's rows).
 uint32_t HintsModString(int slot, const wchar_t* text);
 // A text element's (CText2d) laid-out width, as a share of the screen's.
 float HintsTextWidth(char* text);

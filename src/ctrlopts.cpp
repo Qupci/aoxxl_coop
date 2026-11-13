@@ -2,6 +2,7 @@
 #include "config.h"
 #include "coop.h"
 #include "detour.h"
+#include "coopopts.h"
 #include "hints.h"
 #include "icons.h"
 #include "inputmgr.h"
@@ -270,7 +271,42 @@ bool IsPage4(char* e) {
 	return false;
 }
 
-// Page 3's rows or page 4's shown (the page button and the backing stay).
+// ---- the co-op options on the controls page -----------------------------------
+//
+// The pause menu's "CO-OP Options" (a copy of its Options item) opens the
+// game's Options (the item's confirm made the Options item's), whose list then
+// gets Controls chosen (OptMainHook): the controls page, in co-op mode, shows
+// the co-op options (coopopts.cpp) instead of its rows -- copies of the
+// Vibration row again, nine to a page, all in page 3's container (the game is
+// taken to its page 3 by its own page button). Its page button turns the
+// co-op pages; cancel goes back through the options' list (cancelled too) to
+// the pause menu, the item focused.
+const int kCoopMax = 48, kCoopPerPage = 9;
+alignas(16) char g_cLabel[kCoopMax][0x6E0];
+alignas(16) char g_cValue[kCoopMax][0x6DC];
+alignas(16) char g_cColour[kCoopMax][2][0x80];
+int   g_cN = 0;            // the co-op rows put in
+bool  g_coop = false;      // the controls page shows them
+int   g_coopPage = 0;
+int   g_coopEnter = 0;     // ticks left to take the game to its page 3
+// The way in and out: 1 the pause's item chosen (the game opens Options), 2
+// the options' list told to choose Controls, 3 the co-op controls, 4 cancelled
+// (the list cancelled too), 5 back at the pause (the item focused).
+int   g_coopState = 0;
+DWORD g_coopStateAt = 0;
+
+void CoopState(int s) {
+	g_coopState = s;
+	g_coopStateAt = GetTickCount();
+}
+int CoopIndex(char* e) {
+	for (int i = 0; i < g_cN; i++) if (e == g_cLabel[i] || e == g_cValue[i]) return i;
+	return -1;
+}
+int CoopPages() { return (CoopOptCount() + kCoopPerPage - 1) / kCoopPerPage; }
+
+// Page 3's rows or page 4's shown (the page button and the backing stay); in
+// co-op mode only the co-op page's rows.
 void ShowPage(bool page4) {
 	if (!g_page) return;
 	char* lists[2] = { g_labels, g_values };
@@ -278,14 +314,21 @@ void ShowPage(bool page4) {
 		for (char* c = *(char**)(list + 4); c; c = *(char**)(c + 0x10)) {
 			uintptr_t vt = *(uintptr_t*)c;
 			if (c == g_pageButton || (vt != kVtTextButton && vt != kVtText)) continue;
-			Show(c, IsPage4(c) == page4);
+			int ci = CoopIndex(c);
+			Show(c, g_coop ? ci >= 0 && ci / kCoopPerPage == g_coopPage : ci < 0 && IsPage4(c) == page4);
 		}
 }
 
 void BarOut();
 void TakeOut() {
 	if (!g_page) return;
+	g_coop = false;
 	ShowPage(false);
+	for (int i = g_cN - 1; i >= 0; i--) {
+		if (InList(g_values, g_cValue[i])) Unlink(g_values, g_cValue[i]);
+		if (InList(g_labels, g_cLabel[i])) Unlink(g_labels, g_cLabel[i]);
+	}
+	g_cN = 0;
 	for (int i = kNumRows - 1; i >= 0; i--) {
 		if (InList(g_values, g_value[i])) Unlink(g_values, g_value[i]);
 		if (InList(g_labels, g_label[i])) Unlink(g_labels, g_label[i]);
@@ -414,7 +457,8 @@ void BarOut() {
 
 void BarIn(char* opt) {
 	BarOut();
-	if (!CoopP2Joined()) return;
+	bool coop = g_coopState == 2 || g_coop;
+	if (!CoopP2Joined() && !coop) return;
 	char* right = *(char**)(opt + 0x60);
 	uintptr_t vt = right ? *(uintptr_t*)right : 0;
 	if (vt != kVtText && vt != kVtTextButton) return;
@@ -447,7 +491,8 @@ void BarIn(char* opt) {
 	g_bar[5] &= ~4;
 	wchar_t text[40];
 	wchar_t g = IconGlyph(g_view ? "p2" : "p1");
-	if (g) swprintf(text, 40, L"%c Controls", g);
+	if (coop) wcscpy(text, L"CO-OP Options");
+	else if (g) swprintf(text, 40, L"%c Controls", g);
 	else swprintf(text, 40, L"P%d Controls", g_view + 1);
 	((SetTextFn)0x42E590)(g_bar + 0x20, nullptr, HintsModString(31, text));
 	float w = HintsTextWidth(g_bar);
@@ -643,6 +688,55 @@ void BindFrame(char* opt) {
 	HintsRefreshTexts();   // the labels' icons
 }
 
+// A co-op row's label (the ini key) and value.
+void ShowCoopRow(int i) {
+	wchar_t label[64], value[64];
+	swprintf(label, 64, L"%hs", CoopOptKey(i));
+	((SetTextFn)0x42E590)(g_cLabel[i] + 0x20, nullptr, HintsModString(32 + 2 * i, label));
+	bool on;
+	uint32_t vid;
+	if (CoopOptToggle(i, &on)) vid = on ? kYes : kNo;
+	else {
+		CoopOptValue(i, value, 64);
+		vid = HintsModString(33 + 2 * i, value);
+	}
+	((SetTextFn)0x42E590)(g_cValue[i] + 0x20, nullptr, vid);
+}
+
+// The co-op rows: copies of the mod's last row (itself the Vibration row's),
+// after it in both lists, nine to a page from the top row down.
+void CoopRowsIn(float top) {
+	char* tplLabel = g_label[kNumRows - 1];
+	char* tplValue = g_value[kNumRows - 1];
+	g_cN = CoopOptCount() < kCoopMax ? CoopOptCount() : kCoopMax;
+	char* afterLabel = tplLabel;
+	char* afterValue = tplValue;
+	for (int i = 0; i < g_cN; i++) {
+		memcpy(g_cLabel[i], tplLabel, sizeof(g_cLabel[i]));
+		memcpy(g_cValue[i], tplValue, sizeof(g_cValue[i]));
+		char* rows[2] = { g_cLabel[i], g_cValue[i] };
+		for (int k = 0; k < 2; k++) {
+			char*& colour = *(char**)(rows[k] + 0x68C);
+			if (!colour) continue;
+			memcpy(g_cColour[i][k], colour, sizeof(g_cColour[i][k]));
+			colour = g_cColour[i][k];
+		}
+		g_cLabel[i][5] &= ~4;
+		ShowCoopRow(i);
+		LinkAfter(g_labels, afterLabel, g_cLabel[i]);
+		LinkAfter(g_values, afterValue, g_cValue[i]);
+		afterLabel = g_cLabel[i];
+		afterValue = g_cValue[i];
+		*(float*)(g_cLabel[i] + 0x18) = *(float*)(g_cValue[i] + 0x18) = top - kPage3Step * (i % kCoopPerPage);
+	}
+	g_coop = true;
+	g_coopPage = 0;
+	g_coopEnter = 30;
+	CoopState(3);
+	ShowPage(false);
+	Log("ctrlopts: the co-op options (%d, %d pages) on the controls page", g_cN, CoopPages());
+}
+
 // Page 3 with the mod's rows: copies of the Vibration label and value, linked
 // in (Switch hero before Vibration, the rest after it), page 3's rows closed up
 // from the top one, page 4's put at the top and hidden.
@@ -715,7 +809,8 @@ void PutIn(char* opt) {
 	}
 	for (char* c = *(char**)(values + 4); c && top >= 0.0f; c = *(char**)(c + 0x10))
 		if (*(uintptr_t*)c == kVtText) *(float*)(c + 0x18) = IsPage4(c) ? top - kPage4Step * v4++ : top - kPage3Step * v3++;
-	SetLoc(kLocPageCur, *(int*)(opt + 0x20C) + 1);   // the counter's text again, with 4 pages
+	if (g_coopState == 2) CoopRowsIn(top);
+	SetLoc(kLocPageCur, g_coop ? 1 : *(int*)(opt + 0x20C) + 1);   // the counter's text again, with 4 pages
 	BarIn(opt);
 	HintsRefreshTexts();
 	Log("ctrlopts: the mod's rows put in the controls (player %d's; page 3: %d rows, page 4: %d, from %.3f)", g_view + 1, n3, n4,
@@ -728,6 +823,44 @@ void SetPage4(char* opt, bool on) {
 	ShowPage(on);
 	SetLoc(kLocPageCur, on ? 4 : *(int*)(opt + 0x20C) + 1);
 	Log("ctrlopts: page %d", on ? 4 : *(int*)(opt + 0x20C) + 1);
+}
+
+// The controls page in co-op mode: the game taken to its page 3 (its page
+// button rightwards), its page button turning the co-op pages, a row's left /
+// right / confirm its option's, cancel the way back.
+int CoopPageTick(char* opt, void* edx, uint32_t arg, int page, bool onPageButton, bool left, bool right, bool confirm, bool ready) {
+	char* view = *(char**)(opt + 0x18);
+	ViewActionFn act = (ViewActionFn)0x4358B0;
+	if (g_coopEnter > 0) {
+		g_coopEnter--;
+		if (page == 2) {
+			g_coopEnter = 0;
+			SetLoc(kLocPageCur, g_coopPage + 1);
+		} else if (onPageButton) {
+			InputManager im = GetInputManager();
+			if (uint8_t* v = im ? im.Values() : nullptr) v[19] = 0xFF;   // its page button rightwards
+			left = right = confirm = false;
+		}
+	}
+	if (ready && view && act(view, nullptr, 5)) CoopState(4);   // cancel: back to the pause (OptMainHook)
+	if (page == 2 && onPageButton && (left || right)) {
+		int n = CoopPages();
+		g_coopPage = (g_coopPage + (right ? 1 : n - 1)) % n;
+		*(uint32_t*)(opt + 0x21C) = 1;
+		MenuSound(opt);
+		SetLoc(kLocPageCur, g_coopPage + 1);
+		left = right = false;
+	}
+	int focused = -1;
+	for (int i = 0; i < g_cN; i++) if (g_cLabel[i][5] & 4) focused = i;
+	int r = g_origCtrlPage(opt, edx, arg);
+	if (*(int*)(opt + 0x20C) == 2) ShowPage(false);
+	if (focused >= 0 && (g_cLabel[focused][5] & 4) && (left || right || confirm) &&
+	    CoopOptChange(focused, left ? -1 : right ? 1 : 0)) {
+		MenuSound(opt);
+		ShowCoopRow(focused);
+	}
+	return r;
 }
 
 int __fastcall CtrlPageHook(char* opt, void* edx, uint32_t arg) {
@@ -743,6 +876,7 @@ int __fastcall CtrlPageHook(char* opt, void* edx, uint32_t arg) {
 	int page = *(int*)(opt + 0x20C);
 	char* pageButtonNow = page >= 0 && page < 3 ? *(char**)(opt + 0x1D0 + page * 4) : nullptr;
 	bool onPageButton = pageButtonNow && (pageButtonNow[5] & 4);
+	if (g_coop) return CoopPageTick(opt, edx, arg, page, onPageButton, left, right, confirm, ready);
 	// Player 2's view: its Current Configuration (the game's is player 1's) and
 	// its game rows' rebinding, not the game's.
 	if (g_view == 1 && (left || right || confirm)) {
@@ -789,6 +923,14 @@ void __fastcall RowColoursHook(char* opt, void* edx, void* time, char* focused) 
 	if (!g_page || !focused) return;
 	uint32_t pulse = *((uint32_t*(__fastcall*)(char*, void*))0x461A00)(opt + 0xB4, nullptr);
 	uint32_t normal = *(uint32_t*)(opt + 0xB0);
+	for (int i = 0; i < g_cN; i++) {
+		char* layout = g_cValue[i] + 0x20;
+		((SetColourFn)(*(void***)layout)[0x28 / 4])(layout, nullptr, focused == g_cLabel[i] ? pulse : normal);
+		if (focused != g_cLabel[i]) {
+			layout = g_cLabel[i] + 0x20;
+			((SetColourFn)(*(void***)layout)[0x28 / 4])(layout, nullptr, normal);
+		}
+	}
 	for (int i = 0; i < kNumRows; i++) {
 		char* layout = g_value[i] + 0x20;
 		((SetColourFn)(*(void***)layout)[0x28 / 4])(layout, nullptr, focused == g_label[i] ? pulse : normal);
@@ -826,6 +968,134 @@ void InvertFrame() {
 	}
 	if (g_config.invertCamY) { uint8_t t = v[46]; v[46] = v[47]; v[47] = t; }
 	if (g_config.invertCamX) { uint8_t t = v[48]; v[48] = v[49]; v[49] = t; }
+}
+
+// ---- "CO-OP Options" in the pause menu ------------------------------------------
+
+// The pause screen (CKHkInterfacePause 2/131) tick, vf18 (thiscall(arg),
+// ret 4): its container is menu element +0x20, its items +0x30 Combos, +0x34
+// Options, +0x38 Forfeit, +0x3C Quit Game, +0x40 Resume, its view +0x18 (action
+// 4 confirm). The item: a copy of Options below it, the items under it and the
+// backing moved down a row while it is in (put back when the pause is gone).
+typedef void(__fastcall* PauseTickFn)(char* pause, void* edx, uint32_t arg);
+typedef int(__fastcall* OptMainFn)(char* opt, void* edx, uint32_t arg);
+const uintptr_t kPauseTick = 0x529660, kOptMain = 0x526730;
+const uint8_t   kPauseTickPrologue[5] = { 0x83, 0xEC, 0x0C, 0x53, 0x56 };
+const uint8_t   kOptMainPrologue[8] = { 0x83, 0xEC, 0x14, 0xA1, 0xF4, 0x21, 0x66, 0x00 };
+PauseTickFn g_origPauseTick = nullptr;
+OptMainFn   g_origOptMain = nullptr;
+
+alignas(16) char g_pItem[0x6E0];
+alignas(16) char g_pItemColour[0x80];
+char* g_pList = nullptr;
+DWORD g_pauseTick = 0;
+struct Moved { char* e; float y, h; };
+Moved g_moved[16];
+int   g_nMoved = 0;
+
+void Focus(char* e) {
+	if (e) ((void(__fastcall*)(char*, void*))(*(void***)e)[0x60 / 4])(e, nullptr);
+}
+
+void PauseOut() {
+	if (!g_pList) return;
+	if (InList(g_pList, g_pItem)) Unlink(g_pList, g_pItem);
+	for (int i = 0; i < g_nMoved; i++) {
+		*(float*)(g_moved[i].e + 0x18) = g_moved[i].y;
+		*(float*)(g_moved[i].e + 0x38) = g_moved[i].h;
+	}
+	g_nMoved = 0;
+	g_pList = nullptr;
+}
+
+void PauseIn(char* pause) {
+	if (g_pList && InList(g_pList, g_pItem)) return;
+	g_pList = nullptr;
+	CKYellowPages* yp = YellowPages();
+	char* m2d = yp ? *(char**)((char*)yp + 0x34) : nullptr;
+	char* menus = m2d ? *(char**)(m2d + 0x3C) : nullptr;
+	char* box = menus ? ((MenuElementFn)0x42A720)(menus, nullptr, *(uint32_t*)(pause + 0x20)) : nullptr;
+	char* options = *(char**)(pause + 0x34);
+	if (!box || !options || *(uintptr_t*)options != kVtTextButton) return;
+	static int logs = 0;
+	if (logs < 1) {
+		logs++;
+		for (int o = 0x30; o <= 0x40; o += 4) {
+			char* e = *(char**)(pause + o);
+			char a[40] = {};
+			for (int k = 0; e && k < 39 && ((wchar_t*)(e + 0x38))[k]; k++) a[k] = (char)((wchar_t*)(e + 0x38))[k];
+			Log("ctrlopts: pause +%02X %p \"%s\" at %.3f %.3f", o, e, a, e ? *(float*)(e + 0x14) : 0.0f, e ? *(float*)(e + 0x18) : 0.0f);
+		}
+	}
+	char* list = nullptr;
+	for (int o = 0x24; o <= 0x28 && !list; o += 4) {
+		char* l = *(char**)(box + o);
+		if (l && InList(l, options)) list = l;
+	}
+	char* above = *(char**)(options + 0xC);
+	if (!list || !above) return;
+	float step = *(float*)(above + 0x18) - *(float*)(options + 0x18);
+	if (step <= 0.0f || step > 0.3f) return;
+	float y0 = *(float*)(options + 0x18);
+	g_nMoved = 0;
+	for (int o = 0x24; o <= 0x28; o += 4) {
+		char* l = *(char**)(box + o);
+		for (char* c = l ? *(char**)(l + 4) : nullptr; c && g_nMoved < 16; c = *(char**)(c + 0x10)) {
+			uintptr_t vt = *(uintptr_t*)c;
+			float* y = (float*)(c + 0x18);
+			float* h = (float*)(c + 0x38);
+			if (vt == kVtTextButton && *y < y0 - 0.001f) {
+				g_moved[g_nMoved++] = { c, *y, *h };
+				*y -= step;
+			} else if (vt == 0x6235C0) {   // the backing: a row taller, as far down
+				g_moved[g_nMoved++] = { c, *y, *h };
+				Log("ctrlopts: pause backing at %.3f height %.3f, alignment %d %d", *y, *h, c[6], c[7]);
+				float half = c[7] == 1 ? 0.5f : c[7] == 2 ? 0.0f : 1.0f;
+				*h += step;
+				*y -= step * half;
+			}
+		}
+	}
+	memcpy(g_pItem, options, sizeof(g_pItem));
+	char*& colour = *(char**)(g_pItem + 0x68C);
+	if (colour) { memcpy(g_pItemColour, colour, sizeof(g_pItemColour)); colour = g_pItemColour; }
+	g_pItem[5] &= ~4;
+	*(float*)(g_pItem + 0x18) = y0 - step;
+	((SetTextFn)0x42E590)(g_pItem + 0x20, nullptr, HintsModString(128, L"CO-OP Options"));
+	LinkAfter(list, options, g_pItem);
+	g_pList = list;
+	Log("ctrlopts: \"CO-OP Options\" put in the pause menu (%.3f below Options)", step);
+}
+
+void __fastcall PauseTickHook(char* pause, void* edx, uint32_t arg) {
+	g_pauseTick = GetTickCount();
+	if (*(int*)(pause + 0x20) != -1) PauseIn(pause);
+	if (g_pList) {
+		if (g_coopState == 5) { Focus(g_pItem); CoopState(0); }
+		char* view = *(char**)(pause + 0x18);
+		if ((g_pItem[5] & 4) && view && ((ViewActionFn)0x4358B0)(view, nullptr, 4)) {
+			Focus(*(char**)(pause + 0x34));   // the game opens Options
+			CoopState(1);
+			Log("ctrlopts: CO-OP Options chosen");
+		}
+	}
+	g_origPauseTick(pause, edx, arg);
+}
+
+// The options' list (FUN_00526730, page kind 3): on the way in, Controls
+// (+0x100) chosen; on the way out, cancelled.
+int __fastcall OptMainHook(char* opt, void* edx, uint32_t arg) {
+	InputManager im = GetInputManager();
+	uint8_t* v = im ? im.Values() : nullptr;
+	if (g_coopState == 1 && v) {
+		Focus(*(char**)(opt + 0x100));
+		v[20] = 0xFF;
+		CoopState(2);
+	} else if (g_coopState == 4 && v) {
+		v[21] = 0xFF;
+		CoopState(5);
+	}
+	return g_origOptMain(opt, edx, arg);
 }
 
 // ---- the pause menu for either player ------------------------------------------
@@ -908,7 +1178,7 @@ const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s) {
 	const wchar_t* at = wcsstr(s, kVar);
 	if (!at) return s;
 	static wchar_t buf[200];
-	swprintf(buf, 200, L"%.*s4%s", (int)(at - s), s, at + wcslen(kVar));
+	swprintf(buf, 200, L"%.*s%d%s", (int)(at - s), s, g_coop ? CoopPages() : 4, at + wcslen(kVar));
 	return buf;
 }
 
@@ -919,7 +1189,13 @@ void CtrlOptsFrame() {
 	InvertFrame();
 	RumbleFrame();
 	MenuFrame();
-	if (g_page && GetTickCount() - g_pageTick > 100) TakeOut();
+	DWORD now = GetTickCount();
+	if (g_page && now - g_pageTick > 100) TakeOut();
+	if (g_pList && now - g_pauseTick > 100) PauseOut();
+	if (g_coopState && g_coopState != 3 && now - g_coopStateAt > 3000) {
+		Log("ctrlopts: the co-op options' way %d not taken in 3 s -- dropped", g_coopState);
+		CoopState(0);
+	}
 }
 
 bool CtrlOptsInstallHooks() {
@@ -936,5 +1212,10 @@ bool CtrlOptsInstallHooks() {
 	                    "controls page (Invert Camera rows)");
 	ok &= InstallDetour(kRowColours, (void*)RowColoursHook, (void**)&g_origRowColours, kRowColoursPrologue,
 	                    sizeof(kRowColoursPrologue), "options rows' colours (Invert Camera values)");
+	ok &= InstallDetour(kPauseTick, (void*)PauseTickHook, (void**)&g_origPauseTick, kPauseTickPrologue,
+	                    sizeof(kPauseTickPrologue), "pause screen tick (CO-OP Options item)");
+	ok &= InstallDetour(kOptMain, (void*)OptMainHook, (void**)&g_origOptMain, kOptMainPrologue, sizeof(kOptMainPrologue),
+	                    "options list tick (the way to the co-op options)");
+	CoopOptsInit();
 	return ok;
 }

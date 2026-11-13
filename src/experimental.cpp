@@ -54,6 +54,10 @@ bool g_pathCheck = false;
 struct Apart { bool apart = false, fresh = true; int noes = 0; DWORD at = 0; int told = 0, timed = 0; } g_apart;
 
 void ApartFrame() {
+	// (The co-op options can change the factors and rules while playing.)
+	bool squads = g_config.squadAliveFactor != 1.0f || g_config.squadCountFactor != 1.0f;
+	bool combo = g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f;
+	g_pathCheck = (squads || combo) && !g_config.rulesStatic && g_config.apartByPath;
 	if (!g_pathCheck || !CoopP2Joined() || !KalLevelIsLoaded()) {
 		g_apart.apart = false;
 		g_apart.fresh = true;
@@ -920,7 +924,8 @@ void ExperimentalFrame() {
 	GateStartFrame(m, now);
 	UpdateSquads(m, now);
 	GateFrame(m);
-	if (g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f)
+	// (Once on, it goes on: factors put back to 1 in the co-op options give the game's own values back.)
+	if (g_comboGm || g_config.comboFactor != 1.0f || g_config.comboDrainFactor != 1.0f || g_config.comboFullDrainFactor != 1.0f)
 		ComboFrame(m);
 }
 
@@ -934,7 +939,7 @@ bool ExperimentalInstallHooks() {
 	    g_config.rulesStatic ? "static (on all through co-op)" : "dynamic (the game's own while the heroes are apart)",
 	    g_pathCheck ? "looked up every 0.5 s in co-op" : "not looked up");
 	g_logCmds = getenv("XXL_SQUADCMDS") != nullptr;
-	if (squads || g_logCmds) {
+	if (true) {   // (always: the co-op options can turn the factors on while playing)
 		ok &= InstallDetour(kSquadDeserialize, (void*)SquadDeserializeHook, (void**)&g_origSquadDeserialize,
 		                    kSquadDeserializePrologue, sizeof(kSquadDeserializePrologue),
 		                    "squad load (experimental: Romans at once / to defeat)");
@@ -949,8 +954,7 @@ bool ExperimentalInstallHooks() {
 	                    "squad formation spot (extra Romans beside the spots, not on the centre)");
 	ok &= InstallDetour(kAvoidAdd, (void*)AvoidAddHook, (void**)&g_origAvoidAdd, kAvoidAddPrologue,
 	                    sizeof(kAvoidAddPrologue), "avoidance add (at most its 50 entries)");
-	if (g_config.priceFactor != 1.0f)
-		ok &= InstallDetour(kShopDeserialize, (void*)ShopDeserializeHook, (void**)&g_origShopDeserialize,
+	ok &= InstallDetour(kShopDeserialize, (void*)ShopDeserializeHook, (void**)&g_origShopDeserialize,
 		                    kShopDeserializePrologue, sizeof(kShopDeserializePrologue),
 		                    "merchant load (experimental: prices)");
 	return ok;

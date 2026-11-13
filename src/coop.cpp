@@ -903,6 +903,19 @@ int  CoopNonLeaderPlayer() {
 	return t.Leader() == g.p2Hero ? g.p1Hero : g.p2Hero;
 }
 int  CoopP1Hero()    { return g.p1Hero; }
+
+// The players change heroes (p2_hero in the co-op options; the hero swap):
+// everything per player follows its hero (input, views, HUD, prompts), so the
+// swap is the two indices; player 2's own follow camera starts again.
+void CoopSwapHeroes(const char* why) {
+	if (!g.p2Joined) return;
+	int a = g.p1Hero;
+	g.p1Hero = g.p2Hero;
+	g.p2Hero = a;
+	P2CamReset();
+	Log("coop: heroes swapped (%s): player 1 %s, player 2 %s", why, HeroName(g.p1Hero), HeroName(g.p2Hero));
+	CoopLogState("hero swap");
+}
 int  CoopP2Pad()     { return g.p2Pad; }
 bool CoopSuspended() { return g.suspended; }
 int  CoopShopper() { return g.p2Joined && g.shopping && !g.suspended ? g.shopper : -1; }

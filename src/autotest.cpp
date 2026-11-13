@@ -8280,6 +8280,66 @@ const Step kP1Coop[] = {
 	END(14000),
 };
 #undef P2TAP
+// coopopts (level 2): the pause menu's CO-OP Options (down x3 from Resume),
+// its pages 1, 2, 5; nolock toggled and back, revive_time_limit auto <-> seconds
+// and back; cancel: the pause menu, the item focused.
+const Step kCoopOpts[] = {
+	MARK(0, "coopopts"),
+	{ 3000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" }, SHOT(4500, "co_pause"),
+	OPT_PRESS(5000, 17, 33, 53, "down"), OPT_PRESS(5500, 17, 33, 53, "down"), OPT_PRESS(6000, 17, 33, 53, "down"),
+	SHOT(6600, "co_item"), OPT_PRESS(7000, 20, 44, 56, "confirm (co-op options)"), SHOT(8500, "co_page1"),
+	OPT_PRESS(9000, 16, 32, 52, "up (nolock)"), OPT_PRESS(9500, 20, 44, 56, "confirm (nolock)"), SHOT(10200, "co_nolock"),
+	OPT_PRESS(10600, 20, 44, 56, "confirm (nolock back)"),
+	OPT_PRESS(11000, 16, 32, 52, "up"), OPT_PRESS(11400, 16, 32, 52, "up"), OPT_PRESS(11800, 16, 32, 52, "up (revive_time_limit)"),
+	OPT_PRESS(12300, 20, 44, 56, "confirm (auto <-> seconds)"), SHOT(13000, "co_limit"),
+	OPT_PRESS(13400, 19, 35, 55, "right (+5)"), SHOT(14000, "co_limit_more"), OPT_PRESS(14400, 18, 34, 54, "left (-5)"),
+	OPT_PRESS(14800, 20, 44, 56, "confirm (back)"),
+	OPT_PRESS(15300, 17, 33, 53, "down"), OPT_PRESS(15700, 17, 33, 53, "down"), OPT_PRESS(16100, 17, 33, 53, "down"),
+	OPT_PRESS(16500, 17, 33, 53, "down (page button)"),
+	OPT_PRESS(17000, 19, 35, 55, "right (page 2)"), SHOT(17800, "co_page2"),
+	OPT_PRESS(18200, 19, 35, 55, "right"), OPT_PRESS(18700, 19, 35, 55, "right"), OPT_PRESS(19200, 19, 35, 55, "right (page 5)"),
+	SHOT(20000, "co_page5"), OPT_PRESS(20400, 19, 35, 55, "right (page 1)"), SHOT(21000, "co_page1_again"),
+	{ 21500, S_BIND, 21, 0, 0, 0, 0, "cancel (back to the pause)" }, SHOT(23000, "co_back"),
+	END(24000),
+};
+// coopswap (level 2): player 2 joins (Obelix); in CO-OP Options p2_hero to
+// asterix (the heroes swap at once) and split_mode to horizontal; resumed: the
+// halves swapped and stacked; then both back.
+#define COOP_IN(t) OPT_PRESS(t, 17, 33, 53, "down"), OPT_PRESS(t + 400, 17, 33, 53, "down"), 	OPT_PRESS(t + 800, 17, 33, 53, "down"), OPT_PRESS(t + 1200, 20, 44, 56, "confirm (co-op options)")
+const Step kCoopSwap[] = {
+	MARK(0, "coopswap"),
+	VPAD(2000, 1, PAD_START, 0, 0, "p2 start"), VPAD(2200, 1, 0, 0, 0, "p2 release"), SHOT(3500, "cs_before"),
+	VPAD(4000, 1, PAD_BACK, 0, 0, "p2 back (menu)"), VPAD(4120, 1, 0, 0, 0, "p2 release"),
+	COOP_IN(5000),
+	// p2_hero: the page button's next row down is the top one (the list wraps) -- up x9 is sure.
+	OPT_PRESS(7000, 16, 32, 52, "up"), OPT_PRESS(7300, 16, 32, 52, "up"), OPT_PRESS(7600, 16, 32, 52, "up"),
+	OPT_PRESS(7900, 16, 32, 52, "up"), OPT_PRESS(8200, 16, 32, 52, "up"), OPT_PRESS(8500, 16, 32, 52, "up"),
+	OPT_PRESS(8800, 16, 32, 52, "up"), OPT_PRESS(9100, 16, 32, 52, "up"), OPT_PRESS(9400, 16, 32, 52, "up (p2_hero)"),
+	OPT_PRESS(9900, 19, 35, 55, "right (asterix)"), SHOT(10500, "cs_p2hero"),
+	// split_mode: page 2, up x4 from its page button.
+	OPT_PRESS(11000, 17, 33, 53, "down"), OPT_PRESS(11300, 17, 33, 53, "down"), OPT_PRESS(11600, 17, 33, 53, "down"),
+	OPT_PRESS(11900, 17, 33, 53, "down"), OPT_PRESS(12200, 17, 33, 53, "down"), OPT_PRESS(12500, 17, 33, 53, "down"),
+	OPT_PRESS(12800, 17, 33, 53, "down"), OPT_PRESS(13100, 17, 33, 53, "down"), OPT_PRESS(13400, 17, 33, 53, "down (page button)"),
+	OPT_PRESS(13900, 19, 35, 55, "right (page 2)"),
+	OPT_PRESS(14400, 16, 32, 52, "up"), OPT_PRESS(14700, 16, 32, 52, "up"), OPT_PRESS(15000, 16, 32, 52, "up"),
+	OPT_PRESS(15300, 16, 32, 52, "up (split_mode)"), OPT_PRESS(15800, 20, 44, 56, "confirm (horizontal)"), SHOT(16400, "cs_split"),
+	{ 17000, S_BIND, 21, 0, 0, 0, 0, "cancel" }, { 18500, S_BIND, 22, 0, 0, 0, 0, "resume" }, SHOT(20500, "cs_after"),
+	// Both back.
+	VPAD(21500, 1, PAD_BACK, 0, 0, "p2 back (menu)"), VPAD(21620, 1, 0, 0, 0, "p2 release"),
+	COOP_IN(22500),
+	OPT_PRESS(24500, 19, 35, 55, "right (page 2)"),
+	OPT_PRESS(25000, 16, 32, 52, "up"), OPT_PRESS(25300, 16, 32, 52, "up"), OPT_PRESS(25600, 16, 32, 52, "up"),
+	OPT_PRESS(25900, 16, 32, 52, "up (split_mode)"), OPT_PRESS(26400, 20, 44, 56, "confirm (vertical)"),
+	OPT_PRESS(26900, 17, 33, 53, "down"), OPT_PRESS(27200, 17, 33, 53, "down"), OPT_PRESS(27500, 17, 33, 53, "down"),
+	OPT_PRESS(27800, 17, 33, 53, "down (page button)"), OPT_PRESS(28300, 18, 34, 54, "left (page 1)"),
+	OPT_PRESS(28800, 16, 32, 52, "up"), OPT_PRESS(29100, 16, 32, 52, "up"), OPT_PRESS(29400, 16, 32, 52, "up"),
+	OPT_PRESS(29700, 16, 32, 52, "up"), OPT_PRESS(30000, 16, 32, 52, "up"), OPT_PRESS(30300, 16, 32, 52, "up"),
+	OPT_PRESS(30600, 16, 32, 52, "up"), OPT_PRESS(30900, 16, 32, 52, "up"), OPT_PRESS(31200, 16, 32, 52, "up (p2_hero)"),
+	OPT_PRESS(31700, 18, 34, 54, "left (obelix)"),
+	{ 32200, S_BIND, 21, 0, 0, 0, 0, "cancel" }, { 33700, S_BIND, 22, 0, 0, 0, 0, "resume" }, SHOT(35500, "cs_restored"),
+	END(36500),
+};
+#undef COOP_IN
 const Step kCtrlIconsKb[] = {
 	MARK(0, "ctrliconskb"),
 	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
@@ -9820,6 +9880,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("rumble2", kRumble2),
 	SCENARIO("p2menu", kP2Menu),
 	SCENARIO("p1coop", kP1Coop),
+	SCENARIO("coopopts", kCoopOpts),
+	SCENARIO("coopswap", kCoopSwap),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),
