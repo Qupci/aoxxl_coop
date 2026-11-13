@@ -45,10 +45,10 @@ static LONG WINAPI Crash(EXCEPTION_POINTERS* ep) {
 int main(int argc, char** argv) {
 	setvbuf(stdout, NULL, _IONBF, 0);
 	SetUnhandledExceptionFilter(Crash);
-	if (argc < 4) { printf("usage: romanforge <game dir> <out dir> <level> [factor]\n"); return 1; }
+	if (argc < 4) { printf("usage: romanforge <game dir> <out dir> <level> [factor] [module, default axxl.exe]\n"); return 1; }
 	std::filesystem::path game = argv[1];
-	FILE* f = _wfopen((game / "axxl.exe").c_str(), L"rb");
-	if (!f) { printf("no axxl.exe\n"); return 1; }
+	FILE* f = _wfopen((game / (argc > 5 ? argv[5] : "axxl.exe")).c_str(), L"rb");
+	if (!f) { printf("no game module\n"); return 1; }
 	fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
 	std::vector<unsigned char> elb(n);
 	fread(elb.data(), 1, n, f); fclose(f);

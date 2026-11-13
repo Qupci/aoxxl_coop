@@ -12,17 +12,19 @@ param(
     [int]$Level = -1,
     [switch]$NoDeploy,
     # Another game folder, relative to F:\XXL COOP MOD, e.g. "SPQR\Caesars Challenge" (the modded levels).
-    [string]$GameDir = ""
+    [string]$GameDir = "",
+    # The game module to start in that folder (default axxl.exe), e.g. "GameModule.elb".
+    [string]$Exe = ""
 )
 $ErrorActionPreference = "Stop"
 $coop = Split-Path -Parent $PSScriptRoot
 $game = Join-Path (Split-Path -Parent $coop) "Game Files"
 if ($GameDir) { $game = (Resolve-Path (Join-Path (Split-Path -Parent $coop) $GameDir)).Path }
-$exe = Join-Path $game "axxl.exe"
+$exe = Join-Path $game $(if ($Exe) { $Exe } else { "axxl.exe" })
 if (-not (Test-Path $exe)) { $exe = Join-Path $game "Cesar's Challenge - Windowed.exe" }
 $shots = Join-Path $game "shots"
 
-Get-Process axxl, "Cesar's Challenge - Windowed" -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
+Get-Process axxl, GameModule, "Cesar's Challenge - Windowed" -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
 
 # The game keeps only three logs (xxl_coop.log, .1, .2) and every test run
 # rotates them: save any log from a real play session (no "autotest:" line in
@@ -50,7 +52,15 @@ if (Test-Path $shots) { Remove-Item (Join-Path $shots "*") -Force -ErrorAction S
 $env:XXL_AUTOTEST = $Scenario
 if ($Level -ge 0) { $env:XXL_LEVEL = "$Level" }
 try {
-    $p = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
+    # Not through the shell: GameModule.elb has no .exe extension (CreateProcess runs it all the same).
+    $psi = New-Object System.Diagnostics.ProcessStartInfo $exe
+    $psi.WorkingDirectory = $game
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true   # the level rebuild's progress text: drained, not shown
+    $psi.RedirectStandardError = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $null = $p.StandardOutput.ReadToEndAsync()
+    $null = $p.StandardError.ReadToEndAsync()
 } finally {
     Remove-Item Env:XXL_AUTOTEST -ErrorAction SilentlyContinue
     Remove-Item Env:XXL_LEVEL -ErrorAction SilentlyContinue

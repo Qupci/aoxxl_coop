@@ -802,6 +802,40 @@ namespace GamePatcher {
 // moddable format from the game module held in memory, and the module patches
 // as a list -- the same work GamePatcherThreadX1::start does for all levels.
 namespace GamePatcher {
+	// Where a game module keeps each level's DRM values (file offsets, [1..8]), as
+	// GamePatcherThreadX1::start finds them: the Ipatix patch (axxl.exe: the
+	// values after a signature) or the Polish patch (GameModule.elb: a table of
+	// {address, size} at file offset 0x285000, its .files section). false: neither.
+	bool DrmOffsetsX1(const void* elb, size_t elbSize, uint32_t offsets[9])
+	{
+		static const unsigned char drmValSignature[32] = {
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x41,
+			0x0C, 0x00, 0x01, 0x00, 0x44, 0x00, 0x01, 0x00
+		};
+		const uint32_t ipatix[9] = { 0, 0x2e934c, 0x2e937c, 0x2e9460, 0x2e9538, 0x2e9660, 0x2e975c,
+			0x2e9344, 0x2e933c };
+		size_t drmValStart = findmem(elb, 0, elbSize, drmValSignature, sizeof(drmValSignature));
+		if (drmValStart != (size_t)-1) {
+			for (int i = 0; i < 9; i++)
+				offsets[i] = ipatix[i] - 0x2e933c + (uint32_t)drmValStart + 4;
+			return true;
+		}
+		if (elbSize < 0x285000 + 16 * 4)
+			return false;
+		const uint32_t* filesptr = (const uint32_t*)((const char*)elb + 0x285000);
+		if (filesptr[1] != 0x2B || filesptr[3] != 0xE0)
+			return false;
+		offsets[0] = 0;
+		for (int i = 1; i <= 8; i++) {
+			if (*filesptr < 0x410000 || *filesptr - 0x410000 >= elbSize)
+				return false;
+			offsets[i] = *filesptr - 0x410000;
+			filesptr += 2;
+		}
+		return true;
+	}
+
 	bool ConvertLevelX1(const void* elb, size_t elbSize, const std::filesystem::path& inputPath,
 	                    const std::filesystem::path& outputPath, int lvlnum, std::string& error)
 	{
@@ -818,10 +852,10 @@ namespace GamePatcher {
 		uint32_t drmValExeOffsets[9] = { 0, 0x2e934c, 0x2e937c, 0x2e9460, 0x2e9538, 0x2e9660, 0x2e975c,
 			0x2e9344, 0x2e933c };
 		if (lvlnum < 0 || lvlnum > 8) { error = "level out of range"; return false; }
-		size_t drmValStart = findmem(elb, 0, elbSize, drmValSignature, sizeof(drmValSignature));
-		if (drmValStart == (size_t)-1) { error = "DRM values not found in the game module (not the Ipatix build)"; return false; }
-		for (auto& off : drmValExeOffsets)
-			off = off - 0x2e933c + (uint32_t)drmValStart + 4;
+		if (!DrmOffsetsX1(elb, elbSize, drmValExeOffsets)) {
+			error = "DRM values not found in the game module (neither the Ipatix nor the Polish patch)";
+			return false;
+		}
 		try {
 			GamePatcherKEnvironment kenv;
 			kenv.addFactory<CKHkTorch>();

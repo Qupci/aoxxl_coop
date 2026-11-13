@@ -27,16 +27,8 @@ size_t ForgeModulePatches(ForgePatch* out, size_t max) {
 }
 
 bool ForgeModuleKnown(const void* exe, size_t exeSize) {
-	static const unsigned char drmValSignature[32] = {
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x41,
-		0x0C, 0x00, 0x01, 0x00, 0x44, 0x00, 0x01, 0x00
-	};
-	const unsigned char* m = (const unsigned char*)exe;
-	if (exeSize < 0x2F0000) return false;
-	for (size_t p = 0; p + sizeof(drmValSignature) <= exeSize; p++)
-		if (memcmp(m + p, drmValSignature, sizeof(drmValSignature)) == 0) return true;
-	return false;
+	uint32_t offsets[9];
+	return exeSize >= 0x200000 && GamePatcher::DrmOffsetsX1(exe, exeSize, offsets);
 }
 
 namespace {

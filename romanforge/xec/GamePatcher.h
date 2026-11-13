@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <mutex>
 #include <string>
@@ -41,4 +42,5 @@ namespace GamePatcher {
 	bool ConvertLevelX1(const void* elb, size_t elbSize, const std::filesystem::path& inputPath,
 	                    const std::filesystem::path& outputPath, int lvlnum, std::string& error);
 	size_t ModulePatchesX1(ModulePatch* out, size_t max);
+	bool DrmOffsetsX1(const void* elb, size_t elbSize, uint32_t offsets[9]);
 }
