@@ -4934,3 +4934,11 @@ both halves).
   = 1 the keyboard); player 2's logical D-pad up ([p2_pad] / [keyboard] switch_hero). Hold 0.6 s -> HINT_SWAP on
   both boxes (8 s), the other's press -> CoopSwapHeroes. Autotests heroswap (player 2 asks, player 1 on virtual pad
   1 confirms -> swapped; player 1 asks, dropped after 8 s), pauseback (Options and back: only Options lit).
+- Round 266 (Nov 13, commit 1d6168b; user: after Quit Game -> YES -> New Game -> intro skipped, CO-OP Options' next page
+  showed the controls' page 1; the ini written without spaces). The options interface's +0x214 (waiting for a key)
+  is a byte the game tests for == 1 (FUN_00527030); after a quit to the main menu it held 164 (0xA4, never reset),
+  and the mod's "!= 0 = waiting" refused every press, so the game's own page button logic ran (3 -> 1). Ready is now
+  +0x214 != 1. IniWrite replaces WritePrivateProfileString for the menus (key = value, line ends kept); the user's
+  ini's compact lines tidied once. Autotest quitnew (S_POKE8 pause, Quit Game by up from Resume, the message box's
+  YES by left, New Game, CINE_ENTER x2, level 1: CO-OP Options page 2 shown, safe_sequence off/on written
+  "safe_sequence = on").
