@@ -4942,3 +4942,14 @@ both halves).
   ini's compact lines tidied once. Autotest quitnew (S_POKE8 pause, Quit Game by up from Resume, the message box's
   YES by left, New Game, CINE_ENTER x2, level 1: CO-OP Options page 2 shown, safe_sequence off/on written
   "safe_sequence = on").
+- Round 267 (Nov 14, commit 8bcc5f7; user: the other distributed build, GameModule.elb run by Asterix.exe or renamed to
+  .exe -- everything worked but squad_romans_at_once / crates / helmets were back at the levels' limits): GameModule.elb
+  (2,674,688 bytes, md5 c1b32b95..., also in Game Files and F:\XXL PLAY) has the same .text/.rdata as axxl.exe
+  (the 5 module patch sites identical) but a .files section (va 0x295000, raw 0x285000) where the DRM values are
+  listed: {va, size} pairs at file 0x285000 ({0x695100, 0x2B}, {0x69512B, 0xE0}, ...; file offset = va - 0x410000),
+  the 8 level headers from 0x285605 -- XXL-Editor's "Polish patch" layout. levelforge had refused it (no Ipatix
+  signature). GamePatcher::DrmOffsetsX1 (vendored addition) finds either layout; ForgeModuleKnown uses it. Every
+  level 0-8 built from it is byte-identical to axxl.exe's (romanforge.exe <game> <out> <lvl> 3 GameModule.elb). The
+  cache key holds the exe size: switching module rebuilds once. run_test.ps1 -Exe <module> (started without the
+  shell, its stdout/stderr drained -- the forge's printf would otherwise flood the console). atonce41 -Exe
+  GameModule.elb: 18 at once, helmet pool free 100, through to the end.
