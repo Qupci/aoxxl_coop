@@ -547,7 +547,7 @@ void ShowRows(char* opt) {
 }
 
 void WriteIni(const char* section, const char* key, const char* value) {
-	if (g_config.iniPath[0]) WritePrivateProfileStringA(section, key, value, g_config.iniPath);
+	IniWrite(section, key, value);
 }
 
 // A key's ini name: letters / digits / F-keys as such, the rest in hex.
@@ -843,6 +843,16 @@ int CoopPageTick(char* opt, void* edx, uint32_t arg, int page, bool onPageButton
 		}
 	}
 	if (ready && view && act(view, nullptr, 5)) CoopState(4);   // cancel: back to the pause (OptMainHook)
+	{
+		static int logs = 0;
+		bool rawLR = view && (act(view, nullptr, 2) || act(view, nullptr, 3) || act(view, nullptr, 0x12) || act(view, nullptr, 0x13));
+		if (rawLR && !ready && logs < 20) {
+			logs++;
+			char* b = page >= 0 && page < 3 ? *(char**)(opt + 0x1D0 + page * 4) : nullptr;
+			Log("ctrlopts: co-op page press: page %d, its button %p focus %d, ready %d (+214 %u +21C %u), enter %d, left %d right %d",
+			    page, b, b ? (b[5] & 4) != 0 : -1, ready, *(uint8_t*)(opt + 0x214), *(uint32_t*)(opt + 0x21C), g_coopEnter, left, right);
+		}
+	}
 	if (page == 2 && onPageButton && (left || right)) {
 		int n = CoopPages();
 		g_coopPage = (g_coopPage + (right ? 1 : n - 1)) % n;
@@ -871,7 +881,9 @@ int __fastcall CtrlPageHook(char* opt, void* edx, uint32_t arg) {
 	char* view = *(char**)(opt + 0x18);
 	ViewActionFn act = (ViewActionFn)0x4358B0;
 	auto pressed = [&](uint32_t a, uint32_t b) { return view && (act(view, nullptr, a) || act(view, nullptr, b)); };
-	bool ready = !*(uint8_t*)(opt + 0x214) && !*(uint32_t*)(opt + 0x21C) && g_binding < 0;
+	// Waiting for a key is +0x214 == 1, as the game reads it (after a quit to the
+	// main menu it held 164: any non-zero as waiting let the page button through).
+	bool ready = *(uint8_t*)(opt + 0x214) != 1 && !*(uint32_t*)(opt + 0x21C) && g_binding < 0;
 	bool left = ready && pressed(2, 0x12), right = ready && pressed(3, 0x13), confirm = ready && view && act(view, nullptr, 4);
 	int page = *(int*)(opt + 0x20C);
 	char* pageButtonNow = page >= 0 && page < 3 ? *(char**)(opt + 0x1D0 + page * 4) : nullptr;

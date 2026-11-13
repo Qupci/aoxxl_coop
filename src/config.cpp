@@ -7,8 +7,72 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 CoopConfig g_config;
+
+// "key = value" in [section] of the ini (WritePrivateProfileString writes
+// "key=value"): the key's line replaced where it is, else added after the
+// section's last line that is not blank, the section added at the end if it
+// is missing. The file's line ends kept.
+void IniWrite(const char* section, const char* key, const char* value) {
+	const char* path = g_config.iniPath;
+	if (!path[0]) return;
+	FILE* f = fopen(path, "rb");
+	std::string text;
+	if (f) {
+		char buf[4096];
+		size_t n;
+		while ((n = fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n);
+		fclose(f);
+	}
+	const char* nl = text.find("\r\n") != std::string::npos || text.empty() ? "\r\n" : "\n";
+	std::string line = std::string(key) + " = " + value;
+	// The lines, without their ends.
+	std::vector<std::string> lines;
+	for (size_t at = 0; at <= text.size();) {
+		size_t e = text.find('\n', at);
+		if (e == std::string::npos) { if (at < text.size()) lines.push_back(text.substr(at)); break; }
+		std::string l = text.substr(at, e - at);
+		if (!l.empty() && l.back() == '\r') l.pop_back();
+		lines.push_back(l);
+		at = e + 1;
+	}
+	auto trim = [](std::string s) {
+		size_t a = s.find_first_not_of(" \t"), b = s.find_last_not_of(" \t");
+		return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
+	};
+	auto lower = [](std::string s) { for (char& c : s) c = (char)tolower((unsigned char)c); return s; };
+	std::string want = lower(std::string("[") + section + "]");
+	int sec = -1, last = -1, found = -1;
+	for (int i = 0; i < (int)lines.size(); i++) {
+		std::string t = trim(lines[i]);
+		if (!t.empty() && t[0] == '[') {
+			if (sec >= 0) break;
+			if (lower(t) == want) { sec = i; last = i; }
+			continue;
+		}
+		if (sec < 0) continue;
+		if (!t.empty()) last = i;
+		if (t.empty() || t[0] == '#' || t[0] == ';') continue;
+		size_t eq = t.find('=');
+		if (eq != std::string::npos && lower(trim(t.substr(0, eq))) == lower(key)) { found = i; break; }
+	}
+	if (found >= 0) lines[found] = line;
+	else if (sec >= 0) lines.insert(lines.begin() + last + 1, line);
+	else {
+		if (!lines.empty() && !trim(lines.back()).empty()) lines.push_back("");
+		lines.push_back(std::string("[") + section + "]");
+		lines.push_back(line);
+	}
+	std::string out;
+	for (size_t i = 0; i < lines.size(); i++) { out += lines[i]; out += nl; }
+	f = fopen(path, "wb");
+	if (!f) return;
+	fwrite(out.data(), 1, out.size(), f);
+	fclose(f);
+}
 
 const char* const CoopConfig::kKeyNames[CoopConfig::KEY_COUNT] = {
 	"move_up", "move_down", "move_left", "move_right", "look_up", "look_down", "look_left",

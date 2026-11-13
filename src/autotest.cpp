@@ -8363,6 +8363,27 @@ const Step kHeroSwap[] = {
 	SHOT(19000, "hs_dropped"),
 	END(20000),
 };
+// quitnew (level 2, force_level 2): the pause menu's Quit Game (up from Resume),
+// YES (left in the message box), the main menu's New Game, the intro skipped;
+// then CO-OP Options and its page button rightwards (the user's leak of the
+// controls' page 1 after a quit).
+const Step kQuitNew[] = {
+	MARK(0, "quitnew"),
+	{ 3000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	OPT_PRESS(4000, 16, 32, 52, "up (quit game)"), SHOT(4600, "qn_quit"), OPT_PRESS(5000, 20, 44, 56, "confirm"),
+	SHOT(6000, "qn_box"), OPT_PRESS(6500, 18, 34, 54, "left (yes)"), OPT_PRESS(7200, 20, 44, 56, "confirm (yes)"),
+	SHOT(12000, "qn_menu"), OPT_PRESS(14000, 20, 44, 56, "confirm (new game)"), SHOT(16000, "qn_new"),
+	CINE_ENTER(20000), CINE_ENTER(24000), SHOT(30000, "qn_level"), SHOT(40000, "qn_level2"),
+	{ 45000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	OPT_PRESS(46000, 17, 33, 53, "down"), OPT_PRESS(46500, 17, 33, 53, "down"), OPT_PRESS(47000, 17, 33, 53, "down"),
+	OPT_PRESS(47600, 20, 44, 56, "confirm (co-op options)"), SHOT(49000, "qn_coop1"),
+	OPT_PRESS(49500, 19, 35, 55, "right (page 2)"), SHOT(50500, "qn_coop2"),
+	OPT_PRESS(51000, 18, 34, 54, "left (page 1)"),
+	// An ini write: safe_sequence (second row: down twice from the page button, the list wraps) off and on.
+	OPT_PRESS(51500, 17, 33, 53, "down"), OPT_PRESS(51900, 17, 33, 53, "down (safe_sequence)"),
+	OPT_PRESS(52400, 20, 44, 56, "confirm (off)"), SHOT(53000, "qn_safe_off"), OPT_PRESS(53400, 20, 44, 56, "confirm (on)"),
+	END(54500),
+};
 const Step kCtrlIconsKb[] = {
 	MARK(0, "ctrliconskb"),
 	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
@@ -9907,6 +9928,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("coopswap", kCoopSwap),
 	SCENARIO("pauseback", kPauseBack),
 	SCENARIO("heroswap", kHeroSwap),
+	SCENARIO("quitnew", kQuitNew),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),

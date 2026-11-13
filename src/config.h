@@ -109,3 +109,6 @@ struct CoopConfig {
 };
 
 extern CoopConfig g_config;
+
+// "key = value" written into [section] of xxl_coop.ini (the options menus).
+void IniWrite(const char* section, const char* key, const char* value);

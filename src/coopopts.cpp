@@ -83,7 +83,7 @@ const Opt kOpts[] = {
 const int kCount = sizeof(kOpts) / sizeof(kOpts[0]);
 
 void Write(const Opt& o, const char* value) {
-	if (g_config.iniPath[0]) WritePrivateProfileStringA(o.section, o.key, value, g_config.iniPath);
+	IniWrite(o.section, o.key, value);
 	Log("coopopts: %s = %s", o.key, value);
 }
 
