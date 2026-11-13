@@ -18,6 +18,10 @@
 #include <cstdint>
 
 bool CtrlOptsInstallHooks();
+// Player `player` (1: player 2) asks for the pause menu (player 2's Back).
+void CtrlOptsMenuAsk(int player);
+// Whose the pause menu is (0 player 1, 1 player 2: it opened it in co-op).
+int CtrlOptsMenuOwner();
 // Once per frame, right after the game's input update: the camera actions
 // swapped, the rumble's motors, the rows taken out when the controls are gone.
 void CtrlOptsFrame();

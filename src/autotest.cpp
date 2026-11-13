@@ -8234,6 +8234,25 @@ const Step kRumble2[] = {
 	{ 8500, S_RUMBLE, 0, -1, 0, 0.0f, 0, "vibration back" },
 	END(9500),
 };
+// p2menu (level 2): player 2 joins on virtual pad 2; D-pad down held shows its
+// HUD; Back opens the pause menu (player 2's); its D-pad and A go to Options,
+// Controls (player 2's view), B back out twice, Back closes the pause.
+#define P2TAP(t, btn, n) VPAD(t, 1, btn, 0, 0, n), VPAD(t + 120, 1, 0, 0, 0, "p2 release")
+const Step kP2Menu[] = {
+	MARK(0, "p2menu"),
+	VPAD(2000, 1, PAD_START, 0, 0, "p2 start"), VPAD(2200, 1, 0, 0, 0, "p2 release"),
+	VPAD(4000, 1, PAD_DPAD_DOWN, 0, 0, "p2 d-pad down held (hud)"), SHOT(4800, "pm_hud"), VPAD(5000, 1, 0, 0, 0, "p2 release"),
+	P2TAP(6000, PAD_BACK, "p2 back (menu)"), SHOT(7500, "pm_pause"),
+	P2TAP(8000, PAD_DPAD_DOWN, "p2 down"), P2TAP(8600, PAD_DPAD_DOWN, "p2 down"), P2TAP(9200, PAD_A, "p2 a (options)"),
+	SHOT(10500, "pm_options"),
+	P2TAP(11000, PAD_DPAD_DOWN, "p2 down"), P2TAP(11600, PAD_DPAD_DOWN, "p2 down"), P2TAP(12200, PAD_A, "p2 a (controls)"),
+	SHOT(13500, "pm_controls1"), P2TAP(14000, PAD_DPAD_RIGHT, "p2 right"), SHOT(15000, "pm_controls2"),
+	P2TAP(15500, PAD_DPAD_RIGHT, "p2 right"), SHOT(16500, "pm_controls3"),
+	P2TAP(17000, PAD_B, "p2 b"), P2TAP(18000, PAD_B, "p2 b"), SHOT(19000, "pm_back"),
+	P2TAP(19500, PAD_BACK, "p2 back (resume)"), SHOT(21000, "pm_resumed"),
+	END(22000),
+};
+#undef P2TAP
 const Step kCtrlIconsKb[] = {
 	MARK(0, "ctrliconskb"),
 	{ 1500, S_SETPRESET, 1, 0, 0, 0, 0, "keyboard preset" },
@@ -9772,6 +9791,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("ctrliconskb", kCtrlIconsKb),
 	SCENARIO("rumble", kRumble),
 	SCENARIO("rumble2", kRumble2),
+	SCENARIO("p2menu", kP2Menu),
 	SCENARIO("sppotion2", kSpPotion2),
 	SCENARIO("spsecond2", kSpSecond2),
 	SCENARIO("spsecond2c", kSpSecond2C),

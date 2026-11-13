@@ -3176,6 +3176,7 @@ void CoopFrame() {
 		g.lastFpsTick = now;
 	}
 
+	PadsSetP2Slot(g.p2Joined && g.p2Pad >= 0 && g.p2Pad < kXInputPads ? g.p2Pad : -1);   // player 2's pad layout
 	PadsPoll();
 	PadsSetKeyboardOwnedByP2(g.p2Joined && g.p2Pad == kKeyboardPad);
 
@@ -3329,13 +3330,13 @@ void CoopFrame() {
 		}
 	}
 	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y;
-	if (!inCutscene && (p.buttons & PAD_BACK) && (p.pressed & kFace)) g.p2BackCombo = true;
-	if (!(p.buttons & PAD_BACK)) g.p2BackCombo = false;
-	if (!inCutscene && (p.buttons & PAD_BACK) && !g.p2BackCombo) {
+	// Back opens the pause menu for player 2 (it drives it, its Controls are
+	// player 2's: ctrlopts.cpp); D-pad down held shows player 2's HUD (with R3
+	// held it is the torch cheat instead). Start leaves.
+	if (!inCutscene && (p.pressed & PAD_BACK)) CtrlOptsMenuAsk(1);
+	g.p2BackCombo = (p.buttons & PAD_RTHUMB) != 0;
+	if (!inCutscene && (p.buttons & PAD_DPAD_DOWN) && !g.p2BackCombo) {
 		if (g.p2BackHeldAt == 0) g.p2BackHeldAt = now;
-		// Individual heroes: Back shows player 2's HUD, held as long as they like
-		// (Start leaves).
-		else if ((int)(now - g.p2BackHeldAt) >= g_config.dropHoldMs && !IndivActive() && !g.suspended) { Release("held Back"); return; }
 	} else {
 		g.p2BackHeldAt = 0;
 	}
@@ -3367,7 +3368,7 @@ void CoopFrame() {
 			if (i != g.p2Pad && i != kKeyboardPad && PadGet(i).connected) p1pad = i;
 		const PadState& q = PadGet(p1pad);
 		bool mod1 = p1pad >= 0 && p1pad != g.p2Pad && q.connected && (q.buttons & PAD_RTHUMB);
-		bool mod2 = (p.buttons & (PAD_BACK | PAD_RTHUMB)) != 0;
+		bool mod2 = (p.buttons & PAD_RTHUMB) != 0;
 		for (int who = 0; who < 2 && !inCutscene; who++) {
 			bool held = who == 0 ? mod1 : mod2;
 			uint16_t pressed = who == 0 ? q.pressed : p.pressed;

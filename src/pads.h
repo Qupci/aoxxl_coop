@@ -47,6 +47,11 @@ void PadsSetKeyboardOwnedByP2(bool owned);
 bool PadsKeyPressed(int vk);
 
 bool PadsInit();               // false if no XInput DLL could be loaded
+// Player 2's pad (an XInput slot, -1 none): its buttons are read through
+// g_config.p2Pad, the physical button of each action turned into the default
+// one (PadGet gives those); PadsRawButtons the buttons as pressed.
+void PadsSetP2Slot(int i);
+uint16_t PadsRawButtons(int i);
 // XInput pad `i`'s motors (0-65535 each; told again only on a change).
 void PadsSetRumble(int i, uint16_t left, uint16_t right);
 void PadsShutdown();

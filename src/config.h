@@ -89,9 +89,21 @@ struct CoopConfig {
 	bool  keyboard      = true;
 	enum { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_LOOK_UP, KEY_LOOK_DOWN, KEY_LOOK_LEFT,
 	       KEY_LOOK_RIGHT, KEY_JUMP, KEY_ATTACK, KEY_GRAB, KEY_DASH, KEY_LB, KEY_RB, KEY_START,
-	       KEY_BACK, KEY_CENTER_CAMERA, KEY_COUNT };
+	       KEY_BACK, KEY_CENTER_CAMERA, KEY_HUD, KEY_SWITCH, KEY_COUNT };
 	int   keys[KEY_COUNT] = { 'W', 'S', 'A', 'D', 0x26, 0x28, 0x25, 0x27, 0x20, 'J', 'K', 'L', 'U', 'O',
-	                          0x0D, 0x08, 'M' };
+	                          0x0D, 0x08, 'M', 'C', 'X' };
+	static const char* const kKeyNames[KEY_COUNT];   // their ini names ([keyboard])
+
+	// Player 2's pad layout ([p2_pad]): the physical button of each of its
+	// actions (the mod reads player 2's pad through it: the rest of the mod sees
+	// the default buttons, P2_DEFAULT). Back opens the pause menu, D-pad down
+	// shows player 2's HUD, D-pad up asks for a hero swap.
+	enum { P2B_JUMP, P2B_ATTACK, P2B_GRAB, P2B_DASH, P2B_LB, P2B_RB, P2B_MENU, P2B_HUD, P2B_CENTER, P2B_SWITCH, P2B_COUNT };
+	static const uint16_t kP2Default[P2B_COUNT];
+	static const char* const kP2PadNames[P2B_COUNT];   // their ini names ([p2_pad])
+	uint16_t p2Pad[P2B_COUNT] = { 0x1000, 0x4000, 0x2000, 0x8000, 0x0100, 0x0200, 0x0020, 0x0002, 0x0080, 0x0001 };
+	bool  p2InvertCamX = false;   // [controls] p2_invert_camera_x / _y: player 2's Invert Camera rows
+	bool  p2InvertCamY = false;
 
 	void Load(const char* iniPath);
 };

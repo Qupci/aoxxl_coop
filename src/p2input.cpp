@@ -54,11 +54,11 @@ bool BuildP2Actions(int padIndex, uint8_t* out, int numActions) {
 
 void BuildActionsFromPad(const PadState& pad, uint8_t* out, int numActions) {
 	memset(out, 0, numActions);
-	// The mod's own combos (Back or the right stick button held, plus A, B, X,
-	// Y or D-pad up/down): those do not reach the hero while the modifier is held.
+	// The mod's own combos (the right stick button held, plus A, B, X, Y or
+	// D-pad up/down): those do not reach the hero while the modifier is held.
 	PadState p = pad;
 	const uint16_t kFace = PAD_A | PAD_B | PAD_X | PAD_Y | PAD_DPAD_UP | PAD_DPAD_DOWN;
-	if (p.buttons & (PAD_BACK | PAD_RTHUMB)) {
+	if (p.buttons & PAD_RTHUMB) {
 		p.buttons &= ~kFace;
 		p.pressed &= ~kFace;
 	}
@@ -214,7 +214,7 @@ bool BuildP2Held(int padIndex, uint8_t* out, int numActions) {
 	BuildActionsFromPad(p, out, numActions);   // stick axes
 	for (const ButtonMap& b : kButtons) {
 		if (!(p.buttons & b.padBit)) continue;
-		if ((b.padBit & (PAD_A | PAD_B | PAD_X | PAD_Y)) && (p.buttons & (PAD_BACK | PAD_RTHUMB))) continue;
+		if ((b.padBit & (PAD_A | PAD_B | PAD_X | PAD_Y)) && (p.buttons & PAD_RTHUMB)) continue;
 		if (b.held >= 0 && b.held < numActions) out[b.held] = 0xFF;
 		for (int i = 0; i < 2; i++)
 			if (b.edge[i] >= 0 && b.edge[i] < numActions) out[b.edge[i]] = 0xFF;

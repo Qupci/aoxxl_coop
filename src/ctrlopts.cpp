@@ -613,7 +613,77 @@ void InvertFrame() {
 	if (g_config.invertCamX) { uint8_t t = v[48]; v[48] = v[49]; v[49] = t; }
 }
 
+// ---- the pause menu for either player ------------------------------------------
+
+// Player 2's Back asks for the pause menu: the game's Pause (its binding 12)
+// pressed for a frame. The menu is the asker's (its Controls show that
+// player's) when the pause begins within half a second of the ask, else
+// player 1's. While it is up, player 2's pad drives it too: D-pad / left stick
+// the interface's directions (bindings 16-19, 32-35, 52-55), A confirm (20, 44,
+// 56), B cancel (21), Back resume (22: the pause view's actions 0-7 are the
+// bindings 16-23, its action 6 resumes).
+int   g_menuAsk = -1;
+DWORD g_menuAskAt = 0;
+int   g_menuOwner = 0;
+bool  g_wasPaused = false;
+
+bool GamePaused() {
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	return gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
+}
+
+void MenuFrame() {
+	InputManager im = GetInputManager();
+	uint8_t* v = im ? im.Values() : nullptr;
+	int n = im ? im.NumActions() : 0;
+	auto press = [&](int a, int b, int c) {
+		int xs[3] = { a, b, c };
+		for (int x : xs) if (v && x >= 0 && x < n) v[x] = 0xFF;
+	};
+	bool paused = GamePaused();
+	DWORD now = GetTickCount();
+	if (g_menuAsk >= 0 && !paused && now - g_menuAskAt < 40) press(12, -1, -1);
+	if (paused && !g_wasPaused) {
+		g_menuOwner = g_menuAsk == 1 && now - g_menuAskAt < 500 && CoopP2Joined() ? 1 : 0;
+		Log("ctrlopts: the pause menu is player %d's", g_menuOwner + 1);
+		static int logs = 0;
+		char* pause = (char*)GetLvlObject(2, 131, 0);
+		char* view = pause ? *(char**)(pause + 0x18) : nullptr;
+		uint8_t* remap = view ? *(uint8_t**)(view + 8) : nullptr;
+		if (remap && logs++ < 2)
+			Log("ctrlopts: pause view actions 0-7 -> bindings %d %d %d %d %d %d %d %d", remap[0], remap[1], remap[2], remap[3], remap[4],
+			    remap[5], remap[6], remap[7]);
+	}
+	if (paused || now - g_menuAskAt >= 500) g_menuAsk = -1;
+	if (!paused) g_menuOwner = 0;
+	g_wasPaused = paused;
+	if (!paused || !CoopP2Joined() || g_binding >= 0) return;
+	const PadState& p = PadGet(CoopP2Pad());
+	if (!p.connected) return;
+	// The left stick as presses: a direction pushed past half way.
+	static int stickPrev = -1;
+	int stick = p.ly > 0.5f ? 0 : p.ly < -0.5f ? 1 : p.lx < -0.5f ? 2 : p.lx > 0.5f ? 3 : -1;
+	int stickEdge = stick != stickPrev ? stick : -1;
+	stickPrev = stick;
+	if ((p.pressed & PAD_DPAD_UP) || stickEdge == 0) press(16, 32, 52);
+	if ((p.pressed & PAD_DPAD_DOWN) || stickEdge == 1) press(17, 33, 53);
+	if ((p.pressed & PAD_DPAD_LEFT) || stickEdge == 2) press(18, 34, 54);
+	if ((p.pressed & PAD_DPAD_RIGHT) || stickEdge == 3) press(19, 35, 55);
+	if (p.pressed & PAD_A) press(20, 44, 56);
+	if (p.pressed & PAD_B) press(21, -1, -1);
+	if (p.pressed & PAD_BACK) press(22, -1, -1);   // the pause view's action 6, resume (Escape's binding)
+}
+
 } // namespace
+
+void CtrlOptsMenuAsk(int player) {
+	if (GamePaused()) return;
+	g_menuAsk = player;
+	g_menuAskAt = GetTickCount();
+	Log("ctrlopts: player %d asks for the pause menu", player + 1);
+}
+int CtrlOptsMenuOwner() { return g_menuOwner; }
 
 const wchar_t* CtrlOptsLocString(uint32_t id, const wchar_t* s) {
 	static const wchar_t kVar[] = L"%CtrlPage_Nb%";
@@ -631,6 +701,7 @@ float CtrlOptsCamY() { return g_config.invertCamY ? -1.0f : 1.0f; }
 void CtrlOptsFrame() {
 	InvertFrame();
 	RumbleFrame();
+	MenuFrame();
 	if (g_page && GetTickCount() - g_pageTick > 100) TakeOut();
 }
 

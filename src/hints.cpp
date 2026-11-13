@@ -106,7 +106,7 @@ const wchar_t* __fastcall LocStringHook(void* loc, void* edx, uint32_t id) {
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	bool paused = gm && (*(uint8_t*)(gm + 0xCC) & 3) == 2;
 	int shopper = paused ? -1 : CoopShopper();
-	int who = shopper >= 0 ? PlayerOfHero(shopper) : 0;
+	int who = shopper >= 0 ? PlayerOfHero(shopper) : paused ? CtrlOptsMenuOwner() : 0;   // the pause menu: whoever opened it
 	bool prompt = false;
 	for (int k = 0; k < 15 && !prompt; k++)
 		if (g_promptIds[k] == id && id) { who = CoopPromptPlayer(); prompt = true; }
@@ -1052,7 +1052,7 @@ void HintsFrame() {
 	if (!gm || !m2d || *(uintptr_t*)m2d != 0x623A28) return;
 	bool paused = (*(uint8_t*)(gm + 0xCC) & 3) == 2;
 	int ctx = !CoopP2Joined() ? 0 : 1 | (paused ? 2 : 0) | (paused ? 0 : (CoopShopper() + 1) << 2) |
-	          (CoopP2Pad() == kKeyboardPad ? 0x10 : 0);
+	          (CoopP2Pad() == kKeyboardPad ? 0x10 : 0) | (paused && CtrlOptsMenuOwner() ? 0x20 : 0);
 	InputManager im = GetInputManager();
 	if (im) ctx |= (*(uint8_t*)(im.raw() + 0x64) + 1) << 8;
 	static int lastCtx = 0;

@@ -28,6 +28,22 @@ static HMODULE            g_xinput = nullptr;
 static PFN_XInputGetState g_getState = nullptr;
 static PFN_XInputSetState g_setState = nullptr;
 static uint32_t           g_rumble[kXInputPads];   // what each pad was last told (left << 16 | right)
+static int                g_p2Slot = -1;
+static uint16_t           g_raw[kMaxPads];
+
+void PadsSetP2Slot(int i) { g_p2Slot = i; }
+uint16_t PadsRawButtons(int i) { return i >= 0 && i < kMaxPads ? g_raw[i] : 0; }
+
+// Player 2's pad: each action's physical button becomes the default one; the
+// buttons no action is on (Start, the other D-pad directions...) stay as they are.
+static uint16_t P2Logical(uint16_t phys) {
+	uint16_t mapped = 0, defaults = 0, out = 0;
+	for (int k = 0; k < CoopConfig::P2B_COUNT; k++) { mapped |= g_config.p2Pad[k]; defaults |= CoopConfig::kP2Default[k]; }
+	out = (uint16_t)(phys & ~mapped & ~defaults);
+	for (int k = 0; k < CoopConfig::P2B_COUNT; k++)
+		if (phys & g_config.p2Pad[k]) out |= CoopConfig::kP2Default[k];
+	return out;
+}
 static PadState           g_pads[kMaxPads];
 static PadState           g_virtual[kMaxPads];
 static bool               g_virtualActive[kMaxPads];
@@ -212,6 +228,9 @@ static void PollKeyboard(PadState& p) {
 	if (down(CoopConfig::KEY_START))  b |= PAD_START;
 	if (down(CoopConfig::KEY_BACK))   b |= PAD_BACK;
 	if (down(CoopConfig::KEY_CENTER_CAMERA)) b |= PAD_RTHUMB;
+	if (down(CoopConfig::KEY_HUD))    b |= PAD_DPAD_DOWN;
+	if (down(CoopConfig::KEY_SWITCH)) b |= PAD_DPAD_UP;
+	g_raw[kKeyboardPad] = b;
 	p.buttons  = b;
 	p.pressed  = (uint16_t)(b & ~prev);
 	p.released = (uint16_t)(prev & ~b);
@@ -242,7 +261,8 @@ void PadsPoll() {
 			uint16_t prevButtons = p.buttons;
 			if (!p.connected) Log("pads: pad %d connected (virtual)", i);
 			p.connected = true;
-			p.buttons   = v.buttons;
+			g_raw[i]    = v.buttons;
+			p.buttons   = i == g_p2Slot ? P2Logical(v.buttons) : v.buttons;
 			p.pressed   = (uint16_t)(p.buttons & ~prevButtons);
 			p.released  = (uint16_t)(prevButtons & ~p.buttons);
 			p.lx = v.lx; p.ly = v.ly; p.rx = v.rx; p.ry = v.ry;
@@ -263,7 +283,8 @@ void PadsPoll() {
 		}
 		if (!p.connected) Log("pads: pad %d connected", i);
 		p.connected = true;
-		p.buttons   = st.Gamepad.wButtons;
+		g_raw[i]    = st.Gamepad.wButtons;
+		p.buttons   = i == g_p2Slot ? P2Logical(st.Gamepad.wButtons) : st.Gamepad.wButtons;
 		p.pressed   = (uint16_t)(p.buttons & ~prev);
 		p.released  = (uint16_t)(prev & ~p.buttons);
 		p.lt = st.Gamepad.bLeftTrigger / 255.0f;

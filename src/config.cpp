@@ -10,6 +10,14 @@
 
 CoopConfig g_config;
 
+const char* const CoopConfig::kKeyNames[CoopConfig::KEY_COUNT] = {
+	"move_up", "move_down", "move_left", "move_right", "look_up", "look_down", "look_left",
+	"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back", "center_camera", "hud", "switch_hero" };
+const uint16_t CoopConfig::kP2Default[CoopConfig::P2B_COUNT] = {
+	0x1000, 0x4000, 0x2000, 0x8000, 0x0100, 0x0200, 0x0020, 0x0002, 0x0080, 0x0001 };
+const char* const CoopConfig::kP2PadNames[CoopConfig::P2B_COUNT] = {
+	"jump", "attack", "grab", "dash", "lb", "rb", "menu", "hud", "center_camera", "switch_hero" };
+
 // The pad buttons by their ini names (XInput bits).
 const CoopConfig::PadButton CoopConfig::kPadButtons[CoopConfig::kNumPadButtons] = {
 	{ "dpad_up", 0x0001 }, { "dpad_down", 0x0002 }, { "dpad_left", 0x0004 }, { "dpad_right", 0x0008 },
@@ -186,14 +194,19 @@ void CoopConfig::Load(const char* iniPath) {
 	splitMode = (buf[0] == 'v' || buf[0] == 'V') ? SPLIT_VERTICAL : SPLIT_HORIZONTAL;
 
 	keyboard = ReadBool("keyboard", "enabled", keyboard, full);
-	static const char* const kKeyNames[KEY_COUNT] = {
-		"move_up", "move_down", "move_left", "move_right", "look_up", "look_down", "look_left",
-		"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back", "center_camera" };
 	for (int i = 0; i < KEY_COUNT; i++) {
 		char kb[32] = {};
 		GetPrivateProfileStringA("keyboard", kKeyNames[i], "", kb, sizeof(kb), full);
 		if (kb[0]) keys[i] = ParseKey(kb);
 	}
+	for (int i = 0; i < P2B_COUNT; i++) {
+		char pb[32] = {};
+		GetPrivateProfileStringA("p2_pad", kP2PadNames[i], "", pb, sizeof(pb), full);
+		for (int k = 0; pb[0] && k < kNumPadButtons; k++)
+			if (!_stricmp(pb, kPadButtons[k].name)) p2Pad[i] = kPadButtons[k].bit;
+	}
+	p2InvertCamX = ReadBool("controls", "p2_invert_camera_x", p2InvertCamX, full);
+	p2InvertCamY = ReadBool("controls", "p2_invert_camera_y", p2InvertCamY, full);
 
 	auto readFactorText = [](const char* fb) {
 		if (!_stricmp(fb, "off")) return 1.0f;
