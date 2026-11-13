@@ -4795,3 +4795,19 @@ both halves).
   (its +0x4C cleared by the tick, so it retries once drawn again). A first stopgap (skip a shadow with +8 null,
   result 3) froze the game in the corrupted lists -- removed. Autotest shadow45 (-Level 4, XXL_ATONCE=3): crash at
   8.9 s before, "keeps its slot" at 8.0 s and through to the end after.
+- Round 258 (Nov 13, commit 46ef7e1; user: Snipaste_2026-11-13_05-12-04, LV6-4 after a Twister: helmets past some
+  number not shiny; suggested LV5-1 170.3 11.6 283.0): a helmet is a bare CClone (no child nodes); the shine is
+  one CParticlesNodeFx per bonus pool (pool +0x40 = the editor's particleNode1; +0x44 particleNode2, +0x48
+  secondBonusCpnt; bonus +0x18 = its pool). CKHkBasicBonus::vf15's end (0x54D788..0x54D812) adds the bonus's
+  position (frame +0x80 with bonus +8 bit 0x400, else frame +0x40) as an emission point: buffer (sys +0x44) +0x10,
+  12 bytes each, count byte sys +0x40 (cleared by the walk, CParticlesNodeFx::vf14 0x41A510), sys +0x10 |= 0x400;
+  "count < 0x40" -- 64 points, and the system's particles are fixed too (the buffer is a RW plugin block, 0x1000006,
+  set in CParticlesNodeFx::vf10). The same 64 cap is in ~20 other emitters (left alone). Fix: romanforge 3 clones
+  the pool's shine system for each 64 bonuses past the first (Duplicator::doCloneNode, under the original's
+  parent) and reports "pool class id, pool index, (11,19) indexes;" (each level's 100-helmet pool: one copy; LV4
+  #544, LV5 #604) into the key file's 3rd line; levelforge.cpp replaces the emission (jmp 0x54D788 ->
+  EmitShineStub -> EmitShine(bonus), back to 0x54D812): the first of the pool's systems with a point left, all
+  full -> one of the frame's points in turn. A first try with only the turn-taking (no copies) still left helmets
+  bare (fixed particles shared). Autotests: shine41 (-Level 4, S_SHINE: bonuses near a point with a particle node
+  on them -- 2-6 of ~65, originals and clones alike: not per-helmet nodes), shine51 (-Level 5, XXL_ATONCE=3,
+  Twister at the user's spot): "a bonus on its copy 1", no "all full", the field's helmets all shining.
