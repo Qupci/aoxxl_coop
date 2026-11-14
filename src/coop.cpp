@@ -1723,6 +1723,45 @@ static void __fastcall SkipSceneHook(char* sc, void* edx) {
 	g_origSkipScene(sc, edx);
 }
 
+// A skip (FUN_00461A80 -> FUN_00461B10 clears the scene's +0x21 bit 0x08) ends
+// the scene with a fade-out; once black, FUN_00461B90 puts each of its actors
+// with entry +0xC bit 0 on its end place (entry +0x10) -- FUN_00461E20, which
+// first drops that place onto the ground below (FUN_004493C0 ray). A scene
+// that ends by itself never does this: its actors stay where it left them.
+// LV6-5's Caesar (scene 4, zone 0308) sits on his throne up at marker 69 with
+// no floor under him (two CKHkAnimatedCharacter, 2,97, at 840.5 78.75 -286.2),
+// so a skip dropped him 14.7 units onto the floor below. An animated character
+// (a cutscene's own actor, not a hero) now takes its end place as it is, as
+// the scene would have left it; the heroes are still put on the ground.
+const uintptr_t kSceneEndPlaceCall = 0x461CE9;   // in FUN_00461B90: call FUN_00461E20 (thiscall scene, entry)
+const uint8_t   kSceneEndPlaceCallBytes[5] = { 0xE8, 0x32, 0x01, 0x00, 0x00 };
+const uintptr_t kAnimatedCharacterVtbl = 0x629BC0;
+
+static void __fastcall SceneEndPlaceHook(char* sc, void* edx, char* entry) {
+	char* x = entry ? *(char**)(entry + 4) : nullptr;
+	char* an0 = x ? *(char**)(x + 0x10) : nullptr;
+	char* fr0 = an0 ? *(char**)(an0 + 4) : nullptr;
+	float was = fr0 ? ((float*)(fr0 + 0x40))[1] : 0.f;   // (where the scene left it)
+	((void(__fastcall*)(char*, void*, char*))0x461E20)(sc, edx, entry);
+	const float* to = entry ? *(const float**)(entry + 0x10) : nullptr;
+	static const bool trace = getenv("XXL_SKIPLOG") != nullptr;
+	if (trace && x && to)
+		Log("coop:   skip: end place of %p vt %06X +8 %08X: (%.2f %.2f %.2f)", x, (unsigned)*(uintptr_t*)x, *(uint32_t*)(x + 8), to[0], to[1], to[2]);
+	if (!x || !to || *(uintptr_t*)x != kAnimatedCharacterVtbl) return;
+	char* an = *(char**)(x + 0x10);
+	char* fr = an ? *(char**)(an + 4) : nullptr;
+	if (!fr) return;
+	float y = ((float*)(fr + 0x40))[1];
+	if (fabsf(y - to[1]) < 0.01f) return;
+	((void(__fastcall*)(char*, void*, const float*))0x477770)(an, nullptr, to);   // position + its dirty flags
+	static int s_told = 0;
+	if (s_told < 20) {
+		s_told++;
+		Log("coop: skipped cutscene %p's end place for %p (an animated character, left at height %.2f): kept at (%.2f %.2f %.2f), not dropped to %.2f",
+		    sc, x, was, to[0], to[1], to[2], y);
+	}
+}
+
 // A Roman agent's dialogue (CKHkClueMan, trio event 0x5120, parameter: +4 the
 // spot to walk to, then directions and a second point, 0x34 bytes) has the
 // trio walk the *leader* there (situation 09); the dialogue starts when the
@@ -6241,6 +6280,8 @@ void CoopInit() {
 	              sizeof(kFreezePrologue), "world pause (not for the merchant in co-op)");
 	InstallDetour(kSkipScene, (void*)SkipSceneHook, (void**)&g_origSkipScene, kSkipScenePrologue,
 	              sizeof(kSkipScenePrologue), "cutscene skip (its later events still flagged)");
+	PatchCallSite(kSceneEndPlaceCall, kSceneEndPlaceCallBytes, sizeof(kSceneEndPlaceCallBytes), (void*)SceneEndPlaceHook,
+	              "skipped cutscene's end places (an animated character is not dropped to the ground)");
 	PatchCallSite(kShopMenuInputOff, kShopMenuInputOffBytes, sizeof(kShopMenuInputOffBytes), (void*)ShopMenuInputOff,
 	              "merchant's menu input (player 1's controls on while player 2 shops)");
 	PatchCallSite(kSasPositionCall, kSasPositionCallBytes, sizeof(kSasPositionCallBytes), (void*)SasPosition,

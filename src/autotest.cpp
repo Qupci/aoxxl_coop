@@ -9466,6 +9466,38 @@ const Step kCoLedgeRev65[] = {
 	SHOT(34500, "revived"), SHOT(38000, "after"),
 	END(40000),
 };
+// caesar65 / caesar65w (-Level 6, XXL_SKIPLOG=1): the user's LV6-5 -- Asterix
+// punches the last lever (spact65a), walks through zone 0308 (758.7 64.1 -263.1:
+// Caesar's cutscene); caesar65 skips it by holding pad A 2 s, caesar65w watches
+// it to its end. Then Asterix stands at 837.1 64.07 -285.7: Caesar should sit up
+// on his place (840.4 79.2 -286.1, marker 69), not on nothing below it.
+#define CAESAR65_START() \
+	SPACT65_START(), \
+	SPACT65_PUNCHES(25000, HERO_ASTERIX), \
+	SHOT(28000, "punched"), \
+	GLIDEAT(29000, HERO_ASTERIX, 753.9f, 64.07f, -261.2f, 800), \
+	GLIDEAT(30000, HERO_ASTERIX, 759.0f, 64.07f, -263.1f, 800), \
+	{ 31500, S_CINEDUMP, -1, 0, 0, 0, 0, "the playing scene" }, \
+	SHOT(32000, "cutscene")
+const Step kCaesar65[] = {
+	CAESAR65_START(),
+	{ 32200, S_WATCHRW, HERO_ASTERIX, 0, 0, 10, 0, "caesar's height" },
+	VPAD(32500, 0, PAD_A, 0, 0, "pad 1 holds A"), VPAD(35500, 0, 0, 0, 0, "pad 1 release"),
+	SHOT(36500, "skipped"), { 36600, S_CINEDUMP, 4, 0, 0, 0, 0, "scene 4 after the skip" },
+	PLACEAT(39000, HERO_ASTERIX, 837.106f, 64.073f, -285.666f), { 41500, S_CINEDUMP, 4, 0, 0, 0, 0, "scene 4 later" },
+	SHOT(41000, "caesar"), SHOT(44000, "caesar_2"),
+	END(45000),
+};
+const Step kCaesar65W[] = {
+	CAESAR65_START(),
+	{ 35000, S_CINEDUMP, 4, 0, 0, 0, 0, "scene 4 at the skip's time" },
+	{ 39500, S_CINEDUMP, 4, 0, 0, 0, 0, "scene 4 ended" },
+	SHOT(40000, "cutscene_2"), SHOT(50000, "cutscene_3"), SHOT(60000, "cutscene_4"),
+	PLACEAT(70000, HERO_ASTERIX, 837.106f, 64.073f, -285.666f),
+	SHOT(72000, "caesar"), SHOT(75000, "caesar_2"),
+	END(76000),
+};
+#undef CAESAR65_START
 #undef SPACT65_START
 #undef SPACT65_PUNCHES
 // splock47 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=0; sp_hero_switch_lock on):
@@ -9970,6 +10002,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("cohearth23", kCoHearth23),
 	SCENARIO("comarker23", kCoMarker23),
 	SCENARIO("coledgerev65", kCoLedgeRev65),
+	SCENARIO("caesar65", kCaesar65),
+	SCENARIO("caesar65w", kCaesar65W),
 	SCENARIO("spdownhud2", kSpDownHud2),
 	SCENARIO("spsq24", kSpSq24),
 	SCENARIO("spsq24n", kSpSq24N),
@@ -11341,6 +11375,17 @@ void RunStep(const Step& s) {
 				if (door) Log("autotest:     door: inputs %d of %d", *(int*)(nd + 0x20), *(int*)(nd + 0x24));
 				else if (k.id == 25) Log("autotest:     event %04X, waits for sekens %d line %d", *(uint16_t*)(nd + 0x2C), *(int*)(nd + 0x20), *(int*)(nd + 0x24));
 				else if (*(int*)(nd + 0x20) != -1) Log("autotest:     waits for sekens %d line %d", *(int*)(nd + 0x20), *(int*)(nd + 0x24));
+				if (k.id == 3 || k.id == 4) {   // its actor (scene data +4: the actor's +0x10 anim part, +4 its node, +0x40 position)
+					char* sd = *(char**)(nd + 0x10);
+					char* x = sd ? *(char**)(sd + 4) : nullptr;
+					char* an = x ? *(char**)(x + 0x10) : nullptr;
+					char* fr = an ? *(char**)(an + 4) : nullptr;
+					if (fr) Log("autotest:     actor %p vt %06X anim %p (time %.2f, anim %p) at (%.2f %.2f %.2f) | +44 %08X +54 %p +68 %d +6C (%.2f %.2f %.2f)",
+					    x, (unsigned)*(uintptr_t*)x & 0xFFFFFF, an, *(float*)(an + 0x30), *(void**)(an + 0x38),
+					    ((float*)(fr + 0x40))[0], ((float*)(fr + 0x40))[1], ((float*)(fr + 0x40))[2],
+					    k.id == 3 ? *(uint32_t*)(nd + 0x44) : 0, k.id == 3 ? *(void**)(nd + 0x54) : nullptr, k.id == 3 ? *(int*)(nd + 0x68) : 0,
+					    k.id == 3 ? *(float*)(nd + 0x6C) : 0.f, k.id == 3 ? *(float*)(nd + 0x70) : 0.f, k.id == 3 ? *(float*)(nd + 0x74) : 0.f);
+				}
 			}
 		}
 		break;
@@ -11837,6 +11882,26 @@ void RunStep(const Step& s) {
 				for (unsigned r = 0, nr = *(unsigned*)(pick + 0x14C); r < nr && nw < 4; r++) w[nw++] = recs + 0x1C * r + 0x16;
 				WatchBytes(w, nw, 0, 0);
 				Log("autotest: watching writes to 'sent' of squad %p's %d member groups", pick, nw);
+			}
+			break;
+		}
+		if (s.x == 10) {   // the height of the first animated character (2,97) played by the playing scene, jumps with stacks
+			CKYellowPages* yp = YellowPages();
+			char* cin = yp ? *(char**)((char*)yp + 0x80) : nullptr;
+			char* sc = nullptr;
+			for (unsigned i = 0, n = cin ? *(unsigned*)(cin + 0x14) : 0; i < n && !sc; i++) {
+				char* c = (*(char***)(cin + 0x10))[i];
+				if ((*(uint16_t*)(c + 0x20) & 1) && (*(uint16_t*)(c + 0x20) & 0x180) != 0x80) sc = c;
+			}
+			for (unsigned i = 0, n = sc ? GetNumLvlClassInstances(8, 3) : 0; i < n; i++) {
+				char* nd = (char*)GetLvlObject(8, 3, i);
+				char* sd = nd && *(char**)(nd + 0x1C) == sc ? *(char**)(nd + 0x10) : nullptr;
+				char* x = sd ? *(char**)(sd + 4) : nullptr;
+				if (!x || (*(uintptr_t*)x & 0xFFFFFF) != 0x629BC0) continue;
+				char* fr = *(char**)(*(char**)(x + 0x10) + 4);
+				WatchFloatJump((const float*)(fr + 0x44));
+				Log("autotest: watching the height of %p (now %.2f)", x, *(float*)(fr + 0x44));
+				break;
 			}
 			break;
 		}
