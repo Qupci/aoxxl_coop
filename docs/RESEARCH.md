@@ -5137,3 +5137,11 @@ both halves).
   first switch refused). spfuselink41 (-Level 4, Obelix 11 units off at the start): Obelix's bar under 0.75 at ~18.0,
   link kept on Asterix's 1.8, switch back at 18.47, Asterix's X 18.89, 0x25 x10 -> 0x26 x120; spfuse41 and twfuse41
   (co-op) fuse through 0x26.
+- Round 278 (Nov 14, commit ce368e4; user: LV6-4 with to_defeat/at_once 3, the gate's 3000 jumps to ~1000 under the
+  Twister, 1100 after a death -- xxl_coop.lv6-4_from_3000_to_1100.log). TrimStuck (experimental.cpp, the 6 s
+  "none of its N Romans left to send came" safety net) fired on squad 8's pool 2 (950 -> 2850, at once 0: sent by
+  the script in waves) while the Twister had beaten every Roman alive and the script paused -- 1900 taken with ~900
+  of the level's still to come. The squad's counts survive a game over (only sent/alive reset), hence 120+30+950 =
+  1100 after. Now the trim needs left-to-send <= own+extra (the level's own all sent: the "sent >= n" script end
+  it was made for). twist64 (-Level 6, taps past the spy talk as fight64, 10 Twisters at 358 42 -290): before, trim
+  at 27.3 s (2898 -> 978); after, 3000 -> 2578 steadily, no trim.
