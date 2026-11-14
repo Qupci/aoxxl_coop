@@ -4984,3 +4984,16 @@ both halves).
   The camera goes to Asterix, and the mode hint is swapped. boat49o (-Level 4, XXL_ACTIONLOG=1): player 2's stick is
   no longer answered (before: "boat[0]/trio[2] answered by player 2"), and player 2's A is answered as boat[4] / trio[4].
   slide22s doesn't reach a moving slide (the camera NaN, Obelix frozen), so only the hint is checked there.
+- Round 270 (Nov 14, commit 1909e8d; user: both players do the Twister, the one who started first -- the left screen --
+  keeps shaking after the later one's Twister has ended). The Twister's end, FUN_00498C10 (plain, attack 9) /
+  FUN_00498D70 (Fusion-ready, 10), thiscall(char ended) ret 4, run in the hero's own tick: with ended != 0 and the
+  other hero (trio vf 0x90 if hero +0x18 bit 0 (AI), else vf 0x98) still in the same attack state (+0x135), it skips
+  the cleanup: shake stop (svc +0xC bit 0x1000), trio +0x5B0 bit 0x20, +0x58C+0x29 bit 2, the music fade
+  (FUN_004813A0 / FUN_00480230) and the yp+0x6C register. That's for the AI companion's copy ending before the leader's
+  spin. With two players the first spinner ends first, so its camera shook out the full 24 s (round 113: each hero's
+  Twister shake is on its own camera). gamecam.cpp TwistEnd9/10Hook: in split screen (g_active, P2 joined), when the skip
+  applies and the camera in place is the ending hero's (game state for g_liveOwner, or the swapped-in copy), the
+  shake bit is cleared after the original. The rest of the skipped cleanup is left for the later spinner's end. Autotests
+  twistboth (P1 first; before: game shake on to 33.3 s / elapsed 24.00; now stopped at elapsed 12.03) and
+  twistboth2 (P2 first: the copy stopped at 12.04). twistend / twistenda are stale: their P2 Back step opens the pause
+  menu since round 263, so use S_P1COMBO -1 for the combo cheat.
