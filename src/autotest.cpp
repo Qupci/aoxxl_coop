@@ -4650,6 +4650,27 @@ const Step kSpOwnTw2B[] = {
 	TAP1(8700), TAP1(9100), TAP1(9500), TAP1(9900),
 	SHOT(10500, "fuse_x"), SHOT(12000, "fused"), SHOT(26000, "after"), END(27000),
 };
+// spfuse41 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1): spowntw2 on
+// LV4-1's field (potion): both own Twisters, X -- the Fusion only while the
+// leader's bar can pay for it (its price logged); the hero switch during the
+// fused tornado refused (user: it handed over the hidden hero, the tornado
+// stayed behind).
+const Step kSpFuse41[] = {
+	MARK(0, "spfuse41"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	PLACEAT(1300, HERO_ASTERIX, -301.081f, 1.2f, 87.452f), POTION(1400),
+	PLACEAT(1500, HERO_OBELIX, -297.0f, 1.2f, 91.5f),   // (6 units off: beside the starting tornado he is lifted, the switch refused)
+	{ 1600, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (asterix): the Twister" },
+	{ 4800, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 5000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full (he leads: the hits count)" },
+	{ 5400, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix beside the spinning asterix" },
+	{ 5600, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (obelix): the Twister" },
+	TAP1(8000), TAP1(8400),
+	SHOT(9500, "fused"),
+	{ 11000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch during the fused tornado (refused)" },
+	SHOT(12000, "after_switch"), SHOT(16000, "fused_later"), SHOT(26000, "after"), END(27000),
+};
 // spbarslow2 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1; user: the
 // off-lead bar ran out at the game's pace after Asterix's Twister and a switch):
 // Asterix's bar full and shown (its HUD bar in its full state); the switch to
@@ -10467,6 +10488,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spowntw2", kSpOwnTw2),
 	SCENARIO("spowntw2b", kSpOwnTw2B),
 	SCENARIO("spbarslow2", kSpBarSlow2),
+	SCENARIO("spfuse41", kSpFuse41),
 	SCENARIO("shine51", kShine51),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),

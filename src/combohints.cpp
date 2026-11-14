@@ -421,6 +421,7 @@ void FuseFrame(Trio t) {
 		if (a && b && spin(a) && spin(b) && CoopFusionAllowed(t.Leader())) {
 			Vector3 d = a.Pos() - b.Pos();
 			float r = *(float*)(t.raw() + 0x3D8);
+			if (Solo() && IndivActive() && r < 8.0f) r = 8.0f;   // (second chance: coop.cpp kOwnTwistersNear)
 			on = d.len2() < r * r;
 		}
 	}

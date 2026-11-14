@@ -4719,24 +4719,39 @@ static uint8_t SubState(Hero h) { return *(uint8_t*)(h.raw() + 0x38E) & 0x3F; }
 // spinning, 0x23, but no merge step) -- X still fused: the leader held merging
 // (0x25) until the companion's spin ended, then a whole fused tornado for free
 // (user, single player: a Twister of 20 s and more).
+// The Fusion's price: FUN_00493810(3) takes gm +0xBC+3 / +0xBB of the full bar
+// (+0xA0) off the gauge (+0xA4) -- and with less there it empties the bar and
+// the fusion goes on all the same: "some left" was never "affordable" (user).
+static float FusionCost(char* gm) {
+	uint8_t levels = *(uint8_t*)(gm + 0xBB), cost = *(uint8_t*)(gm + 0xBC + 3);
+	float full = *(float*)(gm + 0xA0);
+	static int s_told = 0;
+	if (s_told++ < 3)
+		Log("coop: the Twister Fusion costs %u of %u of the full bar (%.1f): %.2f (the Twister %u)", cost, levels, full,
+		    levels ? cost * full / levels : 0.0f, *(uint8_t*)(gm + 0xBC + 2));
+	return levels ? cost * full / levels : 0.0f;
+}
+
 bool CoopFusionAllowed(int lead) {
 	Trio t = GetTrio();
 	if (!t || (lead != HERO_ASTERIX && lead != HERO_OBELIX)) return false;
 	Hero l = t.GetHero(lead), o = t.GetHero(lead ^ 1);
 	if (!l || !o || *(uint8_t*)(l.raw() + 0x135) != 10 || *(uint8_t*)(o.raw() + 0x135) != 10) return false;
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	if (!gm) return false;
+	float cost = FusionCost(gm);
 	int hp, sh;
 	float gauge;
-	if (IndivStats(lead, &hp, &sh, nullptr, &gauge)) {   // its own bar, full (some left)
-		if (gauge < 0.0f) return false;
+	if (IndivStats(lead, &hp, &sh, nullptr, &gauge)) {   // its own bar, full (-1: not), pays for it
+		if (gauge < 0.0f || gauge < cost) return false;
 		// Second chance: two Twisters of their own -- some left on the other's bar too.
 		float other = 0.0f;
 		if (!g.p2Joined && IndivStats(lead ^ 1, &hp, &sh, nullptr, &other)) return other >= 0.0f;
 		return true;
 	}
-	CKYellowPages* yp = YellowPages();
-	char* gm = yp ? (char*)yp->gameManager : nullptr;
-	char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
-	return cb && (*(uint32_t*)(cb + 0x10) & 0x4000);
+	char* cb = *(char**)(gm + 0x40);
+	return cb && (*(uint32_t*)(cb + 0x10) & 0x4000) && *(float*)(gm + 0xA4) >= cost;
 }
 
 static char __fastcall FuseHook(char* hero, void* edx) {
@@ -4754,7 +4769,7 @@ static char __fastcall FuseHook(char* hero, void* edx) {
 			if (s_told++ < 20) {
 				Hero o = (li == HERO_ASTERIX || li == HERO_OBELIX) ? t.GetHero(li ^ 1) : Hero();
 				bool ready = lh && o && *(uint8_t*)(lh.raw() + 0x135) == 10 && *(uint8_t*)(o.raw() + 0x135) == 10;
-				Log("coop: Twister Fusion refused -- %s", ready ? "no combo left on the leader's bar (second chance: or the other's)"
+				Log("coop: Twister Fusion refused -- %s", ready ? "the leader's bar can't pay for it (second chance: or the other's ran out)"
 				                                                : "a hero not in the Fusion-ready Twister");
 			}
 			*own = 0;
@@ -5488,7 +5503,8 @@ int CoopSidekickView() {
 static const char* const kSwitchTooFar = "the other hero is too far";
 // Refusals with no other hero to show (no sidekick view for them).
 static const char* const kSwitchNoView[] = { "no game", "paused", "a cutscene", "no leader", "a hero missing",
-                                             "the other hero is not with the leader (level 1: Obelix not found)" };
+                                             "the other hero is not with the leader (level 1: Obelix not found)",
+                                             "the Twister Fusion" };
 static bool SwitchRefusalShowsView(const char* no) {
 	for (const char* s : kSwitchNoView) if (no == s) return false;
 	return true;
@@ -5702,6 +5718,10 @@ static const char* SoloSwitchRefusal(Trio t, bool press) {
 	if (*(uint8_t*)(ch.raw() + 0x1A)) return kSwitchNoView[5];
 	if (IndivFallen(OtherHero(l))) return "the other hero is down";
 	if (HeroMode(lh.Flags18()) != 0 || HeroMode(ch.Flags18()) != 0) return "a scripted mode (a ride, the slide, a machine)";
+	// The Twister Fusion merging or running (either hero's body sub-state 0x25..0x27, or X just asked for it): the
+	// switch handed you the hidden hero and left the fused tornado behind (user).
+	auto fusing = [](Hero h) { uint8_t s = SubState(h); return Twisting(h) && (s == 0x25 || s == 0x26 || s == 0x27); };
+	if (fusing(lh) || fusing(ch) || *(uint8_t*)(lh.raw() + 0x188)) return kSwitchNoView[6];   // (no sidekick view: it is there)
 	if (lh.Busy() || ch.Busy()) return "a hero busy";
 	if (ch.Order() != AI_FOLLOW_LEADER) return "the other hero is held by the level (a wait, a ride, a walk)";
 	if (Situation(lh) != 0) return "the leader is doing something (its situation)";
