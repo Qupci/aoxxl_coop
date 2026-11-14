@@ -4,6 +4,7 @@
 #include "ctrlopts.h"
 #include "detour.h"
 #include "inputmgr.h"
+#include "levelforge.h"
 #include "log.h"
 #include "pads.h"
 
@@ -202,7 +203,7 @@ void LoadComboIcons() {
 	int found = 0;
 	for (int lvl : { 2, 1, 3, 4, 5, 6 }) {
 		char rel[64], path[MAX_PATH];
-		snprintf(rel, sizeof(rel), "LVL%03d\\LVL%02d.KWN", lvl, lvl);
+		snprintf(rel, sizeof(rel), "LVL%03d\\LVL%02d.%s", lvl, lvl, GameFileExt());
 		GameDirPath(path, sizeof(path), rel);
 		FILE* f = fopen(path, "rb");
 		if (!f) continue;

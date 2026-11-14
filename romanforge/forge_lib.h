@@ -19,8 +19,14 @@ size_t ForgeModulePatches(ForgePatch* out, size_t max);
 // Checks the game module is the build the conversion knows (the Ipatix patch).
 bool ForgeModuleKnown(const void* exe, size_t exeSize);
 
+// The game files' extension the module opens ("KWN"; mods may rename it: Unfair
+// XXL 2.0 reads .KSX) -- the module's ".KWN" string (file offset 0x245858).
+const char* ForgeModuleFileExt(const void* exe, size_t exeSize);
+
 // Builds level `lvl` into outDir (LVLnnn\LVLnn.KWN, and the sectors' STRnn_mm.KWN
-// when Romans were added): converted, Romans cloned with factor > 1. Writes a
+// when Romans were added; the module's extension): converted (a level already
+// in the moddable format, as mods made with XXL-Editor ship them, is used as it
+// is), Romans cloned with factor > 1. Writes a
 // short report to `report`. *cloned: Romans added. false: nothing usable written.
 // `shine`: the copies of bonus pools' shine particle systems, "pool class id,
 // pool index, particle system (11,19) indexes;" per pool.

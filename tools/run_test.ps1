@@ -24,7 +24,8 @@ $exe = Join-Path $game $(if ($Exe) { $Exe } else { "axxl.exe" })
 if (-not (Test-Path $exe)) { $exe = Join-Path $game "Cesar's Challenge - Windowed.exe" }
 $shots = Join-Path $game "shots"
 
-Get-Process axxl, GameModule, "Cesar's Challenge - Windowed" -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
+Get-Process axxl, GameModule, "Cesar's Challenge - Windowed", "Cesar's Challenge - Fullsreen", GameModule_MP, GameModule_MP_windowed,
+    GameModule_UXXL_windowed, GameModule_UXXL_fullscreen -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
 
 # The game keeps only three logs (xxl_coop.log, .1, .2) and every test run
 # rotates them: save any log from a real play session (no "autotest:" line in

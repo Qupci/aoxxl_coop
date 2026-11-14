@@ -416,8 +416,9 @@ struct CKHkMachinegun : CKHookSubclass<CKHkMachinegun, CKHook, 31> {
 
 
 struct CKHkTorch : CKHookSubclass<CKHkTorch, CKHook, 32> {
-	kobjref<CKSoundDictionaryID> torchSndDict;
-	kobjref<CSGBranch> torchBranch;
+	// romanforge: both may be a sector's (Caesar's Challenge LVL1), bound with the sectors
+	KPostponedRef<CKSoundDictionaryID> torchSndDict;
+	KPostponedRef<CSGBranch> torchBranch;
 	float torchUnk2;
 	float torchUnk3;
 	float torchUnk4;

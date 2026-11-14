@@ -51,7 +51,7 @@ std::string LevelKey(int lvl) {
 	std::vector<std::string> names;
 	for (const auto& e : fs::directory_iterator(fs::u8path(g_gameDir) / dir, ec)) {
 		std::string n = e.path().filename().u8string();
-		if (n.size() > 4 && _stricmp(n.c_str() + n.size() - 4, ".KWN") == 0 &&
+		if (n.size() > 4 && n[n.size() - 4] == '.' && _stricmp(n.c_str() + n.size() - 3, GameFileExt()) == 0 &&
 		    (_strnicmp(n.c_str(), "LVL", 3) == 0 || _strnicmp(n.c_str(), "STR", 3) == 0))
 			names.push_back(n);
 	}
@@ -94,7 +94,7 @@ bool CacheValid(int lvl, int* cloned, char* shine, size_t shineSize) {
 		snprintf(shine, shineSize, "%s", nl2 + 1);
 	}
 	char lvlFile[64];
-	snprintf(lvlFile, sizeof(lvlFile), "\\LVL%03d\\LVL%02d.KWN", lvl, lvl);
+	snprintf(lvlFile, sizeof(lvlFile), "\\LVL%03d\\LVL%02d.%s", lvl, lvl, GameFileExt());
 	return GetFileAttributesA((g_cacheDir + lvlFile).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
@@ -178,7 +178,8 @@ DWORD WINAPI Worker(LPVOID) {
 	return 0;
 }
 
-// "...LVL004\LVL04.KWN" / "...LVL004\STR04_03.KWN": the level and the file name.
+// "...LVL004\LVL04.KWN" / "...LVL004\STR04_03.KWN" (the module's extension): the
+// level and the file name.
 bool ParseLevelPath(const char* path, int* lvl, const char** file) {
 	const char* best = nullptr;
 	for (const char* p = path; *p; p++)
@@ -193,7 +194,7 @@ bool ParseLevelPath(const char* path, int* lvl, const char** file) {
 	char ext[8] = {};
 	bool lvlFile = sscanf(f, "%*1[Ll]%*1[Vv]%*1[Ll]%2d.%4s", &a, ext) == 2 && a == l;
 	bool strFile = !lvlFile && sscanf(f, "%*1[Ss]%*1[Tt]%*1[Rr]%2d_%2d.%4s", &a, &b, ext) == 3 && a == l;
-	if ((!lvlFile && !strFile) || _stricmp(ext, "KWN") != 0) return false;
+	if ((!lvlFile && !strFile) || _stricmp(ext, GameFileExt()) != 0) return false;
 	*lvl = l;
 	*file = f;
 	return true;
@@ -350,6 +351,16 @@ __declspec(naked) void EmitShineStub() {
 
 } // namespace
 
+const char* GameFileExt() {
+	static char s_ext[4] = "";
+	if (!s_ext[0]) {
+		const char* p = (const char*)0x645858;   // "LVL\0STR\0.KWN\0" (.data)
+		bool ok = p[0] == '.' && p[1] == 'K' && isupper((unsigned char)p[2]) && isupper((unsigned char)p[3]) && !p[4];
+		snprintf(s_ext, sizeof(s_ext), "%s", ok ? p + 1 : "KWN");
+	}
+	return s_ext;
+}
+
 bool LevelForgePoolsFilled(int level) {
 	return g_factor > 1.0f && level >= 0 && level < kLevels && g_lv[level].state == LV_DONE && g_lv[level].ok &&
 	       g_lv[level].cloned > 0;
@@ -420,6 +431,7 @@ void LevelForgeInstall() {
 	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
 	Log("levelforge: Roman pools (basic Romans, leaders, archers, jumping Romans) filled up to x%.2f, bonuses and "
 	    "crates x2; the levels are read from %s "
-	    "(the module reads XXL-Editor's format: %u patches)", g_factor, g_cacheDir.c_str(), (unsigned)np);
+	    "(the module reads XXL-Editor's format: %u patches; game files .%s)", g_factor, g_cacheDir.c_str(), (unsigned)np,
+	    GameFileExt());
 	CloseHandle(CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr));
 }

@@ -297,7 +297,8 @@ struct CKFlaggedPath : CKSubclass<CKLogic, 23> {
 };
 
 struct CKMsgAction : CKSubclass<CKLogic, 24> {
-	using MAParameter = std::variant<uint32_t, uint32_t, float, kobjref<CKObject>, MarkerIndex>;
+	struct MARawParameter { uint32_t type, value; };   // romanforge: a type the game skips (4 bytes)
+	using MAParameter = std::variant<uint32_t, uint32_t, float, kobjref<CKObject>, MarkerIndex, MARawParameter>;
 	struct MAAction {
 		uint8_t num;
 		std::vector<MAParameter> parameters;

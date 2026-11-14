@@ -32,6 +32,8 @@ public:
 	CKSceneNode* doCloneNode(CKSceneNode* node);
 	void doExport(CKObject* object, const std::filesystem::path& path);
 	void doImport(const std::filesystem::path& path, CKGroup* parentGroup);
+	// romanforge: public (the group a hook's clone goes to, nullptr: outside the tree).
+	static CKGroup* findGroup(CKHook* hook, CKGroup* root);
 
 private:
 	KEnvironment& kenv;
@@ -46,7 +48,6 @@ private:
 	}
 
 	CKSceneNode* cloneNode(CKSceneNode* original, bool recursive);
-	static CKGroup* findGroup(CKHook* hook, CKGroup* root);
 
 	virtual void reflect(uint8_t& ref, const char* name);
 	virtual void reflect(uint16_t& ref, const char* name);

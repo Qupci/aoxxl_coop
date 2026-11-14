@@ -925,9 +925,26 @@ CKObject * KEnvironment::getObjPnt(uint32_t objid, int sector)
 	if (objnb < cllvlobjs.size())
 		return cllvlobjs[objnb];
 	else if(cllvl.instantiation == KInstantiation::SectorShared) {
-		assert(sector != -1);
-		auto &strtype = sectorObjects[sector].categories[clcat].type[clid];
-		return strtype.objects[objnb - strtype.startId];
+		// romanforge: bounds checked. Mods' levels refer to sector-shared objects
+		// from the level (Caesar's Challenge LVL1 torch, Unfair XXL LVL6 camera
+		// bloc) or with a number the guessed sector doesn't hold (Unfair XXL LVL6
+		// events -- was a garbage pointer): then the first sector holding that
+		// number. Saved back as the same number (saveMap numbers every sector's
+		// sector-shared objects from the same startId).
+		auto inSector = [&](int s) -> CKObject* {
+			if (s < 0 || s >= (int)sectorObjects.size() || clid >= sectorObjects[s].categories[clcat].type.size())
+				return nullptr;   // not loaded yet
+			auto& strtype = sectorObjects[s].categories[clcat].type[clid];
+			int x = (int)objnb - (int)strtype.startId;
+			return x >= 0 && x < (int)strtype.objects.size() ? strtype.objects[x] : nullptr;
+		};
+		if (CKObject* o = inSector(sector))
+			return o;
+		for (int s = 0; s < (int)sectorObjects.size(); s++)
+			if (CKObject* o = inSector(s))
+				return o;
+		assert(false && "sector-shared object number held by no sector");
+		return nullptr;
 		//return loadMap.at(std::make_pair(objid, sector));
 	}
 	else {

@@ -20,6 +20,11 @@
 // class header and some values in the game module, which is patched in memory
 // (the editor's game patcher's patches) to read them from the level file -- so
 // every level the game loads is served rebuilt (most just converted).
+//
+// Mods made with XXL-Editor (the SPQR mods: Caesar's Challenge, Beta Rome,
+// Unfair XXL 2.0) ship an already patched module and levels already in that
+// format: those levels are cloned as they are (no conversion), with the file
+// extension the module reads (Unfair XXL renames .KWN to .KSX).
 #pragma once
 
 // From DllMain, after the config: patches the module, hooks the file opens,
@@ -28,3 +33,6 @@
 void LevelForgeInstall();
 // The level loaded has its Roman pools filled (squad_romans_at_once > 1).
 bool LevelForgePoolsFilled(int level);
+// The game files' extension the running module opens: "KWN", or a mod's own
+// ("KSX": Unfair XXL 2.0) -- the module's ".KWN" string at 0x645858.
+const char* GameFileExt();

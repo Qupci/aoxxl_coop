@@ -446,7 +446,8 @@ void CKSpline4L::deserialize(KEnvironment * kenv, File * file, size_t length)
 	for (Vector3 &v : cksPrecomputedPoints)
 		for (float &c : v)
 			c = file->readFloat();
-	assert(numBings == (uint32_t)cksNumParts * 4);
+	// romanforge: not asserted (numBings == cksNumParts * 4) -- a mod's spline
+	// breaks it (Caesar's Challenge LVL1); both counts are written back as read.
 }
 
 void CKSpline4L::serialize(KEnvironment * kenv, File * file)
@@ -1154,7 +1155,10 @@ void CKMsgAction::deserialize(KEnvironment * kenv, File * file, size_t length)
 					case 4:
 						d.emplace<MarkerIndex>().read(kenv, file); break;
 					default:
-						assert(false && "unknown parameter type");
+						// romanforge: the game reads 4 bytes for a type it doesn't
+						// know (and keeps nothing); some mods' levels hold such
+						// pairs (Unfair XXL 2.0) -- kept as they are.
+						d.emplace<MARawParameter>(MARawParameter{ type, file->readUint32() });
 					}
 				}
 			}
@@ -1186,8 +1190,10 @@ void CKMsgAction::serialize(KEnvironment * kenv, File * file)
 		for (MAMessage &b : a.messageHandlers) {
 			for (MAAction &c : b.actions) {
 				for (MAParameter& d : c.parameters) {
-					file->writeUint32((uint32_t)d.index());
+					file->writeUint32(d.index() == 5 ? std::get<MARawParameter>(d).type : (uint32_t)d.index());
 					switch (d.index()) {
+					case 5:
+						file->writeUint32(std::get<MARawParameter>(d).value); break;
 					case 0:
 						file->writeUint32(std::get<0>(d)); break;
 					case 1:
