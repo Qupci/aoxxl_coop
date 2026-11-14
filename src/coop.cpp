@@ -4846,8 +4846,19 @@ static void TwisterNearness(Trio t, Hero h1, Hero h2, float range) {
 	float near2 = *(float*)(t.raw() + 0x3D8);
 	if (range > near2) near2 = range;
 	if (!(d < near2)) return;
-	if (!*(uint8_t*)(h1.raw() + 0x189) || !*(uint8_t*)(h2.raw() + 0x189))
+	if (!*(uint8_t*)(h1.raw() + 0x189) || !*(uint8_t*)(h2.raw() + 0x189)) {
 		Log("coop: both Twisters %.1f apart (fusion range %.1f): Twister Fusion possible", d, near2);
+		// Second chance: the AI's spin that marks the pair (FUN_00498560, 0x4986A8)
+		// also starts the trio's lightning between the tornados -- FUN_00480930
+		// (thiscall on the trio, the length 2 x trio +0x3AC, ret 4: its bolt object
+		// +0x4E4, flags +0x524). Marked here, it never ran: the fused tornado's
+		// lightning stood as one still line (user).
+		if (range > 0.0f) {
+			typedef void(__fastcall* LinkFn)(char* trio, void* edx, float length);
+			((LinkFn)0x480930)(t.raw(), nullptr, *(float*)(t.raw() + 0x3AC) * 2.0f);
+			Log("coop: second chance: the trio's lightning between the Twisters started (as the AI's own spin does)");
+		}
+	}
 	*(uint8_t*)(h1.raw() + 0x189) = 1;
 	*(uint8_t*)(h2.raw() + 0x189) = 1;
 }

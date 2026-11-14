@@ -729,10 +729,22 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 		// silent -- kept only in its copy, a full bar stood still where the switch
 		// left it and came back with the lead, full over a drained gauge: hits
 		// did not fill it until it had run down (user).
+		// Full, the bar part counts its own fill down by the clock's dt (+0xC) and
+		// ends the full state itself at 0 (FUN_00518190 state 4: hits cleared),
+		// whatever the gauge says: with [single_player] sp_second_chance_combo_drain
+		// its clock's dt is scaled as the gauge's run-down (individual.cpp
+		// RunDownCombo) -- the off-lead bar ran out at the game's pace (user).
 		if (!(f & 0x10000000)) {
 			g_muteHudSound = solo;
-			kComboPart(itf, nullptr, time);
-			kComboGlowPart(itf, nullptr, time);
+			uint8_t slow[64];
+			void* comboTime = time;
+			if (solo && time && g_config.spSecondChanceComboDrain != 1.0f) {
+				memcpy(slow, time, sizeof(slow));
+				*(float*)(slow + 0xC) *= g_config.spSecondChanceComboDrain;
+				comboTime = slow;
+			}
+			kComboPart(itf, nullptr, comboTime);
+			kComboGlowPart(itf, nullptr, comboTime);
 			g_muteHudSound = false;
 		}
 	}

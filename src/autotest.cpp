@@ -4629,7 +4629,7 @@ const Step kSpOwnTw2[] = {
 	{ 5600, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (obelix): the Twister" },
 	SHOT(6500, "both_start"), SHOT(8200, "both_spin"),
 	TAP1(8500), TAP1(8900), TAP1(9300), TAP1(9700),
-	SHOT(10000, "fuse_x"), SHOT(11500, "fused"), SHOT(14000, "fused_later"),
+	SHOT(10000, "fuse_x"), SHOT(11500, "fused"), SHOT(14000, "fused_later"), SHOT(14350, "fused_b1"), SHOT(14700, "fused_b2"), SHOT(15050, "fused_b3"),
 	SHOT(26000, "after"), END(27000),
 };
 // spowntw2b (as spowntw2): back to Asterix while both spin (both Twisters kept
@@ -4649,6 +4649,23 @@ const Step kSpOwnTw2B[] = {
 	SHOT(8400, "back"),
 	TAP1(8700), TAP1(9100), TAP1(9500), TAP1(9900),
 	SHOT(10500, "fuse_x"), SHOT(12000, "fused"), SHOT(26000, "after"), END(27000),
+};
+// spbarslow2 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1; user: the
+// off-lead bar ran out at the game's pace after Asterix's Twister and a switch):
+// Asterix's bar full and shown (its HUD bar in its full state); the switch to
+// Obelix; Asterix's full bar left alone (25 s at the game's pace) -- with
+// sp_second_chance_combo_drain 0.33 it lasts about three times longer.
+const Step kSpBarSlow2[] = {
+	MARK(0, "spbarslow2"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	// LV4-1's field Romans (twnerf41's spot), Obelix 6 units off; the potion: no fall (its gauge has the combo bar's place on the HUD, which stays hidden).
+	PLACEAT(1300, HERO_ASTERIX, -301.081f, 1.2f, 87.452f), PLACEAT(1300, HERO_OBELIX, -297.0f, 1.2f, 91.5f), POTION(1400),
+	TAP1(4000), TAP1(4400), TAP1(4800), TAP1(5200), TAP1(5600), TAP1(6000),   // hits on the Romans come: the HUD's combo bar up
+	{ 6500, S_SPMOD, PAD_DPAD_LEFT, 0, 0, 0, 0, "R3 + D-pad left: asterix's combo bar filled (the cheat, as the user)" },
+	SHOT(7500, "bar_full"),
+	{ 8500, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix (asterix's bar full)" },
+	SHOT(9000, "after_switch"), SHOT(20000, "later"), SHOT(34000, "later_2"),
+	END(40000),
 };
 // shine51 (-Level 5, XXL_ATONCE=3; user: LV5-1 170.3 11.6 283.0 -- no wheat, no
 // dialogue): Asterix's Twister among the Romans there; the helmets left after it
@@ -9798,7 +9815,7 @@ const Step kSpFuse2[] = {
 	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1: the Twister" },
 	SHOT(3300, "both_start"), SHOT(4800, "both_spin"),
 	TAP1(5000), TAP1(5400), TAP1(5800), TAP1(6200), TAP1(6600),
-	SHOT(7000, "fuse_x"), SHOT(8500, "fused"), SHOT(11000, "fused_later"),
+	SHOT(7000, "fuse_x"), SHOT(8500, "fused"), SHOT(11000, "fused_later"), SHOT(11350, "fused_b1"), SHOT(11700, "fused_b2"), SHOT(12050, "fused_b3"),
 	END(13000),
 };
 // spbar2 (level 2; XXL_SPISOLATION=1 the game's own, or XXL_SPSECOND=1):
@@ -10449,6 +10466,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("twfuse41", kTwFuse41),
 	SCENARIO("spowntw2", kSpOwnTw2),
 	SCENARIO("spowntw2b", kSpOwnTw2B),
+	SCENARIO("spbarslow2", kSpBarSlow2),
 	SCENARIO("shine51", kShine51),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),
