@@ -4953,3 +4953,21 @@ both halves).
   cache key holds the exe size: switching module rebuilds once. run_test.ps1 -Exe <module> (started without the
   shell, its stdout/stderr drained -- the forge's printf would otherwise flood the console). atonce41 -Exe
   GameModule.elb: 18 at once, helmet pool free 100, through to the end.
+- Round 268 (Nov 14, commit e04d01c; user: LV6-5, the last lever's door, then zone 0308 (758.7 64.1 -263.1) starts
+  Caesar's cutscene; skipped by holding A, Caesar sat on nothing at the door (840 64 -286) instead of up at marker 69):
+  the scene (level 6 scene 4, flags 0x1D01, one of the scenes skip_cutscenes made skippable) has a StartDoor -> 3
+  PathFinding -> 3 PlayAnim (two CKHkAnimatedCharacter (2,97, vt 0x629BC0) = Caesar, both at 840.48 78.75 -286.20,
+  and Asterix), and the cameras' And doors stop the PlayAnims. Ended by itself, the actors stay where it left them.
+  A skip (FUN_00461A80 -> FUN_00461B10) clears the scene's +0x21 bit 0x08 (flag 0x800). That sends FUN_00461B90 down its
+  fade-out branch, and once black it calls FUN_00461E20 (thiscall scene, entry; ret 4; one call site 0x461CE9) for
+  every scene-data entry with +0xC bit 0. FUN_00461E20 takes the entry's end place (*(entry+0x10), actor *(entry+4)),
+  drops it to the ground below with the FUN_004493C0 ray, grounds a hero via the yellow pages +0x54 list (FUN_0041CB50),
+  and sets it with FUN_00477770 (ECX = the actor's +0x10 part, its +4 node +0x40 position). Caesar's end place is
+  78.75 and the ray found the floor at 64.07. Found by a float-jump watch on the actor's node +0x44
+  (autotest S_WATCHRW x=10, stack 462074 <- 461CEE <- 460CF0 <- 46ACEB). Fix: coop.cpp SceneEndPlaceHook (patched call
+  0x461CE9) calls FUN_00461E20, then puts a CKHkAnimatedCharacter back on its end place as given. Heroes are still
+  grounded. The actor's +8 bit 0 (its own 0x1202 ground snap) is no guide: one Caesar part has it and still sits up
+  there. Level 1's intro skip now also keeps an actor at 22.20 (left by the scene at 22.46; it was dropped to 16.26).
+  S_CINEDUMP now logs each PlayAnim / PathFinding bloc's actor and position. Autotests caesar65 (skip: Caesar kept at
+  78.75) and caesar65w (watched to its end; the reference: 78.75), both -Level 6, XXL_SKIPLOG=1 for the run-on +
+  end-place trace; holdskip -Level 1 regression OK.
