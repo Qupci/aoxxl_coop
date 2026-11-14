@@ -5145,3 +5145,42 @@ both halves).
   1100 after. Now the trim needs left-to-send <= own+extra (the level's own all sent: the "sent >= n" script end
   it was made for). twist64 (-Level 6, taps past the spy talk as fight64, 10 Twisters at 358 42 -290): before, trim
   at 27.3 s (2898 -> 978); after, 3000 -> 2578 steadily, no trim.
+- Round 279 (Nov 14, commit 2158cf8; user's new difficulty settings: Romans' faster charge, a shield for every enemy
+  (breakable as the guards' / infinite as LV2-3 squad 25), more hits to defeat, more blows on a shield, a shorter
+  weaponless daze, the heroes' permanent shields 1-6 + extra 0-6 -- "shields" = the health bar). toughness.cpp, all
+  live, all in CO-OP Options (page 4):
+  - Enemy component (pool record +4, shared by the pool's Romans; hook +0x54) offsets from the deserializers
+    (CKEnemyCpnt 0x4F4F00, CKSeizableEnemyCpnt 0x4F4370, CKBasicEnemyCpnt 0x4F4A80): +4 flags (0x10 has shield, 0x40
+    infinite, 0x08 can be disarmed), +8 health (the hook takes it at a send, Shared_Class_2_88_vf16 -> hook +0x48),
+    +0x110 shield points, +0x111 extra (seUnk28), +0x114 cover time, +0xF0 the daze (seComboStunTime 5.0), +0x154 the
+    wind-up (beChargeDuration 1.5: FUN_004E3F60 reaction 0x2A while hook +0x260 <= it, then 0x29 the blow; the
+    animation at 0.9 / it, CKHkBasicEnemy::vf36). Seizable +0x94.. +0x11C and basic +0x130.. +0x170 as XXL-Editor's
+    field order (map in toughness.cpp's head).
+  - Shield (Shared_Class_2_84_vf28 0x4CF970, kind 0 front, reaction not 1..5): hits in a row +0x148 += 1; <= points
+    blocked (+0x24 |= 0x10000, cover); > points + extra blocked only with 0x40; between: lands. Never blocked while
+    disarmed (+0x24 bit 0x8000) or a strong blow (kind 3). +0x148 goes back to 0 only as a block's cover ends
+    (vf30 0x4CB840: +0x144 over cover time +0x114) or a send (vf15/vf16). A Roman reeling (reaction 1..5) skips it:
+    combo blows after the first land. LV2-3 squad 25 (poolkinds -Level 2): flags 03007ED9, points 0, extra 2 --
+    two blows land, then blocked.
+  - Disarm: event 0x4C05 (Class_2_84::sendEvent class 0x4C case 5) or a reaction-4 blow with flag 0x08 sets +0x24
+    bit 0x8000; vf30 then vf56; vf52 0x4CD260 clocks hook +0x128 to +0xF0 (stars past 0.66 of it, FUN_004CCC80) and
+    clears the bit (the only place). Asterix's combo action 3 (S_P1COMBO 3) disarms a crowd.
+  - Health bar: the hit FUN_00495FA0 drops a shield (shields > 3 and health <= shields*5 - 5) -- bought/picked
+    shields are lost as their part empties, never under 3; a pit (FUN_0049DD30) takes one regardless (left so).
+    Immediates patched live: 3 at 0x50146B / 0x501B5F / 0x4FE170 (gm vf12, vf13 respawn, vf18 new game) and the
+    hit's floor 0x49611E; 15 at 0x501467 / 0x501B2F / 0x4FE174 (base*5); 6 at 0x507232/38 (add a shield),
+    0x4BB050/A9/AF (bonus pool FUN_004BAFB0), 0x4BFD5E / 0x4C001F/25 (merchant). Clamp each frame: no more than the
+    most (game place + IndivEachShieldCopy); raised to the base only as it changes / a level begins (options on).
+    individual.cpp's shield pickup rule uses ToughnessHeroShieldsMax.
+  - Modes: enemies with ExperimentalMode() == 2 (the squads' rules on; the game's own while apart / SP coop_only);
+    the bar with mode != 0. Components keyed by pointer, originals re-taken when a component no longer holds what was
+    put in (a reload); cleared out of a level. Shields only for basic Romans and leaders whose model has no lion /
+    pirate / normand / dompt / barberousse texture (GuardModelTextures). Turtles, tower, jetpack: KeptAsIs.
+  - CO-OP Options went past 48 rows (51): kCoopMax 64, rows 48+ on text slots 130.. (128 is the pause item's);
+    hints' kNumStrings 176. K_SHIELD kind (off -> breakable -> infinite).
+  Autotests: tough41 (-Level 4, XXL_TOUGHWATCH=1 XXL_OBELIXPOTION=0 + XXL_ROMANSHIELD/HEALTH/SHIELDHITS/CHARGE/
+  DISARM, XXL_HEROSHIELDS/HEROEXTRA): wind-up 0.73 s at x2 (1.5), 6 hits at health x2, infinite blocks at hits in a
+  row 3, breakable x1.5 -> 3 points blocks, S_DISARM daze clock 5.01 -> 2.01 at 0.4 (weaponless 6.5 s -> 3.5 s; a
+  combo's knock-down before it adds ~2.8 s), bar 4+1: 3 -> 4 at the start, given shields stop at 5, hits no longer
+  take the 4th; 2+0: 3 -> 2, health 10. coopopts2 (-Level 2): page 4 rows, roman_shield cycles, page 6 (rows 45-50).
+  Not verified: a charging Roman hit through an infinite shield (the user's account of squad 25: the game's own).
