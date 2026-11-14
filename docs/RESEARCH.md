@@ -5039,3 +5039,44 @@ both halves).
   put-back, row up with 3; now back at 40.5 57.2 -89.5, Obelix leads, row hidden) and splift21 (-Level 2: squad 29
   won, Asterix on the circle, Obelix on the lifter; 48C4 at +6 s: lock undone, both ride up, the circle locks
   Asterix again later). liftdown21, liftdown21r, liftdie21a, liftdie21b, lifterlock as before.
+- Round 273 (Nov 14, commit 7398e4e; user's request: nerf the plain Twister, keep the Fusion's effect; second chance
+  Twisters of their own; a slower background combo bar in second chance -- three options, in CO-OP Options).
+  (1) The Twister's pull, FUN_00498270 (thiscall, no args, plain ret; prologue 83 EC 1C 53 55 56 57; called from
+  the spin steps FUN_00497C90 / FUN_00498560 and the fused FUN_00498A30): Romans of the trio's list (trio vt+0xF8,
+  null-terminated) within trio +0x3B8 of the tornado (hero +0x17C) get 0x4C0D -- caught: their 0x4C01 flags bit
+  0x400000; IsA 0x1702 ones counted per squad (enemy +0x4C) into hero +0x198 (4 slots). Its clock hero +0x18C (+=
+  dt), past +0x190 (plain, attack 9) / +0x194 (Fusion-ready, 10) over the most caught of one squad, calls each such
+  squad's slot 41 (0x4C8CB0, (1, -1, a spot near the tornado)): one Roman still to come taken (+0x16 up to +0x18,
+  0x4D09 = the gate counter, a helmet), clock to 0. With -1 slot 41 picks a random record with Romans left and caps
+  n at that record's rest -- so n calls of 1, not one of n. Measured LV4-1 field (twnerf41, squad 282 to defeat):
+  game's -- 18 -> 57 -> 239 -> 282 taken in 9 s of spin.
+  [coop] twister_nerf (on, XXL_TWISTERNERF) + twister_nerf_per_roman (4, 1..10, XXL_TWISTERPER): TwistPullHook --
+  not for sub-states 0x25..0x27 (fused), co-op or SoloMod(): clock held (-1e30 before the call, 0 after), then each
+  caught IsA-0x1702 Roman not counted yet (g_caught: the ones still flagged; reset after 1 s with no pull) takes
+  per_roman - 1 more off its squad (slot 41 (1, -1, +0x17C) each); the Roman itself is already "taken" (placed).
+  twnerf41 nerf on: 18 -> 78 -> 99 (caught ones only); per_roman 1: no extra. twfuse41 (co-op, -Level 4): plain
+  part counted per Roman, then fused 60 -> 203 -> 282 (the game's run-down).
+  (2) Second chance (IndivActive, no player 2), each hero its own Twister, not tied to the nerf (user):
+  ChooseAttackHook -- an AI hero not in 9/10 while the leader twists asks the chooser with the leader's +0x135
+  hidden (no copy; a 9/10 result -> current); an AI hero in 9/10 (its own, begun while it led) asks as the player
+  variant (+0x18 bit 0 cleared for the call): the AI case's exits (leader body sub-state 0, leader +0x3E9 9, +0x564)
+  would end it at once. The switch (trio 4800/4801) only moves +0x18; the Life state changes at the hero's next
+  Life tick (CKHkAsterixLife::Tick 0x4AA9C0: state = (f18 >> 1) & 0xF vs life +0x1D; handlers from the table at
+  life +0x18 -- NOT the vtable: a vtable-slot patch never ran). The old state's exit (State0_Player 0x4AAAE0 /
+  0x4AB900, State1_Ai 0x4AACE0 / 0x4ABB00, phase 2; prologue 8B 44 24 04 56 8B 71 10 for all four) calls the attack
+  handler's exit (10: 0x493F70 -> 0x494130 -> Twister end 0x498D70), sets +0x135 0xFF, and puts the body +0x38E
+  0xE3 -> 0xC0 (without keeping it: attack 10 with sub-state 0, hidden, never ending). SoloHeroSwitch marks a
+  spinning hero (g_keepTwist, 1 s); KeepTwistExit hides +0x135 and restores the body around that exit; the entry
+  leaves both alone. (Bug on the way: the mark was GetTickCount() | 1 compared unsigned -- 1 ms in the future on
+  even ticks: 1 run in 3.) SoloSwitchRefusal: a twisting hero off its feet (the tornado lifts it) may be switched.
+  TwisterNearness in the solo frame with range kOwnTwistersNear 8 (trio +0x3D8 is 3; the AI's own tornado drifts --
+  4.3 apart in a run); once marked the AI's spin (FUN_00498560) follows the leader's. CoopFusionAllowed: second
+  chance also needs combo left on the other hero's bar (IndivStats gauge >= 0).
+  (3) [single_player] sp_second_chance_combo_drain (0.33, 0.05..3, XXL_SPCOMBODRAIN): RunDownCombo (the off-lead
+  hero's bar; the leader's runs in the gm tick) scales dt in second chance (g.solo) -- full gauge and hit decay.
+  (4) CO-OP Options: twister_nerf, twister_nerf_per_roman (1..10 step 1), sp_second_chance_combo_drain (0.05..1,
+  step 0.01) -- 44 rows, 5 pages (coopopts: page 2 / 5 shown). gamecam TwistEnd logs the caller of a Twister's end
+  in single player (40 cap).
+  Autotests (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1) spowntw2 (Asterix's Twister, Obelix stands;
+  switch, Obelix's own, X: Fusion -- 6/6 after the fixes) and spowntw2b (switch back while both spin: both kept,
+  Asterix's X fuses -- 3/3); twnerf41 / twfuse41 (-Level 4); fuse2 (co-op) unchanged.
