@@ -516,6 +516,20 @@ bool OnPartnerGround(Hero h, const char** what) {
 
 } // namespace
 
+bool IndivHeroOnLifter(int hero) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(hero) : Hero();
+	char* ground = h ? *(char**)(h.raw() + 0x280) : nullptr;
+	if (!ground || IsBadReadPtr(ground, 4) || *(uintptr_t*)ground != 0x6241BC) return false;
+	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 47); i < n; i++) {
+		char* o = (char*)GetLvlObject(2, 47, i);
+		if (!o || IsBadReadPtr(o, 0x100)) continue;
+		for (int off = 0x10; off < 0x100; off += 4)
+			if (*(char**)(o + off) == ground) return true;
+	}
+	return false;
+}
+
 bool IndivHoldsBack(char* hook) {
 	int down = IndivFallenHero();
 	if (down < 0 || !hook || CoopSuspended()) return false;

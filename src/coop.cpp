@@ -2156,7 +2156,8 @@ static bool LockedByLevel(int idx, Hero h) {
 	return waits && (g.held[idx] || g_lock.hero == idx);
 }
 
-static void UndoLock(Trio t, int up, bool lead);
+static void UndoLock(Trio t, int up, bool lead, bool putBack = true);
+static void LevelLeadBack(int who, const char* why);
 static void UndoSequence();
 
 // A rope-pulled cable car (CKHkTowedTelepher 2,159) lets go of `hero` (0x512D)
@@ -2245,9 +2246,27 @@ static void NoteSoloPark(int fallen, int up, Hero h) {
 	int order = (int)h.Order();
 	if (!IndivActive() || (order != AI_WAIT && order != AI_GOTO_POS)) return;
 	if (g.p2Joined && !g.held[up]) return;   // (co-op: a player's hero the level does not hold -- nolock)
-	if (g_soloOrder.hero != up || !g_soloOrder.event || g_soloOrder.level != CurrentLevelNow()) return;
+	if (g_soloOrder.hero != up || !g_soloOrder.event || g_soloOrder.level != CurrentLevelNow()) {
+		static int s_told = 0;
+		if (s_told++ < 10)
+			Log("coop: revive: %s's AI order %d not kept (no level order of its own: %04X for %s)", HeroName(up), order,
+			    g_soloOrder.event, HeroName(g_soloOrder.hero));
+		return;
+	}
 	bool lock = g_lock.hero == up && LockedByLevel(up, h);
-	if (lock && (g_lock.car || PictureLightsPillar(g_lock.pic))) return;
+	// (A light pillar's wait is undone to before it -- unless the level has moved
+	// the companion on since: LV2-8, the platform's pillar (42 57 -120), then zone
+	// 02B0's scene put Asterix on its platform (40.4 57.1 -89.4), its 4820 if
+	// skipped. Undone to before the pillar lost the platforms and the scene; the
+	// user: back on the platform, the lead back to Obelix.)
+	bool movedOn = g_soloOrder.event != 0x4802 || (h.Pos() - g_lock.at).len2() > 6.0f * 6.0f;
+	if (lock && (g_lock.car || (PictureLightsPillar(g_lock.pic) && !movedOn))) {
+		static int s_told = 0;
+		if (s_told++ < 10)
+			Log("coop: revive: %s's wait not kept (%s, the level's last order %04X) -- its undo stands", HeroName(up),
+			    g_lock.car ? "a cable car's ride" : "a light pillar's sequence", g_soloOrder.event);
+		return;
+	}
 	SoloPark& k = g_soloPark;
 	k.set = true;
 	k.lock = lock;
@@ -2281,11 +2300,27 @@ bool CoopRestorePark(int revived) {
 		Log("coop: revive: %s's kept order dropped (the lead is not %s's)", HeroName(k.hero), HeroName(revived));
 		return false;
 	}
-	if (k.lock) RestoreLockPicture(k.after);
-	// Back where it was (its marker, or its walk there) -- not a hero that has
-	// gone on more than 40 units since (a sector away).
+	if (k.lock) {
+		RestoreLockPicture(k.after);
+		// A light pillar the fall's undo switched back (LV2-8's platform pillar):
+		// as the lock's own event left it again.
+		if (k.before.event != 0xFFFF) {
+			char* objs[64];
+			uint16_t msgs[64];
+			int n = ProximityGroupTargets(k.before.event, objs, msgs, 64);
+			typedef int(__fastcall* SendEventFn)(void* self, void* edx, int event, void* param);
+			for (int i = 0; i < n; i++)
+				if (objs[i] && *(uintptr_t*)objs[i] == 0x629030 && (msgs[i] == 0x900 || msgs[i] == 0x901)) {
+					((SendEventFn)(*(void***)objs[i])[5])(objs[i], nullptr, msgs[i], nullptr);
+					Log("coop: revive: light pillar %p as the lock's event %04X left it (%04X)", objs[i], k.before.event, msgs[i]);
+				}
+		}
+	}
+	// Back where it was (its marker, or its walk there), however far it went
+	// (LV2-8: the walk to the fallen Obelix was 80 units -- 47 from the wait, the
+	// old 40-unit cap left Asterix waiting at the revive spot; the level is the same).
 	Vector3 d = h.Pos() - k.at;
-	if (d.len2() > 0.25f && d.len2() < 40.0f * 40.0f) {
+	if (d.len2() > 0.25f) {
 		Vector3 to = k.at;
 		to.y += 0.5f;
 		SetHeroPosition(h, to);
@@ -2317,6 +2352,10 @@ int CoopUndoLockFor(int fallen) {
 	int before = g_lock.hero == up ? g_lock.pic.leader
 	           : g_seqHero == up && SequenceUnderWay() ? g_seqPic.leader : -1;   // (a corkscrew's ride kept, no-lock)
 	UndoLock(t, up, true);
+	// (a wait kept for after the revive: the fallen hero leads again then, the lock's
+	// lead before it is not the one to go back to)
+	if (g_soloPark.set && g_soloPark.lock) return -1;
+	LevelLeadBack(before, "the waiting hero's sequence undone by a fall");
 	return before;
 }
 
@@ -2398,7 +2437,12 @@ static void GiveLead(Trio t, int who) {
 // back is still where it was for the spinning platform this frame -- handed the
 // lead at once on its circle, it set it off again.
 struct PendingLead { int who = -1; DWORD at = 0; } g_pendingLead;
-static void GiveLeadLater(int who) { g_pendingLead.who = who; g_pendingLead.at = GetTickCount(); }
+// (a sequence undone: the lead back to who had it before -- the level's lead too)
+static void GiveLeadLater(int who) {
+	g_pendingLead.who = who;
+	g_pendingLead.at = GetTickCount();
+	LevelLeadBack(who, "a sequence undone");
+}
 static void WatchPendingLead(Trio t) {
 	if (g_pendingLead.who < 0 || GetTickCount() - g_pendingLead.at < 300) return;
 	if (t && LocksTracked()) GiveLead(t, g_pendingLead.who);
@@ -2676,8 +2720,9 @@ static void UndoSequence() {
 // (it takes the lead if `lead`; else the lead goes back to who had it before the
 // lock -- the spinning platform's circle answers only the leader: LV2-1, its
 // event's 4801 had given it to Obelix and Asterix's circle stayed dead) and put
-// on its last solid ground.
-static void UndoLock(Trio t, int up, bool lead) {
+// on its last solid ground (not with `putBack` false: the level itself put it
+// where it is).
+static void UndoLock(Trio t, int up, bool lead, bool putBack) {
 	// A rope-pulled cable car (CKHkTowedTelepher; not the automatic ones) the
 	// locked hero boarded lets go and goes back to its start.
 	char* carBack = nullptr;
@@ -2701,7 +2746,7 @@ static void UndoLock(Trio t, int up, bool lead) {
 	else GiveLeadLater(before);
 	g.held[up] = false;
 	if (g.p2Joined) StartAiCycle(up, "its sequence undone");
-	IndivPutOnSafeGround(up);
+	if (putBack) IndivPutOnSafeGround(up);
 	GameCamAimAtHero(up);   // a cable car had its camera follow the car
 	// The car, set back, offers itself again at once to a hero still in its zone:
 	// kept off cable cars for a while (WatchStrandedCar).
@@ -2729,6 +2774,41 @@ static void UnlockByPlayer(Trio t, int me, const char* player) {
 		Log("coop: %s took %s back from the game (AI order %d left behind)", player, HeroName(me), (int)h.Order());
 		EnforcePlayer(t, me);
 	}
+}
+
+// The level put the companion on one of its markers (trio 0x48BB..0x48EC; the
+// leader's are 0x4885..0x48B6) while a wait of ours held it. LV2-1 single player
+// (xxl_coop.lifter_softlock.log): Asterix waited on the corkscrew (lead to
+// Obelix) with AI Obelix left on the lifter below; the level's anti-softlock
+// (zone 0B30 after Obelix stood there a while: 48C4 + 488E) put Asterix on the
+// lifter, which went up with both -- Asterix still waiting, the corkscrew dead
+// (user). Landed on a lifter's own ground within 1.5 s: the lock undone as by
+// R3 + B (the corkscrew's detectors and circles as before it, the lead back to
+// who had it), the hero left on the lifter.
+struct LockMarkerPut { int hero = -1; DWORD at = 0; } g_lockMarkerPut;
+
+static void NoteLockMarkerPut(unsigned ev) {
+	if (ev < 0x48BB || ev > 0x48EC || !LocksTracked()) return;
+	Trio t = GetTrio();
+	int c = t ? OtherHero(t.Leader()) : -1;
+	Hero h = c >= 0 ? t.GetHero(c) : Hero();
+	if (!h || g_lock.hero != c || !LockedByLevel(c, h) || IndivFallenHero() >= 0) return;
+	g_lockMarkerPut = { c, GetTickCount() };
+}
+
+static void WatchLockMarkerPut(Trio t) {
+	LockMarkerPut& p = g_lockMarkerPut;
+	if (p.hero < 0) return;
+	Hero h = t ? t.GetHero(p.hero) : Hero();
+	if (!h || GetTickCount() - p.at > 1500 || g_lock.hero != p.hero || !LockedByLevel(p.hero, h) || IndivFallenHero() >= 0) {
+		if (GetTickCount() - p.at > 1500 || g_lock.hero != p.hero) p = LockMarkerPut();
+		return;
+	}
+	if (!IndivHeroOnLifter(p.hero)) return;
+	int up = p.hero;
+	p = LockMarkerPut();
+	Log("coop: the level put the waiting %s on a lifter (its marker) -- its wait undone, the sequence as before it", HeroName(up));
+	UndoLock(t, up, false, false);
 }
 
 // No-lock mode: the level has given `hero` a scripted order the mode leaves
@@ -2951,6 +3031,7 @@ void CoopNoteTrioEvent(void* trio, int event, void* param) {
 		if (tl) g_telepherRider = tl.Leader();   // (the leader its tick saw: the rider)
 	}
 	if (IndivActive()) NoteSoloOrder(GetTrio(), (unsigned)event & 0xFFFF);
+	NoteLockMarkerPut((unsigned)event & 0xFFFF);
 	if (LocksTracked() && ((event & 0xFFFF) == 0x4802 || (event & 0xFFFF) == 0x4803)) {
 		Trio tl = GetTrio();
 		if ((event & 0xFFFF) == 0x4803) {
@@ -3424,6 +3505,7 @@ void CoopFrame() {
 	WatchControllerPreset();
 	WatchBindings();
 	if (t && CoopGameplayLive()) WatchMarkerWalk(t);
+	if (t && CoopGameplayLive()) WatchLockMarkerPut(t);
 	if (!g.p2Joined) {
 		// Without player 2 the hero that is not leading is the AI companion. A
 		// save made during co-op stores player 2's hero in the player variant:
@@ -5300,6 +5382,17 @@ int CoopSoloLevelLeaderAway() {
 	// fight. Answering Obelix, it never fired.)
 	if (l != g_solo.choice) return -1;
 	return ll;
+}
+
+// A lock's sequence undone (R3 + B, a lifter, a fall, the level's own put on a
+// lifter): the level's lead back to who had it before the lock, as the lead
+// itself (user: splift21's lead came back to Asterix, LVL LEAD stayed Obelix).
+static void LevelLeadBack(int who, const char* why) {
+	if (g.p2Joined || (who != HERO_ASTERIX && who != HERO_OBELIX) || g_solo.levelLeader == who) return;
+	static int s_told = 0;
+	if (s_told++ < 40)
+		Log("coop: the level's lead back to %s (%s; was %s)", HeroName(who), why, HeroName(g_solo.levelLeader));
+	g_solo.levelLeader = who;
 }
 
 int CoopSoloLevelLead() {

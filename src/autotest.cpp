@@ -3241,6 +3241,67 @@ const Step kLiftDie21B[] = {
 	END(15000),
 };
 
+// spfarpark28 (-Level 2, XXL_SPSECOND=1 XXL_REVIVEHOLD=2 XXL_HUDPOS=1): the
+// user's xxl_coop.lv2-8_asterix_tp_fail.log, in the level's order (beam28's):
+// Asterix onto the platform's light pillar (the level's 4801 + 4802: Obelix leads,
+// LVL LEAD Obelix, Asterix waits), then onto the cutscene platform (41.0 58.5
+// -89.6; zone 02B0 flagged as he gets there -- an AI hero placed or glided sets
+// off no zone -- its scene, skipped by A as the user did: its later events, 4820). Then Obelix walks on 47 units and goes down leading
+// (shockwaves: the game's own death) -- the lead to Asterix. You play Asterix:
+// hit by shockwaves (Obelix's row must stay hidden -- user: it stood up with 1
+// health), by Obelix, holds B; revived, the lead back to Obelix and Asterix back
+// on his platform, waiting (it stayed at the revive spot: a 40-unit cap).
+#define OBHIT(t) { t, S_AREAHIT, HERO_OBELIX, 0, 0, 0, 0, "shockwave on obelix" }
+const Step kSpFarPark28[] = {
+	MARK(0, "spfarpark28"), LOADSECTOR(200, 8),
+	PLACEAT(2000, HERO_ASTERIX, 16.913f, 51.4f, -133.0f),
+	GLIDEAT(2300, HERO_ASTERIX, 16.913f, 51.4f, -127.5f, 1000),
+	PLACEAT(4000, HERO_OBELIX, 37.923f, 51.5f, -120.156f),
+	PLACEAT(4200, HERO_ASTERIX, 42.057f, 57.5f, -120.097f),
+	PLACEAT(6000, HERO_OBELIX, 38.0f, 57.5f, -92.0f),
+	PLACEAT(6000, HERO_ASTERIX, 41.0f, 58.5f, -89.613f),
+	{ 6500, S_FLAGEV, 0x02B0, 0, 0, 0, 0, "zone 02B0 (asterix on the cutscene platform: the scene, 4820)" },
+	SHOT(8000, "parked"),
+	P1(8500, PAD_A, 0, 0, "p1 holds A (the scene skipped, as the user did)"), P1(11500, 0, 0, 0, "p1 release"),
+	PLACEAT(21000, HERO_OBELIX, 39.75f, 50.8f, -42.79f), SHOT(21800, "obelix_on"),
+	OBHIT(22000), OBHIT(23200), OBHIT(24400), OBHIT(25600), OBHIT(26800), OBHIT(28000), OBHIT(29200),
+	SHOT(30000, "down"),
+	{ 31500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "shockwave on asterix" },
+	SHOT(31700, "hit_1"), SHOT(32300, "hit_1b"),
+	PLACEAT(33500, HERO_ASTERIX, 40.3f, 50.8f, -44.5f),
+	{ 34500, S_AREAHIT, HERO_ASTERIX, 0, 0, 0, 0, "shockwave on asterix" },
+	SHOT(34700, "hit_2"), SHOT(35300, "hit_2b"), SHOT(37500, "hit_2c"),
+	P1(38000, PAD_B, 0, 0, "p1 holds B"), P1(41000, 0, 0, 0, "p1 release"),
+	SHOT(41500, "revived"), SHOT(43500, "after"),
+	END(44500),
+};
+
+// splift21 (-Level 2, XXL_LIFTLOG=1): lifterlock in single player -- the user's
+// xxl_coop.lifter_softlock.log. Asterix goes onto the spinning platform's circle
+// (the lead to Obelix, Asterix waits), Obelix goes back onto the lifter at the
+// top and stands there: the lifter's own wait puts Asterix on it (zone 0B30:
+// 48C4 + 488E) -- his wait must be undone there (the circle's lock as before it,
+// the lead back to Asterix), and the lifter go on with both; then the circle
+// locks him again.
+const Step kSpLift21[] = {
+	MARK(0, "splift21"), SQUADWON(1000, 29),   // (squad 29 at the lifter's foot beaten: the lifter goes up)
+	PLACEAT(1500, HERO_ASTERIX, -746.697f, 506.5f, -992.08f), PLACEAT(1500, HERO_OBELIX, -746.697f, 506.5f, -990.5f),
+	SHOT(4000, "splift21_0"), SHOT(9000, "splift21_1"),
+	PLACEAT(9000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(9300, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(11000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	GLIDEAT(12500, HERO_OBELIX, -745.719f, 514.5f, -979.123f, 1500),
+	SHOT(15000, "splift21_2"),
+	PLACEAT(16000, HERO_OBELIX, -746.697f, 517.0f, -992.08f),
+	SHOT(20000, "splift21_3"), SHOT(26000, "splift21_4"), SHOT(30000, "splift21_5"),
+	// the corkscrew answers again: Asterix back onto its circle, locked again
+	PLACEAT(32000, HERO_ASTERIX, -762.0f, 516.5f, -979.2f),
+	GLIDEAT(32300, HERO_ASTERIX, -778.45f, 518.0f, -982.0f, 1500),
+	GLIDEAT(34000, HERO_ASTERIX, -777.997f, 517.84f, -977.562f, 1000),
+	SHOT(37000, "splift21_6"),
+	END(38000),
+};
+
 // catrate31 (-Level 3, XXL_P2HERO=asterix XXL_CATTRACE=1): player 2's Asterix
 // (leading) from LV3-1's catapult walks out into its reach and stands there,
 // healed, while it fires at him: the trace has each fire (the charge back to 0)
@@ -10417,6 +10478,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("liftdown21r", kLiftDown21R),
 	SCENARIO("liftdie21a", kLiftDie21A),
 	SCENARIO("liftdie21b", kLiftDie21B),
+	SCENARIO("spfarpark28", kSpFarPark28),
+	SCENARIO("splift21", kSpLift21),
 	SCENARIO("reach26b", kReach26B),
 	SCENARIO("reach23", kReach23),
 	SCENARIO("reach23g", kReach23G),

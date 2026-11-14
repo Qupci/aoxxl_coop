@@ -93,6 +93,8 @@ void IndivReviveAtLauncher(int hero);
 // down, and the standing hero is at it (on its ground; within a Roman agent's
 // talk). That hero is put back too (not from a talk).
 bool IndivHoldsBack(char* hook);
+// Hero `hero` stands on a lifter's (2,47) own moving ground.
+bool IndivHeroOnLifter(int hero);
 
 // The stats of `hero` (for the HUD): health points, shields, combo hits.
 bool IndivStats(int hero, int* hp, int* shields, int* hits = nullptr, float* gauge = nullptr);

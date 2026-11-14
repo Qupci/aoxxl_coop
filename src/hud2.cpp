@@ -715,6 +715,11 @@ void Hud2AfterInterfaceTick(char* itf, void* time) {
 	if (solo && IndivFallen(g.soloOther)) {
 		f &= ~kShowFlags;
 		g.pending[1] = false;
+		// A row up when its hero fell leading (LV2-8: Obelix's, the game's row then,
+		// shown with a last health of 3; the lead swap made it the other row) stayed
+		// up for good -- state 2 goes on while +0x270 is nonzero. Its last shown
+		// health cleared: the part drops it as at the game's own death.
+		if (*(uint32_t*)(itf + 0x24) & 0x30) *(uint32_t*)(itf + 0x270) = 0;
 	}
 	int prev = IndivEnter(solo ? g.soloOther : CoopP2Hero());
 	g.inP2Tick = true;
