@@ -4997,3 +4997,16 @@ both halves).
   twistboth (P1 first; before: game shake on to 33.3 s / elapsed 24.00; now stopped at elapsed 12.03) and
   twistboth2 (P2 first: the copy stopped at 12.04). twistend / twistenda are stale: their P2 Back step opens the pause
   menu since round 263, so use S_P1COMBO -1 for the combo cheat.
+- Round 271 (Nov 14, commit edf6607; user: LV5-7 machine gun at squad_romans_at_once = 3, the bullets go through
+  many of the Romans spawned after the three CKHkPyramidalTurtle). CKSrvCollision's projectile pass FUN_00447FF0
+  tests each live projectile (+0x20, 8 B {hit list, shape}, count byte +0x1B6, 50 slots) against the projectile
+  targets (+0x1B0, 0x48 B {hit list, up to 16 shapes, count byte +0x44}, u16 count +0x1B4). That array is read from
+  the level file, and XXL-Editor's Duplicator copied a clone's collision tests but not its projectileTargets entry,
+  so no cloned Roman (round 254) could be hit by a projectile. Duplicator.cpp now adds a copy of every target entry
+  holding a cloned shape (shapes substituted); kForgeVersion "romanforge 4" rebuilds the cache; the forge report
+  logs "projectile targets N -> M" (LV5 220 -> 276 = +56 Romans; LV1 229 -> 269, LV2 308 -> 366, LV3 365 -> 443,
+  LV4 300 -> 352, LV6 304 -> 376; crates have no targets). Also in the pass: at most 30 hits a frame (0x1D cap),
+  untouched. Autotest gun57 (-Level 5, XXL_ATONCE=3; S_PROJHITS a = the level's target count logs targets hit,
+  read between collision ticks): 2 s bursts sweeping left / right (held X overheats the gun, which then fires
+  high -- user), 30 hits on the level's targets, 20 on clones (#245, #270, #274...); before, no target past #220
+  existed. User saw the hits consistent on the pad (Nov 14).
