@@ -604,10 +604,55 @@ void GameCamDropCopy(int hero) {
 	g_copy.numTracks = 0;
 }
 
+// The Twister's end (FUN_00498C10 the plain one, FUN_00498D70 the Fusion-ready
+// one; thiscall(bool ended), ret 4, in the hero's own tick) stops the camera
+// shake its start asked for -- but not when the other hero (trio vf 0x90 / 0x98)
+// is still in the same Twister: the AI companion's copy ending first must not
+// stop the leader's shake. With each player's own camera the hero that started
+// first ended first and left its own camera shaking out the 24 s asked for.
+// Now its camera (the one in place in its tick) is stopped all the same; the
+// rest of the end the game skips (trio flags, music) stays for the later one.
+namespace {
+typedef void(__fastcall* TwistEndFn)(char* hero, void* edx, char ended);
+const uintptr_t kTwistEnd9 = 0x498C10, kTwistEnd10 = 0x498D70;
+const uint8_t   kTwistEndPrologue[6] = { 0x53, 0x56, 0x8B, 0xF1, 0x6A, 0x00 };
+TwistEndFn g_origTwistEnd9 = nullptr, g_origTwistEnd10 = nullptr;
+
+void TwistEnd(TwistEndFn orig, uint8_t state, char* hero, void* edx, char ended) {
+	int me = -1, mate = -1;
+	bool skips = false;
+	if (ended && g_active && CoopP2Joined()) {
+		Trio t = GetTrio();
+		if (t) {
+			Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
+			me = a && hero == a.raw() ? HERO_ASTERIX : o && hero == o.raw() ? HERO_OBELIX : -1;
+			mate = me == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX;
+			Hero m = t.GetHero(mate);
+			skips = me >= 0 && m && *(uint8_t*)(m.raw() + 0x135) == state;
+		}
+	}
+	// This hero's camera is the one in place: the game's (it owns it) or its copy.
+	bool mine = skips && g_svc && (g_inCopy ? g_copy.hero == me : g_liveOwner == me);
+	orig(hero, edx, ended);
+	if (!mine || !(*(uint32_t*)(g_svc + 0xC) & 0x1000)) return;
+	*(uint32_t*)(g_svc + 0xC) &= ~0x1000u;
+	static int s_logged = 0;
+	if (s_logged++ < 20)
+		Log("gamecam: %s's Twister ended with %s still spinning: its camera shake stopped (elapsed %.2f of %.2f s)",
+		    HeroName(me), HeroName(mate), *(float*)(g_svc + 0x66C), *(float*)(g_svc + 0x668));
+}
+void __fastcall TwistEnd9Hook(char* hero, void* edx, char ended) { TwistEnd(g_origTwistEnd9, 9, hero, edx, ended); }
+void __fastcall TwistEnd10Hook(char* hero, void* edx, char ended) { TwistEnd(g_origTwistEnd10, 10, hero, edx, ended); }
+} // namespace
+
 bool GameCamInstallHooks() {
 	bool ok = PatchVtableSlot(kSrvCameraVtbl, kTickSlot, kTick, (void*)TickHook, (void**)&g_origTick,
 	                          "CKSrvCamera::tick");
 	ok &= InstallDetour(kSetTarget, (void*)SetTargetHook, (void**)&g_origSetTarget, kSetTargetPrologue,
 	                    sizeof(kSetTargetPrologue), "CKSrvCamera::SetTarget");
+	ok &= InstallDetour(kTwistEnd9, (void*)TwistEnd9Hook, (void**)&g_origTwistEnd9, kTwistEndPrologue,
+	                    sizeof(kTwistEndPrologue), "Twister end (plain)");
+	ok &= InstallDetour(kTwistEnd10, (void*)TwistEnd10Hook, (void**)&g_origTwistEnd10, kTwistEndPrologue,
+	                    sizeof(kTwistEndPrologue), "Twister end (Fusion-ready)");
 	return ok;
 }
