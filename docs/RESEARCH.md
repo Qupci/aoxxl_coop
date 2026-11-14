@@ -5113,3 +5113,15 @@ both halves).
   other's bar still full. combohints FuseFrame's range 8 in second chance (as TwisterNearness). Attack states left
   alone: the AI's own Twister stays 10 after its bar runs out (the game's companion would drop to 9 with a fresh
   start pose -- round 204's "re-do").
+- Round 276 (Nov 14, commit 15d2e8d; user: the "Fusion-ready state" = both spinning, the companion's tornado keeping to
+  the player's at a set distance, the strikes and the lightning joining them -- still there with Obelix's bar empty).
+  That look is the pair link: +0x189 on both (FUN_00498560's AI branch then follows the leader's +0x17C) plus the
+  trio's link (FUN_00480930: bolt +0x4E4, strikes +0x528). In the game it ends with the bar: the companion's chooser
+  gives 9, the Twister end FUN_00498D70 calls trio FUN_00480E90 (+0x528 vt+0x48, zeroed) and FUN_00480A70 (+0x4E4
+  likewise), both thiscall no args plain ret. Second chance's own Twisters stay 10, so it stood on. Now:
+  SoloFusionLink (solo frame, IndivActive, before TwisterNearness): a link up, neither hero in 0x25..0x27, and
+  CoopFusionAllowed false -> both +0x189 / +0x188 cleared, the two trio calls. TwisterNearness (range > 0) links only
+  while allowed. SpinStepHook (0x498560, prologue 83 EC 38 56 8B F1 57): an unlinked AI hero in second chance while
+  not allowed runs it with trio +0x3D8 = -1 (no self-link within 3 units). spfuselink41 (-Level 4, no X): linked at
+  13.6, undone at 17.7 as Obelix's bar fell under 0.75, stays undone, no lightning (shots linked / unlinked_2);
+  spfuse41 still fuses, switch refused in it.
