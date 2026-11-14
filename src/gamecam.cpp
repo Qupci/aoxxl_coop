@@ -618,7 +618,7 @@ const uintptr_t kTwistEnd9 = 0x498C10, kTwistEnd10 = 0x498D70;
 const uint8_t   kTwistEndPrologue[6] = { 0x53, 0x56, 0x8B, 0xF1, 0x6A, 0x00 };
 TwistEndFn g_origTwistEnd9 = nullptr, g_origTwistEnd10 = nullptr;
 
-void TwistEnd(TwistEndFn orig, uint8_t state, char* hero, void* edx, char ended) {
+void TwistEnd(TwistEndFn orig, uint8_t state, char* hero, void* edx, char ended, void* from = nullptr) {
 	int me = -1, mate = -1;
 	bool skips = false;
 	if (ended && g_active && CoopP2Joined()) {
@@ -633,6 +633,14 @@ void TwistEnd(TwistEndFn orig, uint8_t state, char* hero, void* edx, char ended)
 	}
 	// This hero's camera is the one in place: the game's (it owns it) or its copy.
 	bool mine = skips && g_svc && (g_inCopy ? g_copy.hero == me : g_liveOwner == me);
+	if (!CoopP2Joined()) {   // (single player: who ends a Twister -- second chance's own Twisters)
+		static int s_sp = 0;
+		Trio t = GetTrio();
+		Hero a = t ? t.GetHero(HERO_ASTERIX) : Hero();
+		if (s_sp++ < 40)
+			Log("gamecam: %s's Twister (%d) ends (ended %d, f18 %02X, body %02X) -- from %p", a && hero == a.raw() ? "Asterix" : "Obelix",
+			    state, ended, *(uint8_t*)(hero + 0x18), *(uint8_t*)(hero + 0x38E), from);
+	}
 	orig(hero, edx, ended);
 	if (!mine || !(*(uint32_t*)(g_svc + 0xC) & 0x1000)) return;
 	*(uint32_t*)(g_svc + 0xC) &= ~0x1000u;
@@ -641,8 +649,8 @@ void TwistEnd(TwistEndFn orig, uint8_t state, char* hero, void* edx, char ended)
 		Log("gamecam: %s's Twister ended with %s still spinning: its camera shake stopped (elapsed %.2f of %.2f s)",
 		    HeroName(me), HeroName(mate), *(float*)(g_svc + 0x66C), *(float*)(g_svc + 0x668));
 }
-void __fastcall TwistEnd9Hook(char* hero, void* edx, char ended) { TwistEnd(g_origTwistEnd9, 9, hero, edx, ended); }
-void __fastcall TwistEnd10Hook(char* hero, void* edx, char ended) { TwistEnd(g_origTwistEnd10, 10, hero, edx, ended); }
+void __fastcall TwistEnd9Hook(char* hero, void* edx, char ended) { TwistEnd(g_origTwistEnd9, 9, hero, edx, ended, _ReturnAddress()); }
+void __fastcall TwistEnd10Hook(char* hero, void* edx, char ended) { TwistEnd(g_origTwistEnd10, 10, hero, edx, ended, _ReturnAddress()); }
 } // namespace
 
 bool GameCamInstallHooks() {

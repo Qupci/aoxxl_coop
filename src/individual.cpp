@@ -1297,6 +1297,9 @@ void RunDownCombo(int idx) {
 	if (!clock || idx == g.ctx) return;
 	float dt = *(float*)(clock + 0xC);
 	if (!(dt > 0.0f && dt < 0.5f)) return;
+	// Second chance: at [single_player] sp_second_chance_combo_drain of the pace
+	// (time to switch over and begin the other hero's own Twister too).
+	if (g.solo) dt *= g_config.spSecondChanceComboDrain;
 	Stats& s = g.st[idx];
 	if (!s.full) {
 		if (s.decay <= 0.0f) s.chain = 0;

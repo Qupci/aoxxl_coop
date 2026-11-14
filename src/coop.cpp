@@ -1264,7 +1264,8 @@ void CheckMarker(DWORD now) {
 }
 
 static void SetHeroPosition(Hero h, const Vector3& to);
-static void TwisterNearness(Trio t, Hero h1, Hero h2);
+static void TwisterNearness(Trio t, Hero h1, Hero h2, float range = 0.0f);
+const float kOwnTwistersNear = 8.0f;   // second chance: two Twisters of their own this near can fuse
 static bool FusionOn(Hero h1, Hero h2);
 
 // The level streams one sector at a time besides sector 0 (CKLevel, yellow
@@ -3530,6 +3531,8 @@ void CoopFrame() {
 		SoloSwitchLockWatch(t);
 		SoloGunFrame(t);
 		SoloBoatFrame(t);
+		if (IndivActive() && t.GetHero(HERO_ASTERIX) && t.GetHero(HERO_OBELIX))   // (second chance: two Twisters of their own)
+			TwisterNearness(t, t.GetHero(HERO_ASTERIX), t.GetHero(HERO_OBELIX), kOwnTwistersNear);
 		WatchPendingLead(t);   // (an undone lock's lead back: R3 + B, second chance)
 		GuardFrame();          // (second chance: romans_guard_downed)
 		ShowJoinHint(t);
@@ -4619,27 +4622,48 @@ static void TrackTwisters(Trio t) {
 }
 
 static char __fastcall ChooseAttackHook(char* hero, void* edx, int current) {
-	// Single player, second chance (each hero its own combo bar): the AI
-	// companion's copy of the leader's Twister asks FUN_004963D0, every tick,
-	// whether the bar is still full (the Fusion-ready Twister, 10) -- with the
-	// companion's own bar in the game's place, never full: the plain Twister (9),
-	// whose spin never marks the partner near (+0x189), so X never fused them.
-	// The game's one bar is the leader's: the chooser asks with it in place. Its
-	// rest after the Twister's spend runs out in a few seconds, and the companion
-	// falls back to the plain Twister, no longer Fusion-ready, as in the game.
+	// Single player, second chance (each hero its own combo bar): each hero's
+	// Twister is its own, as in co-op. The AI companion copies none of the
+	// leader's (the chooser's AI branch, while the leader is in 9 / 10, gives
+	// FUN_004963D0's): it asks with the leader's attack state hidden. A Twister
+	// the companion began itself (it led then: a hero switch after its start)
+	// runs its course as a player's -- the AI's own exits (the leader's body
+	// sub-state 0, its +0x3E9 9) would end it at once: the chooser asks as the
+	// player variant. Fusion: both spinning near each other (TwisterNearness),
+	// the leader's X, with combo left on both bars (CoopFusionAllowed).
 	if (!g.p2Joined && IndivActive() && (*(uint8_t*)(hero + 0x18) & 1)) {
 		Trio ts = GetTrio();
 		int li = ts ? ts.Leader() : -1;
 		Hero lead = ts ? ts.GetHero(li) : Hero();
-		if ((li == HERO_ASTERIX || li == HERO_OBELIX) && lead && lead.raw() != hero && Twisting(lead)) {
-			int prev = IndivEnter(li);
-			char next = g_origChooseAttack(hero, edx, current);
-			IndivLeave(prev);
-			static int s_told = 0;
-			if ((next == 9 || next == 10) && next != (char)current && s_told++ < 20)
-				Log("coop: the AI companion copies %s's Twister by %s's combo bar: %s", HeroName(li), HeroName(li),
-				    next == 10 ? "Fusion-ready (some left)" : "the plain one (none left)");
-			return next;
+		uint8_t cur = (uint8_t)current;
+		if ((li == HERO_ASTERIX || li == HERO_OBELIX) && lead && lead.raw() != hero) {
+			if (cur == 9 || cur == 10) {
+				uint8_t* f = (uint8_t*)(hero + 0x18);
+				uint8_t was = *f;
+				*f = was & ~1;
+				char next = g_origChooseAttack(hero, edx, current);
+				*f = (*f & ~1) | (was & 1);
+				static int s_ends = 0;
+				if ((uint8_t)next != cur && s_ends++ < 20)
+					Log("coop: second chance: the AI %s's own Twister ends (attack %d -> %d)", HeroName(OtherHero(li)), cur,
+					    (int)(uint8_t)next);
+				return next;
+			}
+			if (Twisting(lead)) {
+				uint8_t* ls = (uint8_t*)(lead.raw() + 0x135);
+				uint8_t was = *ls;
+				*ls = 0;
+				char next = g_origChooseAttack(hero, edx, current);
+				*ls = was;
+				static int s_told = 0;
+				static DWORD s_at = 0;
+				if (GetTickCount() - s_at > 5000 && s_told++ < 20) {   // (once a Twister)
+					s_at = GetTickCount();
+					Log("coop: second chance: the AI %s does not spin along with %s's Twister (its own: attack %d)",
+					    HeroName(OtherHero(li)), HeroName(li), (int)(uint8_t)next);
+				}
+				return next == 9 || next == 10 ? (char)current : next;
+			}
 		}
 	}
 	char next = g_origChooseAttack(hero, edx, current);
@@ -4702,7 +4726,13 @@ bool CoopFusionAllowed(int lead) {
 	if (!l || !o || *(uint8_t*)(l.raw() + 0x135) != 10 || *(uint8_t*)(o.raw() + 0x135) != 10) return false;
 	int hp, sh;
 	float gauge;
-	if (IndivStats(lead, &hp, &sh, nullptr, &gauge)) return gauge >= 0.0f;   // its own bar, full (some left)
+	if (IndivStats(lead, &hp, &sh, nullptr, &gauge)) {   // its own bar, full (some left)
+		if (gauge < 0.0f) return false;
+		// Second chance: two Twisters of their own -- some left on the other's bar too.
+		float other = 0.0f;
+		if (!g.p2Joined && IndivStats(lead ^ 1, &hp, &sh, nullptr, &other)) return other >= 0.0f;
+		return true;
+	}
 	CKYellowPages* yp = YellowPages();
 	char* gm = yp ? (char*)yp->gameManager : nullptr;
 	char* cb = gm ? *(char**)(gm + 0x40) : nullptr;
@@ -4724,7 +4754,7 @@ static char __fastcall FuseHook(char* hero, void* edx) {
 			if (s_told++ < 20) {
 				Hero o = (li == HERO_ASTERIX || li == HERO_OBELIX) ? t.GetHero(li ^ 1) : Hero();
 				bool ready = lh && o && *(uint8_t*)(lh.raw() + 0x135) == 10 && *(uint8_t*)(o.raw() + 0x135) == 10;
-				Log("coop: Twister Fusion refused -- %s", ready ? "no combo left on the leader's bar"
+				Log("coop: Twister Fusion refused -- %s", ready ? "no combo left on the leader's bar (second chance: or the other's)"
 				                                                : "a hero not in the Fusion-ready Twister");
 			}
 			*own = 0;
@@ -4806,17 +4836,134 @@ static char __fastcall FuseStep25Hook(char* hero, void* edx) { return FuseStepAs
 static char __fastcall FuseStep26Hook(char* hero, void* edx) { return FuseStepAsCompanion(g_origFuseStep26, hero, edx); }
 
 // Both player heroes spinning near each other: the "partner near" flag the AI
-// companion's spin would set.
-static void TwisterNearness(Trio t, Hero h1, Hero h2) {
+// companion's spin would set (within the trio's fusion range +0x3D8, 3 units;
+// `range` when larger). Second chance, kOwnTwistersNear: one of the two
+// tornados is the AI's own and drifts as it likes (no copy that starts beside
+// the leader) -- once marked, the AI's spin (FUN_00498560) follows the leader's.
+static void TwisterNearness(Trio t, Hero h1, Hero h2, float range) {
 	if (!Twisting(h1) || !Twisting(h2) || SubState(h1) != 0x23 || SubState(h2) != 0x23) return;
 	float d = sqrtf((h1.Pos() - h2.Pos()).len2());
 	float near2 = *(float*)(t.raw() + 0x3D8);
+	if (range > near2) near2 = range;
 	if (!(d < near2)) return;
 	if (!*(uint8_t*)(h1.raw() + 0x189) || !*(uint8_t*)(h2.raw() + 0x189))
 		Log("coop: both Twisters %.1f apart (fusion range %.1f): Twister Fusion possible", d, near2);
 	*(uint8_t*)(h1.raw() + 0x189) = 1;
 	*(uint8_t*)(h2.raw() + 0x189) = 1;
 }
+
+// [coop] twister_nerf. The Twister's pull (FUN_00498270, thiscall, no args, in
+// the spin steps of both Twisters and the fused one): Romans of the trio's list
+// (vt+0xF8) within trio +0x3B8 get 0x4C0D (caught: their 0x4C01 flags 0x400000),
+// the caught ones counted per squad (hero +0x198, 4 slots); its clock +0x18C,
+// past +0x190 (plain) / +0x194 (Fusion-ready) over the most caught of a squad,
+// takes one Roman still to come off each such squad (CKGrpSquadEnemy slot 41:
+// (1, -1, a helmet's spot) -- +0x16 up, event 0x4D09 the gate counter, a
+// helmet) -- the gate's count running down for as long as the Twister lasts. The
+// fused tornado (sub-states 0x25..0x27) keeps that. The plain one (not fused) no
+// longer: its clock is held, and each Roman it catches counts
+// twister_nerf_per_roman with itself (it is beaten by the tornado on its own):
+// that many less 1 taken off its squad's pool, one slot 41 call each (a record
+// with Romans left, as the game's -1 picks it).
+typedef void(__fastcall* TwistPullFn)(char* hero, void* edx);
+const uintptr_t kTwistPull = 0x498270;
+const uint8_t   kTwistPullPrologue[7] = { 0x83, 0xEC, 0x1C, 0x53, 0x55, 0x56, 0x57 };
+TwistPullFn g_origTwistPull = nullptr;
+const int kCaughtMax = 96;
+char* g_caught[kCaughtMax];   // Romans in a tornado already counted
+int g_caughtN = 0;
+
+static bool TwisterNerfOn() { return g_config.twisterNerf && (g.p2Joined || g_config.SoloMod()); }
+
+static uint32_t EnemyFlags(char* e) {
+	typedef void(__fastcall* AskFn)(char* self, void* edx, int ev, void* out);
+	uint32_t f = 0;
+	((AskFn)(*(void***)e)[5])(e, nullptr, 0x4C01, &f);
+	return f;
+}
+
+static void __fastcall TwistPullHook(char* hero, void* edx) {
+	uint8_t sub = *(uint8_t*)(hero + 0x38E) & 0x3F;
+	char* trio = *(char**)(hero + 0x14);
+	if (!TwisterNerfOn() || sub == 0x25 || sub == 0x26 || sub == 0x27 || !trio) { g_origTwistPull(hero, edx); return; }
+	*(float*)(hero + 0x18C) = -1e30f;   // never past its time: no Roman still to come taken
+	g_origTwistPull(hero, edx);
+	*(float*)(hero + 0x18C) = 0.0f;
+	typedef char** (__fastcall* ListFn)(char* self, void* edx);
+	typedef char(__fastcall* IsAFn)(char* self, void* edx, int cls);
+	typedef int(__fastcall* TakeFn)(char* squad, void* edx, int n, int group, float* at);
+	char** list = ((ListFn)(*(void***)trio)[0xF8 / 4])(trio, nullptr);
+	if (!list) return;
+	static DWORD s_last = 0;
+	if (GetTickCount() - s_last > 1000) g_caughtN = 0;   // no Twister since: none counted any more
+	s_last = GetTickCount();
+	Trio t = GetTrio();
+	int me = t && t.GetHero(HERO_ASTERIX).raw() == hero ? HERO_ASTERIX : t && t.GetHero(HERO_OBELIX).raw() == hero ? HERO_OBELIX : -1;
+	// Only the Romans still in a tornado stay counted (one in a freed slot later counts again).
+	char* kept[kCaughtMax];
+	int keptN = 0;
+	int extra = (int)(g_config.twisterNerfPerRoman + 0.5f) - 1;
+	for (int i = 0; list[i] && i < 512; i++) {
+		char* e = list[i];
+		if (!(EnemyFlags(e) & 0x400000)) continue;
+		bool seen = false;
+		for (int k = 0; k < g_caughtN && !seen; k++) seen = g_caught[k] == e;
+		if (keptN < kCaughtMax) kept[keptN++] = e;
+		if (seen || !((IsAFn)(*(void***)e)[1])(e, nullptr, 0x1702)) continue;
+		char* sq = *(char**)(e + 0x4C);
+		int took = 0;
+		for (int n = 0; sq && n < extra; n++) took += ((TakeFn)(*(void***)sq)[41])(sq, nullptr, 1, -1, (float*)(hero + 0x17C));
+		static int s_told = 0;
+		if (s_told++ < 80)
+			Log("coop: twister_nerf: %s's Twister caught a Roman (%p) of squad %p -- %d more off its pool (of %d)",
+			    me >= 0 ? HeroName(me) : "a hero", e, sq, took, extra);
+	}
+	memcpy(g_caught, kept, keptN * sizeof(char*));
+	g_caughtN = keptN;
+}
+
+// Second chance: the hero switch keeps a spinning hero's own Twister. The
+// switch (trio 4800 / 4801) moves both heroes' +0x18 one Life state along; at
+// each hero's next Life tick the old state's handler exits (param 2:
+// CKHkAsterixLife / CKHkObelixLife State0_Player 0x4AAAE0 / 0x4AB900, State1_Ai
+// 0x4AACE0 / 0x4ABB00, from the Life tick's state table) ending the attack running --
+// the Twister's end -- and setting +0x135 to 0xFF. A Twister marked at the switch
+// (g_keepTwist, the tick of it; 1 s at most) is hidden from that exit.
+DWORD g_keepTwist[HERO_COUNT] = {};
+typedef char(__fastcall* LifeStateFn)(char* life, void* edx, int phase, int arg);
+LifeStateFn g_origLifeState[4] = {};
+
+static char KeepTwistExit(int k, char* life, void* edx, int phase, int arg) {
+	char* hero = *(char**)(life + 0x10);
+	int idx = k < 2 ? HERO_ASTERIX : HERO_OBELIX;
+	if (phase != 2 || !hero || !g_keepTwist[idx] || (int)(GetTickCount() - g_keepTwist[idx]) > 1000)
+		return g_origLifeState[k](life, edx, phase, arg);
+	g_keepTwist[idx] = 0;
+	uint8_t* atk = (uint8_t*)(hero + 0x135);
+	uint8_t was = *atk;
+	static int s_told = 0;
+	if (was != 9 && was != 10) {
+		if (s_told++ < 40)
+			Log("coop: second chance: %s's Life state exit (%d) found its Twister over already (attack %d, body %02X)",
+			    HeroName(idx), k, was, *(uint8_t*)(hero + 0x38E));
+		return g_origLifeState[k](life, edx, phase, arg);
+	}
+	// The exit also puts the body back to its idle (0xE3 spinning -> 0xC0): kept too.
+	*atk = 0xFF;
+	uint8_t body = *(uint8_t*)(hero + 0x38E);
+	char r = g_origLifeState[k](life, edx, phase, arg);
+	*atk = was;
+	uint8_t bodyAfter = *(uint8_t*)(hero + 0x38E);
+	*(uint8_t*)(hero + 0x38E) = body;
+	if (s_told++ < 40)
+		Log("coop: second chance: %s's own Twister kept through its Life state's exit (%s; body %02X, the exit's %02X)",
+		    HeroName(idx), k & 1 ? "AI -> player" : "player -> AI", body, bodyAfter);
+	return r;
+}
+static char __fastcall AstLife0Hook(char* l, void* e, int p, int a) { return KeepTwistExit(0, l, e, p, a); }
+static char __fastcall AstLife1Hook(char* l, void* e, int p, int a) { return KeepTwistExit(1, l, e, p, a); }
+static char __fastcall ObeLife0Hook(char* l, void* e, int p, int a) { return KeepTwistExit(2, l, e, p, a); }
+static char __fastcall ObeLife1Hook(char* l, void* e, int p, int a) { return KeepTwistExit(3, l, e, p, a); }
 
 static bool FusionOn(Hero h1, Hero h2) {
 	if (g_fusionAsked && GetTickCount() - g_fusionAsked < 1500) return true;
@@ -5547,7 +5694,9 @@ static const char* SoloSwitchRefusal(Trio t, bool press) {
 	if (lh.Busy() || ch.Busy()) return "a hero busy";
 	if (ch.Order() != AI_FOLLOW_LEADER) return "the other hero is held by the level (a wait, a ride, a walk)";
 	if (Situation(lh) != 0) return "the leader is doing something (its situation)";
-	if ((*(uint32_t*)(lh.raw() + 0x384) & 7) || (*(uint32_t*)(ch.raw() + 0x384) & 7)) return "a hero off its feet";
+	// (Second chance: a hero in its own Twister -- the tornado lifts it now and then -- may be switched from or to.)
+	auto offFeet = [](Hero h) { return (*(uint32_t*)(h.raw() + 0x384) & 7) && !(IndivActive() && Twisting(h)); };
+	if (offFeet(lh) || offFeet(ch)) return "a hero off its feet";
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
 		char* sh = (char*)GetLvlObject(2, 172, i);
 		if (sh && (*(uint8_t*)(sh + 8) & 7) != 0) return "at the merchant";
@@ -5612,6 +5761,19 @@ static void SoloHeroSwitch(Trio t) {
 	if (g_viewUntil) Log("coop: sidekick view off (switched)");
 	g_viewUntil = 0;
 	if (s_logs++ < 60) Log("coop: hero switch: %s -> %s", HeroName(l), HeroName(OtherHero(l)));
+	// Second chance: a hero's own Twister goes on through the switch. The Life
+	// states' exits (CKHkAsterixLife / CKHkObelixLife State0_Player / State1_Ai,
+	// param 2) end the attack running (its handler's exit: the Twister's end
+	// 0x498C10 / 0x498D70) and set +0x135 to 0xFF -- hidden from them.
+	// The Life state changes at the hero's next Life tick (KeepTwistExit).
+	const int both[2] = { HERO_ASTERIX, HERO_OBELIX };
+	for (int i : both) {
+		Hero h = t.GetHero(i);
+		g_keepTwist[i] = IndivActive() && h && Twisting(h) ? (GetTickCount() | 1) : 0;
+		if (g_keepTwist[i])
+			Log("coop: hero switch: %s's own Twister goes on (attack %d, body %02X)", HeroName(i),
+			    *(uint8_t*)(h.raw() + 0x135), SubState(h));
+	}
 	CoopGiveLead(OtherHero(l), "the hero switch button");
 	g_solo.choice = t.Leader();
 }
@@ -6369,6 +6531,20 @@ void CoopInit() {
 	              "Twister Fusion check (both players)");
 	InstallDetour(kChooseAttack, (void*)ChooseAttackHook, (void**)&g_origChooseAttack, kChooseAttackPrologue,
 	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");
+	InstallDetour(kTwistPull, (void*)TwistPullHook, (void**)&g_origTwistPull, kTwistPullPrologue,
+	              sizeof(kTwistPullPrologue), "Twister pull (twister_nerf: the plain Twister by the Romans it catches)");
+	{
+		// (Called through the Life's state table, life +0x18, not its vtable: detoured.)
+		static const uint8_t kLifeStatePrologue[8] = { 0x8B, 0x44, 0x24, 0x04, 0x56, 0x8B, 0x71, 0x10 };
+		const uintptr_t at[4] = { 0x4AAAE0, 0x4AACE0, 0x4AB900, 0x4ABB00 };
+		void* const hooks[4] = { (void*)AstLife0Hook, (void*)AstLife1Hook, (void*)ObeLife0Hook, (void*)ObeLife1Hook };
+		const char* const names[4] = { "CKHkAsterixLife::State0_Player (second chance: a Twister through the hero switch)",
+		                               "CKHkAsterixLife::State1_Ai (second chance: a Twister through the hero switch)",
+		                               "CKHkObelixLife::State0_Player (second chance: a Twister through the hero switch)",
+		                               "CKHkObelixLife::State1_Ai (second chance: a Twister through the hero switch)" };
+		for (int k = 0; k < 4; k++)
+			InstallDetour(at[k], hooks[k], (void**)&g_origLifeState[k], kLifeStatePrologue, sizeof(kLifeStatePrologue), names[k]);
+	}
 	InstallDetour(kFreezeWorld, (void*)FreezeWorldHook, (void**)&g_origFreeze, kFreezePrologue,
 	              sizeof(kFreezePrologue), "world pause (not for the merchant in co-op)");
 	InstallDetour(kSkipScene, (void*)SkipSceneHook, (void**)&g_origSkipScene, kSkipScenePrologue,

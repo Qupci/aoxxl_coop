@@ -4577,6 +4577,79 @@ const Step kShine41[] = {
 	{ 3000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, { 3500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
 	SHINE41(9000, "shine41_1"), SHINE41(11000, "shine41_2"), SHINE41(13000, "shine41_3"), END(14000),
 };
+// twnerf41 (-Level 4; XXL_TWISTERNERF=0 / 1, XXL_TWISTERPER=N): Asterix's plain
+// Twister in the middle of LV4-1's field Romans (shine41's spot) -- the squads'
+// "sent" (Romans taken off the pool) through it: with the nerf only the caught
+// Romans (twister_nerf_per_roman each), without it a steady run-down.
+const Step kTwNerf41[] = {
+	MARK(0, "baseline"),
+	PLACEAT(1000, HERO_ASTERIX, -301.081f, 1.2f, 87.452f), POTION(1200),
+	{ 3000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, SQUADS(3400, HERO_ASTERIX, 30.0f),
+	{ 3500, S_P1COMBO, 4, 0, 0, 0, 0, "twister" },
+	SQUADS(6000, HERO_ASTERIX, 30.0f), SHOT(6000, "twnerf41_1"), SQUADS(9000, HERO_ASTERIX, 30.0f),
+	SQUADS(12000, HERO_ASTERIX, 30.0f), SHOT(12000, "twnerf41_2"), SQUADS(15000, HERO_ASTERIX, 30.0f),
+	SQUADS(18000, HERO_ASTERIX, 30.0f), END(18500),
+};
+// twfuse41 (-Level 4): fuse2 at twnerf41's spot -- co-op, both Twisters, player
+// 2's X: the fused tornado keeps the game's steady run-down of the pool with
+// the nerf on (only the plain Twister counts its caught Romans).
+const Step kTwFuse41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(1000, HERO_ASTERIX, -301.081f, 1.2f, 87.452f), POTION(1200),
+	{ 2000, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 2100, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix beside asterix" },
+	{ 2300, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2300, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	SQUADS(3400, HERO_ASTERIX, 30.0f),
+	{ 3500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1: the Twister" },
+	VPAD(3550, 1, PAD_A, 0, 0, "p2 A"), VPAD(3583, 1, 0, 0, 0, "p2 r"), VPAD(3600, 1, PAD_X, 0, 0, "p2 X"),
+	VPAD(3633, 1, 0, 0, 0, "p2 r"), VPAD(3650, 1, PAD_B, 0, 0, "p2 B"), VPAD(3683, 1, 0, 0, 0, "p2 r"),
+	VPAD(3700, 1, PAD_Y, 0, 0, "p2 Y"), VPAD(3733, 1, 0, 0, 0, "p2 r"),
+	SQUADS(6000, HERO_ASTERIX, 30.0f),
+	VPAD(6300, 1, PAD_X, 0, 0, "p2 X"), VPAD(6400, 1, 0, 0, 0, "p2 release"),
+	SHOT(8000, "fused"), SQUADS(9000, HERO_ASTERIX, 30.0f), SQUADS(12000, HERO_ASTERIX, 30.0f),
+	SQUADS(15000, HERO_ASTERIX, 30.0f), SQUADS(18000, HERO_ASTERIX, 30.0f), END(18500),
+};
+// spowntw2 (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1): second
+// chance, both bars full; Asterix's Twister -- the AI Obelix beside does not spin
+// along; switch to Obelix (Asterix spins on, his own), Obelix's own Twister; X
+// while both spin: the Twister Fusion.
+const Step kSpOwnTw2[] = {
+	MARK(0, "spowntw2"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix 1.5 units ahead of asterix (the trio's fusion range)" },
+	{ 1500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (asterix): the Twister" },
+	SHOT(3300, "asterix_alone"), SHOT(4500, "asterix_spins"),
+	{ 4800, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 5000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full (he leads: the hits count)" },
+	SHOT(5300, "switched"),
+	{ 5400, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix beside the spinning asterix (no steering in a test)" },
+	{ 5600, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (obelix): the Twister" },
+	SHOT(6500, "both_start"), SHOT(8200, "both_spin"),
+	TAP1(8500), TAP1(8900), TAP1(9300), TAP1(9700),
+	SHOT(10000, "fuse_x"), SHOT(11500, "fused"), SHOT(14000, "fused_later"),
+	SHOT(26000, "after"), END(27000),
+};
+// spowntw2b (as spowntw2): back to Asterix while both spin (both Twisters kept
+// through the switch), Asterix's X fuses them.
+const Step kSpOwnTw2B[] = {
+	MARK(0, "spowntw2b"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	{ 1300, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix 1.5 units ahead of asterix (the trio's fusion range)" },
+	{ 1500, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (asterix): the Twister" },
+	{ 4800, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 5000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full (he leads: the hits count)" },
+	{ 5400, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix beside the spinning asterix (no steering in a test)" },
+	{ 5600, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (obelix): the Twister" },
+	SHOT(7800, "both_spin"),
+	{ 8000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch back to asterix (both spinning)" },
+	SHOT(8400, "back"),
+	TAP1(8700), TAP1(9100), TAP1(9500), TAP1(9900),
+	SHOT(10500, "fuse_x"), SHOT(12000, "fused"), SHOT(26000, "after"), END(27000),
+};
 // shine51 (-Level 5, XXL_ATONCE=3; user: LV5-1 170.3 11.6 283.0 -- no wheat, no
 // dialogue): Asterix's Twister among the Romans there; the helmets left after it
 // (more than a bonus pool's shine has points for: 64) must all shine.
@@ -10372,6 +10445,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("stack21", kStack21),
 	SCENARIO("shadow45", kShadow45),
 	SCENARIO("shine41", kShine41),
+	SCENARIO("twnerf41", kTwNerf41),
+	SCENARIO("twfuse41", kTwFuse41),
+	SCENARIO("spowntw2", kSpOwnTw2),
+	SCENARIO("spowntw2b", kSpOwnTw2B),
 	SCENARIO("shine51", kShine51),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),

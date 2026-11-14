@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -208,6 +209,23 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_NOLOCKROMANSANY")) noLockRomansAnyMarkers = atoi(getenv("XXL_NOLOCKROMANSANY")) != 0;
 	obelixPotion = ReadBool("coop", "obelix_potion", obelixPotion, full);
 	if (getenv("XXL_OBELIXPOTION")) obelixPotion = atoi(getenv("XXL_OBELIXPOTION")) != 0;
+	twisterNerf = ReadBool("coop", "twister_nerf", twisterNerf, full);
+	if (getenv("XXL_TWISTERNERF")) twisterNerf = atoi(getenv("XXL_TWISTERNERF")) != 0;   // autotests
+	{
+		char nb[32] = {};
+		GetPrivateProfileStringA("coop", "twister_nerf_per_roman", "", nb, sizeof(nb), full);
+		if (const char* e = getenv("XXL_TWISTERPER")) lstrcpynA(nb, e, sizeof(nb));
+		if (nb[0]) {
+			float f = floorf((float)atof(nb) + 0.5f);
+			twisterNerfPerRoman = f < 1.0f ? 1.0f : f > 10.0f ? 10.0f : f;
+		}
+		GetPrivateProfileStringA("single_player", "sp_second_chance_combo_drain", "", nb, sizeof(nb), full);
+		if (const char* e = getenv("XXL_SPCOMBODRAIN")) lstrcpynA(nb, e, sizeof(nb));
+		if (nb[0]) {
+			float f = !_stricmp(nb, "off") ? 1.0f : (float)atof(nb);
+			spSecondChanceComboDrain = f < 0.05f ? 0.05f : f > 3.0f ? 3.0f : f;
+		}
+	}
 	spIsolation    = ReadBool("single_player", "sp_isolation", spIsolation, full);
 	spComboHints   = ReadBool("single_player", "sp_combo_hints", spComboHints, full);
 	spCoopIcons    = ReadBool("single_player", "sp_coop_icons", spCoopIcons, full);
@@ -326,6 +344,8 @@ void CoopConfig::Load(const char* iniPath) {
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);
 	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
 	    hintMachineGun);
+	Log("config: twister nerf %d (a caught Roman counts %.0f), second chance: the other hero's combo bar at x%.2f",
+	    twisterNerf, twisterNerfPerRoman, spSecondChanceComboDrain);
 	if (spIsolation)
 		Log("config: single player: isolated -- the game's own (the ini's combo hints %d, co-op icons %d, hero switch %d, "
 		    "switch lock %d, second chance %d off; obelix_potion and cheats co-op only%s)", spComboHintsIni, spCoopIconsIni,

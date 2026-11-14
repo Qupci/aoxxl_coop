@@ -28,6 +28,8 @@ struct CoopConfig {
 	char  iniPath[260]  = {};     // the ini's full path (the options write [controls] back)
 	int   dropHoldMs    = 1500;
 	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix (single player: Obelix leading, SoloMod())
+	bool  twisterNerf   = true;   // the plain Twister takes no Romans still to come off a squad; each Roman it catches counts twisterNerfPerRoman (co-op, SoloMod())
+	float twisterNerfPerRoman = 4.0f;   // ... a caught Roman with the ones it stands for (1: itself only)
 	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)
 	bool  individual    = true;   // each hero its own health, shields and combo bar; a fallen hero can be revived
 	bool  romansGuardDowned = true; // ... the basic Romans near a fallen hero stay round it, shielded, until it is revived
@@ -81,6 +83,7 @@ struct CoopConfig {
 	bool  spSwitchLock   = true;   // sp_hero_switch_lock: the level's lead switches ignored, a lock's switch undone at its end
 	bool  spSecondChance = false;  // sp_second_chance: each hero its own health; a fallen one waits to be revived
 	bool  spSidekickView = true;   // sp_sidekick_view: a small view of the other hero (switch refused, partner down)
+	float spSecondChanceComboDrain = 0.33f;   // sp_second_chance_combo_drain: the other hero's combo bar runs down at this share of the game's pace
 	// The mod's features in single player at all (sp_isolation off).
 	bool  SoloMod() const { return !spIsolation; }
 
