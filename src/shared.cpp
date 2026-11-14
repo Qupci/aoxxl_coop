@@ -174,9 +174,10 @@ int Route(int map, uint32_t action) {
 		return -1;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
-		// Obelix steers (and the camera), Asterix jumps.
-		if (map == MAP_TRIO || map == MAP_BOAT) return action == 4 ? ast : obe;
-		if (map == MAP_CAMERA) return obe;
+		// Asterix steers (and the camera), Obelix jumps (user, Nov 14: was the
+		// other way round).
+		if (map == MAP_TRIO || map == MAP_BOAT) return action == 4 ? obe : ast;
+		if (map == MAP_CAMERA) return ast;
 		return -1;
 	case SHARED_FUSION:
 		// Asterix forward / back, Obelix left / right and the camera.
@@ -257,8 +258,8 @@ void ShowModeHint(SharedMode m) {
 		break;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
-		swprintf(to, 96, L"%s: steer and camera", HintHeroName(HERO_OBELIX));
-		swprintf(ta, 96, L"%s: jump with %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_A));
+		swprintf(ta, 96, L"%s: steer and camera", HintHeroName(HERO_ASTERIX));
+		swprintf(to, 96, L"%s: jump with %s", HintHeroName(HERO_OBELIX), HintButtonName(o, HB_A));
 		break;
 	default:
 		swprintf(ta, 96, L"%s: forward and back", HintHeroName(HERO_ASTERIX));

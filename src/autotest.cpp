@@ -1636,7 +1636,14 @@ const Step kHintSlide2[] = {
 
 // boat49o / boat49a (-Level 4): sector 9's boat (the user's spot -165.4 6.0
 // -652.0); player 2's Obelix (o) or player 1's Asterix (a) presses X there, the
-// other hero beside; then player 2 steers left, player 1 presses A.
+// other hero beside; then player 2's stick (ignored: Asterix steers), player 1
+// steers left, player 1's A (ignored), player 2's A (Obelix jumps).
+#define BOAT49_RIDE \
+	VPAD(9000, 1, 0, -1.0f, 0.5f, "p2 stick left (ignored)"), VPAD(10000, 1, 0, 0, 0, "p2 release"), \
+	P1(10200, 0, -1.0f, 0.5f, "p1 stick left"), P1(11000, 0, 0, 0, "p1 release"), \
+	P1(11300, PAD_A, 0, 0, "p1 A (ignored)"), P1(11500, 0, 0, 0, "p1 release"), \
+	VPAD(11700, 1, PAD_A, 0, 0, "p2 A"), VPAD(11900, 1, 0, 0, 0, "p2 release"), \
+	SHOT(12000, "boat49_3")
 #define BOAT49_SETUP 	MARK(0, "baseline"), LOADSECTOR(200, 9), 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"), 	SECTORS(3500)
 const Step kBoat49O[] = {
 	BOAT49_SETUP,
@@ -1644,9 +1651,7 @@ const Step kBoat49O[] = {
 	SHOT(5000, "boat49_1"),
 	VPAD(6000, 1, PAD_X, 0, 0, "p2 X"), VPAD(6200, 1, 0, 0, 0, "p2 release"),
 	SHOT(8000, "boat49_2"),
-	VPAD(9000, 1, 0, -1.0f, 0.5f, "p2 stick left"), VPAD(11000, 1, 0, 0, 0, "p2 release"),
-	P1(11500, PAD_A, 0, 0, "p1 A"), P1(11700, 0, 0, 0, "p1 release"),
-	SHOT(11800, "boat49_3"),
+	BOAT49_RIDE,
 	END(14000),
 };
 const Step kBoat49A[] = {
@@ -1655,9 +1660,7 @@ const Step kBoat49A[] = {
 	SHOT(5000, "boat49_1"),
 	P1(6000, PAD_X, 0, 0, "p1 X"), P1(6200, 0, 0, 0, "p1 release"),
 	SHOT(8000, "boat49_2"),
-	VPAD(9000, 1, 0, -1.0f, 0.5f, "p2 stick left"), VPAD(11000, 1, 0, 0, 0, "p2 release"),
-	P1(11500, PAD_A, 0, 0, "p1 A"), P1(11700, 0, 0, 0, "p1 release"),
-	SHOT(11800, "boat49_3"),
+	BOAT49_RIDE,
 	END(14000),
 };
 // spboat49 (-Level 4, XXL_SPISOLATION=0 XXL_SPSWITCH=1): single player, you
@@ -4951,8 +4954,9 @@ const Step kSlide2H[] = {
 	END(44000),
 };
 
-// slide22s (level 2): the LV2-2 belly slide in co-op: player 2 (Obelix) steers
-// it and turns the camera, player 1 (Asterix) jumps.
+// slide22s (level 2): the LV2-2 belly slide in co-op: player 1 (Asterix) steers
+// it and turns the camera, player 2 (Obelix) jumps; player 2's stick and
+// player 1's A do nothing.
 const Step kSlide22S[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -4961,9 +4965,11 @@ const Step kSlide22S[] = {
 	CINE_SKIP(6000), CINE_SKIP(8000), CINE_SKIP(10000), CINE_SKIP(12000), CINE_SKIP(14000), CINE_SKIP(16000), CINE_SKIP(18000), CINE_SKIP(20000), CINE_SKIP(22000), CINE_SKIP(24000), CINE_SKIP(26000), CINE_SKIP(28000),
 	GLIDEAT(31000, HERO_ASTERIX, -907.3f, 526.8f, -903.6f, 1500),
 	SHOT(36000, "slide22s_1"),
-	VPAD(38000, 1, 0, -1.0f, 0.0f, "p2 steers left"), SHOT(40000, "slide22s_2"), VPAD(41000, 1, 0, 0, 0, "p2 release"),
-	VPADR(41500, 1, 1.0f, 0.0f, "p2 turns camera"), SHOT(42500, "slide22s_3"), VPADR(43000, 1, 0.0f, 0.0f, "p2 still"),
-	P1(44000, PAD_A, 0, 0, "p1 jump"), SHOT(44300, "slide22s_4"), P1(44400, 0, 0, 0, "p1 release"),
+	VPAD(37000, 1, 0, 1.0f, 0.0f, "p2 stick right (ignored)"), SHOT(37800, "slide22s_p2stick"), VPAD(38000, 1, 0, 0, 0, "p2 release"),
+	P1(38200, 0, -1.0f, 0.0f, "p1 steers left"), SHOT(40000, "slide22s_2"), P1(41000, 0, 0, 0, "p1 release"),
+	P1R(41500, 1.0f, 0.0f, "p1 turns camera"), SHOT(42500, "slide22s_3"), P1R(43000, 0.0f, 0.0f, "p1 still"),
+	P1(43500, PAD_A, 0, 0, "p1 A (ignored)"), SHOT(43800, "slide22s_p1a"), P1(43900, 0, 0, 0, "p1 release"),
+	VPAD(44500, 1, PAD_A, 0, 0, "p2 jump"), SHOT(44800, "slide22s_4"), VPAD(44900, 1, 0, 0, 0, "p2 release"),
 	END(47000),
 };
 
@@ -5141,6 +5147,24 @@ const Step kWarp[] = {
 	SHOT(7000, "warp_01"),
 	VPAD(7500, 1, PAD_BACK, 0, 0, "p2 hold back (leave)"), VPAD(9500, 1, 0, 0, 0, "p2 release"),
 	END(10000),
+};
+
+// kbcheat (keyboard injected: not while the user is at the PC; the ini's
+// [keyboard] keys ENTER / UP / SPACE / BACKSPACE / P): player 2 joins on the
+// keyboard, walks off, BACKSPACE held + SPACE brings Obelix back to Asterix
+// (the cheat modifier, as before the pause menu took the back key), then P
+// still opens the pause menu.
+const Step kKbCheat[] = {
+	MARK(0, "baseline"),
+	KEY(500, VK_RETURN, 1, "p2 ENTER (join)"), KEY(700, VK_RETURN, 0, "p2 release"),
+	KEY(1500, VK_UP, 1, "p2 UP"), KEY(4500, VK_UP, 0, "p2 release"),
+	SHOT(5000, "kbcheat_apart"),
+	KEY(5500, VK_BACK, 1, "p2 BACKSPACE held"), KEY(5800, VK_SPACE, 1, "p2 SPACE"),
+	KEY(6000, VK_SPACE, 0, "p2 SPACE up"), KEY(6300, VK_BACK, 0, "p2 BACKSPACE up"),
+	SHOT(7000, "kbcheat_warped"),
+	KEY(8000, 'P', 1, "p2 P (menu)"), KEY(8150, 'P', 0, "p2 P up"), SHOT(9500, "kbcheat_menu"),
+	KEY(10000, 'P', 1, "p2 P (resume)"), KEY(10150, 'P', 0, "p2 P up"),
+	END(11000),
 };
 
 // lifter2: player 2's Obelix goes to the lifter alone (player 1 stays at the
@@ -10082,6 +10106,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("kbd", kKbd),
 	SCENARIO("lifter2", kLifter2),
 	SCENARIO("warp", kWarp),
+	SCENARIO("kbcheat", kKbCheat),
 	SCENARIO("potion", kPotion),
 	SCENARIO("pursuito", kPursuitO),
 	SCENARIO("dash", kDash),
