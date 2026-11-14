@@ -4747,14 +4747,29 @@ bool CoopFusionAllowed(int lead) {
 	int hp, sh;
 	float gauge;
 	if (IndivStats(lead, &hp, &sh, nullptr, &gauge)) {   // its own bar, full (-1: not), pays for it
-		if (gauge < 0.0f || gauge < cost) return false;
-		// Second chance: two Twisters of their own -- some left on the other's bar too.
-		float other = 0.0f;
-		if (!g.p2Joined && IndivStats(lead ^ 1, &hp, &sh, nullptr, &other)) return other >= 0.0f;
-		return true;
+		return gauge >= 0.0f && gauge >= cost;   // (the other's bar no matter: the leader pays -- user)
 	}
 	char* cb = *(char**)(gm + 0x40);
 	return cb && (*(uint32_t*)(cb + 0x10) & 0x4000) && *(float*)(gm + 0xA4) >= cost;
+}
+
+// Second chance: the Fusion ready -- both in the Fusion-ready Twister and either
+// hero's bar able to pay for it (the leader's X now, or the other's after a
+// switch: user). The pair's link (SoloFusionLink, TwisterNearness, the spin
+// step) follows it; X still asks CoopFusionAllowed (the leader pays).
+static bool SoloFusionReady(Trio t) {
+	int lead = t ? t.Leader() : -1;
+	if (lead != HERO_ASTERIX && lead != HERO_OBELIX) return false;
+	if (CoopFusionAllowed(lead)) return true;
+	Hero l = t.GetHero(lead), o = t.GetHero(lead ^ 1);
+	CKYellowPages* yp = YellowPages();
+	char* gm = yp ? (char*)yp->gameManager : nullptr;
+	int hp, sh;
+	float other;
+	if (!l || !o || !gm || *(uint8_t*)(l.raw() + 0x135) != 10 || *(uint8_t*)(o.raw() + 0x135) != 10 ||
+	    !IndivStats(lead ^ 1, &hp, &sh, nullptr, &other))
+		return false;
+	return other >= 0.0f && other >= FusionCost(gm);
 }
 
 static char __fastcall FuseHook(char* hero, void* edx) {
@@ -4767,7 +4782,11 @@ static char __fastcall FuseHook(char* hero, void* edx) {
 		Hero lh = t.GetHero(li);
 		uint8_t* own = (uint8_t*)(hero + 0x188);
 		uint8_t* lead = lh ? (uint8_t*)(lh.raw() + 0x188) : nullptr;
-		if ((*own || (lead && *lead)) && !CoopFusionAllowed(li)) {
+		// Paid for already: the leader merging / fused (0x25..0x27) keeps its request up for the partner to join
+		// -- its bar now under the price (it just paid), a refusal cleared it and the leader merged for good.
+		uint8_t ls = lh ? SubState(lh) : 0;
+		bool underway = lh && Twisting(lh) && (ls == 0x25 || ls == 0x26 || ls == 0x27);
+		if ((*own || (lead && *lead)) && !underway && !CoopFusionAllowed(li)) {
 			static int s_told = 0;
 			if (s_told++ < 20) {
 				Hero o = (li == HERO_ASTERIX || li == HERO_OBELIX) ? t.GetHero(li ^ 1) : Hero();
@@ -4865,7 +4884,7 @@ static void TwisterNearness(Trio t, Hero h1, Hero h2, float range) {
 	if (range > near2) near2 = range;
 	if (!(d < near2)) return;
 	// (Second chance: linked only while the Fusion can be paid for -- SoloFusionLink.)
-	if (range > 0.0f && !CoopFusionAllowed(t.Leader())) return;
+	if (range > 0.0f && !SoloFusionReady(t)) return;
 	if (!*(uint8_t*)(h1.raw() + 0x189) || !*(uint8_t*)(h2.raw() + 0x189)) {
 		static int s_told = 0;
 		if (s_told++ < 60) Log("coop: both Twisters %.1f apart (fusion range %.1f): Twister Fusion possible", d, near2);
@@ -4897,7 +4916,7 @@ static void SoloFusionLink(Trio t) {
 	Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
 	if (!a || !o || (!*(uint8_t*)(a.raw() + 0x189) && !*(uint8_t*)(o.raw() + 0x189))) return;
 	auto fusing = [](Hero h) { uint8_t s = SubState(h); return Twisting(h) && (s == 0x25 || s == 0x26 || s == 0x27); };
-	if (fusing(a) || fusing(o) || CoopFusionAllowed(t.Leader())) return;
+	if (fusing(a) || fusing(o) || SoloFusionReady(t)) return;
 	*(uint8_t*)(a.raw() + 0x189) = *(uint8_t*)(o.raw() + 0x189) = 0;
 	*(uint8_t*)(a.raw() + 0x188) = *(uint8_t*)(o.raw() + 0x188) = 0;
 	typedef void(__fastcall* TrioFn)(char* trio, void* edx);
@@ -4905,7 +4924,7 @@ static void SoloFusionLink(Trio t) {
 	((TrioFn)0x480A70)(t.raw(), nullptr);
 	static int s_told = 0;
 	if (s_told++ < 40)
-		Log("coop: second chance: the Twisters' link undone -- the Fusion can't be paid for (%s's bar)",
+		Log("coop: second chance: the Twisters' link undone -- neither bar can pay for the Fusion (%s leads)",
 		    HeroName(t.Leader()));
 }
 
@@ -4921,7 +4940,7 @@ static int __fastcall SpinStepHook(char* hero, void* edx) {
 	if (!trio || g.p2Joined || !IndivActive() || !(*(uint8_t*)(hero + 0x18) & 1) || *(uint8_t*)(hero + 0x189))
 		return g_origSpinStep(hero, edx);
 	Trio t = GetTrio();
-	if (!t || CoopFusionAllowed(t.Leader())) return g_origSpinStep(hero, edx);
+	if (!t || SoloFusionReady(t)) return g_origSpinStep(hero, edx);
 	float* r = (float*)(trio + 0x3D8);
 	float was = *r;
 	*r = -1.0f;
@@ -5779,7 +5798,8 @@ static const char* SoloSwitchRefusal(Trio t, bool press) {
 	if (Situation(lh) != 0) return "the leader is doing something (its situation)";
 	// (Second chance: a hero in its own Twister -- the tornado lifts it now and then -- may be switched from or to.)
 	auto offFeet = [](Hero h) { return (*(uint32_t*)(h.raw() + 0x384) & 7) && !(IndivActive() && Twisting(h)); };
-	if (offFeet(lh) || offFeet(ch)) return "a hero off its feet";
+	if (offFeet(lh)) return "a hero off its feet (the one you play)";
+	if (offFeet(ch)) return "a hero off its feet (the other one)";
 	for (unsigned i = 0, n = GetNumLvlClassInstances(2, 172); i < n && i < 16; i++) {
 		char* sh = (char*)GetLvlObject(2, 172, i);
 		if (sh && (*(uint8_t*)(sh + 8) & 7) != 0) return "at the merchant";
