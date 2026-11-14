@@ -13,7 +13,8 @@ namespace {
 
 // Kinds: a YES / NO, a number (left / right by `step` within lo..hi), a choice
 // of names (left / right go round), and the few with rules of their own.
-enum Kind { K_BOOL, K_NUM, K_CHOICE, K_SP, K_LIMIT, K_P2HERO, K_SPLIT, K_CAMERA };
+enum Kind { K_BOOL, K_NUM, K_CHOICE, K_SP, K_LIMIT, K_P2HERO, K_SPLIT, K_CAMERA, K_SHIELD };
+const char* const kShieldNames[3] = { "off", "breakable", "infinite" };   // roman_shield
 struct Opt {
 	const char* section;
 	const char* key;
@@ -63,6 +64,13 @@ const Opt kOpts[] = {
 	N("coop_difficulty", "combo_bar_fill", comboFactor, 0.1f, 3.0f, 0.1f, "%.2f"),
 	N("coop_difficulty", "combo_bar_drain", comboDrainFactor, 0.1f, 3.0f, 0.1f, "%.2f"),
 	N("coop_difficulty", "combo_bar_full_drain", comboFullDrainFactor, 0.1f, 3.0f, 0.1f, "%.2f"),
+	N("coop_difficulty", "roman_charge_speed", romanChargeSpeed, 1.0f, 5.0f, 0.25f, "%.2f"),
+	{ "coop_difficulty", "roman_shield", K_SHIELD, &g_config.romanShield, 0, 0, 0, nullptr },
+	N("coop_difficulty", "roman_health", romanHealth, 1.0f, 10.0f, 0.5f, "%.1f"),
+	N("coop_difficulty", "roman_shield_hits", romanShieldHits, 1.0f, 10.0f, 0.5f, "%.1f"),
+	N("coop_difficulty", "roman_disarmed_time", romanDisarmedTime, 0.1f, 1.0f, 0.1f, "%.1f"),
+	N("coop_difficulty", "hero_shields", heroShields, 1.0f, 6.0f, 1.0f, "%.0f"),
+	N("coop_difficulty", "hero_extra_shields", heroExtraShields, 0.0f, 6.0f, 1.0f, "%.0f"),
 	B("coop_difficulty.experimental", "nolock_romans", noLockRomans),
 	B("coop_difficulty.experimental", "nolock_romans_any_markers", noLockRomansAnyMarkers),
 	B("hints", "hint_join", hintJoin),
@@ -150,6 +158,7 @@ void CoopOptValue(int i, wchar_t* out, int n) {
 	}
 	case K_SPLIT: wcsncpy(out, *(int*)o.p == SPLIT_VERTICAL ? L"vertical" : L"horizontal", n - 1); break;
 	case K_CAMERA: wcsncpy(out, *(bool*)o.p ? L"game" : L"mod", n - 1); break;
+	case K_SHIELD: swprintf(out, n, L"%hs", kShieldNames[*(int*)o.p % 3]); break;
 	default: break;
 	}
 }
@@ -225,6 +234,12 @@ bool CoopOptChange(int i, int dir) {
 		bool& v = *(bool*)o.p;
 		v = !v;
 		Write(o, v ? "game" : "mod");
+		return true;
+	}
+	case K_SHIELD: {   // off -> breakable -> infinite (rightwards / confirm)
+		int& v = *(int*)o.p;
+		v = (v + (dir < 0 ? 2 : 1)) % 3;
+		Write(o, kShieldNames[v]);
 		return true;
 	}
 	}

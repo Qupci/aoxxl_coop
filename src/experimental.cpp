@@ -886,6 +886,7 @@ void ComboFrame(Mode m) {
 } // namespace
 
 bool EnemyKindKeptAsIs(char* cpnt) { return KeptAsIs(cpnt); }
+int ExperimentalMode() { return ModeNow(); }
 
 bool ExperimentalExtraSpot(char* squad, int n, float* pos, float* dir) {
 	char* node = squad ? *(char**)(squad + 0x30) : nullptr;

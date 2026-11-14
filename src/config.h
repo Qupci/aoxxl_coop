@@ -64,6 +64,14 @@ struct CoopConfig {
 	float comboFactor      = 0.5f;  // combo bar hits counted per Roman hit
 	float comboDrainFactor = 1.5f;  // the combo bar losing its hits (before it is full)
 	float comboFullDrainFactor = 1.5f; // a full combo bar running out
+	// Enemies and the heroes' health bar (toughness.cpp; live, with the squads' rules)
+	float romanChargeSpeed = 1.0f;  // roman_charge_speed: a Roman's wind-up before its blow this many times faster
+	int   romanShield      = 0;     // roman_shield: 0 off (the level's), 1 breakable, 2 infinite (blocks unless charging / disarmed)
+	float romanHealth      = 1.0f;  // roman_health: hits to defeat an enemy
+	float romanShieldHits  = 1.0f;  // roman_shield_hits: blows a shield takes before it gives way
+	float romanDisarmedTime = 1.0f; // roman_disarmed_time: the weaponless daze (Power Hammer, club, Idefix) at this share
+	float heroShields      = 3.0f;  // hero_shields: the health bar's shields a hero starts / respawns with (1..6)
+	float heroExtraShields = 3.0f;  // hero_extra_shields: shields a hero may gain over those (merchant, bonuses; 6 at most in all)
 	bool  noLockRomans     = true;  // no-lock mode: Romans come for a hero the level would have kept waiting ([coop_difficulty.experimental])
 	bool  noLockRomansAnyMarkers = false; // ... at any squad's spawn markers near it, not only its own squad's
 

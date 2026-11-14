@@ -1,4 +1,5 @@
 #include "individual.h"
+#include "toughness.h"
 #include "proximity.h"
 #include "coop.h"
 #include "config.h"
@@ -1412,7 +1413,7 @@ void __fastcall CollectHook(char* pool, void* edx, char* hero) {
 // full health or a seventh shield was taken and wasted. With a health each, it
 // went to a hero it did nothing for, under the nose of the one who needed it:
 // a ham (pool type 5) only for a hero short of its own shields' health, a
-// shield (type 4) only below six shields, nothing for a fallen hero.
+// shield (type 4) only below its most shields (six; hero_extra_shields), nothing for a fallen hero.
 typedef char(__fastcall* MayCollectFn)(char* pool, void* edx, char* hero);
 MayCollectFn g_origMayCollect = nullptr;
 char __fastcall MayCollectHook(char* pool, void* edx, char* hero) {
@@ -1428,7 +1429,7 @@ char __fastcall MayCollectHook(char* pool, void* edx, char* hero) {
 	if (g.fallen[who]) return 0;
 	Stats& st = Current(who);
 	if (type == 5 && st.hp >= st.shields * 5) return 0;
-	if (type == 4 && st.shields >= 6) return 0;
+	if (type == 4 && st.shields >= ToughnessHeroShieldsMax()) return 0;
 	return r;
 }
 
@@ -1538,6 +1539,13 @@ void IndivEachComboCopy(IndivComboFn fn) {
 		for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++)
 			if (i != g.ctx) fn(&g.st[i].hits, &g.st[i].gauge, &g.st[i].decay, g.st[i].full);
 	if (g.kept) fn(&g.keptStats.hits, &g.keptStats.gauge, &g.keptStats.decay, g.keptStats.full);
+}
+
+void IndivEachShieldCopy(IndivShieldFn fn) {
+	if (g.active)
+		for (int i = HERO_ASTERIX; i <= HERO_OBELIX; i++)
+			if (i != g.ctx) fn(&g.st[i].hp, &g.st[i].shields);
+	if (g.kept) fn(&g.keptStats.hp, &g.keptStats.shields);
 }
 
 // A launcher needs both heroes and may stand where the fallen one can't be

@@ -27,10 +27,10 @@ const uint8_t   kLocStringPrologue[8] = { 0x8B, 0x54, 0x24, 0x04, 0x56, 0x83, 0x
 LocStringFn g_origLocString = nullptr;
 // The mod's own strings (no table of the game's goes that far): the players'
 // boxes (0, 1), then the sparkles' glyphs (2..9), the big hero icons (10, 11),
-// other modules' (12..141, HintsModString).
+// other modules' (12..175, HintsModString).
 const uint32_t kStringId = 0x3F00C0DE;
 const int      kTextLen = 200;
-const int      kNumStrings = 142;
+const int      kNumStrings = 176;
 wchar_t        g_strings[kNumStrings][kTextLen];
 
 // The in-game interface's tick (thiscall(this, time), ret 4); time +0xC = dt.

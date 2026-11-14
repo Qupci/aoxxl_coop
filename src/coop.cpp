@@ -20,6 +20,7 @@
 #include "proximity.h"
 #include "detour.h"
 #include "experimental.h"
+#include "toughness.h"
 #include "klusters.h"
 #include "sound.h"
 #include "autotest.h"
@@ -3425,6 +3426,7 @@ void CoopFrame() {
 	}
 	IndivFrame();
 	ExperimentalFrame();
+	ToughnessFrame();
 	SendDeferredSwitch();
 	TracePotionFrame();
 	SoundSetP2Listener();

@@ -103,3 +103,6 @@ bool IndivStats(int hero, int* hp, int* shields, int* hits = nullptr, float* gau
 // the caller's): hits, full bar's gauge, decay timer, full.
 typedef void (*IndivComboFn)(uint32_t* hits, float* gauge, float* decay, bool full);
 void IndivEachComboCopy(IndivComboFn fn);
+// The same for the health bars: health points and shields (game manager +0x40 -> +0x50, +0x51).
+typedef void (*IndivShieldFn)(uint8_t* hp, uint8_t* shields);
+void IndivEachShieldCopy(IndivShieldFn fn);

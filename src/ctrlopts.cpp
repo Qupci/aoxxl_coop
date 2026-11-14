@@ -281,7 +281,10 @@ bool IsPage4(char* e) {
 // taken to its page 3 by its own page button). Its page button turns the
 // co-op pages; cancel goes back through the options' list (cancelled too) to
 // the pause menu, the item focused.
-const int kCoopMax = 48, kCoopPerPage = 9;
+const int kCoopMax = 64, kCoopPerPage = 9;
+// A co-op row's label text slot (HintsModString; its value the next): 32.. for
+// the first 48, past the menu item's (128) for the rest.
+int CoopSlot(int i) { return i < 48 ? 32 + 2 * i : 130 + 2 * (i - 48); }
 alignas(16) char g_cLabel[kCoopMax][0x6E0];
 alignas(16) char g_cValue[kCoopMax][0x6DC];
 alignas(16) char g_cColour[kCoopMax][2][0x80];
@@ -692,13 +695,13 @@ void BindFrame(char* opt) {
 void ShowCoopRow(int i) {
 	wchar_t label[64], value[64];
 	swprintf(label, 64, L"%hs", CoopOptKey(i));
-	((SetTextFn)0x42E590)(g_cLabel[i] + 0x20, nullptr, HintsModString(32 + 2 * i, label));
+	((SetTextFn)0x42E590)(g_cLabel[i] + 0x20, nullptr, HintsModString(CoopSlot(i), label));
 	bool on;
 	uint32_t vid;
 	if (CoopOptToggle(i, &on)) vid = on ? kYes : kNo;
 	else {
 		CoopOptValue(i, value, 64);
-		vid = HintsModString(33 + 2 * i, value);
+		vid = HintsModString(CoopSlot(i) + 1, value);
 	}
 	((SetTextFn)0x42E590)(g_cValue[i] + 0x20, nullptr, vid);
 }

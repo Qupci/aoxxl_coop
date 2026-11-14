@@ -307,6 +307,32 @@ void CoopConfig::Load(const char* iniPath) {
 	comboFactor      = readFactor("combo_bar_fill", comboFactor);
 	comboDrainFactor = readFactor("combo_bar_drain", comboDrainFactor);
 	comboFullDrainFactor = readFactor("combo_bar_full_drain", comboFullDrainFactor);
+	auto readRange = [&](const char* key, float def, float lo, float hi) {
+		char fb[32] = {};
+		GetPrivateProfileStringA("coop_difficulty", key, "", fb, sizeof(fb), full);
+		if (!fb[0]) return def;
+		if (!_stricmp(fb, "off")) return def;
+		float f = (float)atof(fb);
+		return f < lo ? lo : f > hi ? hi : f;
+	};
+	romanChargeSpeed  = readRange("roman_charge_speed", 1.0f, 1.0f, 5.0f);
+	romanHealth       = readRange("roman_health", 1.0f, 1.0f, 10.0f);
+	romanShieldHits   = readRange("roman_shield_hits", 1.0f, 1.0f, 10.0f);
+	romanDisarmedTime = readRange("roman_disarmed_time", 1.0f, 0.05f, 1.0f);
+	heroShields       = floorf(readRange("hero_shields", 3.0f, 1.0f, 6.0f) + 0.5f);
+	heroExtraShields  = floorf(readRange("hero_extra_shields", 3.0f, 0.0f, 6.0f) + 0.5f);
+	{
+		char sb[32] = {};
+		GetPrivateProfileStringA("coop_difficulty", "roman_shield", "off", sb, sizeof(sb), full);
+		romanShield = !_stricmp(sb, "breakable") ? 1 : !_stricmp(sb, "infinite") ? 2 : 0;
+	}
+	if (getenv("XXL_ROMANSHIELD")) romanShield = atoi(getenv("XXL_ROMANSHIELD"));   // autotests
+	if (getenv("XXL_ROMANHEALTH")) romanHealth = (float)atof(getenv("XXL_ROMANHEALTH"));
+	if (getenv("XXL_ROMANSHIELDHITS")) romanShieldHits = (float)atof(getenv("XXL_ROMANSHIELDHITS"));
+	if (getenv("XXL_ROMANCHARGE")) romanChargeSpeed = (float)atof(getenv("XXL_ROMANCHARGE"));
+	if (getenv("XXL_ROMANDISARM")) romanDisarmedTime = (float)atof(getenv("XXL_ROMANDISARM"));
+	if (getenv("XXL_HEROSHIELDS")) heroShields = (float)atof(getenv("XXL_HEROSHIELDS"));
+	if (getenv("XXL_HEROEXTRA")) heroExtraShields = (float)atof(getenv("XXL_HEROEXTRA"));
 	if (getenv("XXL_ATONCE")) squadAliveFactor = readFactorText(getenv("XXL_ATONCE"));   // autotests
 	if (getenv("XXL_FACTORS1"))   // autotests: every squad and combo bar factor the game's own
 		squadAliveFactor = squadCountFactor = comboFactor = comboDrainFactor = comboFullDrainFactor = 1.0f;
@@ -342,6 +368,9 @@ void CoopConfig::Load(const char* iniPath) {
 		noLock, noLockExceptCorkscrews, noLockExceptBeams, carRiderLeads, romansInView, squadAliveFactor, squadCountFactor, priceFactor, comboFactor, comboDrainFactor, comboFullDrainFactor,
 		coopOnly ? "squads and combo bar in co-op only" : "squads and combo bar single player too",
 		rulesStatic ? "static" : "dynamic", apartByPath, toDefeatStays, noLockRomans, noLockRomansAnyMarkers);
+	Log("config: enemies: charge x%.2f, shield %s, health x%.2f, shield hits x%.2f, disarmed time x%.2f; "
+	    "heroes: %.0f shields + %.0f extra", romanChargeSpeed, romanShield == 2 ? "infinite" : romanShield == 1 ? "breakable" : "off",
+	    romanHealth, romanShieldHits, romanDisarmedTime, heroShields, heroExtraShields);
 	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
 	    hintMachineGun);
 	Log("config: twister nerf %d (a caught Roman counts %.0f), second chance: the other hero's combo bar at x%.2f",

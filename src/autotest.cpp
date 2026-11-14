@@ -60,7 +60,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_DISARM, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -4404,6 +4404,39 @@ const Step kGuard41[] = {
 // him 3.5 units off, stands 5.5 units off (they stay within 5 of Obelix), and
 // goes 14 units off (back to their spots). XXL_GUARDRING=0.8 (round 170's ring:
 // spots in Obelix's body) for guards that never get to their spots.
+// tough41 (-Level 4, XXL_TOUGHWATCH=1 XXL_OBELIXPOTION=0, the [coop_difficulty]
+// enemy and health bar options by env: XXL_ROMANSHIELD XXL_ROMANHEALTH
+// XXL_ROMANCHARGE XXL_ROMANDISARM XXL_HEROSHIELDS XXL_HEROEXTRA): both heroes out
+// where LV4-1's lock fight Romans come in (healed every 2.5 s); Asterix given
+// three shields (the most: hero_shields + hero_extra_shields); single blows at the
+// Roman nearest Asterix, then 4-hit combos (blocks, health); then player 2's
+// Obelix does the Club (A A X B, combo cheat) by a Roman (disarmed, for how long).
+#define HEALO(t) { t, S_GIVE, HERO_OBELIX, 0, 0, 10.0f, 0, "heal obelix" }
+#define HEAL2(t) HEALA(t), HEALO(t + 50)
+#define FACEHITA(t) { t, S_NEAROBJ, HERO_ASTERIX, 93, HERO_ASTERIX + 1, 1.3f, 0, "face the roman nearest asterix" }, HIT(t + 50)
+#define FHA5(t) FACEHITA(t), FACEHITA(t + 500), FACEHITA(t + 1000), FACEHITA(t + 1500), FACEHITA(t + 2000), HEAL2(t + 2200)
+#define FCA4(t) FACEHITA(t), HIT(t + 300), HIT(t + 550), HIT(t + 800), HEAL2(t + 1100)
+#define CLUB(t) { t, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, { t + 300, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix combo bar full" }, 	{ t + 800, S_ENEMY, HERO_OBELIX, 0, 0, 0, 0, "obelix next to a roman" }, 	TAP_P2(t + 1300, PAD_A, "p2 A"), TAP_P2(t + 1420, PAD_A, "p2 A"), TAP_P2(t + 2150, PAD_X, "p2 X"), TAP_P2(t + 2260, PAD_B, "p2 B")
+// player 1's combo k at the Roman nearest Asterix (combo cheat: learned, bar full)
+#define PCOMBO(t, k) { t, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, HEAL2(t + 100), \
+	{ t + 400, S_NEAROBJ, HERO_ASTERIX, 93, HERO_ASTERIX + 1, 1.3f, 0, "face the roman nearest asterix" }, { t + 500, S_P1COMBO, k, 0, 0, 0, 0, "p1 combo" }
+const Step kTough41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	{ 4000, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" }, { 4200, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" },
+	{ 4400, S_GIVE, HERO_ASTERIX, 1, 0, 0, 0, "asterix a shield" },
+	HEAL2(5000), HEAL2(7500),
+	PLACEAT(8000, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), PLACEAT(8100, HERO_OBELIX, -294.0f, 0.5f, 90.0f),   // out where the Romans come in
+	HEAL2(10000), SHOT(12000, "tough41_0"), HEAL2(12500),
+	FHA5(14000), FACEHITA(16500), FACEHITA(17700), FACEHITA(18900), FCA4(20100), FCA4(21600), FCA4(23100), FACEHITA(24300),
+	HEAL2(25000), CLUB(25500), SHOT(28000, "tough41_1"), HEAL2(28500), SHOT(28700, "tough41_2"), HEAL2(31000),
+	CLUB(33000), HEAL2(36000),
+	PCOMBO(37000, 3), { 40000, S_DISARM, HERO_ASTERIX, 0, 0, 0, 0, "disarm the roman nearest asterix" }, HEAL2(40500),
+	{ 41000, S_DISARM, HERO_OBELIX, 0, 0, 0, 0, "disarm the roman nearest obelix" }, HEAL2(43000), HEAL2(45500),
+	{ 46000, S_DISARM, HERO_ASTERIX, 0, 0, 0, 0, "disarm the roman nearest asterix" }, HEAL2(48000), HEAL2(50500), END(54000),
+};
 const Step kGuard41M[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -8585,6 +8618,28 @@ const Step kCoopOpts[] = {
 	{ 21500, S_BIND, 21, 0, 0, 0, 0, "cancel (back to the pause)" }, SHOT(23000, "co_back"),
 	END(24000),
 };
+// coopopts2 (level 2): CO-OP Options page 4 (the enemies' and the health bar's
+// rows, 28..34), roman_shield (up x7 from the page button) turned once
+// (off -> breakable) and back (x2: infinite, off); page 6 (rows past 48).
+const Step kCoopOpts2[] = {
+	MARK(0, "coopopts2"),
+	{ 3000, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	OPT_PRESS(5000, 17, 33, 53, "down"), OPT_PRESS(5500, 17, 33, 53, "down"), OPT_PRESS(6000, 17, 33, 53, "down"),
+	OPT_PRESS(7000, 20, 44, 56, "confirm (co-op options: the page button focused)"),
+	OPT_PRESS(9000, 19, 35, 55, "right (page 2)"), OPT_PRESS(9500, 19, 35, 55, "right (page 3)"), OPT_PRESS(10000, 19, 35, 55, "right (page 4)"),
+	SHOT(10800, "co2_page4"),
+	OPT_PRESS(11200, 16, 32, 52, "up"), OPT_PRESS(11600, 16, 32, 52, "up"), OPT_PRESS(12000, 16, 32, 52, "up"),
+	OPT_PRESS(12400, 16, 32, 52, "up"), OPT_PRESS(12800, 16, 32, 52, "up"), OPT_PRESS(13200, 16, 32, 52, "up"),
+	OPT_PRESS(13600, 16, 32, 52, "up (roman_shield)"),
+	OPT_PRESS(14100, 20, 44, 56, "confirm (breakable)"), SHOT(14800, "co2_shield"),
+	OPT_PRESS(15200, 20, 44, 56, "confirm (infinite)"), OPT_PRESS(15700, 20, 44, 56, "confirm (off)"),
+	OPT_PRESS(16200, 17, 33, 53, "down"), OPT_PRESS(16600, 17, 33, 53, "down"), OPT_PRESS(17000, 17, 33, 53, "down"),
+	OPT_PRESS(17400, 17, 33, 53, "down"), OPT_PRESS(17800, 17, 33, 53, "down"), OPT_PRESS(18200, 17, 33, 53, "down"),
+	OPT_PRESS(18600, 17, 33, 53, "down (page button)"),
+	OPT_PRESS(19100, 19, 35, 55, "right (page 5)"), OPT_PRESS(19600, 19, 35, 55, "right (page 6)"), SHOT(20400, "co2_page6"),
+	{ 21000, S_BIND, 21, 0, 0, 0, 0, "cancel (back to the pause)" },
+	END(22500),
+};
 // coopswap (level 2): player 2 joins (Obelix); in CO-OP Options p2_hero to
 // asterix (the heroes swap at once) and split_mode to horizontal; resumed: the
 // halves swapped and stacked; then both back.
@@ -10240,6 +10295,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("p2menu", kP2Menu),
 	SCENARIO("p1coop", kP1Coop),
 	SCENARIO("coopopts", kCoopOpts),
+	SCENARIO("coopopts2", kCoopOpts2),
 	SCENARIO("coopswap", kCoopSwap),
 	SCENARIO("pauseback", kPauseBack),
 	SCENARIO("heroswap", kHeroSwap),
@@ -10656,6 +10712,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("guard36", kGuard36),
 	SCENARIO("guard41", kGuard41),
 	SCENARIO("guard41m", kGuard41M),
+	SCENARIO("tough41", kTough41),
 	SCENARIO("guard41a", kGuard41A),
 	SCENARIO("pool36", kPool36),
 	SCENARIO("poolkinds", kPoolKinds),
@@ -11920,11 +11977,13 @@ void RunStep(const Step& s) {
 					char* hier = node && !IsBadReadPtr(node, 0x60) ? *(char**)(node + 0x28) : nullptr;   // its skeleton
 					char tex[160] = {};
 					if (e) GuardModelTextures(e, tex, sizeof(tex));
+					bool basic = vt == 0x627BD0 || vt == 0x627C30 || vt == 0x627C60;
 					Log("autotest: squad (4,%d) #%u %p pool %u (%p): %d to defeat, cpnt %p %s flags %08X health %u damage %u"
-					    " shield points %d stun %.2f cover %.2f | Roman %p vt %X, bones %d, textures%s | guards %s",
+					    " shield points %d +%d stun %.2f cover %.2f disarmed %.2f charge %.2f | Roman %p vt %X, bones %d, textures%s | guards %s",
 					    c, i, sq, r, pool, *(int16_t*)(rec + 0x18), cp, CpntClass(vt), *(uint32_t*)(cp + 4),
-					    *(uint8_t*)(cp + 8), *(uint8_t*)(cp + 9), seiz ? *(uint8_t*)(cp + 0x110) : -1,
-					    seiz ? *(float*)(cp + 0x120) : 0.0f, seiz ? *(float*)(cp + 0x114) : 0.0f, e, e ? *(unsigned*)e : 0,
+					    *(uint8_t*)(cp + 8), *(uint8_t*)(cp + 9), seiz ? *(uint8_t*)(cp + 0x110) : -1, seiz ? *(uint8_t*)(cp + 0x111) : -1,
+					    seiz ? *(float*)(cp + 0x120) : 0.0f, seiz ? *(float*)(cp + 0x114) : 0.0f, seiz ? *(float*)(cp + 0xF0) : 0.0f,
+					    basic && !IsBadReadPtr(cp, 0x158) ? *(float*)(cp + 0x154) : 0.0f, e, e ? *(unsigned*)e : 0,
 					    hier && !IsBadReadPtr(hier, 8) ? *(uint8_t*)(hier + 4) : -1, tex, e && GuardEligible(rec, e) ? "yes" : "no");
 				}
 			}
@@ -13375,6 +13434,27 @@ void RunStep(const Step& s) {
 			float* hp = (float*)((char*)h.hook->node->matrix + 0x40);
 			hp[0] = to.x; hp[1] = to.y; hp[2] = to.z;
 		}
+		break;
+	}
+	case S_DISARM: {   // the Roman (2,93) nearest hero a disarmed as the game does it (its event 0x4C05: hook +0x24 bit 0x8000, then the daze)
+		Trio t = GetTrio();
+		Hero h = t ? t.GetHero(s.a) : Hero();
+		if (!h) break;
+		char* best = nullptr;
+		float bestD = 1e30f;
+		for (unsigned i = 0, n = GetNumLvlClassInstances(2, 93); i < n; i++) {
+			char* e = (char*)GetLvlObject(2, 93, i);
+			char* node = e ? *(char**)(e + 0x10) : nullptr;
+			char* frame = node ? *(char**)(node + 4) : nullptr;
+			if (!frame || (*(uint8_t*)(node + 0x10) & 2) || (*(uint8_t*)(e + 8) & 1)) continue;
+			Vector3 p(((float*)(frame + 0x80))[0], ((float*)(frame + 0x80))[1], ((float*)(frame + 0x80))[2]);
+			float d = (p - h.Pos()).len2();
+			if (p.len2() != 0.0f && d < bestD) { bestD = d; best = e; }
+		}
+		if (!best) { Log("autotest: disarm: no Roman"); break; }
+		typedef int(__fastcall* SendFn)(void* self, void* edx, int event, void* param);
+		((SendFn)(*(void***)best)[5])(best, nullptr, 0x4C05, nullptr);
+		Log("autotest: disarm: Roman %p (%.1f from %s) sent 4C05 -- +0x24 %08X", best, sqrtf(bestD), HeroName(s.a), *(uint32_t*)(best + 0x24));
 		break;
 	}
 	case S_ENEMY: {

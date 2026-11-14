@@ -29,6 +29,9 @@ void ExperimentalFrame();
 // Enemies a squad pool holds that are left as the level has them (turtles, the
 // mobile tower, jetpack Romans) -- by the pool record's enemy component (+4).
 bool EnemyKindKeptAsIs(char* cpnt);
+// The squads' rules now: 0 the game's own (single player, coop_only), 1 the
+// heroes apart (the game's numbers for the one left), 2 on.
+int ExperimentalMode();
 // Where extra Roman n of a squad (more Romans at once than its formation has
 // spots) goes: spot n % spots shifted sideways by a row, facing as the spot.
 bool ExperimentalExtraSpot(char* squad, int n, float* pos, float* dir);

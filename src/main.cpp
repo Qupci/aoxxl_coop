@@ -19,6 +19,7 @@
 #include "individual.h"
 #include "hud2.h"
 #include "experimental.h"
+#include "toughness.h"
 #include "levelforge.h"
 #include "nolock.h"
 #include "guard.h"
@@ -173,6 +174,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	IndivInstallHooks();
 	Hud2InstallHooks();
 	ExperimentalInstallHooks();
+	ToughnessInstallHooks();
 	NoLockInstallHooks();
 	GuardInstallHooks();
 	CoopInit();
