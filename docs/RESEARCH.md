@@ -5207,3 +5207,28 @@ both halves).
   XXL_SPSWITCH=1 XXL_SPSWITCHLOCK=1: first hint 6 s in, keg 0348 -> "Switch to Obelix" again, the switch hides it,
   zone 01E0 -> "Switch to Asterix"), heroswap (confirm while held swaps; let go -> prompt gone, a later press swaps
   nothing). Autotests show the keyboard's TAB icon in SP (the game's keyboard preset): the pad shows D-pad up.
+- Round 281 (Nov 14, commit b340f44; user request: combos under the magic potion). potioncombos.cpp, [coop]
+  potion_combos (on; CO-OP Options; co-op, single player with sp_isolation off), the hero's potion = +0x388 bit 4.
+  - Club / Power Hammer: the shockwave is the trio's (FUN_0047CE70, thiscall(trio, pos, params at trio+0x45C);
+    called at 0x493477 by the Club -- once per impact, 6-7 a Club -- and at 0x493B8C by the Power Hammer, esi =
+    the hero; visual nodes trio +0x48C / +0x458). Its volume reaches the Romans as contacts (event 0x300 to
+    Class_2_84::sendEvent 0x4CBA60; list {next, pair}, pair {vol a, vol b, ..., +0x1A type 'G' none}, volume +0x19
+    kind, +0x20 owner): the other volume kind 4, owner the trio (CKGrpTrio vt 0x6256A0) -> push, +0x24 |= 0x80,
+    with component flag 0x08 also 0x8000 (disarmed). Call sites patched with thunks noting the hero; within 2 s of
+    a potion shockwave a trio kind-4 contact beats the Roman.
+  - Beaten as a catapult stone (0x301 case, 0x4CBF48..0x4CC064): velocity +0x58 = (away x, 0.33, away z)
+    normalised x component +0xFC, hitter +0x1A0 = 0, +0x24 |= 0x402. Bit 0x2 is state 1 first in the chooser
+    (vf26 0x4D1220) whatever else is set; 0x4C02 does state 1 without the flight. The gate counter counts them.
+  - Mole: FUN_004966E0 (step 0x1E..) sends 0x4C0A to the Romans over it until CKHkAsterix asteUnk0 (+0xB60, int,
+    LV4: 8) are taken (also the 0x4C0A time: cap x 3 + +0xB74 + 1). Steps +0x38E & 0x3F 0x1C..0x20 (handler
+    0x494160). Obelix's +0xB60 is something else (sound data). Tripled while Asterix has the potion, switched
+    only between Moles.
+  - Rage: Idefix's bites are event 0x4C0C to the Roman (case 0xC: +8 kind bite, +0x24 |= 0x80, vf41; answer byte
+    1 if taken, 0 with +0x24 bit 0x20); the disarm follows from the Roman's own tick. Rage = Idefix +0xB91 (bites
+    left) set from +0xB90 (3 on LV4) > 1, a plain RB bite is 1; tracked from > 1 until 0. Under the potion (gauge
+    > 0) a taken bite in the Rage beats the Roman (pushed away from Idefix).
+  - Club combo in autotests: player 2's taps 250 ms apart (combohint2's A, A, X, B) -- the S_P1COMBO 0 injection
+    does nothing (P1 Obelix on the ground or landing), CLUB's tough41 timing did not take on LV4 this time.
+  Autotests (-Level 4, XXL_POTIONCOMBOS=1 / 0): potcombo41 (Power Hammer 25 beaten / disarmed only; Mole 19 of 24
+  / 8 of 8; Rage 3 bites 3 beaten / disarmed), potclub41b (two Clubs, 7 shockwaves each, 21 beaten), potclub41
+  (P1 Obelix via XXL_P2HERO=asterix: the injected Club does not start -- kept for reference).
