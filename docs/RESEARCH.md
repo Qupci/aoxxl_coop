@@ -5100,3 +5100,16 @@ both halves).
   started, one still bolt. Now, with a range given (second chance), the first marking calls FUN_00480930 as the game.
   spowntw2 / spfuse2 (XXL_SPSECOND=0, the game's) got bursts of shots (0.35 s apart) in the fused tornado: the bolts
   move in both now. Co-op's marking (range 0) left as it was.
+- Round 275 (Nov 14, commit ee7af04; user: switching during the Fusion handed over an invisible hero, the fused tornado
+  stayed behind; second chance's "Fusion-ready" looked always on, even when the Fusion was not affordable).
+  (1) SoloSwitchRefusal: a hero in sub-states 0x25..0x27 (merging / fused / its end) or the leader's +0x188 up ->
+  "the Twister Fusion" (kSwitchNoView[6]: no sidekick view). spfuse41 (-Level 4, potion, both own Twisters; Obelix
+  starts 6 units off -- beside the starting tornado he is lifted and the first switch refused "off its feet"): fused
+  at 13.985, the switch at 16.969 refused, the fused tornado ran on.
+  (2) The Fusion's price, logged: gm +0xBB = 40 levels, +0xBC+2 (Twister) 30, +0xBC+3 (Fusion) 1, full bar +0xA0 30
+  -> the Twister takes 22.5, the Fusion 0.75; FUN_00493810 with less empties the bar and the fusion goes on anyway.
+  CoopFusionAllowed (FuseHook's refusal and the combo hint) now needs the leader's gauge >= the price (individual:
+  IndivStats, live for the leader via Current; else stats +0x10 bit 0x4000 and gm +0xA4), second chance also the
+  other's bar still full. combohints FuseFrame's range 8 in second chance (as TwisterNearness). Attack states left
+  alone: the AI's own Twister stays 10 after its bar runs out (the game's companion would drop to 9 with a fresh
+  start pose -- round 204's "re-do").
