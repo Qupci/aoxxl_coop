@@ -5080,3 +5080,23 @@ both halves).
   Autotests (-Level 2, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1) spowntw2 (Asterix's Twister, Obelix stands;
   switch, Obelix's own, X: Fusion -- 6/6 after the fixes) and spowntw2b (switch back while both spin: both kept,
   Asterix's X fuses -- 3/3); twnerf41 / twfuse41 (-Level 4); fuse2 (co-op) unchanged.
+- Round 274 (Nov 14, commit after 7f4cc60; user: round 273 works; the off-lead full bar still ran out at the game's
+  pace; the second chance Fusion's lightning one still line; userlog Game Files xxl_coop.log of 08:14).
+  (1) The user's log: Asterix's Twister at 45.5, switch 46.9, his bar's HUD row (hud2 "bars p2", itf +0x24 & 0x7000)
+  state 2 -> 3 at 51.7 -> 0 at 52.0 -- out 6.5 s after the Twister, the game's pace; X at 53.6 refused (no combo
+  left). hud2 ticks the other hero's combo bar part (kComboPart FUN_00518190 / glow 0x519E70) silently with its
+  stats in place; the part's states run on the clock's dt (param +0xC, the only field read): state 2 counts +0x2BC
+  down then slides out (state 3) and zeroes gm +0xA4; state 4 (full) counts its fill +0x2E0/+0x2E8 down and at 0
+  clears hits and the full state -- whatever RunDownCombo did to the gauge. Now the solo row's combo parts get a
+  64-byte copy of the clock with +0xC x sp_second_chance_combo_drain. spbarslow2 (-Level 4, potion, the cheat fill
+  via S_SPMOD D-pad left, switch with the bar full): x1 out in 23 s; x0.33 13.4 of 24 left after 30 s. (In autotests
+  the HUD's combo bar never shows -- the potion's gauge takes its place, and without it Asterix fell -- so the
+  HUD-part path itself is covered by the user's log and the decomp, not a run.)
+  (2) The pair's "partner near" (+0x189) set by the AI's own spin (FUN_00498560, 0x49868B) is followed by
+  FUN_00480930 -- thiscall on the TRIO (ECX = hero +0x14 at 0x498699), float 2 x trio +0x3AC, ret 4: the trio's
+  link bolt object (+0x4E4, from yellow pages +0x58 class 0x194C, its vt+0x38 started), flags +0x524 |= 7, +0x4EC
+  length, +0x4F0 5, +0x4E8 2; the spin / fused steps then move it (FUN_00480A30 endpoints +0x4F8..+0x50C, FUN_00480A90
+  / 0x480EB0 random bolts, +0x528). TwisterNearness marked second chance pairs itself (range 8): the link never
+  started, one still bolt. Now, with a range given (second chance), the first marking calls FUN_00480930 as the game.
+  spowntw2 / spfuse2 (XXL_SPSECOND=0, the game's) got bursts of shots (0.35 s apart) in the fused tornado: the bolts
+  move in both now. Co-op's marking (range 0) left as it was.
