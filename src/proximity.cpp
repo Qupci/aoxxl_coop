@@ -2040,6 +2040,19 @@ static bool GroupParks(char** objs, const uint16_t* msgs, int n) {
 	return waits || (moves && !frees);
 }
 
+// Does event `ev`'s group start the belly slide (CKAsterixSlideFP among its
+// targets, or the trio's slide mode 0x480B)?
+bool GroupStartsSlide(unsigned ev) {
+	char* objs[64];
+	uint16_t msgs[64];
+	int n = GroupTargets(ev, objs, msgs, 64);
+	for (int k = 0; k < n; k++) {
+		uintptr_t vt = objs[k] ? *(uintptr_t*)objs[k] : 0;
+		if (vt == 0x6259E4 || (vt == 0x6256A0 && msgs[k] == 0x480B)) return true;
+	}
+	return false;
+}
+
 // Does a group under way that sends the trio `msg` (a lead switch) park a hero
 // (GroupParks)? The level's hand-over: the hero at the lever is parked, the
 // other plays on.
@@ -2853,6 +2866,30 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 				if (s_last != (eventId & 0xFFFF)) {
 					s_last = eventId & 0xFFFF;
 					Log("proximity: zone event %04X held back -- %s is down", eventId & 0xFFFF, HeroName(IndivFallenHero()));
+				}
+				return;
+			}
+		}
+		// Co-op, nobody down: the belly slide's cross detector (LV2-2 z -903.8) set
+		// off with the other player's hero far off -- the game takes "the companion"
+		// along from wherever it is. It waits for the other player (user): held back,
+		// the hero put back to the side it came from (the frame before), the other
+		// player's box says it waits.
+		if (CoopP2Joined() && !CoopSuspended() && IndivFallenHero() < 0 && GroupStartsSlide(eventId)) {
+			int zh = ZoneEventHero(eventId & 0xFFFF);
+			if ((zh == HERO_ASTERIX || zh == HERO_OBELIX) && !CoopHeroHeld((zh == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX)) && !CoopRideMateNear(zh)) {
+				Trio tz = GetTrio();
+				Hero hz = tz ? tz.GetHero(zh) : Hero();
+				int ni = hz && g_tickingDet ? NodeIndex(g_tickingDet, hz) : -1;
+				float* prevs = g_tickingDet ? *(float**)(g_tickingDet + 0x1C) : nullptr;
+				float here[3] = { hz ? hz.Pos().x : 0.0f, hz ? hz.Pos().y : 0.0f, hz ? hz.Pos().z : 0.0f };
+				IndivPutBackFrom(zh, "the belly slide", ni >= 0 && prevs && std::isfinite(prevs[3 * ni]) ? prevs + 3 * ni : here);
+				CoopWaitingForYou(zh, "belly slide");
+				static unsigned s_last = 0;
+				if (s_last != (eventId & 0xFFFF)) {
+					s_last = eventId & 0xFFFF;
+					Log("proximity: zone event %04X (the belly slide) held back -- %s is not near", eventId & 0xFFFF,
+					    HeroName((zh == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX)));
 				}
 				return;
 			}

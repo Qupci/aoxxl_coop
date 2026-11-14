@@ -65,6 +65,7 @@ enum HintKey {
 	HINT_FUSE,          // both heroes spinning together: X fuses them
 	HINT_SKIP,          // a cutscene: hold A / Enter to skip it (cutskip.cpp), also over a cutscene
 	HINT_SWAP,          // co-op: the other player asks for a hero swap (coop.cpp HeroSwapFrame)
+	HINT_SWITCH,        // single player: the hero switch button (coop.cpp ShowSwitchHint)
 };
 
 enum HintButton { HB_A, HB_X, HB_LB, HB_START, HB_BACK, HB_B, HB_Y, HB_RB, HB_COUNT };

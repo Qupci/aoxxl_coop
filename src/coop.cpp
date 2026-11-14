@@ -49,7 +49,9 @@ void StartAiCycle(int idx, const char* why);   // below: two ticks through the A
 static void ServeMachineRequest(Trio t);       // below: Obelix's X at a machine
 static bool MachineMatesNear(Trio t);
 static void RefuseMachine(Trio t, int kind, int who);
+static bool RefuseFarLauncher(char* hero);
 static void ShowJoinHint(Trio t);
+static void ShowSwitchHint(Trio t);
 static void SoloHeroSwitch(Trio t);
 static void SoloWatchLock(Trio t);
 static void SoloPotionDash(Trio t);
@@ -3302,9 +3304,9 @@ bool CoopSoloTorchThrowing() { return g_spThrow.phase != 0; }
 
 // The hero swap (co-op): a player holds its Switch hero button 0.6 s (player
 // 1: sp_hero_switch_button / _key; player 2: [p2_pad] / [keyboard]
-// switch_hero, D-pad up), the other player's box asks "Confirm [P1/P2] hero
-// switch [its button]" and its own says it waits; the other's press within 8 s
-// swaps the heroes (CoopSwapHeroes). Not in a cutscene, a scripted ride, the
+// switch_hero, D-pad up), the other player's box asks "Confirm hero switch [its
+// button]" while the asker keeps holding (let go: gone, no confirming); the
+// other's press meanwhile swaps the heroes (CoopSwapHeroes). Not in a cutscene, a scripted ride, the
 // pause, or with R3 held (the mod's buttons).
 struct SwapAsk {
 	int   asker = -1;
@@ -3357,16 +3359,17 @@ void HeroSwapFrame(const PadState& p2, DWORD now, bool blocked) {
 	}
 	if (g_swap.asker >= 0) {
 		int other = 1 - g_swap.asker;
-		if (pressed[other]) {
+		if (!down[g_swap.asker]) {
+			// (The asker let go: the request is over, its prompt gone at once -- user.)
+			HintHide(HINT_SWAP);
+			Log("coop: player %d let go of the hero swap request", g_swap.asker + 1);
+			g_swap.asker = -1;
+		} else if (pressed[other]) {
 			HintHide(HINT_SWAP);
 			Log("coop: player %d confirms player %d's hero swap", other + 1, g_swap.asker + 1);
 			g_swap.asker = -1;
 			g_swap.needRelease[0] = g_swap.needRelease[1] = true;
 			CoopSwapHeroes("the players' hero swap");
-		} else if (now - g_swap.at > 8000) {
-			HintHide(HINT_SWAP);
-			Log("coop: player %d's hero swap not confirmed", g_swap.asker + 1);
-			g_swap.asker = -1;
 		}
 		return;
 	}
@@ -3379,15 +3382,14 @@ void HeroSwapFrame(const PadState& p2, DWORD now, bool blocked) {
 		g_swap.at = now;
 		g_swap.holdSince[k] = 0;
 		g_swap.needRelease[k] = true;
+		// Only the other player's box asks (user): "Confirm hero switch [its button]",
+		// for as long as the asker holds its button.
 		int other = 1 - k;
-		wchar_t asker = IconGlyph(k ? "p2" : "p1"), mate = IconGlyph(other ? "p2" : "p1"), button = SwitchGlyph(other);
+		wchar_t button = SwitchGlyph(other);
 		wchar_t text[96];
-		if (asker && button) swprintf(text, 96, L"Confirm %c hero switch %c", asker, button);
-		else swprintf(text, 96, L"Confirm P%d hero switch", k + 1);
-		HintShow(HINT_SWAP, other, text, 8000);
-		if (mate) swprintf(text, 96, L"Hero switch: waiting for %c", mate);
-		else swprintf(text, 96, L"Hero switch: waiting for P%d", other + 1);
-		HintShow(HINT_SWAP, k, text, 8000);
+		if (button) swprintf(text, 96, L"Confirm hero switch %c", button);
+		else swprintf(text, 96, L"Confirm hero switch");
+		HintShow(HINT_SWAP, other, text, 600000);
 		Log("coop: player %d asks for a hero swap", k + 1);
 		break;
 	}
@@ -3541,6 +3543,7 @@ void CoopFrame() {
 		WatchPendingLead(t);   // (an undone lock's lead back: R3 + B, second chance)
 		GuardFrame();          // (second chance: romans_guard_downed)
 		ShowJoinHint(t);
+		ShowSwitchHint(t);
 		TryJoin(t);
 		g.bossRunHero = -1;    // (noted for a co-op bring-along: the switch lock's boss runs)
 		return;
@@ -4365,7 +4368,7 @@ static void __fastcall TakeHook(char* hero, void* edx, int arg) {
 			pressed = true;
 		}
 	}
-	NoteMachineUse(hero);
+	if (!RefuseFarLauncher(hero)) NoteMachineUse(hero);
 	g_origTake(hero, edx, arg);
 	// Not taken (no torch the take would accept -- every one used up): the press
 	// would be an X, Asterix's three-hit attack for the cheat's 60 frames (user).
@@ -5681,7 +5684,32 @@ static int SoloOwnCatchUp(Trio t, unsigned msg) {
 	return g;
 }
 
+// The hero switch hint (single player, sp_hero_switch; ShowSwitchHint): once
+// per game load after the join hint, and again when the lock ignores a switch of
+// the level's (NoteSwitchHintAgain).
+struct SwitchHint {
+	bool once = false;       // shown since the game started
+	bool again = false;      // to show again (a switch the lock ignored)
+	int  shownFor = -1;      // the hero leading as it shows (switched: it goes)
+} g_switchHint;
+static void NoteSwitchHintAgain(int to) {
+	static int s_told = 0;
+	if (s_told++ < 20) Log("coop: the switch hint again -- the level's lead is %s, ignored by the lock", HeroName(to));
+	g_switchHint.again = true;
+}
+static bool SoloDropsSwitchWhy(int ev);
+// (A switch the lock ignores, the level's lead left with the hero you don't
+// play: the switch hint again -- the level wants you to switch, user.)
 static bool SoloDropsSwitch(int ev) {
+	bool drop = SoloDropsSwitchWhy(ev);
+	Trio t = drop ? GetTrio() : Trio();
+	int l = t ? t.Leader() : -1;
+	if (drop && (l == HERO_ASTERIX || l == HERO_OBELIX) && g_solo.levelLeader == OtherHero(l))
+		NoteSwitchHintAgain(g_solo.levelLeader);
+	return drop;
+}
+
+static bool SoloDropsSwitchWhy(int ev) {
 	if (g.p2Joined || !IsLeaderSwitch(ev)) return false;
 	Trio t = GetTrio();
 	if (!t) return false;
@@ -6276,14 +6304,65 @@ static bool MachineMatesNear(Trio t) {
 	return d.x * d.x + d.z * d.z < 12.0f * 12.0f && fabsf(d.y) < 4.0f;
 }
 
-static void RefuseMachine(Trio t, int kind, int who) {
-	PlaySound(t.GetHero(who), 0x200);
+// A ride both heroes take (a launcher, the belly slide) waits for the other
+// hero within 12 units (6 up or down: a launcher's platform, the slide's slope).
+bool CoopRideMateNear(int hero) {
+	Trio t = GetTrio();
+	Hero h = t && (hero == HERO_ASTERIX || hero == HERO_OBELIX) ? t.GetHero(hero) : Hero();
+	Hero o = h ? t.GetHero(OtherHero(hero)) : Hero();
+	if (!h || !o) return true;
+	Vector3 d = h.Pos() - o.Pos();
+	return d.x * d.x + d.z * d.z < 12.0f * 12.0f && fabsf(d.y) < 6.0f;
+}
+
+// Hero `hero`'s ride or machine waits for the other player: the other player's
+// box says "[hero] is waiting for you" (user), `hero` hears the refusal (once
+// per press: not again within 0.5 s).
+void CoopWaitingForYou(int hero, const char* what) {
+	if (hero != HERO_ASTERIX && hero != HERO_OBELIX) return;
+	int away = OtherHero(hero);
+	static DWORD s_last = 0;
+	DWORD now = GetTickCount();
+	if (now - s_last > 500) {
+		Trio t = GetTrio();
+		if (t) PlaySound(t.GetHero(hero), 0x200);
+		static int s_told = 0;
+		if (s_told++ < 40) Log("coop: %s at the %s waits for %s (not near)", HeroName(hero), what, HeroName(away));
+	}
+	s_last = now;
 	wchar_t text[96];
-	swprintf(text, 96, L"%s has to be\nat the %s too", OtherHero(who) == HERO_ASTERIX ? L"Asterix" : L"Obelix",
-	         kind == 2 ? L"machine gun" : L"boat");
-	HintShow(HINT_MACHINE, who == g.p1Hero ? 0 : 1, text, 4000);
-	Log("coop: %s's X at the %s refused: %s is not there", HeroName(who), kind == 2 ? "machine gun" : "boat",
-	    HeroName(OtherHero(who)));
+	swprintf(text, 96, L"%s is waiting for you", HintHeroName(hero));
+	HintShow(HINT_MACHINE, away == g.p1Hero ? 0 : 1, text, 4000);
+}
+
+static void RefuseMachine(Trio t, int kind, int who) {
+	(void)t;
+	CoopWaitingForYou(who, kind == 2 ? "machine gun" : "boat");
+}
+
+// A launcher (its "Activate": hero +0x3F0 bit 0x4000, the launcher at +0x544)
+// started by X (+0x3EC bit 0x10) with the other player's hero far off: in the
+// game the launcher calls the companion to its marker (trio 0x4804) from
+// wherever it is. In co-op it waits for the other player (user) -- the X and the
+// offer dropped for this tick (the hero's take step, TakeHook, runs before its
+// body machine starts the launch). A hero down (its revive at the launcher) or
+// held by the level (it could not come) doesn't hold it up.
+static bool RefuseFarLauncher(char* hero) {
+	if (!g.p2Joined || g.suspended) return false;
+	uint32_t& ec = *(uint32_t*)(hero + 0x3EC);
+	uint32_t& f = *(uint32_t*)(hero + 0x3F0);
+	if (!(ec & 0x10) || !(f & 0x4000)) return false;
+	Trio t = GetTrio();
+	int idx = -1;
+	for (int i = HERO_ASTERIX; t && i <= HERO_OBELIX; i++)
+		if (t.GetHero(i).raw() == hero) idx = i;
+	if (idx < 0) return false;
+	int other = OtherHero(idx);
+	if (IndivFallen(other) || g.held[other] || CoopRideMateNear(idx)) return false;
+	ec &= ~0x10u;
+	f &= ~0x4000u;
+	CoopWaitingForYou(idx, "launcher");
+	return true;
 }
 
 // Obelix's X at a machine (NoteMachineUse): Asterix takes it from where Obelix
@@ -6396,6 +6475,38 @@ static void GiveBackLead(Trio t) {
 
 // Hint: at the start of a level, how player 2 joins (and leaves) -- for 10 s,
 // once play can start (no cutscene; level 1: once Obelix is found).
+static void ShowSwitchHint(Trio t) {
+	SwitchHint& h = g_switchHint;
+	int l = t ? t.Leader() : -1;
+	if (g.p2Joined || !g_config.SoloMod() || !g_config.spHeroSwitch || !t) {
+		if (h.shownFor >= 0) HintHide(HINT_SWITCH);
+		h.shownFor = -1;
+		h.again = false;
+		return;
+	}
+	if (h.shownFor >= 0) {
+		if (!HintShown(HINT_SWITCH, 0)) h.shownFor = -1;
+		else if (l != h.shownFor) {   // switched: done
+			HintHide(HINT_SWITCH);
+			h.shownFor = -1;
+			h.again = false;
+		}
+		if (h.shownFor >= 0 && !h.again) return;
+	}
+	if (h.once && !h.again) return;
+	// Right after the join hint (user), once play can start.
+	if (g.joinHintPending || HintShown(HINT_JOIN, 0) || !CoopGameplayLive() || CutsceneBars() || g.cutsceneHold > 0) return;
+	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
+	wchar_t button = SwitchGlyph(0), text[96];
+	if (button) swprintf(text, 96, L"%c  Switch to %s", button, HintHeroName(OtherHero(l)));
+	else swprintf(text, 96, L"Switch to %s", HintHeroName(OtherHero(l)));
+	HintShow(HINT_SWITCH, 0, text, 6000);
+	Log("coop: the switch hint (%s): switch to %s", h.once ? "again" : "first", HeroName(OtherHero(l)));
+	h.once = true;
+	h.again = false;
+	h.shownFor = l;
+}
+
 static void ShowJoinHint(Trio t) {
 	if (!g.joinHintPending || !t || !CoopGameplayLive()) return;
 	const char* why = "";

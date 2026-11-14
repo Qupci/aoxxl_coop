@@ -342,23 +342,54 @@ void ForgetRecentSpots(int idx, DWORD now) {
 	}
 }
 
+// (`down` below 0: no hero down -- a ride waiting for the other player, coop.cpp.)
 void PutBackLog(int up, int down, const char* what, const Vector3& spot) {
 	static DWORD s_told = 0;
 	DWORD now = GetTickCount();
 	if (now - s_told > 2000) {
 		s_told = now;
+		if (down < 0) {
+			Log("indiv: %s reached %s without the other hero -- put back (%.1f %.1f %.1f)", HeroName(up), what, spot.x,
+			    spot.y, spot.z);
+			return;
+		}
 		Log("indiv: %s reached %s with %s down -- back on its last solid ground (%.1f %.1f %.1f)", HeroName(up), what,
 		    HeroName(down), spot.x, spot.y, spot.z);
 		ShowDownHint(down);
 	}
 }
+
+// Hero `up` onto its last solid ground away from where it is.
+bool PutBackSafe(int up, const char* what, int down) {
+	Trio t = GetTrio();
+	Hero h = t ? t.GetHero(up) : Hero();
+	Vector3 spot;
+	if (!h || !SafeSpotAway(up, h.Pos(), &spot)) return false;
+	spot.y += 0.5f;
+	PlaceHero(h, spot);
+	g.placedAt[up] = GetTickCount();
+	g.noSafeUntil[up] = GetTickCount() + 1000;
+	PutBackLog(up, down, what, spot);
+	return true;
+}
+
+bool PutBackFrom(int up, const char* what, const float beforeXyz[3], int down);
 }
 
 bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
-	Vector3 before(beforeXyz[0], beforeXyz[1], beforeXyz[2]);
 	int down = IndivFallenHero();
 	if (down < 0 || CoopSuspended()) return false;
-	int up = Other(down);
+	return PutBackFrom(Other(down), what, beforeXyz, down);
+}
+
+bool IndivPutBackFrom(int hero, const char* what, const float beforeXyz[3]) {
+	if ((hero != HERO_ASTERIX && hero != HERO_OBELIX) || CoopSuspended()) return false;
+	return PutBackFrom(hero, what, beforeXyz, -1);
+}
+
+namespace {
+bool PutBackFrom(int up, const char* what, const float beforeXyz[3], int down) {
+	Vector3 before(beforeXyz[0], beforeXyz[1], beforeXyz[2]);
 	Trio t = GetTrio();
 	Hero h = t ? t.GetHero(up) : Hero();
 	if (!h) return false;
@@ -371,19 +402,19 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	if ((*(uint8_t*)(h.raw() + 0x384) & 7) != 0) {
 		static int s_told = 0;
 		if (s_told++ < 20) Log("indiv: %s came into %s off its feet -- its last solid ground", HeroName(up), what);
-		return IndivBlockPartnerSpot(what);
+		return PutBackSafe(up, what, down);
 	}
 	Vector3 back = before - now;
 	back.y = 0.0f;
 	float len = std::sqrt(back.len2());
 	if (len > 8.0f) {   // not a frame's step: stale (a teleport) -- the trail
 		Log("indiv: %s's place before %s is %.0f units back -- the trail", HeroName(up), what, len);
-		return IndivBlockPartnerSpot(what);
+		return PutBackSafe(up, what, down);
 	}
 	if (len < 0.05f && GetTickCount() - g.placedAt[up] < 1000) return true;   // just put here by us: stays
 	if (len < 0.05f) {   // not moving in (already there): the trail
 		Log("indiv: %s did not move into %s (%.1f %.1f %.1f) -- the trail", HeroName(up), what, now.x, now.y, now.z);
-		return IndivBlockPartnerSpot(what);
+		return PutBackSafe(up, what, down);
 	}
 	Vector3 spot = before;
 	if (len > 0.001f) spot = before + back * (1.5f / len);   // a step further back than it came from
@@ -394,6 +425,7 @@ bool IndivBlockPartnerSpotFrom(const char* what, const float beforeXyz[3]) {
 	g.noSafeUntil[up] = GetTickCount() + 1000;
 	PutBackLog(up, down, what, spot);
 	return true;
+}
 }
 
 void IndivPutOnSafeGround(int hero) {
@@ -433,24 +465,7 @@ void IndivNoteLevelLead(int hero) {
 bool IndivBlockPartnerSpot(const char* what) {
 	int down = IndivFallenHero();
 	if (down < 0 || CoopSuspended()) return false;
-	int up = Other(down);
-	Trio t = GetTrio();
-	Hero h = t ? t.GetHero(up) : Hero();
-	Vector3 spot;
-	if (!h || !SafeSpotAway(up, h.Pos(), &spot)) return false;
-	spot.y += 0.5f;
-	PlaceHero(h, spot);
-	g.placedAt[up] = GetTickCount();
-	g.noSafeUntil[up] = GetTickCount() + 1000;
-	static DWORD s_told = 0;
-	DWORD now = GetTickCount();
-	if (now - s_told > 2000) {
-		s_told = now;
-		Log("indiv: %s reached %s with %s down -- back on its last solid ground (%.1f %.1f %.1f)", HeroName(up), what,
-		    HeroName(down), spot.x, spot.y, spot.z);
-		ShowDownHint(down);
-	}
-	return true;
+	return PutBackSafe(Other(down), what, down);
 }
 
 namespace {

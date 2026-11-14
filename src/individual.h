@@ -67,6 +67,9 @@ bool IndivBlockPartnerSpot(const char* what);
 // The same for a zone the standing hero just crossed: back to where it was the
 // frame before (`before`, the detection service's), a little further back.
 bool IndivBlockPartnerSpotFrom(const char* what, const float before[3]);
+// The same put-back for hero `hero` with nobody down (a ride's zone crossed
+// while the other player is far off: coop.cpp CoopRideMateNear).
+bool IndivPutBackFrom(int hero, const char* what, const float before[3]);
 // A Roman agent's talk reached by the standing hero: it stays shut (the caller
 // holds it back), the hero is not put back -- it can walk on past the agent.
 bool IndivBlockTalk(const char* what);

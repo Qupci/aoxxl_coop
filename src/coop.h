@@ -115,6 +115,12 @@ bool CoopDeferTrioEvent(void* trio, int event);
 
 bool CoopInstallHooks();
 bool CoopHeroHeld(int hero);   // borrowed by the game for a scripted order
+// A ride both heroes take (a launcher, the belly slide): is the other hero near
+// hero `hero`? (co-op waits for it)
+bool CoopRideMateNear(int hero);
+// "[hero] is waiting for you" on the other player's box; `hero` hears the
+// refusal (`what` for the log: "launcher", "belly slide", "boat").
+void CoopWaitingForYou(int hero, const char* what);
 bool CoopSoloTorchThrowing();  // single player: Asterix throws his used-up torch as a player's hero
 // Individual heroes: hero `fallen` just went down. If the other was locked in a
 // sequence waiting for it (a blue circle's "wait here", a cable car pulled by

@@ -912,6 +912,35 @@ const Step kLaunchP2[] = {
 	VPAD(38500, 1, 0, 0, 1, "p2 forward"), SHOT(40500, "launch_5"), VPAD(41000, 1, 0, 0, 0, "p2 stop"),
 	END(42000),
 };
+// launchfar: sector 2's launcher, player 2's Obelix on it, Asterix left in the
+// sas: player 2's X refused -- player 1's box says "[Obelix] is waiting for you";
+// Asterix brought next to it: player 2's X launches.
+const Step kLaunchFar[] = {
+	MARK(0, "launchfar"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_ASTERIX, 10, 0, 0, 0, "asterix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_OBELIX, 17, 0, 0, 0, "obelix on the launcher" },
+	VPAD(5500, 1, PAD_X, 0, 0, "p2 X (asterix far)"), VPAD(5700, 1, 0, 0, 0, "p2 release"),
+	SHOT(6300, "lf_refused"), SHOT(8000, "lf_still"),
+	{ 9000, S_PLACE, HERO_ASTERIX, 18, 0, 0, 0, "asterix next to the launcher" },
+	VPAD(10500, 1, PAD_X, 0, 0, "p2 X (asterix near)"), VPAD(10700, 1, 0, 0, 0, "p2 release"),
+	SHOT(12500, "lf_launched"),
+	END(15000),
+};
+// launchfara: the same with player 1's Asterix on it, Obelix in the sas:
+// player 2's box (bottom right) says "[Asterix] is waiting for you".
+const Step kLaunchFarA[] = {
+	MARK(0, "launchfara"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1500, S_PLACE, HERO_OBELIX, 10, 0, 0, 0, "obelix into the sas (sector 2)" },
+	{ 4000, S_PLACE, HERO_ASTERIX, 17, 0, 0, 0, "asterix on the launcher" },
+	P1(5500, PAD_X, 0, 0, "p1 X (obelix far)"), P1(5700, 0, 0, 0, "p1 release"),
+	SHOT(6300, "lfa_refused"),
+	{ 9000, S_PLACE, HERO_OBELIX, 18, 0, 0, 0, "obelix next to the launcher" },
+	P1(10500, PAD_X, 0, 0, "p1 X (obelix near)"), P1(10700, 0, 0, 0, "p1 release"),
+	SHOT(12500, "lfa_launched"),
+	END(15000),
+};
 const Step kLaunchA[] = {
 	MARK(0, "baseline"), { 0, S_WATCHCAM, 0, 0, 0, 0, 0, "watch camera" },
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -5787,6 +5816,22 @@ const Step kSlideCross3[] = {
 	END(15000),
 };
 
+// slidefar (level 2): Asterix walks past LV2-2's cross detector with Obelix
+// left where the sector put him: held back, Asterix put back before the line,
+// player 2's box says "[Asterix] is waiting for you"; with Obelix beside him
+// the slide starts.
+const Step kSlideFar[] = {
+	MARK(0, "slidefar"), LOADSECTOR(200, 2),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(3000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f),
+	GLIDEAT(4500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
+	SHOT(7200, "sf_refused"), SHOT(8500, "sf_after"),
+	PLACEAT(9000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(9000, HERO_OBELIX, -902.5f, 526.5f, -912.0f),
+	GLIDEAT(10500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
+	SHOT(14000, "sf_slide"),
+	END(16000),
+};
+
 // slideend (level 2): Asterix walks down beside the belly slide (LV2-2,
 // -916.8 519.6 -883.8 -> -906.6 511.1 -860.4): what starts the level's end there.
 const Step kSlideEnd[] = {
@@ -8311,6 +8356,24 @@ const Step kLvlLead21[] = {
 	SHOT(12000, "lvllead21_coop"),
 	END(13000),
 };
+// swhint21 (level 2, XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_SPSWITCHLOCK=1): the
+// hero switch hint "[D-pad up]  Switch to [Obelix]" once the join hint is over;
+// LV2-1's keg (0348, "Obelix leads", ignored by the lock) shows it again; the
+// switch to Obelix ends it; zone 01E0 at -793.3 526.2 -989.6 ("Asterix leads",
+// dropped as Obelix's own catch-up) shows "Switch to [Asterix]".
+const Step kSwHint21[] = {
+	MARK(0, "swhint21"),
+	SHOT(3000, "sw_join"), SHOT(8000, "sw_first"), SHOT(14000, "sw_first_gone"),
+	{ 20000, S_FLAGEV, 0x348, 0, 0, 0, 0, "the keg (0348)" },
+	SHOT(21500, "sw_keg"),
+	{ 24000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	SHOT(25000, "sw_switched"),
+	PLACEAT(26000, HERO_ASTERIX, -785.0f, 527.0f, -987.0f),
+	PLACEAT(26000, HERO_OBELIX, -786.0f, 526.8f, -989.0f),
+	GLIDEAT(26500, HERO_OBELIX, -793.3f, 526.3f, -989.6f, 1500),
+	SHOT(29000, "sw_zone"),
+	END(30000),
+};
 const Step kLvlLead21J[] = {
 	MARK(0, "lvllead21j"),
 	{ 2000, S_FLAGEV, 0x348, 0, 0, 0, 0, "the keg (0348)" },
@@ -8688,18 +8751,22 @@ const Step kPauseBack[] = {
 	{ 8000, S_BIND, 21, 0, 0, 0, 0, "cancel (back)" }, SHOT(9500, "pb_back"),
 	END(10500),
 };
-// heroswap (level 2): player 2 joins on virtual pad 2, holds D-pad up 1 s: player
-// 1's box asks "Confirm [P2] hero switch [D-pad up]", player 2's waits; player 1
-// (virtual pad 1) presses D-pad up: the heroes swap. Then player 1 asks and
-// nobody confirms: dropped after 8 s.
+// heroswap (level 2): player 2 joins on virtual pad 2, holds D-pad up: after
+// 0.6 s player 1's box (only) asks "Confirm hero switch [D-pad up]"; player 1
+// (virtual pad 1) presses D-pad up while player 2 still holds: the heroes swap.
+// Then player 1 holds and lets go: player 2's prompt goes at once, and player 2's
+// press after that swaps nothing.
 const Step kHeroSwap[] = {
 	MARK(0, "heroswap"),
 	VPAD(2000, 1, PAD_START, 0, 0, "p2 start"), VPAD(2200, 1, 0, 0, 0, "p2 release"),
-	VPAD(4000, 1, PAD_DPAD_UP, 0, 0, "p2 holds d-pad up"), VPAD(5000, 1, 0, 0, 0, "p2 release"), SHOT(5400, "hs_asked"),
-	VPAD(6000, 0, PAD_DPAD_UP, 0, 0, "p1 d-pad up (confirm)"), VPAD(6150, 0, 0, 0, 0, "p1 release"), SHOT(7500, "hs_swapped"),
-	VPAD(9000, 0, PAD_DPAD_UP, 0, 0, "p1 holds d-pad up"), VPAD(10000, 0, 0, 0, 0, "p1 release"), SHOT(10400, "hs_p1_asks"),
-	SHOT(19000, "hs_dropped"),
-	END(20000),
+	VPAD(4000, 1, PAD_DPAD_UP, 0, 0, "p2 holds d-pad up"), SHOT(5000, "hs_asked"),
+	VPAD(6000, 0, PAD_DPAD_UP, 0, 0, "p1 d-pad up (confirm)"), VPAD(6150, 0, 0, 0, 0, "p1 release"),
+	VPAD(6500, 1, 0, 0, 0, "p2 release"), SHOT(7500, "hs_swapped"),
+	VPAD(9000, 0, PAD_DPAD_UP, 0, 0, "p1 holds d-pad up"), SHOT(9900, "hs_p1_asks"),
+	VPAD(10000, 0, 0, 0, 0, "p1 lets go"), SHOT(10200, "hs_gone"),
+	VPAD(10600, 1, PAD_DPAD_UP, 0, 0, "p2 d-pad up (too late)"), VPAD(10750, 1, 0, 0, 0, "p2 release"),
+	SHOT(12000, "hs_not_swapped"),
+	END(12500),
 };
 // quitnew (level 2, force_level 2): the pause menu's Quit Game (up from Resume),
 // YES (left in the message box), the main menu's New Game, the intro skipped;
@@ -10271,6 +10338,10 @@ const Scenario kScenarios[] = {
 	SCENARIO("spswitch2", kSpSwitch2),
 	SCENARIO("lvllead21", kLvlLead21),
 	SCENARIO("lvllead21j", kLvlLead21J),
+	SCENARIO("swhint21", kSwHint21),
+	SCENARIO("launchfar", kLaunchFar),
+	SCENARIO("launchfara", kLaunchFarA),
+	SCENARIO("slidefar", kSlideFar),
 	SCENARIO("sptorch2", kSpTorch2),
 	SCENARIO("sptorchthrow2", kSpTorchThrow2),
 	SCENARIO("sptorchthrowo2", kSpTorchThrowO2),
@@ -13738,10 +13809,8 @@ void RunStep(const Step& s) {
 			swprintf(text, 200, L"Second pad: %s joins co-op\nand again to leave", HintButtonName(1, HB_START)); break;
 		case 2: key = HINT_PASS;   // coop.cpp
 			swprintf(text, 200, L"%s passes the Roman\nto %s", HintButtonName(a, HB_LB), HintHeroName(ho)); break;
-		case 3: key = HINT_MACHINE;
-			swprintf(text, 200, L"%s has to be\nat the %s too", ho == HERO_ASTERIX ? L"Asterix" : L"Obelix", L"machine gun"); break;
-		case 4: key = HINT_MACHINE;
-			swprintf(text, 200, L"%s has to be\nat the %s too", ho == HERO_ASTERIX ? L"Asterix" : L"Obelix", L"boat"); break;
+		case 3: case 4: key = HINT_MACHINE;   // coop.cpp CoopWaitingForYou (a boat, a launcher, the belly slide)
+			swprintf(text, 200, L"%s is waiting for you", HintHeroName(ho)); break;
 		case 5: key = HINT_LIFTER;
 			swprintf(text, 200, L"The lifter waits for %s\nto go up", HintHeroName(ho)); break;
 		case 6: key = HINT_REVIVE;   // individual.cpp ShowDownHint
