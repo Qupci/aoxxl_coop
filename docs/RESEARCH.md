@@ -5010,3 +5010,32 @@ both halves).
   read between collision ticks): 2 s bursts sweeping left / right (held X overheats the gun, which then fires
   high -- user), 30 hits on the level's targets, 20 on clones (#245, #270, #274...); before, no target past #220
   existed. User saw the hits consistent on the pad (Nov 14).
+- Round 272 (Nov 14, commit f8c9a72; user: xxl_coop.lv2-8_asterix_tp_fail.log, xxl_coop.lifter_softlock.log).
+  (1) LV2-8 second chance: Obelix (leading, LVL LEAD) died 47 units from Asterix's wait on the cutscene platform
+  (40.4 57.1 -89.4, the level's 4820); after the revive Asterix stayed at the revive spot. CoopRestorePark skipped the
+  put-back past 40 units -- cap removed (the level is checked). In the autotest the wait came from the platform's
+  light pillar (event 0608, a flagged group: picture "as before its event"), which NoteSoloPark never kept (a
+  pillar's undo stands); the user's picture was "as now" (FFFF). Now a pillar lock is kept too once the level has
+  moved the companion on (6+ units from g_lock.at, or a later order than the 4802): undone to before the pillar
+  would lose the platforms and zone 02B0's scene. A kept lock gives no lead-back leader (CoopUndoLockFor -1: the
+  fallen hero leads again), and the restore sends the lock group's own pillar message again (0x900).
+  (2) Same log: Obelix's health row stayed up with 1 health while he was down. He fell leading -- his row was the
+  game's, shown (state 0x20, +0x270 = last shown health); the swap made it the other row, and the health part
+  keeps state 2 while +0x270 is nonzero (round 205's flag clearing only stops a row coming up). Hud2AfterInterfaceTick
+  zeroes +0x270 for a fallen other row that is up: dropped within 15 ms.
+  (3) LV2-1 single player: Asterix waited on the corkscrew (event 0050), AI Obelix left on the lifter; the lifter's
+  own wait (round 94: +0x34, ~8 s) fires zone 0B30 = trio 48C4 + 488E. The 48xx handler (0x482BB0): 0x85..0xB6 put
+  the leader on marker (lo - 0x85), 0xBB..0xEC the companion (lo - 0xBB) -- both on marker 9 here, Asterix still
+  AI order 3. NoteLockMarkerPut (in CoopNoteTrioEvent) notes a companion put while our lock holds it;
+  WatchLockMarkerPut, within 1.5 s on a lifter's own ground (IndivHeroOnLifter), undoes the lock as R3 + B does but
+  without the last-ground put-back (UndoLock putBack false). WatchLifterHint's round-94 undo stays co-op only.
+  (4) LVL LEAD (g_solo.levelLeader) follows the lead whenever a sequence undo hands it back (GiveLeadLater, a fall's
+  unkept undo: LevelLeadBack) -- user: splift21's lead came back to Asterix, LVL LEAD stayed Obelix.
+  (5) Tried and reverted (user): dropping the lifter's last-ground put-back with a downed partner. Standing on the
+  lifter the hero is inside the shaft's PF node, which ShutLifters shuts for the revive's queries, so WayToFallen
+  got "not known" (never acted on), not "no": nobody was brought over (liftdown21 / liftdown21r failed).
+  Autotests spfarpark28 (-Level 2, XXL_SPSECOND=1 XXL_REVIVEHOLD=2 XXL_HUDPOS=1: pillar, 02B0 flagged -- an AI hero
+  placed or glided sets off no zone -- Obelix killed by shockwaves 47 units off, Asterix hit, revive; before: no
+  put-back, row up with 3; now back at 40.5 57.2 -89.5, Obelix leads, row hidden) and splift21 (-Level 2: squad 29
+  won, Asterix on the circle, Obelix on the lifter; 48C4 at +6 s: lock undone, both ride up, the circle locks
+  Asterix again later). liftdown21, liftdown21r, liftdie21a, liftdie21b, lifterlock as before.
