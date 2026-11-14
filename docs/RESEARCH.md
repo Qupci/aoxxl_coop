@@ -4971,3 +4971,16 @@ both halves).
   S_CINEDUMP now logs each PlayAnim / PathFinding bloc's actor and position. Autotests caesar65 (skip: Caesar kept at
   78.75) and caesar65w (watched to its end; the reference: 78.75), both -Level 6, XXL_SKIPLOG=1 for the run-on +
   end-place trace; holdskip -Level 1 regression OK.
+- Round 269 (Nov 14, commits 6ec37cf, 31f9f31; user: BACKSPACE no longer works as the keyboard cheat modifier since
+  the P2 menu work, even with back rebound to P; and Asterix should steer the belly slide and the boat, Obelix jump).
+  Cheat modifier: before round 263, player 2's back key (BACKSPACE) gave PAD_BACK, and PAD_BACK | PAD_RTHUMB was the
+  mod buttons' modifier. Round 263 made Back the pause menu and the modifier R3 only, so BACKSPACE did nothing as a
+  modifier. Rebinding back to P only unbound BACKSPACE. New [keyboard] cheat_modifier (KEY_CHEAT, default 0x08): pads.cpp
+  PollKeyboard sets PAD_RTHUMB while it is held, with no rising edge (CoopP2CameraValues' camera centre reads
+  pressed & PAD_RTHUMB). It is skipped when it is the back key. KEY_BACK's default is now 'P' (dist ini too).
+  SetP2Key's swap covers it, so rebinding back onto BACKSPACE in the Controls menu moves cheat_modifier to the old back key.
+  Autotest kbcheat (keyboard injected, not run while the user is at the PC). Ride split: shared.cpp Route SHARED_BOAT /
+  SHARED_SLIDE now gives trio/boat actions to Asterix's owner, except action 4 (jump), which goes to Obelix's owner.
+  The camera goes to Asterix, and the mode hint is swapped. boat49o (-Level 4, XXL_ACTIONLOG=1): player 2's stick is
+  no longer answered (before: "boat[0]/trio[2] answered by player 2"), and player 2's A is answered as boat[4] / trio[4].
+  slide22s doesn't reach a moving slide (the camera NaN, Obelix frozen), so only the hint is checked there.
