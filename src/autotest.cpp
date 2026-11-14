@@ -4231,6 +4231,24 @@ const Step kFight64[] = {
 	SHOT(88000, "fight64_end"),
 	END(89000),
 };
+#define TWIST1(t) { t, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix combo bar full" }, { t + 300, S_P1COMBO, 4, 0, 0, 0, 0, "twister" }, \
+	P1(t + 1200, 0, 0, 1.0f, "p1 forward"), P1(t + 3500, 0, 0, -1.0f, "p1 back"), P1(t + 5800, 0, 0, 0, "p1 stop")
+// twist64 (-Level 6): the user's xxl_coop.lv6-4_from_3000_to_1100.log --
+// Asterix's Twisters in LV6-4's start squad (358 42 -290) with the ini's
+// squad_romans_to_defeat 3: the gate's count must run down by the Romans
+// beaten, never jump (the 6 s stuck-pool trim took 1900 there).
+const Step kTwist64[] = {
+	MARK(0, "baseline"),
+	TAP1(1500), TAP1(2500), TAP1(3500), TAP1(4500), TAP1(5500), TAP1(6500), TAP1(7500), TAP1(8500), TAP1(9500),   // the spy's talk (fight64)
+	{ 10500, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 11000, S_WATCHENEMIES, 0, 0, 0, 358.0f, 42.0f, "watch romans", -290.0f },
+	PLACEAT(11200, HERO_ASTERIX, 358.0f, 42.8f, -290.0f), POTION(11400),
+	TWIST1(13000), TWIST1(19500), TWIST1(26000), TWIST1(32500), TWIST1(39000), TWIST1(45500), TWIST1(52000),
+	TWIST1(58500), TWIST1(65000), TWIST1(71500),
+	SHOT(78000, "twist64_end"),
+	END(79000),
+};
+#undef TWIST1
 // fight56 (-Level 5): Asterix alone fights LV5-6's squad 4 (pools 18, 40, 24 +
 // 8 leaders; the fight lock at -116.16 9.84 33.90), potion on, for 4 minutes.
 #define FIGHT20S(t) POTION(t), TAPS1(t + 500), TAPS1(t + 5500), TAPS1(t + 10500), TAPS1(t + 15500)
@@ -10597,6 +10615,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("lead510o", kLead510O),
 	SCENARIO("reload2", kReload2),
 	SCENARIO("fight64", kFight64),
+	SCENARIO("twist64", kTwist64),
 	SCENARIO("fight56", kFight56),
 	SCENARIO("gatedone", kGateDone),
 	SCENARIO("gatedonew", kGateDoneW),

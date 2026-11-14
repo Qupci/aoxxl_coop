@@ -507,12 +507,17 @@ int Lower(char* sq, SquadOrig& o) {
 // fight gate counts, with Romans of the mod's left to send in and none queued,
 // to replace or alive for 6 s while the squad is active, has had its part of
 // the script end before them (a script counting what it has sent, "sent in so
-// far >= n") -- they are taken away, or the gate would wait for them.
+// far >= n") -- they are taken away, or the gate would wait for them. Only
+// once the level's own Romans of the pool are all sent in (left to send no
+// more than the mod's): before, the script still counts some to come and is
+// only pausing (LV6-4's pool 2 under the Twister: 1900 taken with 900 of the
+// level's still to come).
 void TrimStuck(char* sq, SquadOrig& o, DWORD now) {
 	char* rec0 = *(char**)(sq + 0x144);
 	for (unsigned i = 0; i < o.n; i++) {
 		char* rec = rec0 + i * 0x1C;
 		bool idle = (o.own[i] || o.extra[i]) && *(uint16_t*)(rec + 0x16) && Left(rec) > 0 &&
+		            Left(rec) <= o.own[i] + o.extra[i] &&
 		            !*(uint8_t*)(rec + 0x14) && !*(uint8_t*)(rec + 0x15) && Alive(sq, i) == 0;
 		if (!idle) { o.idleSince[i] = 0; continue; }
 		if (!o.idleSince[i]) { o.idleSince[i] = now; continue; }
