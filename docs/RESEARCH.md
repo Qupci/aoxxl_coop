@@ -5184,3 +5184,26 @@ both halves).
   combo's knock-down before it adds ~2.8 s), bar 4+1: 3 -> 4 at the start, given shields stop at 5, hits no longer
   take the 4th; 2+0: 3 -> 2, health 10. coopopts2 (-Level 2): page 4 rows, roman_shield cycles, page 6 (rows 45-50).
   Not verified: a charging Roman hit through an infinite shield (the user's account of squad 25: the game's own).
+- Round 280 (Nov 14, commit 22d524a; user's three requests). (1) A launcher and the belly slide wait for the other
+  player, as the boat does: co-op only, the other hero within 12 units (6 up or down), not for a downed or
+  level-held partner (CoopRideMateNear). Launcher: the X (hero +0x3EC bit 0x10) with its offer (+0x3F0 bit 0x4000,
+  launcher at +0x544) -- the launch is started by the body machine after the take step FUN_00499CF0 (State0_Player:
+  ReadCommandBlock, ..., 0x499CF0, ..., Hero_TickBodyMachine; the launcher state FUN_0049C030 enter sends 0x5131
+  to the launcher, then 0x4804 / 0x4879, too late to refuse there); TakeHook (the 0x499CF0 detour) clears both bits
+  for that tick: no launch, no punch, the prompt back next frame. Belly slide: FlagEventHook (proximity.cpp), a zone
+  whose group starts the slide (GroupStartsSlide: CKAsterixSlideFP 0x6259E4 or trio 0x480B) with nobody down is
+  held back and the hero put back from the detection service's frame-before place (IndivPutBackFrom: the downed
+  hero's put-back of round 65 without a downed hero; PutBackFrom / PutBackSafe in individual.cpp). (2) Every such
+  refusal (boat, machine gun, launcher, slide) shows "[hero icon] is waiting for you" on the far player's box
+  (CoopWaitingForYou, HINT_MACHINE), the refusal sound on the waiting hero (once per 0.5 s). (3) Single player,
+  sp_hero_switch (SoloMod): "[switch button]  Switch to [other hero]" (HINT_SWITCH, 6 s, player 1's box) once per
+  game load after the join hint is gone, and again whenever sp_hero_switch_lock drops a game switch that leaves
+  the level's lead (LVL LEAD) with the hero not leading (SoloDropsSwitch wrapper -> NoteSwitchHintAgain); a switch
+  ends it. (4) Co-op hero swap: only the other player's box asks "Confirm hero switch [its button]", for as long as
+  the asker holds its button (no 8 s timeout, no "waiting for" box); let go = gone and no confirm.
+  Autotests: launchfar (P2's Obelix on sector 2's launcher, Asterix in the sas: refused, P1 box hint; Asterix
+  beside: launched), launchfara (P1's Asterix, hint in P2's box), slidefar (LV2-2 cross detector: put back to
+  -906.0 524.9 -905.2, hint in P2's box; Obelix 6 units off: slide starts), swhint21 (XXL_SPISOLATION=0
+  XXL_SPSWITCH=1 XXL_SPSWITCHLOCK=1: first hint 6 s in, keg 0348 -> "Switch to Obelix" again, the switch hides it,
+  zone 01E0 -> "Switch to Asterix"), heroswap (confirm while held swaps; let go -> prompt gone, a later press swaps
+  nothing). Autotests show the keyboard's TAB icon in SP (the game's keyboard preset): the pad shows D-pad up.
