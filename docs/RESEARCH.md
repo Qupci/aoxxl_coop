@@ -5232,3 +5232,35 @@ both halves).
   Autotests (-Level 4, XXL_POTIONCOMBOS=1 / 0): potcombo41 (Power Hammer 25 beaten / disarmed only; Mole 19 of 24
   / 8 of 8; Rage 3 bites 3 beaten / disarmed), potclub41b (two Clubs, 7 shockwaves each, 21 beaten), potclub41
   (P1 Obelix via XXL_P2HERO=asterix: the injected Club does not start -- kept for reference).
+- Round 282 (Nov 15, commit 8dfac49; user: the romanforge changes -- Romans at once, helmets, crates, gun targets --
+  in the SPQR mods too, F:\XXL COOP MOD\SPQR\{Caesars Challenge, BetaRomeFinal, Unfair XXL 2.0}). All six mod exes
+  (2,912,256 bytes, windowed + fullscreen) are axxl.exe (Ipatix: same section VAs, "hack" renamed ".patch") with
+  XXL-Editor's 5 module patches already in (levelforge's memory==file check passes, re-patching writes the same
+  bytes; DRM signature at file 0x2B73D4) and their levels already "Asterix " -- ConvertLevelX1 refused them ("The game
+  is already patched for modding!"), levelforge served the originals, nothing cloned. Fixes:
+  - forge_lib.cpp: a level already in the moddable format is loaded as it is (no conversion). The game files'
+    extension comes from the module's ".KWN" string (file 0x245858 / VA 0x645858, "LVL\0STR\0.KWN"): Unfair XXL
+    has ".KSX" for every file; KEnvironment::platformExt[PC] set for the build (FileExtScope), levelforge's
+    ParseLevelPath / LevelKey / CacheValid and icons.cpp's combo icons use GameFileExt().
+  - vendored editor: CKMsgAction parameter of an unknown type (Unfair LVL1/2/3/5: 0x56E87660...) -- the game's
+    reader (0x5312E0) reads 4 bytes and keeps nothing (default case), kept as MARawParameter and written back.
+    getObjPnt for sector-shared classes: bounds checked (Unfair LVL6 event targets gave a garbage pointer ->
+    crash in CKSrvEvent::serialize), falling back to the first sector holding the number (same saved number:
+    saveMap numbers every sector's sector-shared objects from one startId); level objects' refs into sectors
+    (Caesar LVL1 CKHkTorch sound dictionary + branch -> KPostponedRef, bound with the hook's sector; Unfair LVL6
+    CKManageCameraCinematicBloc). CKSpline4L's numBings == parts*4 assert dropped (Caesar LVL1). Fill leaves a
+    pool outside the CKGroupRoot tree (Unfair LVL6 pool 5) -- Duplicator::findGroup made public.
+  - pools of more than 30 Romans (mods only: the game's biggest is 22) filled to their squads' at-once sum
+    (max(u1,u2) over the squads' pool entries) x factor, at most 255: Caesar LVL1 (pools of 444, 100, 80...) went
+    128 MB -> 82 MB (46 MB original; game heap 33 MB, QoL memory_heap_size). The at-once cap for all pools was
+    tried and dropped: two original pools changed (LV3 pool 2 at once 1, LV6 pool 1 used by no squad entry).
+  Offline (romanforge.exe <mod dir> <out> <lvl> 3 <module>): every level of the three mods builds -- Caesar L1
+  +1661, Beta Rome L6 +301 (L1-5 are 5-byte DUMMY files), Unfair L1-6 +189..245; original levels 0-8 rebuild
+  byte-identical to Game Files\coop_levels (no forge version bump). Caesar's exe has CKSrvAvoidance at 1000
+  entries (count +0x10E0): AvoidAddHook's prologue check skips it, correctly. XEADDnnn.KWN is editor-only (the
+  game never opens it). Unfair's folder had no ASI loader: Game Files' dinput8.dll copied in. run_test.ps1 kills
+  the mod exes too. Autotests (XXL_ATONCE=3): atonce41 -Level 4 -GameDir "SPQR\Unfair XXL 2.0" -Exe
+  GameModule_UXXL_windowed.exe (levels served as .KSX, pool 18 -> 54; Unfair's squad there is a set piece, 10
+  placed), stack21 -Level 6 Beta Rome, stack21 -Level 1 Caesar (82 MB level loads, squads wake, shine copies in
+  use; first start waits ~10 s for the build), atonce41 -Level 4 Game Files (18 alive, from the cache). Every
+  screenshot that night came out white, Game Files included (PrintWindow; the desktop likely locked).
