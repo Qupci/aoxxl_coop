@@ -5125,3 +5125,15 @@ both halves).
   not allowed runs it with trio +0x3D8 = -1 (no self-link within 3 units). spfuselink41 (-Level 4, no X): linked at
   13.6, undone at 17.7 as Obelix's bar fell under 0.75, stays undone, no lightning (shots linked / unlinked_2);
   spfuse41 still fuses, switch refused in it.
+- Round 277 (Nov 14, commit 20fe9f9; user: the Fusion-ready look should stay while the companion's bar can still pay --
+  switch to it and fuse).
+  SoloFusionReady(t): both heroes attack 10 and CoopFusionAllowed(leader) or the other's IndivStats gauge >= the
+  price (FusionCost) -- SoloFusionLink, TwisterNearness (range > 0) and SpinStepHook ask it. CoopFusionAllowed
+  (X: FuseHook, the combo hint) = the leader's bar pays, the other's "still full" dropped. Found on the way (the
+  first spfuselink41 runs): Asterix fused with 1.5 left, paid 0.75, stood under the price -- FuseHook's refusal ran on
+  Obelix's join check (the leader's +0x188 is what the AI partner joins by, FUN_004984F0) and cleared it: Asterix
+  merged (0x25) for good, Obelix spun on (0x23). The refusal now skips a leader already in 0x25..0x27 (paid). Also
+  the "off its feet" switch refusal names the hero (LV4-1's crowd knocks Obelix airborne now and then: the test's
+  first switch refused). spfuselink41 (-Level 4, Obelix 11 units off at the start): Obelix's bar under 0.75 at ~18.0,
+  link kept on Asterix's 1.8, switch back at 18.47, Asterix's X 18.89, 0x25 x10 -> 0x26 x120; spfuse41 and twfuse41
+  (co-op) fuse through 0x26.
