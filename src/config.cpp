@@ -76,7 +76,7 @@ void IniWrite(const char* section, const char* key, const char* value) {
 
 const char* const CoopConfig::kKeyNames[CoopConfig::KEY_COUNT] = {
 	"move_up", "move_down", "move_left", "move_right", "look_up", "look_down", "look_left",
-	"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back", "center_camera", "hud", "switch_hero" };
+	"look_right", "jump", "attack", "grab", "dash", "lb", "rb", "start", "back", "center_camera", "hud", "switch_hero", "cheat_modifier" };
 const uint16_t CoopConfig::kP2Default[CoopConfig::P2B_COUNT] = {
 	0x1000, 0x4000, 0x2000, 0x8000, 0x0100, 0x0200, 0x0020, 0x0002, 0x0080, 0x0001 };
 const char* const CoopConfig::kP2PadNames[CoopConfig::P2B_COUNT] = {

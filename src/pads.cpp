@@ -230,9 +230,15 @@ static void PollKeyboard(PadState& p) {
 	if (down(CoopConfig::KEY_CENTER_CAMERA)) b |= PAD_RTHUMB;
 	if (down(CoopConfig::KEY_HUD))    b |= PAD_DPAD_DOWN;
 	if (down(CoopConfig::KEY_SWITCH)) b |= PAD_DPAD_UP;
+	// The cheat modifier (BACKSPACE) holds the right stick button for the mod's
+	// buttons; its press is no camera centring (only center_camera's is).
+	bool cheatOnly = down(CoopConfig::KEY_CHEAT) && !down(CoopConfig::KEY_CENTER_CAMERA) &&
+	                 k[CoopConfig::KEY_CHEAT] != k[CoopConfig::KEY_BACK];
+	if (cheatOnly) b |= PAD_RTHUMB;
 	g_raw[kKeyboardPad] = b;
 	p.buttons  = b;
 	p.pressed  = (uint16_t)(b & ~prev);
+	if (cheatOnly) p.pressed &= (uint16_t)~PAD_RTHUMB;
 	p.released = (uint16_t)(prev & ~b);
 	float x = (down(CoopConfig::KEY_RIGHT) ? 1.0f : 0.0f) - (down(CoopConfig::KEY_LEFT) ? 1.0f : 0.0f);
 	float y = (down(CoopConfig::KEY_UP) ? 1.0f : 0.0f) - (down(CoopConfig::KEY_DOWN) ? 1.0f : 0.0f);
