@@ -4671,6 +4671,25 @@ const Step kSpFuse41[] = {
 	{ 11000, S_SPSWITCH, 0, 0, 0, 0, 0, "switch during the fused tornado (refused)" },
 	SHOT(12000, "after_switch"), SHOT(16000, "fused_later"), SHOT(26000, "after"), END(27000),
 };
+// spfuselink41 (-Level 4, as spfuse41): no X -- the pair linked (the AI's tornado
+// keeping to Obelix's, the lightning between them) only while Obelix's bar can
+// pay for the Fusion; once it runs out (~7 s after his Twister) the link is
+// undone and stays so (user: the Fusion-ready look with Obelix's bar empty).
+const Step kSpFuseLink41[] = {
+	MARK(0, "spfuselink41"),
+	{ 1200, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat: every combo learned" },
+	PLACEAT(1300, HERO_ASTERIX, -301.081f, 1.2f, 87.452f), POTION(1400),
+	PLACEAT(1500, HERO_OBELIX, -297.0f, 1.2f, 91.5f),
+	{ 1600, S_GIVE, HERO_ASTERIX, 2, 0, 0, 0, "asterix's combo bar full" },
+	{ 2500, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (asterix): the Twister" },
+	{ 4800, S_SPSWITCH, 0, 0, 0, 0, 0, "switch to obelix" },
+	{ 5000, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full (he leads: the hits count)" },
+	{ 5400, S_NEXTTO, HERO_OBELIX, HERO_ASTERIX, 0, 1.5f, 0, "obelix beside the spinning asterix" },
+	{ 5600, S_P1COMBO, 4, 0, 0, 0, 0, "player 1 (obelix): the Twister" },
+	SHOT(9000, "linked"), SHOT(14500, "unlinked"), SHOT(16000, "unlinked_2"),
+	TAP1(15000), TAP1(15400),   // X with the bar out: refused
+	END(20000),
+};
 // spbarslow2 (-Level 4, XXL_SPISOLATION=0 XXL_SPSECOND=1 XXL_SPSWITCH=1; user: the
 // off-lead bar ran out at the game's pace after Asterix's Twister and a switch):
 // Asterix's bar full and shown (its HUD bar in its full state); the switch to
@@ -10489,6 +10508,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("spowntw2b", kSpOwnTw2B),
 	SCENARIO("spbarslow2", kSpBarSlow2),
 	SCENARIO("spfuse41", kSpFuse41),
+	SCENARIO("spfuselink41", kSpFuseLink41),
 	SCENARIO("shine51", kShine51),
 	SCENARIO("rules4p", kRules4P),
 	SCENARIO("rules4l", kRules4L),

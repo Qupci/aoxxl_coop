@@ -1265,6 +1265,7 @@ void CheckMarker(DWORD now) {
 
 static void SetHeroPosition(Hero h, const Vector3& to);
 static void TwisterNearness(Trio t, Hero h1, Hero h2, float range = 0.0f);
+static void SoloFusionLink(Trio t);
 const float kOwnTwistersNear = 8.0f;   // second chance: two Twisters of their own this near can fuse
 static bool FusionOn(Hero h1, Hero h2);
 
@@ -3531,8 +3532,10 @@ void CoopFrame() {
 		SoloSwitchLockWatch(t);
 		SoloGunFrame(t);
 		SoloBoatFrame(t);
-		if (IndivActive() && t.GetHero(HERO_ASTERIX) && t.GetHero(HERO_OBELIX))   // (second chance: two Twisters of their own)
+		if (IndivActive() && t.GetHero(HERO_ASTERIX) && t.GetHero(HERO_OBELIX)) {   // (second chance: two Twisters of their own)
+			SoloFusionLink(t);
 			TwisterNearness(t, t.GetHero(HERO_ASTERIX), t.GetHero(HERO_OBELIX), kOwnTwistersNear);
+		}
 		WatchPendingLead(t);   // (an undone lock's lead back: R3 + B, second chance)
 		GuardFrame();          // (second chance: romans_guard_downed)
 		ShowJoinHint(t);
@@ -4861,8 +4864,11 @@ static void TwisterNearness(Trio t, Hero h1, Hero h2, float range) {
 	float near2 = *(float*)(t.raw() + 0x3D8);
 	if (range > near2) near2 = range;
 	if (!(d < near2)) return;
+	// (Second chance: linked only while the Fusion can be paid for -- SoloFusionLink.)
+	if (range > 0.0f && !CoopFusionAllowed(t.Leader())) return;
 	if (!*(uint8_t*)(h1.raw() + 0x189) || !*(uint8_t*)(h2.raw() + 0x189)) {
-		Log("coop: both Twisters %.1f apart (fusion range %.1f): Twister Fusion possible", d, near2);
+		static int s_told = 0;
+		if (s_told++ < 60) Log("coop: both Twisters %.1f apart (fusion range %.1f): Twister Fusion possible", d, near2);
 		// Second chance: the AI's spin that marks the pair (FUN_00498560, 0x4986A8)
 		// also starts the trio's lightning between the tornados -- FUN_00480930
 		// (thiscall on the trio, the length 2 x trio +0x3AC, ret 4: its bolt object
@@ -4871,11 +4877,57 @@ static void TwisterNearness(Trio t, Hero h1, Hero h2, float range) {
 		if (range > 0.0f) {
 			typedef void(__fastcall* LinkFn)(char* trio, void* edx, float length);
 			((LinkFn)0x480930)(t.raw(), nullptr, *(float*)(t.raw() + 0x3AC) * 2.0f);
-			Log("coop: second chance: the trio's lightning between the Twisters started (as the AI's own spin does)");
+			if (s_told < 60) Log("coop: second chance: the trio's lightning between the Twisters started (as the AI's own spin does)");
 		}
 	}
 	*(uint8_t*)(h1.raw() + 0x189) = 1;
 	*(uint8_t*)(h2.raw() + 0x189) = 1;
+}
+
+// Second chance: the pair's link -- "partner near" +0x189 on both (the AI's
+// tornado keeps to the leader's at a set distance, FUN_00498560's AI branch),
+// the trio's lightning between them and its strikes -- is the Fusion-ready
+// look. In the game it goes as the bar runs out: the companion's chooser falls
+// back to the plain Twister (9), whose step has no link. Two Twisters of their
+// own stay 10 to their end: the link stood on with a bar that could not pay
+// for the Fusion (user: Obelix's empty). Undone here as the Twister's end does
+// (trio FUN_00480E90 the strikes +0x528, FUN_00480A70 the link bolt +0x4E4),
+// and SpinStepHook keeps the AI's spin from linking again meanwhile.
+static void SoloFusionLink(Trio t) {
+	Hero a = t.GetHero(HERO_ASTERIX), o = t.GetHero(HERO_OBELIX);
+	if (!a || !o || (!*(uint8_t*)(a.raw() + 0x189) && !*(uint8_t*)(o.raw() + 0x189))) return;
+	auto fusing = [](Hero h) { uint8_t s = SubState(h); return Twisting(h) && (s == 0x25 || s == 0x26 || s == 0x27); };
+	if (fusing(a) || fusing(o) || CoopFusionAllowed(t.Leader())) return;
+	*(uint8_t*)(a.raw() + 0x189) = *(uint8_t*)(o.raw() + 0x189) = 0;
+	*(uint8_t*)(a.raw() + 0x188) = *(uint8_t*)(o.raw() + 0x188) = 0;
+	typedef void(__fastcall* TrioFn)(char* trio, void* edx);
+	((TrioFn)0x480E90)(t.raw(), nullptr);
+	((TrioFn)0x480A70)(t.raw(), nullptr);
+	static int s_told = 0;
+	if (s_told++ < 40)
+		Log("coop: second chance: the Twisters' link undone -- the Fusion can't be paid for (%s's bar)",
+		    HeroName(t.Leader()));
+}
+
+// The Twister's spin step (FUN_00498560, thiscall, no args, the AI branch marks
+// the pair within trio +0x3D8 and starts the link): second chance, while the
+// Fusion can't be paid for, the AI hero asks it with the range at -1.
+typedef int(__fastcall* SpinStepFn)(char* hero, void* edx);
+const uintptr_t kSpinStep = 0x498560;
+const uint8_t   kSpinStepPrologue[7] = { 0x83, 0xEC, 0x38, 0x56, 0x8B, 0xF1, 0x57 };
+SpinStepFn g_origSpinStep = nullptr;
+static int __fastcall SpinStepHook(char* hero, void* edx) {
+	char* trio = *(char**)(hero + 0x14);
+	if (!trio || g.p2Joined || !IndivActive() || !(*(uint8_t*)(hero + 0x18) & 1) || *(uint8_t*)(hero + 0x189))
+		return g_origSpinStep(hero, edx);
+	Trio t = GetTrio();
+	if (!t || CoopFusionAllowed(t.Leader())) return g_origSpinStep(hero, edx);
+	float* r = (float*)(trio + 0x3D8);
+	float was = *r;
+	*r = -1.0f;
+	int res = g_origSpinStep(hero, edx);
+	*r = was;
+	return res;
 }
 
 // [coop] twister_nerf. The Twister's pull (FUN_00498270, thiscall, no args, in
@@ -6564,6 +6616,8 @@ void CoopInit() {
 	              sizeof(kChooseAttackPrologue), "hero attack chooser (Twister for both players)");
 	InstallDetour(kTwistPull, (void*)TwistPullHook, (void**)&g_origTwistPull, kTwistPullPrologue,
 	              sizeof(kTwistPullPrologue), "Twister pull (twister_nerf: the plain Twister by the Romans it catches)");
+	InstallDetour(kSpinStep, (void*)SpinStepHook, (void**)&g_origSpinStep, kSpinStepPrologue, sizeof(kSpinStepPrologue),
+	              "Twister spin step (second chance: no pair link while the Fusion can't be paid for)");
 	{
 		// (Called through the Life's state table, life +0x18, not its vtable: detoured.)
 		static const uint8_t kLifeStatePrologue[8] = { 0x8B, 0x44, 0x24, 0x04, 0x56, 0x8B, 0x71, 0x10 };
