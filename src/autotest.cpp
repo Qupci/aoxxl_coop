@@ -4466,6 +4466,62 @@ const Step kTough41[] = {
 	{ 41000, S_DISARM, HERO_OBELIX, 0, 0, 0, 0, "disarm the roman nearest obelix" }, HEAL2(43000), HEAL2(45500),
 	{ 46000, S_DISARM, HERO_ASTERIX, 0, 0, 0, 0, "disarm the roman nearest asterix" }, HEAL2(48000), HEAL2(50500), END(54000),
 };
+// potcombo41 (-Level 4; XXL_POTIONCOMBOS=0 / 1): combos under the magic potion
+// where tough41's Romans come in -- player 2's Obelix does the Club, player 1's
+// Asterix the Power Hammer and the Mole, then player 2's RB the Rage (Idefix).
+// Club / Power Hammer / Rage: disarmed (+0x24 bit 0x8000) or beaten (0x402);
+// the Mole: how many Romans it takes.
+#define POTCOMBO_STAGE(t) POTION(t), HEAL2(t + 50), PLACEAT(t + 100, HERO_ASTERIX, -296.0f, 0.5f, 92.0f), \
+	PLACEAT(t + 150, HERO_OBELIX, -294.0f, 0.5f, 90.0f)
+// CLUB with the X and B earlier: under the potion Obelix's jump is over by CLUB's X.
+// (combohint2's taps: 250 ms apart).
+#define POTCLUB(t) { t, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, { t + 300, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix combo bar full" }, \
+	{ t + 800, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" }, TAP_P2(t + 1300, PAD_A, "p2 A"), \
+	TAP_P2(t + 1550, PAD_A, "p2 A"), TAP_P2(t + 1800, PAD_X, "p2 X"), TAP_P2(t + 2050, PAD_B, "p2 B")
+const Step kPotCombo41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	POTCOMBO_STAGE(8000), POTCOMBO_STAGE(10000), POTCOMBO_STAGE(12000),
+	POTCOMBO_STAGE(14000), SHOT(16700, "potcombo_before"), POTCOMBO_STAGE(17500),
+	POTCOMBO_STAGE(20000), PCOMBO(20500, 1), SHOT(22000, "potcombo_hammer"), POTCOMBO_STAGE(23500),
+	POTCOMBO_STAGE(26000), PCOMBO(26500, 3), SHOT(28500, "potcombo_mole"), POTCOMBO_STAGE(31000),
+	POTCOMBO_STAGE(34000), { 34500, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" },
+	{ 34700, S_ENEMY, HERO_OBELIX, 2, 0, 0, 0, "obelix 6 from a roman" },
+	{ 34900, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix's combo bar full" },
+	VPAD(35200, 1, PAD_RB, 0, 0, "p2 RB"), VPAD(35300, 1, 0, 0, 0, "p2 release"),
+	SHOT(36500, "potcombo_rage"), POTION(37000), HEAL2(37500), POTION(39000), HEAL2(39500),
+	END(42000),
+};
+// potclub41 (-Level 4, XXL_P2HERO=asterix: player 1 is Obelix; XXL_POTIONCOMBOS=0 / 1):
+// the Club (combo 0, Obelix's) twice where potcombo41's Romans come in.
+#define OCOMBO(t, k) { t, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, HEAL2(t + 100), \
+	{ t + 300, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix combo bar full" }, \
+	{ t + 400, S_NEAROBJ, HERO_OBELIX, 93, HERO_OBELIX + 1, 1.3f, 0, "face the roman nearest obelix" }, \
+	{ t + 900, S_P1COMBO, k, 0, 0, 0, 0, "p1 combo (landed: the Club needs the ground)" }
+const Step kPotClub41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_OBELIX, -288.15f, 0.5f, 117.27f, 800),
+	POTCOMBO_STAGE(8000), POTCOMBO_STAGE(10000), POTCOMBO_STAGE(12000),
+	POTCOMBO_STAGE(14000), OCOMBO(14500, 0), SHOT(15600, "potclub_1"), SHOT(16500, "potclub_2"), POTCOMBO_STAGE(17500),
+	POTCOMBO_STAGE(20000), OCOMBO(20500, 0), SHOT(22500, "potclub_3"), POTCOMBO_STAGE(23500),
+	POTION(26000), HEAL2(26500), END(28000),
+};
+// potclub41b (-Level 4; XXL_OBELIXPOTION=0 / 1, XXL_POTIONCOMBOS=0 / 1): player 2's
+// Obelix does the Club with tough41's taps (CLUB), twice, the potion gauge full.
+const Step kPotClub41B[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	POTCOMBO_STAGE(8000), POTCOMBO_STAGE(10000), POTCOMBO_STAGE(12000),
+	POTCOMBO_STAGE(14000), POTCLUB(14500), SHOT(17200, "potclubb_1"), POTCOMBO_STAGE(18500),
+	POTCOMBO_STAGE(21000), POTCLUB(21500), SHOT(24200, "potclubb_2"), POTCOMBO_STAGE(25500),
+	POTION(28000), HEAL2(28500), END(30000),
+};
 const Step kGuard41M[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -10784,6 +10840,9 @@ const Scenario kScenarios[] = {
 	SCENARIO("guard41", kGuard41),
 	SCENARIO("guard41m", kGuard41M),
 	SCENARIO("tough41", kTough41),
+	SCENARIO("potcombo41", kPotCombo41),
+	SCENARIO("potclub41", kPotClub41),
+	SCENARIO("potclub41b", kPotClub41B),
 	SCENARIO("guard41a", kGuard41A),
 	SCENARIO("pool36", kPool36),
 	SCENARIO("poolkinds", kPoolKinds),

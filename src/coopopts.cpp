@@ -51,6 +51,7 @@ const Opt kOpts[] = {
 	B("coop", "obelix_potion", obelixPotion),
 	B("coop", "twister_nerf", twisterNerf),
 	N("coop", "twister_nerf_per_roman", twisterNerfPerRoman, 1.0f, 10.0f, 1.0f, "%.0f"),
+	B("coop", "potion_combos", potionCombos),
 	{ "coop", "split_mode", K_SPLIT, &g_config.splitMode, 0, 0, 0, nullptr },
 	{ "coop", "camera", K_CAMERA, &g_config.gameCamera, 0, 0, 0, nullptr },
 	N("coop", "split_fov", splitFov, -30.0f, 60.0f, 1.0f, "%.0f"),

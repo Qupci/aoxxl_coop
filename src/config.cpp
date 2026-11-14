@@ -211,6 +211,8 @@ void CoopConfig::Load(const char* iniPath) {
 	if (getenv("XXL_OBELIXPOTION")) obelixPotion = atoi(getenv("XXL_OBELIXPOTION")) != 0;
 	twisterNerf = ReadBool("coop", "twister_nerf", twisterNerf, full);
 	if (getenv("XXL_TWISTERNERF")) twisterNerf = atoi(getenv("XXL_TWISTERNERF")) != 0;   // autotests
+	potionCombos = ReadBool("coop", "potion_combos", potionCombos, full);
+	if (getenv("XXL_POTIONCOMBOS")) potionCombos = atoi(getenv("XXL_POTIONCOMBOS")) != 0;   // autotests
 	{
 		char nb[32] = {};
 		GetPrivateProfileStringA("coop", "twister_nerf_per_roman", "", nb, sizeof(nb), full);
@@ -373,8 +375,8 @@ void CoopConfig::Load(const char* iniPath) {
 	    romanHealth, romanShieldHits, romanDisarmedTime, heroShields, heroExtraShields);
 	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
 	    hintMachineGun);
-	Log("config: twister nerf %d (a caught Roman counts %.0f), second chance: the other hero's combo bar at x%.2f",
-	    twisterNerf, twisterNerfPerRoman, spSecondChanceComboDrain);
+	Log("config: twister nerf %d (a caught Roman counts %.0f), potion combos %d, second chance: the other hero's combo bar "
+	    "at x%.2f", twisterNerf, twisterNerfPerRoman, potionCombos, spSecondChanceComboDrain);
 	if (spIsolation)
 		Log("config: single player: isolated -- the game's own (the ini's combo hints %d, co-op icons %d, hero switch %d, "
 		    "switch lock %d, second chance %d off; obelix_potion and cheats co-op only%s)", spComboHintsIni, spCoopIconsIni,

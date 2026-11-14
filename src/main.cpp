@@ -20,6 +20,7 @@
 #include "hud2.h"
 #include "experimental.h"
 #include "toughness.h"
+#include "potioncombos.h"
 #include "levelforge.h"
 #include "nolock.h"
 #include "guard.h"
@@ -175,6 +176,7 @@ DWORD WINAPI StartupThread(LPVOID) {
 	Hud2InstallHooks();
 	ExperimentalInstallHooks();
 	ToughnessInstallHooks();
+	PotionCombosInstallHooks();
 	NoLockInstallHooks();
 	GuardInstallHooks();
 	CoopInit();

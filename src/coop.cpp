@@ -21,6 +21,7 @@
 #include "detour.h"
 #include "experimental.h"
 #include "toughness.h"
+#include "potioncombos.h"
 #include "klusters.h"
 #include "sound.h"
 #include "autotest.h"
@@ -3429,6 +3430,7 @@ void CoopFrame() {
 	IndivFrame();
 	ExperimentalFrame();
 	ToughnessFrame();
+	PotionCombosFrame();
 	SendDeferredSwitch();
 	TracePotionFrame();
 	SoundSetP2Listener();

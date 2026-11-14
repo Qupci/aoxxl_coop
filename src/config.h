@@ -30,6 +30,7 @@ struct CoopConfig {
 	bool  obelixPotion  = true;   // the magic potion works on a player's Obelix as on Asterix (single player: Obelix leading, SoloMod())
 	bool  twisterNerf   = true;   // the plain Twister takes no Romans still to come off a squad; each Roman it catches counts twisterNerfPerRoman (co-op, SoloMod())
 	float twisterNerfPerRoman = 4.0f;   // ... a caught Roman with the ones it stands for (1: itself only)
+	bool  potionCombos  = true;   // under the magic potion: Power Hammer / Club shockwaves and the Rage's Idefix beat Romans, the Mole takes 3x (potioncombos.cpp; co-op, SoloMod())
 	bool  skipCutscenes = false;  // debug: every cutscene ends on Enter (the game's own skip)
 	bool  individual    = true;   // each hero its own health, shields and combo bar; a fallen hero can be revived
 	bool  romansGuardDowned = true; // ... the basic Romans near a fallen hero stay round it, shielded, until it is revived
