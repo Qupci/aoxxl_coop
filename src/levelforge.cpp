@@ -18,7 +18,7 @@ namespace {
 namespace fs = std::filesystem;
 
 // Bumped when what the forge writes changes: rebuilds every cached level.
-const char* const kForgeVersion = "romanforge 3";   // 2: archers, jumping Romans, bonuses and crates; 3: shine copies
+const char* const kForgeVersion = "romanforge 4";   // 2: archers, jumping Romans, bonuses and crates; 3: shine copies; 4: clones' projectile targets
 const int kLevels = 9;
 
 std::vector<unsigned char> g_exe;

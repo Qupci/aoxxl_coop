@@ -60,7 +60,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -7954,6 +7954,28 @@ const Step kLaunchBoth[] = {
 	SHOT(9500, "one_again"),
 	END(10000),
 };
+// gun57 (-Level 5, XXL_ATONCE=3): the user's LV5-7 machine gun (-222.9 9.3 52.2): Asterix takes it, all the
+// way right, then fires in 2 s bursts sweeping left / right with a short stop between (held on, the gun
+// overheats and fires over the Romans) for ~80 s (the pyramidal turtles, then their Romans);
+// PROJHITS logs the projectile targets hit -- the level's 220, the clones' from #220.
+#define GUN57_SWEEP(t) P1(t, PAD_X, -1.0f, 0, "p1 fire left"), P1(t + 2000, 0, 0, 0, "p1 stop"), \
+	P1(t + 2300, PAD_X, 1.0f, 0, "p1 fire right"), P1(t + 4300, 0, 0, 0, "p1 stop")
+const Step kGun57[] = {
+	MARK(0, "baseline"), LOADSECTOR(200, 7),
+	PLACEAT(3000, HERO_ASTERIX, -222.94f, 9.31f, 52.19f), SECTORS(3500),
+	{ 3600, S_PROJHITS, 220, 0, 0, 0, 0, "projectile hits" },
+	SHOT(4500, "at_gun"),
+	P1(5000, PAD_X, 0, 0, "p1 X: takes the gun"), P1(5200, 0, 0, 0, "p1 release"),
+	P1(6500, 0, 1.0f, 0, "p1 right"), P1(11500, 0, 0, 0, "p1 release"), SHOT(11600, "right_end"),
+	GUN57_SWEEP(12000), GUN57_SWEEP(16600), GUN57_SWEEP(21200), GUN57_SWEEP(25800),
+	GUN57_SWEEP(30400), GUN57_SWEEP(35000), GUN57_SWEEP(39600), GUN57_SWEEP(44200),
+	GUN57_SWEEP(48800), GUN57_SWEEP(53400), GUN57_SWEEP(58000), GUN57_SWEEP(62600),
+	GUN57_SWEEP(67200), GUN57_SWEEP(71800), GUN57_SWEEP(76400), GUN57_SWEEP(81000),
+	GUN57_SWEEP(85600), GUN57_SWEEP(90200),
+	SHOT(95000, "swept"), { 95100, S_PROJHITS, -1, 0, 0, 0, 0, "projectile hits" },
+	END(95600),
+};
+#undef GUN57_SWEEP
 // gunboth33 (-Level 3): both heroes by the LV3-3 machine gun before it is taken --
 // both boxes show its "Use"; Asterix on it alone, Obelix at its handles: his box
 // shows "Use" (his X joins).
@@ -10093,6 +10115,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("flaskbox", kFlaskBox),
 	SCENARIO("launchboth", kLaunchBoth),
 	SCENARIO("gunboth33", kGunBoth33),
+	SCENARIO("gun57", kGun57),
 	SCENARIO("obelixgun33", kObelixGun33),
 	SCENARIO("obelixgun33l", kObelixGun33L),
 	SCENARIO("fuse2", kFuse2),
@@ -10545,6 +10568,8 @@ struct AutotestState {
 	bool    watchCine = false;      // every cinematic scene's +0x20 / +0x30 changes, WATCHCINE
 	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
 	bool    watchEnemies = false;   // Romans and squads near enemyPoint, WATCHENEMIES
+	int     projHitsFrom = -1;      // projectile targets hit (CKSrvCollision +0x1B0), index >= this = a clone's, PROJHITS
+	int     projHits[2] = {};
 	bool    enemiesPrimed = false;
 	bool    cpntCheck = false;      // every Roman's component (+0x54) checked each frame, CPNTCHECK
 	Vector3 enemyPoint;
@@ -10950,6 +10975,19 @@ void LogTick(float t) {
 			Log("autotest: path block #%u %p: slot %d flags %02X state %02X, character %p%s", i, b, (int)*(int8_t*)(b + 0x98),
 			    *(uint8_t*)(b + 0x2C), *(uint32_t*)(b + 0x14) & 0xFF, *(void**)(b + 0x48),
 			    *(int8_t*)(b + 0x98) == -1 && (*(uint8_t*)(b + 0x2C) & 0x40) ? " -- RUNNING WITHOUT A SLOT" : "");
+		}
+	}
+	if (at.projHitsFrom >= 0) {   // the collision tick's projectile hit lists stay until its next tick
+		CKYellowPages* yp = YellowPages();
+		char* srv = yp ? (char*)yp->srvCollision : nullptr;
+		if (srv) {
+			char* tg = *(char**)(srv + 0x1B0);
+			unsigned n = *(uint16_t*)(srv + 0x1B4);
+			for (unsigned i = 0; tg && i < n; i++)
+				if (*(void**)(tg + i * 0x48)) {
+					int c = (int)i >= at.projHitsFrom;
+					if (at.projHits[c]++ < 40) Log("autotest: projectile target #%u hit (%s), owner %p", i, c ? "clone" : "level's", *(void**)(*(char**)(tg + i * 0x48 + 4) + 0x20));
+				}
 		}
 	}
 	if (at.watchEnemies) {   // live Romans near the point; squads near it (flags, member groups)
@@ -12336,6 +12374,14 @@ void RunStep(const Step& s) {
 	case S_WATCHCAM: at.watchCam = true; break;
 	case S_WATCHCINE: at.watchCine = true; break;
 	case S_WATCHBEACONS: at.watchBeacons = true; at.beaconPoint = Vector3(s.x, s.y, s.z); break;
+	case S_PROJHITS: {   // a: the level's own projectile target count (romanforge report); a < 0 logs the totals
+		CKYellowPages* yp = YellowPages();
+		char* srv = yp ? (char*)yp->srvCollision : nullptr;
+		if (s.a >= 0) at.projHitsFrom = s.a;
+		Log("autotest: projectile targets %u (clones from #%d); hits so far: level's %d, clones %d",
+		    srv ? *(uint16_t*)(srv + 0x1B4) : 0, at.projHitsFrom, at.projHits[0], at.projHits[1]);
+		break;
+	}
 	case S_WATCHENEMIES: at.watchEnemies = true; at.enemyPoint = Vector3(s.x, s.y, s.z); break;
 	case S_CPNTCHECK: {   // a > 0: writes to +0x54 of Roman #b of class a watched as well
 		at.cpntCheck = true;

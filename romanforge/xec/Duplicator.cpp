@@ -509,6 +509,20 @@ CKObject* Duplicator::doCommon(CKObject* object)
 				destCollision->inactiveList = added;
 				destCollision->collisionTests.push_back(std::move(dup));
 			}
+
+			// xxl_coop: the clone's projectile targets too (a cloned Roman was missing from the
+			// list -- the machine gun's bullets went through it).
+			size_t numTargets = srcCollision->projectileTargets.size();
+			for (size_t t = 0; t < numTargets; ++t) {
+				bool cloned = false;
+				for (auto& ref : srcCollision->projectileTargets[t])
+					if (cloneMap.count(ref.get())) cloned = true;
+				if (!cloned) continue;
+				std::vector<kobjref<CKObject>> dupTarget;
+				for (auto& ref : srcCollision->projectileTargets[t])
+					dupTarget.emplace_back(substituteIfCloned(ref.get()));
+				destCollision->projectileTargets.push_back(std::move(dupTarget));
+			}
 		}
 
 		//// For animated characters, add their cloned hook to CKLevel's list if it was there

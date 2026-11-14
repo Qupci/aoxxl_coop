@@ -8,6 +8,7 @@
 #include "CoreClasses/CKHook.h"
 #include "GameClasses/CKGameX1.h"
 #include "CoreClasses/CKNode.h"
+#include "CoreClasses/CKService.h"
 #include <algorithm>
 #include <vector>
 #include <initializer_list>
@@ -105,6 +106,8 @@ bool ForgeLevel(const void* exe, size_t exeSize, const char* gameDir, const char
 			kenv.lvlFileOverride = (conv / lvlfn).u8string();
 			kenv.outGamePath = out.u8string();
 			kenv.loadLevel(lvl);
+			CKSrvCollision* srvColl = kenv.levelObjects.getFirst<CKSrvCollision>();
+			size_t targets0 = srvColl ? srvColl->projectileTargets.size() : 0;
 			int i = 0;
 			for (CKObject* o : kenv.levelObjects.getClassType<CKGrpPoolSquad>().objects) {
 				CKGrpPoolSquad* pool = o->cast<CKGrpPoolSquad>();
@@ -192,6 +195,8 @@ bool ForgeLevel(const void* exe, size_t exeSize, const char* gameDir, const char
 			if (bonuses || crates) Add(r, " bonuses +%d, crates +%d, shines +%d;", bonuses, crates, shines);
 			*cloned += shines;
 			*cloned += bonuses + crates;
+			if (srvColl && srvColl->projectileTargets.size() != targets0)
+				Add(r, " projectile targets %u -> %u;", (unsigned)targets0, (unsigned)srvColl->projectileTargets.size());
 			if (*cloned > 0) {
 				kenv.saveLevel(lvl);   // the level and its sectors (ids of their objects follow the level's)
 			} else {
