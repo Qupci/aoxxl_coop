@@ -5264,3 +5264,19 @@ both halves).
   placed), stack21 -Level 6 Beta Rome, stack21 -Level 1 Caesar (82 MB level loads, squads wake, shine copies in
   use; first start waits ~10 s for the build), atonce41 -Level 4 Game Files (18 alive, from the cache). Every
   screenshot that night came out white, Game Files included (PrintWindow; the desktop likely locked).
+- Round 283 (Nov 15, commit 0613f71; user: LV2-2 crash, Power Hammer under the potion, infinite shields just
+  turned on -- the shields play no part). Crash at 0x4CDB01 reading [0 + 0xC]: Shared_CKHkJumpingRoman_vf50
+  (0x4CD9C0, the turn, all Roman classes) reads the Roman's frame clock +0x28 (dt at +0xC). The clock is put in
+  only by the Roman's life tick (CKHkEnemyLife::vf17 0x4CA2F0: hook +0x28 = its param, the game loop's clock
+  gameLoop +8 -> +4, what FUN_00409B20 hands the lives; then vf30 the update). In a frame the services (collision
+  among them, FUN_00409AD0's first call) run before the hook lives, so a Roman sent in from its pool for the first
+  time gets contacts before any tick. Stack: CKSrvCollision vf17 -> FUN_00440F10 -> CKServiceManager vf26 ->
+  CKHkBasicEnemy::sendEvent -> FUN_004D12F0 -> Class_2_84::sendEvent 0x300, the other volume kind 4 (the trio's
+  shockwave): push 0/1 at 0x4CC317/0x4CC325, vf50 at 0x4CC343 -- no shield check on that path. Vanilla rarely has
+  never-ticked Romans in a shockwave; the cloned Romans (rebuilt_levels, at_once 3) are many fresh send-ins late in
+  a level. Event 0x4C01 also reaches every pooled Roman at level load before its tick (harmless). Fix: the Roman
+  sendEvent detour (potioncombos.cpp, installed whatever potion_combos is) puts the clock in when +0x28 is NULL
+  (the last one seen on a Roman, else the game loop's; the same pointer, 0384B6EC on LV4). Autotest noclock41
+  (-Level 4, XXL_POTIONCOMBOS=1): S_NOCLOCK clears +0x28 of the Romans within 15 of Asterix each frame for 3 s
+  around a potion Power Hammer -- the build before crashed at 0x4CDB01 with the user's stack; with the fix 8 beaten,
+  run complete.
