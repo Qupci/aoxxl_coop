@@ -72,8 +72,8 @@ void ShowPrompt(DWORD ms, float progress) {
 	wchar_t g1 = 0;
 	bool pressed = g.held || g.doneAt;
 	if (g.keyboard) g1 = IconKeyGlyph(VK_RETURN, pressed ? ICON_PRESSED : ICON_WAITING);
-	else g1 = IconGlyph(pressed ? "pad_a" : "pad_a_unpressed");
-	if (!g1 && !g.keyboard && !pressed) g1 = IconGlyph("pad_a");
+	else g1 = IconGlyph(pressed ? "pad_a_press" : "pad_a");
+	if (!g1 && !g.keyboard && pressed) g1 = IconGlyph("pad_a");
 	wchar_t text[64];
 	if (g1) swprintf(text, 64, L"Hold %c to skip", g1);
 	else swprintf(text, 64, L"Hold %s to skip", g.keyboard ? L"Enter" : L"A");

@@ -332,7 +332,7 @@ void LoadSparkles() {
 }
 
 // Every PNG of coop_icons but the keycap templates (key, key_wide and their
-// unpressed variants) and the sparkles' images.
+// pressed variants) and the sparkles' images.
 void LoadIcons() {
 	g_loaded = true;
 	if (!g_gdiplus) {
@@ -352,8 +352,8 @@ void LoadIcons() {
 		char* dot = strrchr(name, '.');
 		if (dot) *dot = 0;
 		for (char* c = name; *c; c++) *c = (char)tolower(*c);
-		if (!strcmp(name, "key") || !strcmp(name, "key_wide") || !strcmp(name, "key_unpressed") ||
-		    !strcmp(name, "key_wide_unpressed") || !strcmp(name, "spark") || !strcmp(name, "glow"))
+		if (!strcmp(name, "key") || !strcmp(name, "key_wide") || !strcmp(name, "key_press") ||
+		    !strcmp(name, "key_wide_press") || !strcmp(name, "spark") || !strcmp(name, "glow"))
 			continue;
 		wchar_t path[MAX_PATH];
 		IconsDir(path, MAX_PATH, (std::string(name) + ".png").c_str());
@@ -516,23 +516,23 @@ wchar_t AddKbPng(int vk, bool pressed) {
 
 // A keycap: coop_icons\kb's, else key.png (one character) or key_wide.png with
 // the key's name on it. Pressed (a combo hint's button done, a held key):
-// kb's *_press.png; drawn, key_unpressed.png / key_wide_unpressed.png, else the
+// kb's *_press.png; drawn, key_press.png / key_wide_press.png, else the
 // plain template darkened, and a grey name.
 wchar_t AddKeycap(int vk, int look) {
-	bool unpressed = look == ICON_PRESSED;
-	if (wchar_t g = AddKbPng(vk, unpressed)) return g;
+	bool pressed = look == ICON_PRESSED;
+	if (wchar_t g = AddKbPng(vk, pressed)) return g;
 	wchar_t label[32];
 	KeyLabel(vk, label, 32);
 	bool wide = wcslen(label) > 1 && !(label[0] >= 0x2190 && label[0] <= 0x2193);
 	wchar_t path[MAX_PATH];
-	IconsDir(path, MAX_PATH, unpressed ? (wide ? "key_wide_unpressed.png" : "key_unpressed.png") : wide ? "key_wide.png" : "key.png");
+	IconsDir(path, MAX_PATH, pressed ? (wide ? "key_wide_press.png" : "key_press.png") : wide ? "key_wide.png" : "key.png");
 	Gdiplus::Bitmap own(path);
 	bool darken = false;
 	Gdiplus::Bitmap* tplp = &own;
 	wchar_t tplPath[MAX_PATH];
 	IconsDir(tplPath, MAX_PATH, wide ? "key_wide.png" : "key.png");
 	Gdiplus::Bitmap pressedTpl(tplPath);
-	if (unpressed && (own.GetLastStatus() != Gdiplus::Ok || !own.GetHeight())) { tplp = &pressedTpl; darken = true; }
+	if (pressed && (own.GetLastStatus() != Gdiplus::Ok || !own.GetHeight())) { tplp = &pressedTpl; darken = true; }
 	Gdiplus::Bitmap& tpl = *tplp;
 	if (tpl.GetLastStatus() != Gdiplus::Ok || !tpl.GetHeight()) return 0;
 	int w = (int)((tpl.GetWidth() * kCell + tpl.GetHeight() / 2) / tpl.GetHeight());
@@ -563,7 +563,7 @@ wchar_t AddKeycap(int vk, int look) {
 	Gdiplus::Pen outline(Gdiplus::Color(200, 0, 0, 0), 3.0f);
 	outline.SetLineJoin(Gdiplus::LineJoinRound);
 	g.DrawPath(&outline, &path2);
-	Gdiplus::SolidBrush white(unpressed ? Gdiplus::Color(255, 150, 152, 150) : Gdiplus::Color(255, 244, 246, 244));
+	Gdiplus::SolidBrush white(pressed ? Gdiplus::Color(255, 150, 152, 150) : Gdiplus::Color(255, 244, 246, 244));
 	g.FillPath(&white, &path2);
 	return AddBitmap(cap);
 }
@@ -818,10 +818,10 @@ wchar_t IconGlowGlyph(int fade) {
 }
 
 namespace {
-// A pad icon's waiting variant ("pad_a" -> "pad_a_unpressed"), else itself.
+// A pad icon's pressed variant ("pad_a" -> "pad_a_press"), else itself.
 wchar_t PadGlyph(const char* name, int look) {
-	if (look == ICON_WAITING) {
-		wchar_t g = IconGlyph((std::string(name) + "_unpressed").c_str());
+	if (look == ICON_PRESSED) {
+		wchar_t g = IconGlyph((std::string(name) + "_press").c_str());
 		if (g) return g;
 	}
 	return IconGlyph(name);

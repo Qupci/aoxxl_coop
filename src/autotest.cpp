@@ -18,6 +18,7 @@
 #include "hints.h"
 #include "icons.h"
 #include "combohints.h"
+#include "shared.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -710,28 +711,36 @@ const Step kHintAlign[] = {
 	END(19000),
 };
 // hintcatalog (-Level 2): every hint text of the mod as its code words it, a
-// shot each (for rewording them; not in their real situations). Single player
-// first: the level start's real join hint, both join variants, the revive's
-// hints in player 1's box, the countdown in the left box, the cutscene skip;
-// then player 2 joins on virtual pad 2 and each hint shows in both boxes (a
-// paired mode hint: each hero's part in its player's box).
+// shot each (for rewording them; not in their real situations; the user's new
+// words, Nov 16). Single player first: the level start's real join hint, both
+// join variants, the revive's hints in player 1's box, the countdown in the left
+// box, the cutscene skip (waiting, held); then player 2 joins on virtual pad 2
+// and each hint shows in both boxes (a mode hint: each hero's part in its
+// player's box; combo hints right-aligned in the right box). The countdown goes
+// 27 -> 9 s with its box as wide; combo buttons lit as pressed (the _press icons).
 #define HC1(t, box, k, n) { t, S_HINTCAT, box, k, 0, 0, 1400, n }, SHOT(t + 900, n)
 #define HC2(t, k, lit, n) { t, S_HINTCAT, 0, k, 0, lit, 1400, n }, { t, S_HINTCAT, 1, k, 0, lit, 1400, n }, SHOT(t + 900, n)
 const Step kHintCatalog[] = {
 	MARK(0, "hintcatalog"),
 	SHOT(2000, "hc_00_join_real"),
 	HC1(11000, 0, 0, "hc_01_join_keyboard"), HC1(12500, 0, 1, "hc_02_join_pad_only"),
-	HC1(14000, 0, 6, "hc_03_sp_down"), HC1(15500, 0, 10, "hc_04_sp_hold_revive"), HC1(17000, 0, 9, "hc_05_sp_reviving"),
-	HC1(18500, 1, 7, "hc_06_sp_countdown_left"), HC1(20000, 0, 23, "hc_07_skip"),
+	HC1(14000, 0, 10, "hc_04_sp_hold_revive"), HC1(15500, 0, 9, "hc_05_sp_reviving"),
+	HC1(17000, 1, 7, "hc_06_sp_countdown_left"), HC1(18500, 0, 23, "hc_07_skip"), HC1(20000, 0, 24, "hc_07b_skip_held"),
 	VPAD(22000, 1, PAD_START, 0, 0, "p2 start"), VPAD(22200, 1, 0, 0, 0, "p2 release"),
-	HC2(25000, 2, 0, "hc_08_pass"), HC2(26500, 3, 0, "hc_09_machine_gun_both"), HC2(28000, 4, 0, "hc_10_boat_both"),
-	HC2(29500, 5, 0, "hc_11_lifter"), HC2(31000, 6, 0, "hc_12_down"), HC2(32500, 10, 0, "hc_13_hold_revive"),
-	HC2(34000, 9, 0, "hc_14_reviving"), HC2(35500, 8, 0, "hc_15_coop_countdown"),
-	HC1(37000, 0, 11, "hc_16_mode_gun"), HC1(38500, 0, 12, "hc_17_mode_gun_solo"), HC1(40000, 0, 13, "hc_18_mode_gun_obelix"),
-	HC1(41500, 0, 14, "hc_19_mode_boat_slide"), HC1(43000, 0, 15, "hc_20_mode_one_screen"),
-	HC2(44500, 16, 0, "hc_21_combo_club"), HC2(46000, 17, 0, "hc_22_combo_hammer"), HC2(47500, 18, 0, "hc_23_combo_twister"),
-	HC2(49000, 19, 0, "hc_24_combo_mole"), HC2(50500, 20, 0, "hc_25_combo_rage"), HC2(52000, 21, 0, "hc_26_crowd_twister"),
-	HC2(53500, 21, 2, "hc_27_crowd_twister_2_lit"), HC2(55000, 22, 0, "hc_28_twister_fusion"), HC2(56500, 23, 0, "hc_29_skip_coop"),
+	HC2(25000, 2, 0, "hc_08_pass"), HC2(26500, 3, 0, "hc_10_11_waiting"),
+	HC2(28000, 10, 0, "hc_13_hold_revive"), HC2(29500, 9, 0, "hc_14_reviving"),
+	{ 31000, S_HINTCAT, 0, 8, 0, 27, 2400, "countdown 27" }, { 31000, S_HINTCAT, 1, 8, 0, 27, 2400, "countdown 27" },
+	SHOT(31900, "hc_15_countdown_27"),
+	{ 32200, S_HINTCAT, 0, 8, 0, 9, 1200, "countdown 9" }, { 32200, S_HINTCAT, 1, 8, 0, 9, 1200, "countdown 9" },
+	SHOT(32800, "hc_15b_countdown_9_same_width"),
+	HC1(34000, 0, 11, "hc_16_mode_gun"), HC1(35500, 0, 12, "hc_17_mode_gun_asterix_alone"),
+	HC1(37000, 0, 13, "hc_18_mode_gun_obelix_alone"), HC1(38500, 0, 14, "hc_19_mode_boat_slide"),
+	HC1(40000, 0, 15, "hc_20_mode_fusion"),
+	HC2(41500, 16, 0, "hc_21_combo_club"), HC2(43000, 17, 0, "hc_22_combo_hammer"), HC2(44500, 18, 0, "hc_23_combo_twister"),
+	HC2(46000, 18, 2, "hc_23b_combo_twister_2_pressed"), HC2(47500, 19, 0, "hc_24_combo_mole"), HC2(49000, 20, 0, "hc_25_combo_rage"),
+	HC2(50500, 21, 0, "hc_26_crowd_twister"), HC2(52000, 21, 2, "hc_27_crowd_twister_2_pressed"),
+	HC2(53500, 22, 0, "hc_28_twister_fusion"), HC2(55000, 22, 1, "hc_28b_twister_fusion_pressed"),
+	HC2(56500, 23, 0, "hc_29_skip_coop"),
 	END(58000),
 };
 // revivetimer (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2): the
@@ -13935,54 +13944,45 @@ void RunStep(const Step& s) {
 		int key = HINT_COMBO;
 		float progress = -1.0f, gone = -1.0f;
 		switch (s.b) {
-		case 0: key = HINT_JOIN;   // coop.cpp ShowJoinHint (keyboard on)
-			swprintf(text, 200, L"Second pad: %s joins co-op\n(keyboard: %s), again to leave", HintButtonName(1, HB_START),
-			         HintKeyName(g_config.keys[CoopConfig::KEY_START])); break;
-		case 1: key = HINT_JOIN;   // ... keyboard off
-			swprintf(text, 200, L"Second pad: %s joins co-op\nand again to leave", HintButtonName(1, HB_START)); break;
+		case 0: case 1: {   // coop.cpp ShowJoinHint: 0 with the keyboard free for player 2, 1 without
+			key = HINT_JOIN;
+			int hero = g_config.p2Hero == HERO_ASTERIX || g_config.p2Hero == HERO_OBELIX ? g_config.p2Hero : 1 - p1h;
+			wchar_t start[8] = {};
+			if (wchar_t g = IconGlyph("pad_start")) start[0] = g; else wcscpy(start, L"Start");
+			if (s.b == 0) swprintf(text, 200, L"%s Join CO-OP mode %s/%s", HintHeroName(hero), start, HintKeyName(g_config.keys[CoopConfig::KEY_START]));
+			else swprintf(text, 200, L"%s Join CO-OP mode %s", HintHeroName(hero), start);
+			break;
+		}
 		case 2: key = HINT_PASS;   // coop.cpp
-			swprintf(text, 200, L"%s passes the Roman\nto %s", HintButtonName(a, HB_LB), HintHeroName(ho)); break;
-		case 3: case 4: key = HINT_MACHINE;   // coop.cpp CoopWaitingForYou (a boat, a launcher, the belly slide)
+			swprintf(text, 200, L"Pass %s the enemy to %s", HintButtonName(a, HB_LB), HintHeroName(ho)); break;
+		case 3: case 4: case 5: key = HINT_MACHINE;   // coop.cpp CoopWaitingForYou (rides, machines) and the lifter's
 			swprintf(text, 200, L"%s is waiting for you", HintHeroName(ho)); break;
-		case 5: key = HINT_LIFTER;
-			swprintf(text, 200, L"The lifter waits for %s\nto go up", HintHeroName(ho)); break;
-		case 6: key = HINT_REVIVE;   // individual.cpp ShowDownHint
-			swprintf(text, 200, L"%s is down!\nHold %s by him for %g s to revive", HintHeroName(ho), HintButtonName(a, HB_B),
-			         g_config.reviveHold); break;
-		case 7: key = HINT_REVIVE; gone = 0.4f;   // the revive countdown, single player (left box)
-			swprintf(text, 200, L"Revive %s\n%d s left", HintHeroName(ho), 27); break;
-		case 8: key = HINT_REVIVE; gone = 0.4f;   // ... co-op, the downed player's box
-			swprintf(text, 200, L"%s comes to revive you\n%d s left", HintHeroName(ho), 27); break;
+		case 7: case 8: key = HINT_REVIVE; gone = 0.4f;   // individual.cpp: the revive countdown (x: its seconds, else 27)
+			swprintf(text, 200, L"%s needs help! %ds left", HintHeroName(s.b == 7 ? ho : ha), s.x > 0 ? (int)s.x : 27); break;
 		case 9: key = HINT_REVIVE; progress = 0.5f;
 			swprintf(text, 200, L"Reviving %s", HintHeroName(ho)); break;
 		case 10: key = HINT_REVIVE;
 			swprintf(text, 200, L"Hold %s to revive %s", HintButtonName(a, HB_B), HintHeroName(ho)); break;
-		case 11: key = HINT_MODE;   // shared.cpp ShowModeHint: SHARED_GUN
-			swprintf(to, 200, L"%s: turn the gun", HintHeroName(HERO_OBELIX));
-			swprintf(ta, 200, L"%s: fire with %s", HintHeroName(HERO_ASTERIX), HintButtonName(ast, HB_X)); break;
-		case 12: key = HINT_MODE;   // SHARED_GUN_SOLO (Obelix's box only)
-			swprintf(to, 200, L"%s: %s at the gun's handles\nto turn it for %s", HintHeroName(HERO_OBELIX),
-			         HintButtonName(obe, HB_X), HintHeroName(HERO_ASTERIX)); break;
-		case 13: key = HINT_MODE;   // SHARED_GUN_OBELIX
-			swprintf(to, 200, L"%s: turn the gun\n%s leaves it", HintHeroName(HERO_OBELIX), HintButtonName(obe, HB_A));
-			swprintf(ta, 200, L"%s: %s at the gun\nfires it for %s", HintHeroName(HERO_ASTERIX), HintButtonName(ast, HB_X),
-			         HintHeroName(HERO_OBELIX)); break;
-		case 14: key = HINT_MODE;   // SHARED_BOAT / SHARED_SLIDE
-			swprintf(to, 200, L"%s: steer and camera", HintHeroName(HERO_OBELIX));
-			swprintf(ta, 200, L"%s: jump with %s", HintHeroName(HERO_ASTERIX), HintButtonName(ast, HB_A)); break;
-		case 15: key = HINT_MODE;   // the default (one screen)
-			swprintf(ta, 200, L"%s: forward and back", HintHeroName(HERO_ASTERIX));
-			swprintf(to, 200, L"%s: left, right and camera", HintHeroName(HERO_OBELIX)); break;
+		case 11: case 12: case 13: case 14: case 15: {   // shared.cpp's mode hints: gun, Asterix alone, Obelix alone, boat / slide, Fusion
+			key = HINT_MODE;
+			const SharedMode kModes[5] = { SHARED_GUN, SHARED_GUN_SOLO, SHARED_GUN_OBELIX, SHARED_BOAT, SHARED_FUSION };
+			wchar_t ma[96], mo[96];
+			SharedModeHintText(kModes[s.b - 11], ma, mo);
+			wcscpy(ta, ma);
+			wcscpy(to, mo);
+			break;
+		}
 		case 16: case 17: case 18: case 19: case 20:   // combohints.cpp: Club, Power Hammer, Twister, Mole, Rage
 			ComboHintsText(text, 200, a, s.b == 19 ? 4 : s.b == 20 ? 5 : s.b - 16, false, (int)s.x); break;
 		case 21: ComboHintsText(text, 200, a, 2, true, (int)s.x); break;   // the crowd's Twister
 		case 22: key = HINT_FUSE; ComboHintsText(text, 200, a, 3, false, (int)s.x); break;
-		case 23: {   // cutskip.cpp ShowPrompt (the pad, not pressed)
+		case 23: case 24: {   // cutskip.cpp ShowPrompt: 23 waiting, 24 held (pressed, its bar half full)
 			key = HINT_SKIP;
-			wchar_t g1 = IconGlyph("pad_a_unpressed");
+			wchar_t g1 = IconGlyph(s.b == 24 ? "pad_a_press" : "pad_a");
 			if (!g1) g1 = IconGlyph("pad_a");
 			if (g1) swprintf(text, 200, L"Hold %c to skip", g1);
 			else swprintf(text, 200, L"Hold %s to skip", L"A");
+			if (s.b == 24) progress = 0.5f;
 			break;
 		}
 		}
@@ -13992,7 +13992,7 @@ void RunStep(const Step& s) {
 		} else {
 			HintShow(key, a, text, ms);
 			if (progress >= 0.0f) HintProgress(key, a, progress);
-			if (gone >= 0.0f) HintTimerBar(key, a, gone, 27.0f);
+			if (gone >= 0.0f) HintTimerBar(key, a, gone, s.x > 0 ? s.x : 27.0f);
 		}
 		Log("autotest: hint catalogue %d on box %d (box hero %s)", s.b, a, ha == HERO_ASTERIX ? "asterix" : "obelix");
 		break;

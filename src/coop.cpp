@@ -6065,7 +6065,7 @@ static void WatchSpinHint(int idx, Hero h) {
 	if (!o || IndivFallen(other) || (h.Pos() - o.Pos()).len2() > kPassRange * kPassRange) return;
 	g.spinHints[idx]++;
 	wchar_t text[96];
-	swprintf(text, 96, L"%s passes the Roman\nto %s", HintButtonName(player, HB_LB), HintHeroName(other));
+	swprintf(text, 96, L"Pass %s the enemy to %s", HintButtonName(player, HB_LB), HintHeroName(other));
 	HintShow(HINT_PASS, player, text, 8000);
 	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints[idx], HeroName(idx));
 }
@@ -6521,12 +6521,17 @@ static void ShowJoinHint(Trio t) {
 	if (!CoopAllowedNow(t, &why)) return;
 	g.joinHintPending = false;
 	if (!g_config.hintJoin) return;   // [hints] hint_join off
+	// "[player 2's hero] Join CO-OP mode [Start]/[Enter]" (the keyboard's key only
+	// with the keyboard free for player 2).
+	int hero = g_config.p2Hero == HERO_ASTERIX || g_config.p2Hero == HERO_OBELIX ? g_config.p2Hero : OtherHero(t.Leader());
+	wchar_t start[8] = {};
+	if (wchar_t g = IconGlyph("pad_start")) start[0] = g;
+	else wcscpy(start, L"Start");
 	wchar_t text[96];
 	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
-		swprintf(text, 96, L"Second pad: %s joins co-op\n(keyboard: %s), again to leave", HintButtonName(1, HB_START),
-		         HintKeyName(g_config.keys[CoopConfig::KEY_START]));
+		swprintf(text, 96, L"%s Join CO-OP mode %s/%s", HintHeroName(hero), start, HintKeyName(g_config.keys[CoopConfig::KEY_START]));
 	else
-		swprintf(text, 96, L"Second pad: %s joins co-op\nand again to leave", HintButtonName(1, HB_START));
+		swprintf(text, 96, L"%s Join CO-OP mode %s", HintHeroName(hero), start);
 	HintShow(HINT_JOIN, 0, text, 10000);
 }
 
@@ -6568,9 +6573,10 @@ static void WatchLifterHint(Trio t) {
 		// (Freed already with its spinning platform's turn not done -- Obelix crossed
 		// the turnstile's zone 03C8 on his way here: WatchUnfinishedSequence.)
 		if (GetTickCount() - since < 4000) return;
+		// To the missing hero's player: "[hero on it] is waiting for you" (the rides' words: user).
 		wchar_t text[64];
-		swprintf(text, 64, L"The lifter waits for %s\nto go up", HintHeroName(on[0] ? HERO_OBELIX : HERO_ASTERIX));
-		HintShow(HINT_LIFTER, (on[0] ? HERO_ASTERIX : HERO_OBELIX) == g.p1Hero ? 0 : 1, text, 300);
+		swprintf(text, 64, L"%s is waiting for you", HintHeroName(OtherHero(missing)));
+		HintShow(HINT_LIFTER, missing == g.p1Hero ? 0 : 1, text, 300);
 		return;
 	}
 	waiting = nullptr;

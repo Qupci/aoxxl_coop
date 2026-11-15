@@ -4,6 +4,7 @@
 #include "cutskip.h"
 #include "detour.h"
 #include "hints.h"
+#include "icons.h"
 #include "inputmgr.h"
 #include "life.h"
 #include "log.h"
@@ -181,9 +182,10 @@ int Route(int map, uint32_t action) {
 		if (map == MAP_CAMERA) return ast;
 		return -1;
 	case SHARED_FUSION:
-		// Asterix forward / back, Obelix left / right and the camera.
-		if (map == MAP_TRIO) return action == 0 || action == 1 ? ast : action == 2 || action == 3 ? obe : -1;
-		if (map == MAP_CAMERA) return obe;
+		// Asterix left / right and the camera, Obelix forward / back (user, Nov 16:
+		// the camera with Asterix as on the boat and the slide; was the other way round).
+		if (map == MAP_TRIO) return action == 0 || action == 1 ? obe : action == 2 || action == 3 ? ast : -1;
+		if (map == MAP_CAMERA) return ast;
 		return -1;
 	default:
 		return -1;
@@ -242,37 +244,47 @@ void ShowModeHint(SharedMode m) {
 	if (m != SHARED_FUSION && (!t || !ModeHintHere(m, t))) { HintHide(HINT_MODE); return; }
 	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
 	wchar_t ta[96] = {}, to[96] = {};
-	switch (m) {
-	case SHARED_GUN:
-		swprintf(to, 96, L"%s: turn the gun", HintHeroName(HERO_OBELIX));
-		swprintf(ta, 96, L"%s: fire with %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_X));
-		break;
-	case SHARED_GUN_SOLO:
-		swprintf(to, 96, L"%s: %s at the gun's handles\nto turn it for %s", HintHeroName(HERO_OBELIX),
-		         HintButtonName(o, HB_X), HintHeroName(HERO_ASTERIX));
-		HintShow(HINT_MODE, o, to, 6000);
-		return;
-	case SHARED_GUN_OBELIX:
-		swprintf(to, 96, L"%s: turn the gun\n%s leaves it", HintHeroName(HERO_OBELIX), HintButtonName(o, HB_A));
-		swprintf(ta, 96, L"%s: %s at the gun\nfires it for %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_X),
-		         HintHeroName(HERO_OBELIX));
-		break;
-	case SHARED_BOAT:
-	case SHARED_SLIDE:
-		swprintf(ta, 96, L"%s: steer and camera", HintHeroName(HERO_ASTERIX));
-		swprintf(to, 96, L"%s: jump with %s", HintHeroName(HERO_OBELIX), HintButtonName(o, HB_A));
-		break;
-	default:
-		swprintf(ta, 96, L"%s: forward and back", HintHeroName(HERO_ASTERIX));
-		swprintf(to, 96, L"%s: left, right and camera", HintHeroName(HERO_OBELIX));
-		break;
-	}
+	SharedModeHintText(m, ta, to);
 	DWORD ms = m == SHARED_FUSION ? 500 : 10000;
 	HintShow(HINT_MODE, a, ta, ms);
 	HintShow(HINT_MODE, o, to, ms);
 }
 
 } // namespace
+
+// Mode `m`'s who-does-what hint: Asterix's part `ta`, Obelix's `to` (96 each).
+void SharedModeHintText(SharedMode m, wchar_t* ta, wchar_t* to) {
+	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
+	ta[0] = to[0] = 0;
+	// (The user's words, Nov 16: the hero's icon, then its part; the stick's
+	// directions as the player's own move icons.)
+	const wchar_t* lrA = IconsRewrite(L"\xE008\xE007", a, DIRS_MOVE);
+	const wchar_t* lrO = IconsRewrite(L"\xE008\xE007", o, DIRS_MOVE);
+	const wchar_t* udO = IconsRewrite(L"\xE005\xE006", o, DIRS_MOVE);
+	switch (m) {
+	case SHARED_GUN:
+		swprintf(ta, 96, L"%s Fire %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_X));
+		swprintf(to, 96, L"%s Move left and right %s", HintHeroName(HERO_OBELIX), lrO);
+		break;
+	case SHARED_GUN_SOLO:   // Asterix alone on the gun
+		swprintf(ta, 96, L"Fire %s", HintButtonName(a, HB_X));
+		swprintf(to, 96, L"%s is waiting for you", HintHeroName(HERO_ASTERIX));
+		break;
+	case SHARED_GUN_OBELIX:   // Obelix alone on the gun
+		swprintf(ta, 96, L"%s is waiting for you", HintHeroName(HERO_OBELIX));
+		swprintf(to, 96, L"Move left and right %s", lrO);
+		break;
+	case SHARED_BOAT:
+	case SHARED_SLIDE:
+		swprintf(ta, 96, L"%s Steer %s", HintHeroName(HERO_ASTERIX), lrA);
+		swprintf(to, 96, L"%s Jump %s", HintHeroName(HERO_OBELIX), HintButtonName(o, HB_A));
+		break;
+	default:   // the Twister Fusion: Asterix left / right and the camera, Obelix forward / back
+		swprintf(ta, 96, L"%s Move left and right %s", HintHeroName(HERO_ASTERIX), lrA);
+		swprintf(to, 96, L"%s Move front and back %s", HintHeroName(HERO_OBELIX), udO);
+		break;
+	}
+}
 
 const char* SharedModeName(SharedMode m) {
 	switch (m) {

@@ -329,8 +329,6 @@ int IndivFallenHero() {
 	return -1;
 }
 
-namespace { void ShowDownHint(int down); }
-
 namespace {
 void ForgetRecentSpots(int idx, DWORD now) {
 	for (int i = 0; i < kSafeSpots; i++)
@@ -355,7 +353,6 @@ void PutBackLog(int up, int down, const char* what, const Vector3& spot) {
 		}
 		Log("indiv: %s reached %s with %s down -- back on its last solid ground (%.1f %.1f %.1f)", HeroName(up), what,
 		    HeroName(down), spot.x, spot.y, spot.z);
-		ShowDownHint(down);
 	}
 }
 
@@ -447,7 +444,6 @@ bool IndivBlockTalk(const char* what) {
 	if (now - s_told > 2000) {
 		s_told = now;
 		Log("indiv: %s reached %s with %s down -- it waits (no put-back)", HeroName(Other(down)), what, HeroName(down));
-		ShowDownHint(down);
 	}
 	return true;
 }
@@ -698,15 +694,6 @@ int SecondsLeft(int down) {
 	return s > 0.0f ? (int)ceilf(s) : 0;
 }
 
-void ShowDownHint(int down) {
-	int up = Other(down);
-	Trio t = GetTrio();
-	Hero h = t ? t.GetHero(down) : Hero();
-	wchar_t text[200];
-	swprintf(text, 200, L"%s is down!\nHold %s by him for %g s to revive", HintHeroName(down),
-	         HintButtonName(PlayerOf(up), HB_B), h ? HoldSeconds(h.Pos()) : g_config.reviveHold);
-	HintShow(HINT_REVIVE, PlayerOf(up), text, 8000);
-}
 
 // The HUD's health shows again and is read afresh (game manager +0x5C bit
 // 0x4000, as the game's heal sets it).
@@ -1205,8 +1192,8 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	if (now - g.limitHintAt < 250) return false;
 	g.limitHintAt = now;
 	wchar_t text[160];
-	if (g.solo) swprintf(text, 160, L"Revive %s\n%d s left", HintHeroName(down), SecondsLeft(down));
-	else swprintf(text, 160, L"%s comes to revive you\n%d s left", HintHeroName(up), SecondsLeft(down));
+	// (One line; the box keeps its width as the seconds go down: hints.cpp.)
+	swprintf(text, 160, L"%s needs help! %ds left", HintHeroName(down), SecondsLeft(down));
 	// (Single player: in the left box -- in player 1's, with the revive's own
 	// hints and bar there, the two took turns every 250 ms: user.)
 	HintShow(HINT_REVIVE, box, text, 600);
@@ -1260,10 +1247,7 @@ void Activate(Trio t) {
 		// Player 2 back in the same level: their hero as they left it.
 		g.st[g.p2Hero] = g.keptStats;
 		if (g.ctx == g.p2Hero) Write(g.keptStats);
-		if (g.keptFallen || g.keptStats.hp == 0) {
-			g.fallen[g.p2Hero] = true;
-			ShowDownHint(g.p2Hero);
-		}
+		if (g.keptFallen || g.keptStats.hp == 0) g.fallen[g.p2Hero] = true;
 		Log("indiv: individual heroes on -- %s (player 2) as they left it: health %d, %d shields%s; %s health %d",
 		    HeroName(g.p2Hero), g.keptStats.hp, g.keptStats.shields, g.fallen[g.p2Hero] ? ", down" : "",
 		    HeroName(Other(g.p2Hero)), s.hp);
@@ -1648,7 +1632,6 @@ bool IndivHeroDown(int hero, const char* how) {
 		g.fellLeading[hero] = false;
 		Log("indiv: %s led only for the undone sequence -- no lead back after the revive", HeroName(hero));
 	}
-	ShowDownHint(hero);
 	return true;
 }
 

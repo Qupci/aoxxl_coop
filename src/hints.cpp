@@ -184,6 +184,9 @@ const float  kEdge = 0.05f, kMargin = 0.02f;
 // the line's place (the text's y - 1 + the word's y) -- measured on the boxes'
 // shots; the lines are centred on the plate by it.
 const float  kInkMid = 1.23f;
+// A combo hint's gap between buttons, a share of a button's measured width.
+const float  kComboGap = 0.07f;
+const float  kComboTextGap = 0.17f;   // ... between a button and the Mole's "+" / "..."
 
 struct Burst { int button; DWORD at; };   // the n-th button of the last line, when
 struct Slot {
@@ -202,7 +205,7 @@ struct Slot {
 	int      nLines = 1, lastLineWord = 0, nWords = 0;
 	float    longest = 0.0f, step = 0.0f, size = 0.0f;
 	float    wx[kMaxWords] = {}, wy[kMaxWords] = {}, ww[kMaxWords] = {};
-	bool     button[kMaxWords] = {};  // a button of the last line: any word but ">"
+	bool     button[kMaxWords] = {};  // a button of the last line: an icon alone (not the first word)
 	Burst    bursts[8] = {};
 	int      nBursts = 0;
 	Bar      bar;                    // the hint's bar
@@ -309,8 +312,30 @@ void LayOutSlot(Slot& s, int si, const char* game) {
 		s.ww[i] = WordWidth(t20, i);
 		x1[i] = x0[i] + s.ww[i];
 		const wchar_t* w = *(const wchar_t**)(t20 + 0x2D8 + 4 * i);
-		wchar_t next = IconGlyph("next");
-		s.button[i] = w && w[0] && !((w[0] == L'>' || (next && w[0] == next)) && !w[1]);
+		// (An icon alone, not the text's first word: a combo hint's own icon.)
+		s.button[i] = i > 0 && w && w[0] >= 0xE000 && w[0] < 0xF900 && !w[1];
+	}
+	// A combo hint's buttons (and the Mole's "+" / "..." between them) a quarter
+	// of a button apart, not a space (the user's Figma: 12 px between 48 px icons).
+	if (s.kind == 2 && (s.ident == HINT_COMBO || s.ident == HINT_FUSE)) {
+		auto tight = [&](unsigned i) {
+			const wchar_t* w = *(const wchar_t**)(t20 + 0x2D8 + 4 * i);
+			return s.button[i] || (w && (!wcscmp(w, L"+") || !wcscmp(w, L"...")));
+		};
+		float shift = 0.0f;
+		for (unsigned i = 1; i < n; i++) {
+			x0[i] -= shift;
+			x1[i] -= shift;
+			bool lineStart = false;
+			for (int l = 0; l < s.nLines; l++) lineStart |= lineWord[l] == i;
+			if (lineStart || !tight(i - 1) || !tight(i)) continue;
+			// (Shares of the button's measured width -- icons draw wider than measured --
+			// giving the Figma's quarter of an icon between the inks, measured on the shots.)
+			bool icons = s.button[i - 1] && s.button[i];
+			float want = (icons ? kComboGap : kComboTextGap) * (s.button[i - 1] ? s.ww[i - 1] : s.ww[i]);
+			float gap = x0[i] - x1[i - 1];
+			if (gap > want) { x0[i] -= gap - want; x1[i] -= gap - want; shift += gap - want; }
+		}
 	}
 	float start[8], width[8], longest = 0.0f;
 	for (int l = 0; l < s.nLines; l++) {
@@ -432,7 +457,9 @@ void UpdateSlot(int p, char* itf, float dt, char* tpl = nullptr) {
 	Bar bar;
 	Choose(p, itf, &kind, &ident, &text, &bar);
 	Place pl = PlaceOf(p);
-	bool right = false;   // every box's lines left-aligned (the left box's right-aligned lines read oddly: user)
+	// Every box's lines left-aligned (the left box's right-aligned lines read
+	// oddly: user), but a combo hint's right-aligned in a box at the right (user).
+	bool right = !pl.left && kind == 2 && (ident == HINT_COMBO || ident == HINT_FUSE);
 	DWORD now = GetTickCount();
 	if (kind == s.kind && ident == s.ident) {
 		s.pendKind = -1;
@@ -442,7 +469,10 @@ void UpdateSlot(int p, char* itf, float dt, char* tpl = nullptr) {
 		if (kind && (wcscmp(text, s.text) != 0 || right != s.rightAligned || !s.laid)) {
 			wcsncpy(s.text, text, kTextLen - 1);
 			s.rightAligned = right;
+			float was = s.longest;
 			LayOutSlot(s, p, game);
+			// A countdown's box keeps its width as its seconds go down (user).
+			if (s.bar.style == BAR_TIMER && was > s.longest) s.longest = was;
 		}
 	} else {
 		if (s.kind && s.in > 0.0f) {

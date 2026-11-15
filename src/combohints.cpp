@@ -221,22 +221,23 @@ void Compose(wchar_t* out, int n, int p, int c, bool crowd, int lit, bool fuse) 
 	wchar_t ic[3] = { icon, (wchar_t)(icon ? L' ' : 0), 0 };
 	wchar_t keys[160] = {};
 	const Seq& s = kSeq[c];
+	// (The buttons a space apart, no chevrons: the user's Figma.)
 	for (int i = 0; i < s.n; i++) {
-		if (i) wcscat(keys, HintNext());
+		if (i) wcscat(keys, L" ");
 		wcscat(keys, HintButtonName(p, s.b[i], i >= lit ? ICON_WAITING : ICON_PRESSED));
 	}
 	if (fuse) {
-		swprintf(out, n, L"%sTwister Fusion:\n%s fuses the tornadoes", ic, keys);
+		swprintf(out, n, L"%sTwister Fusion %s", ic, keys);
 	} else if (crowd) {
 		swprintf(out, n, L"%sSo many Romans: Twister!\n%s", ic, keys);
 	} else if (c == C_MOLE) {
 		wchar_t x[32];
 		wcscpy(x, HintButtonName(p, HB_X));
-		swprintf(out, n, L"%sTry your new combo: %s\n%s then %s %s %s...", ic, kName[c], keys, x, x, x);
+		swprintf(out, n, L"%s%s Combo\n%s + %s %s ...", ic, kName[c], keys, x, x);
 	} else if (c == C_RAGE) {
-		swprintf(out, n, L"%sTry your new combo: %s\n%s sends Idefix in", ic, kName[c], keys);
+		swprintf(out, n, L"%s%s Combo %s", ic, kName[c], keys);
 	} else {
-		swprintf(out, n, L"%sTry your new combo: %s\n%s", ic, kName[c], keys);
+		swprintf(out, n, L"%s%s Combo\n%s", ic, kName[c], keys);
 	}
 }
 

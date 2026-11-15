@@ -19,16 +19,15 @@ bool IconsInstallHooks();
 void IconsFrame();
 
 // How a button's icon looks: plain (a prompt), or a combo hint's / a hold's
-// button not pressed yet or pressed. A pad button waiting is its dimmed
-// variant (pad_a_unpressed.png), pressed the plain one; a key waiting is the
-// plain (glowing) keycap, pressed the dark one (kb\key_a_press.png).
+// button not pressed yet or pressed. Waiting is the plain icon, pressed its
+// _press variant (pad_a_press.png, kb\key_a_press.png).
 enum IconLook { ICON_PLAIN, ICON_WAITING, ICON_PRESSED };
 
 // The glyph of icon `name` (a PNG's name: "pad_a", "p1", "asterix"), 0 if none.
 wchar_t IconGlyph(const char* name);
 // The glyph of a keyboard key, 0 if none: coop_icons\kb's keycap of it
 // (key_a.png, arrow_up.png; pressed: key_a_press.png), else one drawn with its
-// name (key.png / key_wide.png; pressed: key_unpressed.png / key_wide_unpressed.png,
+// name (key.png / key_wide.png; pressed: key_press.png / key_wide_press.png,
 // else the plain one darkened).
 wchar_t IconKeyGlyph(int vk, int look = ICON_PLAIN);
 // The glyph for what player `player` (0 = player 1) presses for game action
