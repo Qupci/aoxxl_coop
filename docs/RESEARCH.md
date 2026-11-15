@@ -5352,3 +5352,15 @@ both halves).
   language via the pause menu (S_LANGRIGHT until LocLanguage matches, Apply, YES, CONTINUE, Resume), then the
   hints in both boxes and player 2's pause / Controls 1, 3, 4 / CO-OP Options -- all five clean; French / German
   Fusion pair shortened (the two boxes met in split screen). The runs leave the save's language English.
+- Round 289 (Nov 16, commit 7351ae1; user log userlogs\*-xxl_coop.langjoin_crash.log): English -> German on
+  the pause menu's language row, then player 2 joined on the keyboard (Enter): crash at axxl+0x11E0 in the next
+  text layout (0x42E590 -> font width 0x5FDAB0, esi = UTF-16 "ED" as a pointer). icons.cpp kept every font it
+  had patched (g_fonts); the row reads the fonts again for each language passed (the log: 0407729C took the
+  icons three times, the boot font 03861E24 kept) and frees the old ones, so the keycaps drawn for player 2's
+  keys (AddKeycap -> AddToFonts -> AddGlyphs: RwSList entries + the index table) were written into freed
+  memory. A pad join adds no new glyph (hence round 288's hintlang runs were clean). Fix: PruneFonts drops a
+  font not in CManager2d (13/16 +8 + id * 4) for 2 s, before IconsFrame and AddToFonts; NoteFont resets an
+  entry when a font is read at a known (reused) address. Autotest hintlang with XXL_ICONP2KB=1 (player 2's
+  icons as keycaps, made after the change; no keyboard injected): German -> French and French -> German, the
+  old fonts dropped, keycaps drawn, no crash. Not reproduced as a crash before the fix (a use-after-free only
+  crashes when the memory is reused), the mechanism shown by the user's log.
