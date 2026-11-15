@@ -5280,3 +5280,12 @@ both halves).
   (-Level 4, XXL_POTIONCOMBOS=1): S_NOCLOCK clears +0x28 of the Romans within 15 of Asterix each frame for 3 s
   around a potion Power Hammer -- the build before crashed at 0x4CDB01 with the user's stack; with the fix 8 beaten,
   run complete.
+- Round 284 (Nov 15, commit 899a707; user after the round 280 pad test: all works, but the switch hint came back on
+  every ignored switch). (1) The lock's re-show of the SP switch hint is now once per game load as well
+  (SwitchHint.againUsed), and only when the ignored switch changes the level's lead (SoloDropsSwitch compares
+  levelLeader before / after: LVL LEAD Asterix -> Asterix is no change). (2) [hints] hint_switch (on; config.h
+  hintSwitch, CO-OP Options row, ini text) hides it; the co-op swap confirmation is not a hint and always shows.
+  (3) The belly slide's wait range 30 units, 15 up or down (user: still safe there); CoopRideMateNear takes the range,
+  the launcher keeps 12 / 6. Autotests swhint21 (first at 12 s, keg 0348 Asterix -> Obelix: once more; zone 01E0
+  Obelix -> Asterix: none; keg again, Obelix -> Obelix: none), slidefar (Obelix at the sector start: held back;
+  Obelix 26 units back: the slide starts).
