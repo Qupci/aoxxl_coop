@@ -5302,3 +5302,8 @@ both halves).
   talks, Obelix walks back over the line, Asterix into the slide: before -- 03C0 at +0.6 s, slide dropped; after
   -- held back at 593 ms, still sliding 12 s on), spyzones (XXL_SURVEYSECTOR=n: groups sending 0x5198 + zone
   dump). The run's first try without LOADSECTOR(2) had the heroes in a void: teleports alone don't stream a sector.
+- Round 286 (Nov 15, commit 337561f; user pad-tested round 285 OK): belly slide wait range 30 -> 15 units (15 up or
+  down kept). LV2-2's spy line (z -920.7) is ~17 from the slide's detector (z -903.8), so Obelix can no longer
+  start the slide from behind it; user: a respawned spy no longer counts the helmets on the slide, so the Obelix
+  player has to take the talk first. Round 285's hold-back stays as a safety net. Autotest slidefar: Obelix at the
+  sector start and 26 units back -- held back ("[Asterix] is waiting for you"); 12 back -- the slide starts.
