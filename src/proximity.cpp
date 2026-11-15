@@ -10,6 +10,7 @@
 #include "nolock.h"
 #include "p2cam.h"
 #include "trio.h"
+#include "shared.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -2791,6 +2792,7 @@ typedef void(__fastcall* FlagEventFn)(void* self, void* edx, unsigned eventId);
 const uintptr_t kFlagEvent = 0x460C20;
 const uint8_t   kFlagEventPrologue[7] = { 0x8B, 0xD1, 0x66, 0x8B, 0x4C, 0x24, 0x04 };
 const uintptr_t kDetectTickBegin = 0x46BE90, kDetectTickEnd = 0x46C0CE;   // CKSrvDetection::vf17
+const unsigned  kSlideStartTalkMs = 4000;   // a spy's talk this soon after the belly slide's start is held back
 FlagEventFn g_origFlagEvent = nullptr;
 
 // Diagnostics: events flagged into a group that messages the sound manager
@@ -2867,6 +2869,27 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 					s_last = eventId & 0xFFFF;
 					Log("proximity: zone event %04X held back -- %s is down", eventId & 0xFFFF, HeroName(IndivFallenHero()));
 				}
+				return;
+			}
+		}
+		// Co-op: a Roman agent's talk (CKHkClueMan 0x5198) set off in the belly
+		// slide's first seconds. The slide waits for the other hero within 30 units,
+		// so it can start behind a spy's line: LV2-2's agent (zone 03C0, z -920, on
+		// since the keg's group 0B6) crossed by the sliding Obelix asked the trio to
+		// walk the leader to it (0x5120 + "Asterix leads") -- the slide dropped, both
+		// heroes stuck in its mode. Held back as with a hero down; a talk at the
+		// slide's end (LV4-10, LV5-9) comes long after its start.
+		if (CoopP2Joined() && SharedCurrentMode() == SHARED_SLIDE && SharedModeAgeMs() < kSlideStartTalkMs) {
+			char* objs[64];
+			uint16_t msgs[64];
+			bool talk = false;
+			for (int k = 0, n = GroupTargets(eventId, objs, msgs, 64); k < n; k++)
+				talk |= objs[k] && *(uintptr_t*)objs[k] == 0x6261F4 && msgs[k] == 0x5198;
+			if (talk) {
+				static int s_told = 0;
+				if (s_told++ < 20)
+					Log("proximity: zone event %04X (a Roman agent's talk) held back -- the belly slide started %u ms ago",
+					    eventId & 0xFFFF, SharedModeAgeMs());
 				return;
 			}
 		}

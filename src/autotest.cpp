@@ -5901,6 +5901,41 @@ const Step kSlideFar[] = {
 	END(16000),
 };
 
+// slidespy22 (level 2): the user's softlock (xxl_coop.lv2-2_belly-slide_stuck.log).
+// Asterix has the spy's talk (zone 03C0, z -920), then stands by the slide's
+// start; Obelix is put behind the spy's zone, in the slide's 30-unit range.
+// Asterix walks into the cross detector: the slide carries Obelix through the
+// spy's zone -- no talk, the slide runs on.
+const Step kSlideSpy22[] = {
+	MARK(0, "slidespy22"), LOADSECTOR(200, 2), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	{ 1000, S_WATCHCLUE, 1, 0, 0, 0, 0, "open the spies' gate" },
+	PLACEAT(3000, HERO_ASTERIX, -906.15f, 528.0f, -938.71f), PLACEAT(3000, HERO_OBELIX, -903.7f, 528.0f, -938.4f),
+	// The keg by -908.4 527.3 -944.5 set on fire: group 0B6 enables the spy's zone
+	// (detection 0x1638: plane-cross 56, event 03C0).
+	{ 3500, S_FLAGEV, 0x05B0, 0, 0, 0, 0, "group 0B6 (the keg: the spy's zone on)" },
+	GLIDEAT(4000, HERO_ASTERIX, -905.79f, 528.2f, -920.68f, 2000),
+	TAP1(8000), TAP1(9000), TAP1(10000), TAP1(11000), TAP1(12000), TAP1(13000), TAP1(14000), TAP1(15000), TAP1(16000),
+	TAP1(17000), TAP1(18000), TAP1(19000), TAP1(20000), TAP1(21000), TAP1(22000), TAP1(23000), TAP1(24000),
+	SHOT(25000, "slidespy_talked"),
+	PLACEAT(26000, HERO_ASTERIX, -908.23f, 528.2f, -906.1f), PLACEAT(26000, HERO_OBELIX, -906.5f, 528.5f, -912.0f),
+	GLIDEAT(27000, HERO_OBELIX, -906.15f, 527.8f, -938.71f, 2500),
+	GLIDEAT(30000, HERO_OBELIX, -906.3f, 528.2f, -929.12f, 1000),
+	SHOT(31800, "slidespy_before"),
+	GLIDEAT(32000, HERO_ASTERIX, -908.89f, 525.8f, -901.04f, 1000),
+	SHOT(34000, "slidespy_1"), SHOT(37000, "slidespy_2"), SHOT(43000, "slidespy_3"),
+	END(45000),
+};
+
+// spyzones (any level, XXL_SURVEYSECTOR=n): the groups that send a Roman agent
+// its "start the talk" (0x5198), and the sector's zone tests with their events.
+const Step kSpyZones[] = {
+	MARK(0, "spyzones"), { 200, S_LOADSECTOR, -2, 0, 0, 0, 0, "load sector (XXL_SURVEYSECTOR)" },
+	{ 4000, S_FINDGROUPS, 0x6261F4, 0x5198, 0, 2.0f, 0, "groups: spy talk" },
+	{ 4100, S_DETECT, 0, 0, 0, 0, 0, "detect" },
+	END(4500),
+};
+
 // slideend (level 2): Asterix walks down beside the belly slide (LV2-2,
 // -916.8 519.6 -883.8 -> -906.6 511.1 -860.4): what starts the level's end there.
 const Step kSlideEnd[] = {
@@ -10415,6 +10450,8 @@ const Scenario kScenarios[] = {
 	SCENARIO("launchfar", kLaunchFar),
 	SCENARIO("launchfara", kLaunchFarA),
 	SCENARIO("slidefar", kSlideFar),
+	SCENARIO("slidespy22", kSlideSpy22),
+	SCENARIO("spyzones", kSpyZones),
 	SCENARIO("sptorch2", kSpTorch2),
 	SCENARIO("sptorchthrow2", kSpTorchThrow2),
 	SCENARIO("sptorchthrowo2", kSpTorchThrowO2),
@@ -11833,8 +11870,14 @@ void RunStep(const Step& s) {
 		CKYellowPages* yp = YellowPages();
 		char* lvl = yp ? *(char**)((char*)yp + 0x90) : nullptr;
 		if (!lvl) break;
-		Log("autotest: loading sector %d (current %d)", s.a, *(int*)(lvl + 0x24));
-		*(int*)(lvl + 0x34) = s.a;
+		int sector = s.a;
+		if (sector == -2) {   // spyzones: the sector from the environment
+			const char* e = getenv("XXL_SURVEYSECTOR");
+			if (!e) break;
+			sector = atoi(e);
+		}
+		Log("autotest: loading sector %d (current %d)", sector, *(int*)(lvl + 0x24));
+		*(int*)(lvl + 0x34) = sector;
 		break;
 	}
 	case S_CINEDUMP: {   // cinematic scene a (-1: the one playing): its nodes, edges and events

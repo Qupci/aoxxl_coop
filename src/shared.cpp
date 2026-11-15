@@ -34,6 +34,7 @@ struct State {
 	const uint8_t* p2 = nullptr;            // player 2's hero values
 	const uint8_t* p2cam = nullptr;         // player 2's values for the camera map
 	SharedMode mode = SHARED_NONE;
+	DWORD    modeSince = 0;                 // when `mode` began
 	int      owner[2] = { -1, -1 };         // player (0 = P1, 1 = P2) driving Asterix / Obelix
 	bool     joined = false;
 	int      logActions = -1;               // XXL_ACTIONLOG
@@ -286,6 +287,7 @@ const char* SharedModeName(SharedMode m) {
 }
 
 SharedMode SharedCurrentMode() { return g.mode; }
+unsigned SharedModeAgeMs() { return GetTickCount() - g.modeSince; }
 
 void SharedFrame() {
 	if (g.logActions < 0) g.logActions = getenv("XXL_ACTIONLOG") ? atoi(getenv("XXL_ACTIONLOG")) : 0;
@@ -317,6 +319,7 @@ void SharedFrame() {
 		Log("shared: %s -> %s (Asterix: player %d, Obelix: player %d)", SharedModeName(g.mode), SharedModeName(m),
 		    g.owner[HERO_ASTERIX] + 1, g.owner[HERO_OBELIX] + 1);
 		g.mode = m;
+		g.modeSince = GetTickCount();
 		ShowModeHint(m);
 	} else if (m == SHARED_FUSION) {
 		ShowModeHint(m);   // up as long as the fused tornado lasts
