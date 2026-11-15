@@ -2877,7 +2877,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		// player's box says it waits.
 		if (CoopP2Joined() && !CoopSuspended() && IndivFallenHero() < 0 && GroupStartsSlide(eventId)) {
 			int zh = ZoneEventHero(eventId & 0xFFFF);
-			if ((zh == HERO_ASTERIX || zh == HERO_OBELIX) && !CoopHeroHeld((zh == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX)) && !CoopRideMateNear(zh)) {
+			if ((zh == HERO_ASTERIX || zh == HERO_OBELIX) && !CoopHeroHeld((zh == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX)) && !CoopRideMateNear(zh, 30.0f, 15.0f)) {
 				Trio tz = GetTrio();
 				Hero hz = tz ? tz.GetHero(zh) : Hero();
 				int ni = hz && g_tickingDet ? NodeIndex(g_tickingDet, hz) : -1;

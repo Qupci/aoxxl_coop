@@ -78,6 +78,7 @@ const Opt kOpts[] = {
 	B("hints", "hint_pass_roman", hintPass),
 	B("hints", "hint_combos", hintCombos),
 	B("hints", "hint_machine_gun", hintMachineGun),
+	B("hints", "hint_switch", hintSwitch),
 	SP("sp_combo_hints", SP_COMBO_HINTS),
 	SP("sp_hero_switch", SP_HERO_SWITCH),
 	SP("sp_hero_switch_lock", SP_SWITCH_LOCK),

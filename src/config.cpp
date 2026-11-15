@@ -171,6 +171,7 @@ void CoopConfig::Load(const char* iniPath) {
 	hintPass   = ReadBool("hints", "hint_pass_roman", hintPass, full);
 	hintCombos = ReadBool("hints", "hint_combos", hintCombos, full);
 	hintMachineGun = ReadBool("hints", "hint_machine_gun", hintMachineGun, full);
+	hintSwitch = ReadBool("hints", "hint_switch", hintSwitch, full);
 	{
 		// Seconds; `env` (autotests) over the ini; "off" = 0, "auto" = -1 where allowed.
 		auto readSeconds = [&](const char* key, const char* env, float def, float lo, float hi, bool autoOk) {
@@ -373,8 +374,8 @@ void CoopConfig::Load(const char* iniPath) {
 	Log("config: enemies: charge x%.2f, shield %s, health x%.2f, shield hits x%.2f, disarmed time x%.2f; "
 	    "heroes: %.0f shields + %.0f extra", romanChargeSpeed, romanShield == 2 ? "infinite" : romanShield == 1 ? "breakable" : "off",
 	    romanHealth, romanShieldHits, romanDisarmedTime, heroShields, heroExtraShields);
-	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d", hintJoin, hintPass, hintCombos,
-	    hintMachineGun);
+	Log("config: hints: join %d, pass the Roman %d, combos %d, machine gun %d, hero switch %d", hintJoin, hintPass, hintCombos,
+	    hintMachineGun, hintSwitch);
 	Log("config: twister nerf %d (a caught Roman counts %.0f), potion combos %d, second chance: the other hero's combo bar "
 	    "at x%.2f", twisterNerf, twisterNerfPerRoman, potionCombos, spSecondChanceComboDrain);
 	if (spIsolation)

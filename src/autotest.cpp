@@ -5887,15 +5887,15 @@ const Step kSlideCross3[] = {
 
 // slidefar (level 2): Asterix walks past LV2-2's cross detector with Obelix
 // left where the sector put him: held back, Asterix put back before the line,
-// player 2's box says "[Asterix] is waiting for you"; with Obelix beside him
-// the slide starts.
+// player 2's box says "[Asterix] is waiting for you"; with Obelix ~26 units
+// back (in the 30-unit range) the slide starts.
 const Step kSlideFar[] = {
 	MARK(0, "slidefar"), LOADSECTOR(200, 2),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
 	PLACEAT(3000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f),
 	GLIDEAT(4500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
 	SHOT(7200, "sf_refused"), SHOT(8500, "sf_after"),
-	PLACEAT(9000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(9000, HERO_OBELIX, -902.5f, 526.5f, -912.0f),
+	PLACEAT(9000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(9000, HERO_OBELIX, -902.5f, 528.5f, -930.0f),
 	GLIDEAT(10500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
 	SHOT(14000, "sf_slide"),
 	END(16000),
@@ -8427,9 +8427,11 @@ const Step kLvlLead21[] = {
 };
 // swhint21 (level 2, XXL_SPISOLATION=0 XXL_SPSWITCH=1 XXL_SPSWITCHLOCK=1): the
 // hero switch hint "[D-pad up]  Switch to [Obelix]" once the join hint is over;
-// LV2-1's keg (0348, "Obelix leads", ignored by the lock) shows it again; the
-// switch to Obelix ends it; zone 01E0 at -793.3 526.2 -989.6 ("Asterix leads",
-// dropped as Obelix's own catch-up) shows "Switch to [Asterix]".
+// LV2-1's keg (0348, "Obelix leads", ignored by the lock: the level's lead
+// Asterix -> Obelix) shows it once more; the switch to Obelix ends it; zone 01E0
+// at -793.3 526.2 -989.6 ("Asterix leads", dropped as Obelix's own catch-up)
+// shows nothing (once more per game load only), and a second keg (Obelix ->
+// Obelix, no change) nothing either.
 const Step kSwHint21[] = {
 	MARK(0, "swhint21"),
 	SHOT(3000, "sw_join"), SHOT(8000, "sw_first"), SHOT(14000, "sw_first_gone"),
@@ -8441,7 +8443,9 @@ const Step kSwHint21[] = {
 	PLACEAT(26000, HERO_OBELIX, -786.0f, 526.8f, -989.0f),
 	GLIDEAT(26500, HERO_OBELIX, -793.3f, 526.3f, -989.6f, 1500),
 	SHOT(29000, "sw_zone"),
-	END(30000),
+	{ 31000, S_FLAGEV, 0x348, 0, 0, 0, 0, "the keg again (no change of the level's lead)" },
+	SHOT(32000, "sw_keg2"),
+	END(33000),
 };
 const Step kLvlLead21J[] = {
 	MARK(0, "lvllead21j"),

@@ -38,6 +38,7 @@ struct CoopConfig {
 	bool  hintPass    = true;   // [hints] hint_pass_roman: "LB passes the Roman" while spinning one
 	bool  hintCombos  = true;   // [hints] hint_combos: the combo hints (combohints.cpp)
 	bool  hintMachineGun = true;   // [hints] hint_machine_gun: who does what at the machine gun (shared.cpp)
+	bool  hintSwitch  = true;   // [hints] hint_switch: single player, the hero switch button (sp_hero_switch; coop.cpp ShowSwitchHint)
 	float reviveHold    = 5.0f;   // ... seconds the other player holds the grab button by it to revive it
 	float reviveHoldCatapultWindow = 0.4f; // ... under catapult fire: this share of the time between its stones (at most reviveHold)
 	float reviveLimit   = 0.0f;   // ... seconds to revive it before the game over: 0 none, -1 auto (the walk there + reviveGrace)

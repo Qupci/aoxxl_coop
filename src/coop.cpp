@@ -5686,27 +5686,32 @@ static int SoloOwnCatchUp(Trio t, unsigned msg) {
 	return g;
 }
 
-// The hero switch hint (single player, sp_hero_switch; ShowSwitchHint): once
-// per game load after the join hint, and again when the lock ignores a switch of
-// the level's (NoteSwitchHintAgain).
+// The hero switch hint (single player, sp_hero_switch, [hints] hint_switch;
+// ShowSwitchHint): once per game load after the join hint, and once more per
+// game load the first time the lock ignores a switch that changes the level's
+// lead (NoteSwitchHintAgain).
 struct SwitchHint {
 	bool once = false;       // shown since the game started
+	bool againUsed = false;  // the lock's one more time asked for since the game started
 	bool again = false;      // to show again (a switch the lock ignored)
 	int  shownFor = -1;      // the hero leading as it shows (switched: it goes)
 } g_switchHint;
 static void NoteSwitchHintAgain(int to) {
-	static int s_told = 0;
-	if (s_told++ < 20) Log("coop: the switch hint again -- the level's lead is %s, ignored by the lock", HeroName(to));
+	if (g_switchHint.againUsed || !g_config.hintSwitch) return;
+	g_switchHint.againUsed = true;
+	Log("coop: the switch hint again -- the level's lead is %s, ignored by the lock", HeroName(to));
 	g_switchHint.again = true;
 }
 static bool SoloDropsSwitchWhy(int ev);
-// (A switch the lock ignores, the level's lead left with the hero you don't
-// play: the switch hint again -- the level wants you to switch, user.)
+// (A switch the lock ignores that changes the level's lead to the hero you
+// don't play: the switch hint again -- the level wants you to switch, user. A
+// switch to the hero the level's lead already was is no change.)
 static bool SoloDropsSwitch(int ev) {
+	int before = g_solo.levelLeader;
 	bool drop = SoloDropsSwitchWhy(ev);
 	Trio t = drop ? GetTrio() : Trio();
 	int l = t ? t.Leader() : -1;
-	if (drop && (l == HERO_ASTERIX || l == HERO_OBELIX) && g_solo.levelLeader == OtherHero(l))
+	if (drop && g_solo.levelLeader != before && (l == HERO_ASTERIX || l == HERO_OBELIX) && g_solo.levelLeader == OtherHero(l))
 		NoteSwitchHintAgain(g_solo.levelLeader);
 	return drop;
 }
@@ -6306,15 +6311,16 @@ static bool MachineMatesNear(Trio t) {
 	return d.x * d.x + d.z * d.z < 12.0f * 12.0f && fabsf(d.y) < 4.0f;
 }
 
-// A ride both heroes take (a launcher, the belly slide) waits for the other
-// hero within 12 units (6 up or down: a launcher's platform, the slide's slope).
-bool CoopRideMateNear(int hero) {
+// A ride both heroes take waits for the other hero: a launcher within 12 units
+// (6 up or down: its platform), the belly slide within 30 (15 up or down: its
+// slope; still safe there -- user).
+bool CoopRideMateNear(int hero, float range, float height) {
 	Trio t = GetTrio();
 	Hero h = t && (hero == HERO_ASTERIX || hero == HERO_OBELIX) ? t.GetHero(hero) : Hero();
 	Hero o = h ? t.GetHero(OtherHero(hero)) : Hero();
 	if (!h || !o) return true;
 	Vector3 d = h.Pos() - o.Pos();
-	return d.x * d.x + d.z * d.z < 12.0f * 12.0f && fabsf(d.y) < 6.0f;
+	return d.x * d.x + d.z * d.z < range * range && fabsf(d.y) < height;
 }
 
 // Hero `hero`'s ride or machine waits for the other player: the other player's
@@ -6360,7 +6366,7 @@ static bool RefuseFarLauncher(char* hero) {
 		if (t.GetHero(i).raw() == hero) idx = i;
 	if (idx < 0) return false;
 	int other = OtherHero(idx);
-	if (IndivFallen(other) || g.held[other] || CoopRideMateNear(idx)) return false;
+	if (IndivFallen(other) || g.held[other] || CoopRideMateNear(idx, 12.0f, 6.0f)) return false;
 	ec &= ~0x10u;
 	f &= ~0x4000u;
 	CoopWaitingForYou(idx, "launcher");
@@ -6480,7 +6486,7 @@ static void GiveBackLead(Trio t) {
 static void ShowSwitchHint(Trio t) {
 	SwitchHint& h = g_switchHint;
 	int l = t ? t.Leader() : -1;
-	if (g.p2Joined || !g_config.SoloMod() || !g_config.spHeroSwitch || !t) {
+	if (g.p2Joined || !g_config.SoloMod() || !g_config.spHeroSwitch || !g_config.hintSwitch || !t) {
 		if (h.shownFor >= 0) HintHide(HINT_SWITCH);
 		h.shownFor = -1;
 		h.again = false;
