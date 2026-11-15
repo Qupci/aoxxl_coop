@@ -58,7 +58,7 @@ const wchar_t kFirstCode = 0xE100, kLastCode = 0xE1FF;
 const int kAtlasW = 1024, kAtlasH = 512, kCell = 64, kGap = 4;
 
 struct Glyph { wchar_t code; int x, y, w; };
-struct Font  { char* f; size_t glyphs; bool ok, tried; int page; };
+struct Font  { char* f; size_t glyphs; bool ok, tried; int page; DWORD at; };   // at: when it was seen
 
 uint32_t* g_atlas = nullptr;          // kAtlasW x kAtlasH, A8R8G8B8
 int g_penX = kGap, g_penY = kGap;
@@ -72,10 +72,36 @@ bool  g_loaded = false;
 ULONG_PTR g_gdiplus = 0;
 int   g_logs = 0;
 
+// A font read where an old (freed) one was is a new font: its entry starts over.
+void NoteFont(char* f) {
+	for (Font& ft : g_fonts)
+		if (ft.f == f) { ft = { f, 0, false, false, -1, GetTickCount() }; return; }
+	g_fonts.push_back({ f, 0, false, false, -1, GetTickCount() });
+}
+
 char* __cdecl FontReadHook(void* stream) {
 	char* f = g_origFontRead(stream);
-	if (f) g_fonts.push_back({ f, 0, false, false, -1 });
+	if (f) NoteFont(f);
 	return f;
+}
+
+// A language change (Options' language row: each language at once) reads the
+// game's fonts again and frees the old ones: a font no longer CManager2d's
+// (13/16 +8 + id * 4) for 2 s is dropped -- adding a later icon (a keycap
+// drawn when player 2 joins on the keyboard) to a freed font wrote over freed
+// memory and crashed the next text's layout (user, round 289).
+void PruneFonts() {
+	char* m = (char*)GetLvlObject(13, 16, 0);
+	if (!m || *(uintptr_t*)m != 0x623A28) return;
+	DWORD now = GetTickCount();
+	for (size_t i = 0; i < g_fonts.size();) {
+		bool held = false;
+		for (int k = 0; k < 10 && !held; k++) held = *(char**)(m + 8 + 4 * k) == g_fonts[i].f;
+		if (held || now - g_fonts[i].at < 2000) { i++; continue; }
+		static int logs = 0;
+		if (logs++ < 20) Log("icons: font %p is no longer the game's (a language change) -- dropped", g_fonts[i].f);
+		g_fonts.erase(g_fonts.begin() + i);
+	}
 }
 
 // A place for a glyph `w` wide on the page.
@@ -441,6 +467,7 @@ void AddGlyphs(Font& ft) {
 }
 
 void AddToFonts() {
+	PruneFonts();
 	for (Font& ft : g_fonts) if (ft.ok) AddGlyphs(ft);
 }
 
@@ -971,13 +998,14 @@ void FindFonts() {
 		if (!f) continue;
 		bool known = false;
 		for (const Font& ft : g_fonts) if (ft.f == f) known = true;
-		if (!known) g_fonts.push_back({ f, 0, false, false, -1 });
+		if (!known) g_fonts.push_back({ f, 0, false, false, -1, GetTickCount() });
 	}
 }
 
 } // namespace
 
 void IconsFrame() {
+	PruneFonts();
 	FindFonts();
 	bool pending = false;
 	for (const Font& ft : g_fonts) if (!ft.tried) pending = true;
