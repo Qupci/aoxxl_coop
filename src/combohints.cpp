@@ -9,6 +9,7 @@
 #include "kal.h"
 #include "life.h"
 #include "log.h"
+#include "loc.h"
 #include "shared.h"
 #include "trio.h"
 
@@ -226,18 +227,20 @@ void Compose(wchar_t* out, int n, int p, int c, bool crowd, int lit, bool fuse) 
 		if (i) wcscat(keys, L" ");
 		wcscat(keys, HintButtonName(p, s.b[i], i >= lit ? ICON_WAITING : ICON_PRESSED));
 	}
+	// (The names from xxl_coop_lang.ini: the game's own combo names.)
+	static const char* const kKey[C_COUNT] = { "combo_club", "combo_hammer", "combo_twister", "combo_fusion", "combo_mole", "combo_rage" };
 	if (fuse) {
-		swprintf(out, n, L"%sTwister Fusion %s", ic, keys);
+		swprintf(out, n, L"%s%s %s", ic, Loc("combo_fusion"), keys);
 	} else if (crowd) {
-		swprintf(out, n, L"%sSo many Romans: Twister!\n%s", ic, keys);
+		swprintf(out, n, L"%s%s\n%s", ic, Loc("combo_crowd"), keys);
 	} else if (c == C_MOLE) {
 		wchar_t x[32];
 		wcscpy(x, HintButtonName(p, HB_X));
-		swprintf(out, n, L"%s%s Combo\n%s + %s %s ...", ic, kName[c], keys, x, x);
+		swprintf(out, n, L"%s%s\n%s + %s %s ...", ic, Loc(kKey[c]), keys, x, x);
 	} else if (c == C_RAGE) {
-		swprintf(out, n, L"%s%s Combo %s", ic, kName[c], keys);
+		swprintf(out, n, L"%s%s %s", ic, Loc(kKey[c]), keys);
 	} else {
-		swprintf(out, n, L"%s%s Combo\n%s", ic, kName[c], keys);
+		swprintf(out, n, L"%s%s\n%s", ic, Loc(kKey[c]), keys);
 	}
 }
 

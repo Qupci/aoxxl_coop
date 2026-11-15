@@ -47,6 +47,13 @@ if (-not $NoDeploy) {
     New-Item -ItemType Directory -Force $icons | Out-Null
     Get-ChildItem (Join-Path $coop "icons") -Filter *.png | Where-Object { -not (Test-Path (Join-Path $icons $_.Name)) } |
         Copy-Item -Destination $icons
+    # The texts (xxl_coop_lang.ini): copied when missing or older than the repo's
+    # (a copy edited in Game Files since is newer, so it is kept).
+    $lang = Join-Path $coop "dist\xxl_coop_lang.ini"
+    $langDest = Join-Path $game "xxl_coop_lang.ini"
+    if (-not (Test-Path $langDest) -or (Get-Item $lang).LastWriteTime -gt (Get-Item $langDest).LastWriteTime) {
+        Copy-Item $lang $langDest -Force
+    }
 }
 if (Test-Path $shots) { Remove-Item (Join-Path $shots "*") -Force -ErrorAction SilentlyContinue }
 

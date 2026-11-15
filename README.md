@@ -55,8 +55,11 @@ Copy into the game folder next to `axxl.exe`:
 
 * `xxl_coop.asi`
 * `xxl_coop.ini`
+* `xxl_coop_lang.ini` (`coop\dist\`): every text the mod shows, per game language (French, English,
+  German, Spanish, Italian). Edit it to change a hint's words; the game reads it again when it is saved.
+  `run_test.ps1` copies it over unless the copy in `Game Files\` is newer.
 
-Both are already installed in `Game Files\`. The mod writes `xxl_coop.log` there.
+They are already installed in `Game Files\`. The mod writes `xxl_coop.log` there.
 
 With DSOAL as the sound wrapper, also copy `xxl_timerfix.asi` (`coop\timerfix\build.bat`). It is
 separate from the mod. Without it the game runs at ~45 fps instead of 62: the frame limiter's `Sleep`

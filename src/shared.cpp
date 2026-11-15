@@ -8,6 +8,7 @@
 #include "inputmgr.h"
 #include "life.h"
 #include "log.h"
+#include "loc.h"
 #include "trio.h"
 
 #include <intrin.h>
@@ -243,7 +244,7 @@ void ShowModeHint(SharedMode m) {
 	Trio t = GetTrio();
 	if (m != SHARED_FUSION && (!t || !ModeHintHere(m, t))) { HintHide(HINT_MODE); return; }
 	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
-	wchar_t ta[96] = {}, to[96] = {};
+	wchar_t ta[kModeHintLen] = {}, to[kModeHintLen] = {};
 	SharedModeHintText(m, ta, to);
 	DWORD ms = m == SHARED_FUSION ? 500 : 10000;
 	HintShow(HINT_MODE, a, ta, ms);
@@ -252,7 +253,7 @@ void ShowModeHint(SharedMode m) {
 
 } // namespace
 
-// Mode `m`'s who-does-what hint: Asterix's part `ta`, Obelix's `to` (96 each).
+// Mode `m`'s who-does-what hint: Asterix's part `ta`, Obelix's `to` (kModeHintLen each).
 void SharedModeHintText(SharedMode m, wchar_t* ta, wchar_t* to) {
 	int a = g.owner[HERO_ASTERIX], o = g.owner[HERO_OBELIX];
 	ta[0] = to[0] = 0;
@@ -261,27 +262,30 @@ void SharedModeHintText(SharedMode m, wchar_t* ta, wchar_t* to) {
 	const wchar_t* lrA = IconsRewrite(L"\xE008\xE007", a, DIRS_MOVE);
 	const wchar_t* lrO = IconsRewrite(L"\xE008\xE007", o, DIRS_MOVE);
 	const wchar_t* udO = IconsRewrite(L"\xE005\xE006", o, DIRS_MOVE);
+	// (Texts from xxl_coop_lang.ini; an empty {hero}: none, as the user's words.)
+	const wchar_t* hA = HintHeroName(HERO_ASTERIX);
+	const wchar_t* hO = HintHeroName(HERO_OBELIX);
 	switch (m) {
 	case SHARED_GUN:
-		swprintf(ta, 96, L"%s Fire %s", HintHeroName(HERO_ASTERIX), HintButtonName(a, HB_X));
-		swprintf(to, 96, L"%s Move left and right %s", HintHeroName(HERO_OBELIX), lrO);
+		LocFormat(ta, kModeHintLen, "fire", { { "hero", hA }, { "button", HintButtonName(a, HB_X) } });
+		LocFormat(to, kModeHintLen, "move_left_right", { { "hero", hO }, { "stick", lrO } });
 		break;
 	case SHARED_GUN_SOLO:   // Asterix alone on the gun
-		swprintf(ta, 96, L"Fire %s", HintButtonName(a, HB_X));
-		swprintf(to, 96, L"%s is waiting for you", HintHeroName(HERO_ASTERIX));
+		LocFormat(ta, kModeHintLen, "fire", { { "hero", L"" }, { "button", HintButtonName(a, HB_X) } });
+		LocFormat(to, kModeHintLen, "waiting_for_you", { { "hero", hA } });
 		break;
 	case SHARED_GUN_OBELIX:   // Obelix alone on the gun
-		swprintf(ta, 96, L"%s is waiting for you", HintHeroName(HERO_OBELIX));
-		swprintf(to, 96, L"Move left and right %s", lrO);
+		LocFormat(ta, kModeHintLen, "waiting_for_you", { { "hero", hO } });
+		LocFormat(to, kModeHintLen, "move_left_right", { { "hero", L"" }, { "stick", lrO } });
 		break;
 	case SHARED_BOAT:
 	case SHARED_SLIDE:
-		swprintf(ta, 96, L"%s Steer %s", HintHeroName(HERO_ASTERIX), lrA);
-		swprintf(to, 96, L"%s Jump %s", HintHeroName(HERO_OBELIX), HintButtonName(o, HB_A));
+		LocFormat(ta, kModeHintLen, "steer", { { "hero", hA }, { "stick", lrA } });
+		LocFormat(to, kModeHintLen, "jump", { { "hero", hO }, { "button", HintButtonName(o, HB_A) } });
 		break;
 	default:   // the Twister Fusion: Asterix left / right and the camera, Obelix forward / back
-		swprintf(ta, 96, L"%s Move left and right %s", HintHeroName(HERO_ASTERIX), lrA);
-		swprintf(to, 96, L"%s Move front and back %s", HintHeroName(HERO_OBELIX), udO);
+		LocFormat(ta, kModeHintLen, "move_left_right", { { "hero", hA }, { "stick", lrA } });
+		LocFormat(to, kModeHintLen, "move_front_back", { { "hero", hO }, { "stick", udO } });
 		break;
 	}
 }

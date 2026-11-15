@@ -39,6 +39,7 @@
 #include "nolock.h"
 #include "guard.h"
 #include "pathfind.h"
+#include "loc.h"
 
 #include <intrin.h>
 #include <cmath>
@@ -3386,10 +3387,9 @@ void HeroSwapFrame(const PadState& p2, DWORD now, bool blocked) {
 		// Only the other player's box asks (user): "Confirm hero switch [its button]",
 		// for as long as the asker holds its button.
 		int other = 1 - k;
-		wchar_t button = SwitchGlyph(other);
-		wchar_t text[96];
-		if (button) swprintf(text, 96, L"Confirm hero switch %c", button);
-		else swprintf(text, 96, L"Confirm hero switch");
+		wchar_t button[2] = { SwitchGlyph(other), 0 };
+		wchar_t text[160];
+		LocFormat(text, 160, "confirm_switch", { { "button", button } });
 		HintShow(HINT_SWAP, other, text, 600000);
 		Log("coop: player %d asks for a hero swap", k + 1);
 		break;
@@ -6064,8 +6064,8 @@ static void WatchSpinHint(int idx, Hero h) {
 	Hero o = t ? t.GetHero(other) : Hero();
 	if (!o || IndivFallen(other) || (h.Pos() - o.Pos()).len2() > kPassRange * kPassRange) return;
 	g.spinHints[idx]++;
-	wchar_t text[96];
-	swprintf(text, 96, L"Pass %s the enemy to %s", HintButtonName(player, HB_LB), HintHeroName(other));
+	wchar_t text[160];
+	LocFormat(text, 160, "pass_enemy", { { "button", HintButtonName(player, HB_LB) }, { "hero", HintHeroName(other) } });
 	HintShow(HINT_PASS, player, text, 8000);
 	Log("coop: hint %d/3: %s can pass the spinning Roman with LB", g.spinHints[idx], HeroName(idx));
 }
@@ -6338,8 +6338,8 @@ void CoopWaitingForYou(int hero, const char* what) {
 		if (s_told++ < 40) Log("coop: %s at the %s waits for %s (not near)", HeroName(hero), what, HeroName(away));
 	}
 	s_last = now;
-	wchar_t text[96];
-	swprintf(text, 96, L"%s is waiting for you", HintHeroName(hero));
+	wchar_t text[160];
+	LocFormat(text, 160, "waiting_for_you", { { "hero", HintHeroName(hero) } });
 	HintShow(HINT_MACHINE, away == g.p1Hero ? 0 : 1, text, 4000);
 }
 
@@ -6505,9 +6505,8 @@ static void ShowSwitchHint(Trio t) {
 	// Right after the join hint (user), once play can start.
 	if (g.joinHintPending || HintShown(HINT_JOIN, 0) || !CoopGameplayLive() || CutsceneBars() || g.cutsceneHold > 0) return;
 	if (l != HERO_ASTERIX && l != HERO_OBELIX) return;
-	wchar_t button = SwitchGlyph(0), text[96];
-	if (button) swprintf(text, 96, L"%c  Switch to %s", button, HintHeroName(OtherHero(l)));
-	else swprintf(text, 96, L"Switch to %s", HintHeroName(OtherHero(l)));
+	wchar_t button[2] = { SwitchGlyph(0), 0 }, text[160];
+	LocFormat(text, 160, "switch_to", { { "button", button }, { "hero", HintHeroName(OtherHero(l)) } });
 	HintShow(HINT_SWITCH, 0, text, 6000);
 	Log("coop: the switch hint (%s): switch to %s", h.once ? "again" : "first", HeroName(OtherHero(l)));
 	h.once = true;
@@ -6524,14 +6523,15 @@ static void ShowJoinHint(Trio t) {
 	// "[player 2's hero] Join CO-OP mode [Start]/[Enter]" (the keyboard's key only
 	// with the keyboard free for player 2).
 	int hero = g_config.p2Hero == HERO_ASTERIX || g_config.p2Hero == HERO_OBELIX ? g_config.p2Hero : OtherHero(t.Leader());
-	wchar_t start[8] = {};
+	wchar_t start[32] = {};
 	if (wchar_t g = IconGlyph("pad_start")) start[0] = g;
-	else wcscpy(start, L"Start");
-	wchar_t text[96];
+	else wcsncpy(start, Loc("button_start"), 31);
+	wchar_t text[160];
 	if (g_config.keyboard && Player1Pad() != kKeyboardPad)
-		swprintf(text, 96, L"%s Join CO-OP mode %s/%s", HintHeroName(hero), start, HintKeyName(g_config.keys[CoopConfig::KEY_START]));
+		LocFormat(text, 160, "join", { { "hero", HintHeroName(hero) }, { "start", start },
+		                               { "key", HintKeyName(g_config.keys[CoopConfig::KEY_START]) } });
 	else
-		swprintf(text, 96, L"%s Join CO-OP mode %s", HintHeroName(hero), start);
+		LocFormat(text, 160, "join_pad_only", { { "hero", HintHeroName(hero) }, { "start", start } });
 	HintShow(HINT_JOIN, 0, text, 10000);
 }
 
@@ -6574,8 +6574,8 @@ static void WatchLifterHint(Trio t) {
 		// the turnstile's zone 03C8 on his way here: WatchUnfinishedSequence.)
 		if (GetTickCount() - since < 4000) return;
 		// To the missing hero's player: "[hero on it] is waiting for you" (the rides' words: user).
-		wchar_t text[64];
-		swprintf(text, 64, L"%s is waiting for you", HintHeroName(OtherHero(missing)));
+		wchar_t text[160];
+		LocFormat(text, 160, "waiting_for_you", { { "hero", HintHeroName(OtherHero(missing)) } });
 		HintShow(HINT_LIFTER, missing == g.p1Hero ? 0 : 1, text, 300);
 		return;
 	}

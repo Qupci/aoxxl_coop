@@ -8,6 +8,7 @@
 #include "kal.h"
 #include "life.h"
 #include "log.h"
+#include "loc.h"
 #include "pathfind.h"
 #include "trio.h"
 
@@ -1193,7 +1194,9 @@ bool TimeLimit(int down, Hero h, int up, bool holding, float dt, DWORD now) {
 	g.limitHintAt = now;
 	wchar_t text[160];
 	// (One line; the box keeps its width as the seconds go down: hints.cpp.)
-	swprintf(text, 160, L"%s needs help! %ds left", HintHeroName(down), SecondsLeft(down));
+	wchar_t secs[16];
+	swprintf(secs, 16, L"%d", SecondsLeft(down));
+	LocFormat(text, 160, "needs_help", { { "hero", HintHeroName(down) }, { "seconds", secs } });
 	// (Single player: in the left box -- in player 1's, with the revive's own
 	// hints and bar there, the two took turns every 250 ms: user.)
 	HintShow(HINT_REVIVE, box, text, 600);
@@ -1870,8 +1873,8 @@ void IndivFrame() {
 		if (holding) {
 			g.revive[i] += dt;
 			// The box itself is the bar (hints.cpp HintProgress).
-			wchar_t text[128];
-			swprintf(text, 128, L"Reviving %s", HintHeroName(i));
+			wchar_t text[160];
+			LocFormat(text, 160, "reviving", { { "hero", HintHeroName(i) } });
 			HintShow(HINT_REVIVE, PlayerOf(up), text, 500);
 			HintProgress(HINT_REVIVE, PlayerOf(up), g.revive[i] / hold);
 			if (g.revive[i] >= hold) {
@@ -1886,8 +1889,8 @@ void IndivFrame() {
 			g.revive[i] = 0.0f;
 			if (close && now - g.hintAt > 400) {
 				g.hintAt = now;
-				wchar_t text[128];
-				swprintf(text, 128, L"Hold %s to revive %s", HintButtonName(PlayerOf(up), HB_B), HintHeroName(i));
+				wchar_t text[160];
+				LocFormat(text, 160, "hold_to_revive", { { "button", HintButtonName(PlayerOf(up), HB_B) }, { "hero", HintHeroName(i) } });
 				HintShow(HINT_REVIVE, PlayerOf(up), text, 600);
 			}
 		}

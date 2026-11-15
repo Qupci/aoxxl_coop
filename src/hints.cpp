@@ -8,6 +8,7 @@
 #include "individual.h"
 #include "inputmgr.h"
 #include "log.h"
+#include "loc.h"
 #include "pads.h"
 #include "splitscreen.h"
 
@@ -382,6 +383,15 @@ void LayOutSlot(Slot& s, int si, const char* game) {
 
 // The sparkles' and the heroes' glyphs, each laid out once per interface.
 void LayOutGlyphs(const char* game) {
+	// A language change loads the game's fonts again (the old one freed): the
+	// glyphs' copies are laid out again with the new one (text +0x20 +0x660).
+	static void* s_font = nullptr;
+	void* font = *(void* const*)(game + 0x20 + 0x660);
+	if (font != s_font) {
+		if (s_font) Log("hints: the game's font changed (a language change) -- the glyphs laid out again");
+		s_font = font;
+		for (int i = 0; i < kGlyphs; i++) g_glyphLaid[i] = false;
+	}
 	for (int i = 0; i < kGlyphs; i++) {
 		if (g_glyphLaid[i]) continue;
 		wchar_t c = i < 4 ? IconSparkGlyph(i) : i < 8 ? IconGlowGlyph(i - 4) : IconGlyph(i == kHeroGlyph ? "asterix" : "obelix");
@@ -461,6 +471,9 @@ void UpdateSlot(int p, char* itf, float dt, char* tpl = nullptr) {
 	// oddly: user), but a combo hint's right-aligned in a box at the right (user).
 	bool right = !pl.left && kind == 2 && (ident == HINT_COMBO || ident == HINT_FUSE);
 	DWORD now = GetTickCount();
+	// The box's copy keeps the game's font of its layout; a language change frees
+	// it (drawing with it crashed): laid out again with the game's new one.
+	if (s.laid && *(void**)(s.obj + 0x20 + 0x660) != *(void**)(game + 0x20 + 0x660)) s.laid = false;
 	if (kind == s.kind && ident == s.ident) {
 		s.pendKind = -1;
 		s.leaving = false;
@@ -542,6 +555,22 @@ bool HudUp(char* itf) {
 // (a word is drawn at its text's place y - 1 + its own y): where they are meant.
 const float kAboveScreen = 1.5f;
 
+// A box's plate, up and down (`bottom`, height `h`: shares of the screen's
+// height from the bottom), the game's prompt plate (`plate`, as the game left
+// it) moved up by `up`: every box centred where the game's one-line box is --
+// two lines no lower than one (user) -- and taller by kHeroPlateExtra of the
+// game's plate with a hero's icon (drawn half as big again: the same padding
+// round it as round the text, user), kept on the screen.
+const float kHeroPlateExtra = 0.46f;   // (measured: icon ink 36 px, capitals 15 px on a 49 px plate at 540)
+void PlateSpan(const Slot& s, const float* plate, float up, float* bottom, float* h) {
+	uint8_t ay = ((const uint8_t*)plate)[7];
+	float h1 = plate[14] + 0.015f, y1 = plate[6] + up;
+	float mid = (ay == 0 ? y1 - h1 : ay == 2 ? y1 : y1 - h1 * 0.5f) + h1 * 0.5f;
+	*h = plate[14] * s.nLines + 0.015f + (s.nHeroes > 0 ? kHeroPlateExtra * plate[14] : 0.0f);
+	*bottom = mid - *h * 0.5f;
+	if (*bottom < 0.01f) *bottom = 0.01f;
+}
+
 // A box's place as drawn (its text's x, how far up), its slide in or out
 // included -- sideways from its edge, or up from below the screen (fromBelow:
 // as far down as its top). `plate`: the game's prompt plate, as the game left it.
@@ -550,12 +579,11 @@ void BoxPlace(int p, const Slot& s, const float* plate, float* x, float* up) {
 	float w = s.longest / Aspect();
 	float e = 1.0f - (1.0f - s.in) * (1.0f - s.in);
 	float aside = p == HINT_LEFT_BOX && !CoopP2Joined() ? g_leftAside : 0.0f;
-	*up = pl.up + (s.nLines > 2 ? s.step * (s.nLines - 2) : 0.0f);
+	*up = pl.up;
 	if (s.fromBelow && plate) {
-		float y = plate[6] - 0.012f * (s.nLines - 1) + *up, h = plate[14] * s.nLines + 0.015f;
-		uint8_t ay = ((const uint8_t*)plate)[7];
-		float top = (ay == 0 ? y - h : ay == 2 ? y : y - h * 0.5f) + h;
-		*up -= (1.0f - e) * (top + 0.01f);
+		float bottom, h;
+		PlateSpan(s, plate, *up, &bottom, &h);
+		*up -= (1.0f - e) * (bottom + h + 0.01f);
 		*x = (pl.left ? kEdge : 1.0f - kEdge - w) + aside;
 		return;
 	}
@@ -662,10 +690,16 @@ void DrawSlot(int p, char* game, float* plate, void* arg) {
 	Slot& s = g_slots[p];
 	if (!s.kind || !s.laid || s.in <= 0.0f) return;
 	if (!game) return;
+	// A language change frees the game's font: a copy laid out with the old one
+	// is not drawn (it crashed in the font's draw, 0x5FF070, on resuming) until
+	// the interface's tick lays it out again (UpdateSlot); the glyphs alike.
+	void* font = *(void**)(game + 0x20 + 0x660);
+	for (int i = 0; i < kGlyphs; i++)
+		if (g_glyphLaid[i] && *(void**)(g_glyphObj[i] + 0x20 + 0x660) != font) g_glyphLaid[i] = false;
+	if (*(void**)(s.obj + 0x20 + 0x660) != font) { s.laid = false; return; }
 	Place pl = PlaceOf(p);
 	float a = Aspect();
 	float w = s.longest / a;
-	// Lines go down from the prompt's line; more than two: the box goes up.
 	float x, up;
 	BoxPlace(p, s, plate && *(uintptr_t*)plate == 0x6235C0 ? plate : nullptr, &x, &up);
 	float y = ((float*)game)[6] + up;
@@ -677,12 +711,12 @@ void DrawSlot(int p, char* game, float* plate, void* arg) {
 		pb[6] = pl.left ? 0 : 2;
 		plate[5] = pl.left ? x - kMargin : x + w + kMargin;
 		plate[13] = (w + 2.0f * kMargin) / PlateDrawScale();
-		plate[14] = sv[3] * s.nLines + 0.015f;
-		plate[6] = sv[1] - 0.012f * (s.nLines - 1) + up;
-		// The text's lines centred on the plate, up and down.
-		float ph = plate[14];
+		float bottom, ph;
+		PlateSpan(s, plate, up, &bottom, &ph);
 		uint8_t ay = pb[7];
-		float bottom = ay == 0 ? plate[6] - ph : ay == 2 ? plate[6] : plate[6] - ph * 0.5f;
+		plate[14] = ph;
+		plate[6] = ay == 0 ? bottom + ph : ay == 2 ? bottom : bottom + ph * 0.5f;
+		// The text's lines centred on the plate, up and down.
 		float wy0 = s.nWords ? s.wy[0] : 0.0f;
 		y = bottom + ph * 0.5f + 1.0f - wy0 - kInkMid * s.size + s.step * (s.nLines - 1) * 0.5f;
 		// (XXL_HINTLOG: the plate as drawn, once a box is in place -- the autotests'
@@ -909,7 +943,7 @@ const wchar_t* HintButtonName(int player, HintButton b, int look) {
 		if (!g) vk = IconsP1Vk(kAction[b]);
 	}
 	if (g) { out[0] = g; out[1] = 0; return out; }
-	if (!vk) return kPad[b];
+	if (!vk) return b == HB_START ? Loc("button_start") : b == HB_BACK ? Loc("button_back") : kPad[b];
 	IconsKeyName(vk, out, 32);
 	return out;
 }
@@ -934,7 +968,7 @@ const wchar_t* HintHeroName(int hero) {
 	static int n = 0;
 	wchar_t* out = buf[n++ & 3];
 	wchar_t g = IconGlyph(hero == HERO_ASTERIX ? "asterix" : "obelix");
-	const wchar_t* name = hero == HERO_ASTERIX ? L"Asterix" : L"Obelix";
+	const wchar_t* name = Loc(hero == HERO_ASTERIX ? "hero_asterix" : "hero_obelix");
 	// With its icon, the icon alone (drawn bigger than the text: the user's designer).
 	if (g) swprintf(out, 24, L"%c", g);
 	else swprintf(out, 24, L"%s", name);
@@ -952,10 +986,14 @@ const wchar_t* HintHero(int hero, int player) {
 }
 
 const wchar_t* HintPlayer(int player) {
-	static wchar_t buf[2][16];
+	static wchar_t buf[2][32];
 	wchar_t g = IconGlyph(player ? "p2" : "p1");
-	if (g) swprintf(buf[player != 0], 16, L"%c", g);
-	else swprintf(buf[player != 0], 16, L"Player %d:", player + 1);
+	if (g) swprintf(buf[player != 0], 32, L"%c", g);
+	else {
+		wchar_t num[4];
+		swprintf(num, 4, L"%d", player + 1);
+		LocFormat(buf[player != 0], 32, "player", { { "n", num } });
+	}
 	return buf[player != 0];
 }
 
@@ -1040,11 +1078,10 @@ bool HintBoxRect(int player, float* left, float* right, float* bottom, float* to
 	float w = s.longest / Aspect();
 	float x, up;
 	BoxPlace(player, s, plate, &x, &up);
-	float y = plate[6] - 0.012f * (s.nLines - 1) + up, h = plate[14] * s.nLines + 0.015f;
-	uint8_t ay = ((uint8_t*)plate)[7];
+	float h;
+	PlateSpan(s, plate, up, bottom, &h);
 	*left = x - kMargin;
 	*right = x + w + kMargin;
-	*bottom = ay == 0 ? y - h : ay == 2 ? y : y - h * 0.5f;
 	*top = *bottom + h;
 	return true;
 }

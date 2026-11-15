@@ -8,6 +8,7 @@
 #include "inputmgr.h"
 #include "kal.h"
 #include "log.h"
+#include "loc.h"
 #include "p2cam.h"
 #include "pads.h"
 #include "trio.h"
@@ -206,12 +207,12 @@ RowColoursFn g_origRowColours = nullptr;
 // Configuration says; Escape / B keeps the old one).
 enum RowKind { RK_TOGGLE, RK_NUMBER, RK_BIND };
 enum RowId { R_SWITCH, R_INVX, R_INVY, R_DEADZONE, kNumRows };
-struct RowDef { const wchar_t* name; RowKind kind; bool page4; };
+struct RowDef { const char* name; RowKind kind; bool page4; };   // name: its xxl_coop_lang.ini key
 const RowDef kRows[kNumRows] = {
-	{ L"Switch hero", RK_BIND, false },
-	{ L"Invert Camera X", RK_TOGGLE, false },
-	{ L"Invert Camera Y", RK_TOGGLE, false },
-	{ L"Deadzone", RK_NUMBER, true },
+	{ "row_switch_hero", RK_BIND, false },
+	{ "row_invert_camera_x", RK_TOGGLE, false },
+	{ "row_invert_camera_y", RK_TOGGLE, false },
+	{ "row_deadzone", RK_NUMBER, true },
 };
 const float kPage3Step = 0.075f;    // page 3's nine rows, 0.842 down to 0.242
 const float kPage4Step = 0.075f;
@@ -361,17 +362,25 @@ const char* PadButtonName(uint16_t bit) {
 		if (CoopConfig::kPadButtons[i].bit == bit) return CoopConfig::kPadButtons[i].name;
 	return "none";
 }
+// "D-pad Up" (xxl_coop_lang.ini's dpad with the direction `dir`: "dir_up"...).
+const wchar_t* DirTitle(const char* what, const char* dir) {
+	static wchar_t buf[4][64];
+	static int k = 0;
+	wchar_t* out = buf[k++ & 3];
+	LocFormat(out, 64, what, { { "dir", Loc(dir) } });
+	return out;
+}
 const wchar_t* PadButtonTitle(uint16_t bit) {
 	switch (bit) {
-	case 0x0001: return L"D-pad Up";    case 0x0002: return L"D-pad Down";
-	case 0x0004: return L"D-pad Left";  case 0x0008: return L"D-pad Right";
-	case 0x0010: return L"Start";       case 0x0020: return L"Back";
+	case 0x0001: return DirTitle("dpad", "dir_up");    case 0x0002: return DirTitle("dpad", "dir_down");
+	case 0x0004: return DirTitle("dpad", "dir_left");  case 0x0008: return DirTitle("dpad", "dir_right");
+	case 0x0010: return Loc("button_start");           case 0x0020: return Loc("button_back");
 	case 0x0040: return L"L3";          case 0x0080: return L"R3";
 	case 0x0100: return L"LB";          case 0x0200: return L"RB";
 	case 0x1000: return L"A";           case 0x2000: return L"B";
 	case 0x4000: return L"X";           case 0x8000: return L"Y";
 	}
-	return L"None";
+	return Loc("none");
 }
 
 // The game's 23 binding rows (labels +0x10C + i*4, values +0x168 + i*4): Up,
@@ -390,12 +399,12 @@ const int kP2KeyOf[kGameRows] = { C::KEY_UP, C::KEY_DOWN, C::KEY_LEFT, C::KEY_RI
 
 void KeyTitle(int vk, wchar_t* out, int n) {
 	if (vk) IconsKeyName(vk, out, n);
-	else wcsncpy(out, L"None", n - 1);
+	else wcsncpy(out, Loc("none"), n - 1);
 }
 
 // Player 2's value of game row `i`.
 void P2RowText(int i, wchar_t* out, int n) {
-	static const wchar_t* const kDir[4] = { L"Up", L"Down", L"Left", L"Right" };
+	static const char* const kDir[4] = { "dir_up", "dir_down", "dir_left", "dir_right" };
 	out[0] = 0;
 	if (g_p2Dev == 1) {
 		int k = kP2KeyOf[i];
@@ -407,11 +416,11 @@ void P2RowText(int i, wchar_t* out, int n) {
 	}
 	int b = kP2PadOf[i];
 	if (b >= 0) { wcsncpy(out, PadButtonTitle(g_config.p2Pad[b]), n - 1); return; }
-	if (i <= 3) swprintf(out, n, L"Left Stick %s", kDir[i]);
-	else if (i >= 12 && i <= 15) swprintf(out, n, L"D-pad %s", kDir[i - 12]);
+	if (i <= 3) wcsncpy(out, DirTitle("left_stick", kDir[i]), n - 1);
+	else if (i >= 12 && i <= 15) wcsncpy(out, DirTitle("dpad", kDir[i - 12]), n - 1);
 	else if (i == 16) wcsncpy(out, PadButtonTitle(g_config.p2Pad[C::P2B_JUMP]), n - 1);
 	else if (i == 17) wcsncpy(out, PadButtonTitle(g_config.p2Pad[C::P2B_GRAB]), n - 1);
-	else if (i >= 18 && i <= 21) swprintf(out, n, L"Right Stick %s", kDir[i - 18]);
+	else if (i >= 18 && i <= 21) wcsncpy(out, DirTitle("right_stick", kDir[i - 18]), n - 1);
 }
 
 uint32_t g_gameRowIds[kGameRows];
@@ -492,11 +501,12 @@ void BarIn(char* opt) {
 	char*& colour = *(char**)(g_bar + 0x68C);
 	if (colour) { memcpy(g_barColour, colour, sizeof(g_barColour)); colour = g_barColour; }
 	g_bar[5] &= ~4;
-	wchar_t text[40];
-	wchar_t g = IconGlyph(g_view ? "p2" : "p1");
-	if (coop) wcscpy(text, L"CO-OP Options");
-	else if (g) swprintf(text, 40, L"%c Controls", g);
-	else swprintf(text, 40, L"P%d Controls", g_view + 1);
+	wchar_t text[64];
+	wchar_t g[4] = { IconGlyph(g_view ? "p2" : "p1"), 0 };
+	if (!g[0]) swprintf(g, 4, L"P%d", g_view + 1);
+	if (coop) wcsncpy(text, Loc("menu_coop_options"), 63);
+	else LocFormat(text, 64, "menu_controls", { { "player", g } });
+	text[63] = 0;
 	((SetTextFn)0x42E590)(g_bar + 0x20, nullptr, HintsModString(31, text));
 	float w = HintsTextWidth(g_bar);
 	*(float*)(g_bar + 0x14) = 0.5f + 0.5f * w + 0.01f;   // the middle of the bar
@@ -509,7 +519,7 @@ void BarIn(char* opt) {
 
 // A row's label and value texts (the label with its button's icon, as the game's rows).
 void RowTexts(char* opt, int i, wchar_t* label, wchar_t* value, int n) {
-	wcsncpy(label, kRows[i].name, n - 1);
+	wcsncpy(label, Loc(kRows[i].name), n - 1);
 	label[n - 1] = 0;
 	value[0] = 0;
 	bool pad = OnPad(opt);
@@ -518,7 +528,7 @@ void RowTexts(char* opt, int i, wchar_t* label, wchar_t* value, int n) {
 		uint16_t bit = g_view ? g_config.p2Pad[C::P2B_SWITCH] : g_config.spSwitchButton;
 		int vk = g_view ? g_config.keys[C::KEY_SWITCH] : g_config.spSwitchKey;
 		wchar_t g = pad ? IconPadButtonGlyph(bit) : IconKeyGlyph(vk);
-		if (g) swprintf(label, n, L"%s %c", kRows[i].name, g);
+		if (g) swprintf(label, n, L"%s %c", Loc(kRows[i].name), g);
 		if (g_binding == i) wcsncpy(value, L"...", n - 1);
 		else if (pad) wcsncpy(value, PadButtonTitle(bit), n - 1);
 		else KeyTitle(vk, value, n);
@@ -1079,7 +1089,7 @@ void PauseIn(char* pause) {
 	*(float*)(g_pItem + 0x18) = y0 - 0.5f * step;   // below Options (itself half a row up)
 	if (g_pItem[5] & 4) ((void(__fastcall*)(char*, void*))(*(void***)g_pItem)[0x64 / 4])(g_pItem, nullptr);   // unfocused, its colour too
 	g_pItem[5] &= ~4;
-	((SetTextFn)0x42E590)(g_pItem + 0x20, nullptr, HintsModString(128, L"CO-OP Options"));
+	((SetTextFn)0x42E590)(g_pItem + 0x20, nullptr, HintsModString(128, Loc("menu_coop_options")));
 	LinkAfter(list, options, g_pItem);
 	g_pList = list;
 	Log("ctrlopts: \"CO-OP Options\" put in the pause menu (%.3f below Options)", step);
@@ -1089,6 +1099,17 @@ void __fastcall PauseTickHook(char* pause, void* edx, uint32_t arg) {
 	g_pauseTick = GetTickCount();
 	if (*(int*)(pause + 0x20) != -1) PauseIn(pause);
 	if (g_pList) {
+		// A language change (Options' language row) loads the fonts and texts again,
+		// the old font freed: the item's copy takes Options' new one (drawing with
+		// the old one crashed on resuming) and its text in the new language.
+		char* opt = *(char**)(pause + 0x34);
+		if (opt && *(uintptr_t*)opt == kVtTextButton &&
+		    *(void**)(g_pItem + 0x20 + 0x660) != *(void**)(opt + 0x20 + 0x660)) {
+			*(void**)(g_pItem + 0x20 + 0x660) = *(void**)(opt + 0x20 + 0x660);
+			*(void**)(g_pItem + 0x20 + 4) = *(void**)(opt + 0x20 + 4);
+			((SetTextFn)0x42E590)(g_pItem + 0x20, nullptr, HintsModString(128, Loc("menu_coop_options")));
+			Log("ctrlopts: the game's font changed (a language change) -- \"CO-OP Options\" laid out again");
+		}
 		if (g_coopState == 5) { Focus(g_pItem); CoopState(0); }
 		char* view = *(char**)(pause + 0x18);
 		if ((g_pItem[5] & 4) && view && ((ViewActionFn)0x4358B0)(view, nullptr, 4)) {

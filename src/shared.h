@@ -21,6 +21,7 @@ enum SharedMode { SHARED_NONE, SHARED_GUN, SHARED_GUN_SOLO, SHARED_BOAT, SHARED_
 SharedMode SharedCurrentMode();
 unsigned SharedModeAgeMs();   // how long the current mode has been on
 const char* SharedModeName(SharedMode m);
-// Mode `m`'s who-does-what hint: Asterix's part in `ta`, Obelix's in `to` (96
-// characters each; empty: none).
+// Mode `m`'s who-does-what hint: Asterix's part in `ta`, Obelix's in `to`
+// (kModeHintLen characters each; empty: none).
+const int kModeHintLen = 160;
 void SharedModeHintText(SharedMode m, wchar_t* ta, wchar_t* to);

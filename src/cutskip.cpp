@@ -4,6 +4,7 @@
 #include "icons.h"
 #include "kal.h"
 #include "log.h"
+#include "loc.h"
 #include "pads.h"
 
 #include <windows.h>
@@ -74,9 +75,9 @@ void ShowPrompt(DWORD ms, float progress) {
 	if (g.keyboard) g1 = IconKeyGlyph(VK_RETURN, pressed ? ICON_PRESSED : ICON_WAITING);
 	else g1 = IconGlyph(pressed ? "pad_a_press" : "pad_a");
 	if (!g1 && !g.keyboard && pressed) g1 = IconGlyph("pad_a");
-	wchar_t text[64];
-	if (g1) swprintf(text, 64, L"Hold %c to skip", g1);
-	else swprintf(text, 64, L"Hold %s to skip", g.keyboard ? L"Enter" : L"A");
+	wchar_t text[160], button[8] = { g1, 0 };
+	if (!g1) wcscpy(button, g.keyboard ? L"Enter" : L"A");
+	LocFormat(text, 160, "hold_to_skip", { { "button", button } });
 	HintShow(HINT_SKIP, g.player, text, ms);
 	HintProgress(HINT_SKIP, g.player, progress);
 	g.shown = true;

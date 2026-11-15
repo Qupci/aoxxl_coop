@@ -19,6 +19,7 @@
 #include "icons.h"
 #include "combohints.h"
 #include "shared.h"
+#include "loc.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -61,7 +62,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_DISARM, S_NOCLOCK, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_DISARM, S_NOCLOCK, S_LANG, S_LANGRIGHT, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -743,6 +744,55 @@ const Step kHintCatalog[] = {
 	HC2(56500, 23, 0, "hc_29_skip_coop"),
 	END(58000),
 };
+// hintlang (-Level 2, XXL_GAMELANG=0..4): the game switched to that language
+// (its options menu's way), then the mod's texts in it (xxl_coop_lang.ini): the
+// join and countdown hints single player, then player 2 joins and the hints in
+// both boxes; then player 2's pause menu (the CO-OP Options item), Options,
+// Controls pages 1, 3 (Switch hero, Invert Camera) and 4 (Deadzone), CO-OP Options.
+#define P2TAPL(t, btn, n) VPAD(t, 1, btn, 0, 0, n), VPAD(t + 120, 1, 0, 0, 0, "p2 release")
+const Step kHintLang[] = {
+	MARK(0, "hintlang"),
+	// The game's language from the pause menu's Options (as a player does): its
+	// language row (first, focused), right until it is XXL_GAMELANG's, down to Apply,
+	// confirm; the "overwrite the options data?" box (NO focused): left to YES, confirm
+	// -- the player's saved options are written (user: fine); "save done" box's
+	// CONTINUE confirmed; out to the pause menu, up to Resume, confirm.
+	{ 1500, S_POKE8, -3, 2, 0, 0, 0, "pause menu" },
+	OPT_PRESS(2500, 17, 33, 53, "down"), OPT_PRESS(3000, 17, 33, 53, "down"), OPT_PRESS(3500, 20, 44, 56, "confirm (options)"),
+	SHOT(4800, "hl_00a_options"),
+	{ 5000, S_LANGRIGHT, 0 }, { 5500, S_LANGRIGHT, 1 }, { 6000, S_LANGRIGHT, 2 }, { 6500, S_LANGRIGHT, 3 },
+	SHOT(6900, "hl_00b_language"),
+	{ 7000, S_LANGRIGHT, 4 },
+	OPT_PRESS(7500, 17, 33, 53, "down"), OPT_PRESS(7900, 17, 33, 53, "down"), OPT_PRESS(8300, 17, 33, 53, "down"),
+	OPT_PRESS(8700, 17, 33, 53, "down"), OPT_PRESS(9100, 17, 33, 53, "down (apply)"), OPT_PRESS(9600, 20, 44, 56, "confirm (apply)"),
+	SHOT(10800, "hl_00c_overwrite"),
+	OPT_PRESS(11200, 18, 34, 54, "left (yes)"), SHOT(11800, "hl_00d_yes"), OPT_PRESS(12200, 20, 44, 56, "confirm (yes)"),
+	SHOT(14000, "hl_00e_saved"), OPT_PRESS(14400, 20, 44, 56, "confirm (continue)"),
+	{ 15200, S_BIND, 21, 0, 0, 0, 0, "cancel (options)" }, SHOT(16300, "hl_00f_pause"),
+	OPT_PRESS(16700, 16, 32, 52, "up"), OPT_PRESS(17100, 16, 32, 52, "up (resume)"), OPT_PRESS(17500, 20, 44, 56, "confirm (resume)"),
+	SHOT(19000, "hl_00g_game"),
+	HC1(23000, 0, 0, "hl_01_join"), HC1(24500, 1, 7, "hl_02_countdown_left"), HC1(26000, 0, 24, "hl_03_skip_held"),
+	VPAD(27500, 1, PAD_START, 0, 0, "p2 start"), VPAD(27700, 1, 0, 0, 0, "p2 release"),
+	HC2(30000, 2, 0, "hl_04_pass"), HC2(31500, 3, 0, "hl_05_waiting"), HC2(33000, 10, 0, "hl_06_hold_revive"),
+	HC2(34500, 9, 0, "hl_07_reviving"), HC2(36000, 8, 0, "hl_08_countdown"),
+	HC1(37500, 0, 11, "hl_09_mode_gun"), HC1(39000, 0, 12, "hl_10_gun_asterix_alone"), HC1(40500, 0, 13, "hl_11_gun_obelix_alone"),
+	HC1(42000, 0, 14, "hl_12_boat_slide"), HC1(43500, 0, 15, "hl_13_fusion"),
+	HC2(45000, 16, 0, "hl_14_club"), HC2(46500, 17, 0, "hl_15_hammer"), HC2(48000, 18, 0, "hl_16_twister"),
+	HC2(49500, 19, 0, "hl_17_mole"), HC2(51000, 20, 0, "hl_18_rage"), HC2(52500, 21, 0, "hl_19_crowd"),
+	HC2(54000, 22, 0, "hl_20_fusion"), HC2(55500, 23, 0, "hl_21_skip"),
+	P2TAPL(58000, PAD_BACK, "p2 back (menu)"), SHOT(59500, "hl_22_pause"),
+	P2TAPL(60000, PAD_DPAD_DOWN, "p2 down"), P2TAPL(60600, PAD_DPAD_DOWN, "p2 down"), P2TAPL(61200, PAD_A, "p2 a (options)"),
+	P2TAPL(62800, PAD_DPAD_DOWN, "p2 down"), P2TAPL(63400, PAD_DPAD_DOWN, "p2 down"), P2TAPL(64000, PAD_A, "p2 a (controls)"),
+	SHOT(65500, "hl_23_controls1"),
+	P2TAPL(66000, PAD_DPAD_RIGHT, "p2 right"), P2TAPL(66800, PAD_DPAD_RIGHT, "p2 right"), SHOT(67800, "hl_24_controls3"),
+	P2TAPL(68300, PAD_DPAD_RIGHT, "p2 right"), SHOT(69300, "hl_25_controls4"),
+	P2TAPL(69800, PAD_B, "p2 b"), P2TAPL(70800, PAD_B, "p2 b"),
+	P2TAPL(72000, PAD_DPAD_DOWN, "p2 down"), P2TAPL(72600, PAD_DPAD_DOWN, "p2 down"), P2TAPL(73200, PAD_DPAD_DOWN, "p2 down"),
+	P2TAPL(73800, PAD_A, "p2 a (co-op options)"), SHOT(75300, "hl_26_coop_options"),
+	P2TAPL(76000, PAD_B, "p2 b"), P2TAPL(77000, PAD_BACK, "p2 back (resume)"),
+	END(78500),
+};
+#undef P2TAPL
 // revivetimer (level 2, XXL_SPSECOND=1 XXL_DOWNAT=0:3000 XXL_REVIVEHOLD=2): the
 // revive countdown's bar in the left box -- red, filling with the time gone,
 // pulsing 33-66% in its last 10 s; Obelix revives Asterix before it runs out.
@@ -10643,6 +10693,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("holdskip", kHoldSkip),
 	SCENARIO("hintalign", kHintAlign),
 	SCENARIO("hintcatalog", kHintCatalog),
+	SCENARIO("hintlang", kHintLang),
 	SCENARIO("promptsp", kPromptSp),
 	SCENARIO("revivetimer", kReviveTimer),
 	SCENARIO("boothold", kBootHold),
@@ -13947,26 +13998,32 @@ void RunStep(const Step& s) {
 		case 0: case 1: {   // coop.cpp ShowJoinHint: 0 with the keyboard free for player 2, 1 without
 			key = HINT_JOIN;
 			int hero = g_config.p2Hero == HERO_ASTERIX || g_config.p2Hero == HERO_OBELIX ? g_config.p2Hero : 1 - p1h;
-			wchar_t start[8] = {};
-			if (wchar_t g = IconGlyph("pad_start")) start[0] = g; else wcscpy(start, L"Start");
-			if (s.b == 0) swprintf(text, 200, L"%s Join CO-OP mode %s/%s", HintHeroName(hero), start, HintKeyName(g_config.keys[CoopConfig::KEY_START]));
-			else swprintf(text, 200, L"%s Join CO-OP mode %s", HintHeroName(hero), start);
+			wchar_t start[32] = {};
+			if (wchar_t g = IconGlyph("pad_start")) start[0] = g; else wcsncpy(start, Loc("button_start"), 31);
+			if (s.b == 0) LocFormat(text, 200, "join", { { "hero", HintHeroName(hero) }, { "start", start },
+			                                             { "key", HintKeyName(g_config.keys[CoopConfig::KEY_START]) } });
+			else LocFormat(text, 200, "join_pad_only", { { "hero", HintHeroName(hero) }, { "start", start } });
 			break;
 		}
 		case 2: key = HINT_PASS;   // coop.cpp
-			swprintf(text, 200, L"Pass %s the enemy to %s", HintButtonName(a, HB_LB), HintHeroName(ho)); break;
+			LocFormat(text, 200, "pass_enemy", { { "button", HintButtonName(a, HB_LB) }, { "hero", HintHeroName(ho) } }); break;
 		case 3: case 4: case 5: key = HINT_MACHINE;   // coop.cpp CoopWaitingForYou (rides, machines) and the lifter's
-			swprintf(text, 200, L"%s is waiting for you", HintHeroName(ho)); break;
+			LocFormat(text, 200, "waiting_for_you", { { "hero", HintHeroName(ho) } }); break;
 		case 7: case 8: key = HINT_REVIVE; gone = 0.4f;   // individual.cpp: the revive countdown (x: its seconds, else 27)
-			swprintf(text, 200, L"%s needs help! %ds left", HintHeroName(s.b == 7 ? ho : ha), s.x > 0 ? (int)s.x : 27); break;
+		{
+			wchar_t secs[8];
+			swprintf(secs, 8, L"%d", s.x > 0 ? (int)s.x : 27);
+			LocFormat(text, 200, "needs_help", { { "hero", HintHeroName(s.b == 7 ? ho : ha) }, { "seconds", secs } });
+			break;
+		}
 		case 9: key = HINT_REVIVE; progress = 0.5f;
-			swprintf(text, 200, L"Reviving %s", HintHeroName(ho)); break;
+			LocFormat(text, 200, "reviving", { { "hero", HintHeroName(ho) } }); break;
 		case 10: key = HINT_REVIVE;
-			swprintf(text, 200, L"Hold %s to revive %s", HintButtonName(a, HB_B), HintHeroName(ho)); break;
+			LocFormat(text, 200, "hold_to_revive", { { "button", HintButtonName(a, HB_B) }, { "hero", HintHeroName(ho) } }); break;
 		case 11: case 12: case 13: case 14: case 15: {   // shared.cpp's mode hints: gun, Asterix alone, Obelix alone, boat / slide, Fusion
 			key = HINT_MODE;
 			const SharedMode kModes[5] = { SHARED_GUN, SHARED_GUN_SOLO, SHARED_GUN_OBELIX, SHARED_BOAT, SHARED_FUSION };
-			wchar_t ma[96], mo[96];
+			wchar_t ma[kModeHintLen], mo[kModeHintLen];
 			SharedModeHintText(kModes[s.b - 11], ma, mo);
 			wcscpy(ta, ma);
 			wcscpy(to, mo);
@@ -13980,8 +14037,8 @@ void RunStep(const Step& s) {
 			key = HINT_SKIP;
 			wchar_t g1 = IconGlyph(s.b == 24 ? "pad_a_press" : "pad_a");
 			if (!g1) g1 = IconGlyph("pad_a");
-			if (g1) swprintf(text, 200, L"Hold %c to skip", g1);
-			else swprintf(text, 200, L"Hold %s to skip", L"A");
+			wchar_t button[4] = { g1 ? g1 : L'A', 0 };
+			LocFormat(text, 200, "hold_to_skip", { { "button", button } });
 			if (s.b == 24) progress = 0.5f;
 			break;
 		}
@@ -13995,6 +14052,28 @@ void RunStep(const Step& s) {
 			if (gone >= 0.0f) HintTimerBar(key, a, gone, s.x > 0 ? s.x : 27.0f);
 		}
 		Log("autotest: hint catalogue %d on box %d (box hero %s)", s.b, a, ha == HERO_ASTERIX ? "asterix" : "obelix");
+		break;
+	}
+	case S_LANG: {   // the game's language a (0 French .. 4 Italian; -1: XXL_GAMELANG's, none: nothing) as its options menu sets it
+		// (Called from a frame mid-level it crashed in a text layout 80 ms on (axxl+0x150050 from 0x42F651):
+		// hintlang switches through the pause menu's Options instead.)
+		int lang = s.a;
+		if (lang < 0) { const char* e = getenv("XXL_GAMELANG"); lang = e && *e ? atoi(e) : -1; }
+		CKYellowPages* yp = YellowPages();
+		void* self = yp ? *(void**)((char*)yp + 0x28) : nullptr;
+		if (lang < 0 || lang > 4 || !self) { Log("autotest: language left as it is"); break; }
+		// FUN_004090c0: thiscall(yellow pages +0x28, language, 0), ret 8 (the options menu's Language row).
+		((void(__fastcall*)(void*, void*, unsigned, unsigned))0x4090C0)(self, nullptr, (unsigned)lang, 0);
+		Log("autotest: the game's language set to %d (loc: %S)", lang, Loc("menu_coop_options"));
+		break;
+	}
+	case S_LANGRIGHT: {   // "right" on the Options' language row while the game's language is not XXL_GAMELANG's
+		// (the row takes each language at once, not in their index order: English, German, ..., Spanish, French)
+		const char* e = getenv("XXL_GAMELANG");
+		int lang = e && *e ? atoi(e) : 1;
+		if (LocLanguage() == lang) { Log("autotest: language row: on %d", lang); break; }
+		at.bind[0] = 19; at.bind[1] = 35; at.bind[2] = 55; at.bindFrames = 1;
+		Log("autotest: language row: right (now %d, for %d)", LocLanguage(), lang);
 		break;
 	}
 	case S_HINTSPARK:   // a sparkle on button b of player a's test hint, with the sound
