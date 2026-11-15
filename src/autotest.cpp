@@ -60,7 +60,7 @@ bool __fastcall StartLineHook(char* hero, void* edx, float* to) {
 }
 
 enum StepKind { S_MARK, S_SHOT, S_FORCE, S_P1, S_VPAD, S_VPADR, S_TELEPORT, S_BONUS, S_PROBE, S_BUMPER,
-                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_DISARM, S_END };
+                S_CRATE, S_ENEMY, S_CINE, S_DETECT, S_TRIOEV, S_PLACE, S_SCATTER, S_KEY, S_KEYMAP, S_SECTORS, S_GLIDE, S_LOADSECTOR, S_POTION, S_PLATES, S_DASHFLAG, S_SETF18, S_REGIONS, S_POKE8, S_EVGROUP, S_MUSICGROUPS, S_WATCHGROUPS, S_WATCHCLUE, S_TORCH, S_LEVERS, S_WATCHCAM, S_HEROFIELDS, S_WATCHRW, S_NEAROBJ, S_INPUTDUMP, S_WATCHBEACONS, S_P2LOOK, S_FINDGROUPS, S_WATCHGROUP2, S_P1COMBO, S_WATCHENEMIES, S_NODEDUMP, S_CAMDUMP, S_BOSSSCAN, S_SETPRESET, S_NEXTTO, S_HUDDIFF, S_GIVE, S_RELOAD, S_OBJEV, S_PFDUMP, S_REACH, S_UNLOCKHERO, S_CARPOS, S_CPNTCHECK, S_CAMSECTOR, S_DETOFF, S_FLAGEV, S_PULLLEVER, S_CINEDUMP, S_WATCHCINE, S_APARTSPOT, S_SQUADS, S_SQUADRESET, S_DOORS, S_STEERCHECK, S_CAMTARGET, S_BIND, S_AREAHIT, S_P1R, S_POOLHOLD, S_ENDFIGHT, S_POOLKINDS, S_GUARDSPOTS, S_HINTTEST, S_HINTSPARK, S_COMBOHINT, S_SPSWITCH, S_SPMOD, S_CAMFOV, S_CALLHK, S_ZONEREC, S_SIDEREACH, S_AIWATCH, S_CLEARLINE, S_SLIDEPUSH, S_BOSSDUMP, S_HINTCAT, S_SHINE, S_OPTDUMP, S_RUMBLE, S_PROJHITS, S_DISARM, S_NOCLOCK, S_END };
 
 struct Step {
 	int         t;        // ms after the scenario starts
@@ -4478,6 +4478,19 @@ const Step kTough41[] = {
 #define POTCLUB(t) { t, S_P1COMBO, -1, 0, 0, 0, 0, "combo cheat" }, { t + 300, S_GIVE, HERO_OBELIX, 2, 0, 0, 0, "obelix combo bar full" }, \
 	{ t + 800, S_ENEMY, HERO_OBELIX, 1, 0, 0, 0, "obelix next to a roman" }, TAP_P2(t + 1300, PAD_A, "p2 A"), \
 	TAP_P2(t + 1550, PAD_A, "p2 A"), TAP_P2(t + 1800, PAD_X, "p2 X"), TAP_P2(t + 2050, PAD_B, "p2 B")
+// noclock41 (-Level 4; user's LV2-2 crash, 0x4CDB01): the Power Hammer's
+// shockwave under the potion reaching Romans not ticked yet (frame clock +0x28
+// NULL, as one sent in from its pool for the first time).
+const Step kNoClock41[] = {
+	MARK(0, "baseline"),
+	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
+	PLACEAT(2500, HERO_ASTERIX, -288.15f, 0.8f, 124.0f), PLACEAT(2600, HERO_OBELIX, -286.15f, 0.8f, 118.0f),
+	GLIDEAT(3000, HERO_ASTERIX, -288.15f, 0.5f, 117.27f, 800),
+	POTCOMBO_STAGE(8000), POTCOMBO_STAGE(10000), POTCOMBO_STAGE(12000),
+	POTCOMBO_STAGE(14000), POTCOMBO_STAGE(17500),
+	POTCOMBO_STAGE(20000), { 20450, S_NOCLOCK, HERO_ASTERIX, 3000, 0, 0, 0, "romans without a clock" },
+	PCOMBO(20500, 1), SHOT(22000, "noclock_hammer"), SHOT(24000, "noclock_after"), END(25000),
+};
 const Step kPotCombo41[] = {
 	MARK(0, "baseline"),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -10841,6 +10854,7 @@ const Scenario kScenarios[] = {
 	SCENARIO("guard41m", kGuard41M),
 	SCENARIO("tough41", kTough41),
 	SCENARIO("potcombo41", kPotCombo41),
+	SCENARIO("noclock41", kNoClock41),
 	SCENARIO("potclub41", kPotClub41),
 	SCENARIO("potclub41b", kPotClub41B),
 	SCENARIO("guard41a", kGuard41A),
@@ -10978,6 +10992,8 @@ struct AutotestState {
 	bool    watchBeacons = false;   // beacon bonuses near beaconPoint, WATCHBEACONS
 	bool    watchEnemies = false;   // Romans and squads near enemyPoint, WATCHENEMIES
 	int     projHitsFrom = -1;      // projectile targets hit (CKSrvCollision +0x1B0), index >= this = a clone's, PROJHITS
+	int     noClockUntil = 0;       // NOCLOCK: until this run time the Romans near noClockHero lose their frame clock each frame
+	int     noClockHero = 0, noClockMost = 0;
 	int     projHits[2] = {};
 	bool    enemiesPrimed = false;
 	bool    cpntCheck = false;      // every Roman's component (+0x54) checked each frame, CPNTCHECK
@@ -13566,6 +13582,12 @@ void RunStep(const Step& s) {
 		}
 		break;
 	}
+	case S_NOCLOCK:   // for b ms the Romans within 15 of hero a as if just sent in for the first time (no frame clock +0x28)
+		at.noClockHero = s.a;
+		at.noClockUntil = (int)(GetTickCount() - at.runStart) + s.b;
+		at.noClockMost = 0;
+		Log("autotest: the Romans near %s lose their frame clock for %d ms", HeroName(s.a), s.b);
+		break;
 	case S_DISARM: {   // the Roman (2,93) nearest hero a disarmed as the game does it (its event 0x4C05: hook +0x24 bit 0x8000, then the daze)
 		Trio t = GetTrio();
 		Hero h = t ? t.GetHero(s.a) : Hero();
@@ -14221,6 +14243,28 @@ void AutotestFrame() {
 	}
 	while (at.phase == AutotestState::RUN && at.next < at.sc->count && at.sc->steps[at.next].t <= t)
 		RunStep(at.sc->steps[at.next++]);
+	if (t < at.noClockUntil) {
+		// (The services -- collision among them -- run before the hook lives in a
+		// frame: the next frame's contacts find these Romans without a clock.)
+		Trio tr = GetTrio();
+		Hero h = tr ? tr.GetHero(at.noClockHero) : Hero();
+		int cleared = 0;
+		for (unsigned i = 0, n = h ? GetNumLvlClassInstances(2, 93) : 0; i < n; i++) {
+			char* e = (char*)GetLvlObject(2, 93, i);
+			char* node = e ? *(char**)(e + 0x10) : nullptr;
+			char* fr = node ? *(char**)(node + 4) : nullptr;
+			if (!fr || (*(uint8_t*)(node + 0x10) & 2)) continue;
+			const float* p = (const float*)(fr + 0x80);
+			float dx = p[0] - h.Pos().x, dz = p[2] - h.Pos().z;
+			if (dx * dx + dz * dz > 15.0f * 15.0f) continue;
+			*(char**)(e + 0x28) = nullptr;
+			cleared++;
+		}
+		if (cleared > at.noClockMost) {
+			at.noClockMost = cleared;
+			Log("autotest: %d Romans near %s without their frame clock", cleared, HeroName(at.noClockHero));
+		}
+	}
 	if (getenv("XXL_CATTRACE")) {
 		// XXL_CATTRACE: Roman catapults (CKHkCatapult 2,130) -- its fields once, its
 		// state (+0x14 flags, +0x1A, charge timer +0x70 of +0x74) as it changes, the

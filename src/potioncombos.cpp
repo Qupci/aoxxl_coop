@@ -2,6 +2,7 @@
 #include "config.h"
 #include "coop.h"
 #include "detour.h"
+#include "kal.h"
 #include "trio.h"
 #include "log.h"
 #include <windows.h>
@@ -125,7 +126,44 @@ bool Beat(char* roman, const float* from) {
 	return true;
 }
 
+// A Roman's frame clock (+0x28, dt at +0xC) is put in by its life's tick
+// (CKHkEnemyLife::vf17 0x4CA2F0) -- the game loop's (gameLoop +8 -> +4, what
+// FUN_00409B20 hands the lives). A Roman sent in from its pool for the first
+// time is not ticked before the collision service runs, so a contact that
+// frame (the Power Hammer's shockwave, kind 4: the turn vf50 0x4CD9C0 reads
+// the clock) crashed at 0x4CDB01. Cloned Romans make many first send-ins.
+char* g_clockSeen = nullptr;
+int   g_clockLogs = 0;
+char* FrameClock() {
+	CKYellowPages* yp = YellowPages();
+	char* loop = yp ? (char*)yp->gameLoop : nullptr;
+	char* tm = loop ? *(char**)(loop + 8) : nullptr;
+	return tm ? *(char**)(tm + 4) : nullptr;
+}
+bool GiveClock(char* roman, uint32_t ev) {
+	char** clock = (char**)(roman + 0x28);
+	if (*clock) {
+		if (*clock != g_clockSeen) {
+			if (g_clockSeen && g_clockLogs < 20) {
+				g_clockLogs++;
+				Log("potioncombos: a Roman's frame clock %p, not the last one seen %p (the game loop's %p)", *clock, g_clockSeen, FrameClock());
+			}
+			g_clockSeen = *clock;
+		}
+		return true;
+	}
+	char* c = g_clockSeen ? g_clockSeen : FrameClock();
+	if ((ev & 0xFFFF) != 0x4C01 && g_clockLogs < 20) {   // (0x4C01 reaches every pooled Roman as a level loads: not told)
+		g_clockLogs++;
+		Log("potioncombos: roman %p (vt %08X, +0x24 %08X) gets event %04X before its first tick: given the frame clock %p (the game loop's %p)",
+		    roman, *(uint32_t*)roman, *(uint32_t*)(roman + 0x24), ev & 0xFFFF, c, FrameClock());
+	}
+	*clock = c;
+	return c != nullptr;
+}
+
 int __fastcall RomanSendHook(char* roman, void* edx, uint32_t ev, void* param) {
+	if (!GiveClock(roman, ev)) return 0;   // (no clock to give: dropped, not crashed on)
 	uint32_t e = ev & 0xFFFF;
 	if (e == 0x4C0A && g_inMole) g_moleCaught++;
 	// Idefix's bite (0x4C0C: hit, a bite kind; the answer byte 1 if it took): in
