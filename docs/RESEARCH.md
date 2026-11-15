@@ -5307,3 +5307,23 @@ both halves).
   start the slide from behind it; user: a respawned spy no longer counts the helmets on the slide, so the Obelix
   player has to take the talk first. Round 285's hold-back stays as a safety net. Autotest slidefar: Obelix at the
   sector start and 26 units back -- held back ("[Asterix] is waiting for you"); 12 back -- the slide starts.
+- Round 287 (Nov 16, commit 8678d8f; user's new-text table over the hintcatalog shots): every mod hint reworded.
+  Join "[p2 hero] Join CO-OP mode [pad_start]/[Enter key]" (p2_hero -1: the hero player 1 does not lead with); the
+  "[hero] is down!" hint removed (ShowDownHint gone: the "Hold B to revive" by the downed hero says it); the revive
+  countdown "[downed hero] needs help! Ns left" on one line in both modes -- hints.cpp keeps a BAR_TIMER box's widest
+  layout (s.longest) while the same hint is re-laid out, so 27s -> 9s keeps the box; pass "Pass [LB] the enemy to
+  [hero]"; the lifter "[hero on it] is waiting for you" now to the missing hero's player (the rides' words). Mode
+  hints (shared.cpp SharedModeHintText, exported for the autotest): gun "[A] Fire X" / "[O] Move left and right
+  [ls_leftright]", Asterix alone "Fire X" / "[A] is waiting for you", Obelix alone "[O] is waiting for you" / "Move
+  left and right ..", boat/slide "[A] Steer [LS]" / "[O] Jump A", Fusion "[A] Move left and right" / "[O] Move
+  front and back [ls_updown]" -- the stick icons are IconsRewrite(L"\xE008\xE007" / L"\xE005\xE006", player,
+  DIRS_MOVE), so a keyboard player gets its keys. The Fusion's routing swapped (Route: trio actions 0/1 -> Obelix,
+  2/3 + the camera map -> Asterix). Combo hints: "[combo icon] <name> Combo\n<buttons>" without chevrons, Mole
+  "<buttons> + X X ...", Rage "... Rage Combo RB" and "... Twister Fusion X" on one line, crowd text kept; a combo
+  hint (HINT_COMBO / HINT_FUSE) in a box at the right is right-aligned; its buttons (an icon-only word, not the
+  first word) are tightened in LayOutSlot to the Figma's 12 px between 48 px icons -- kComboGap 0.07 of the
+  measured width between two icons, kComboTextGap 0.17 next to "+" / "..." (the icons draw wider than
+  0x5FDAB0 measures; measured on zoomed shots). s.button (sparkles) is now any lone icon but the first word.
+  Button looks swapped (user renamed the PNGs): waiting = plain, pressed = *_press (PadGlyph; keycap templates
+  key_press / key_wide_press; cutscene skip pad_a / pad_a_press). Autotest hintcatalog redone (30 shots: countdown
+  27 -> 9 same width, pressed variants). Not autotested: the Fusion's swapped controls in a real fusion.
