@@ -5327,3 +5327,28 @@ both halves).
   Button looks swapped (user renamed the PNGs): waiting = plain, pressed = *_press (PadGlyph; keycap templates
   key_press / key_wide_press; cutscene skip pad_a / pad_a_press). Autotest hintcatalog redone (30 shots: countdown
   27 -> 9 same width, pressed variants). Not autotested: the Fusion's swapped controls in a real fusion.
+- Round 288 (Nov 16, commit 1317287; user: round 287 confirmed, sparkles right; two old box issues + a
+  localisation file). (1) Hint boxes with a hero icon (drawn 1.5x) grow so the icon keeps the text's padding:
+  hints.cpp PlateSpan -- plate height + kHeroPlateExtra (0.46) x the game's plate height when the box has a hero
+  (measured at 540 px: plate 49, capitals 15 with ~16 padding, icon ink 36 -> ~68). (2) Every box is centred on
+  the game's one-line box (two lines no longer hang 0.012 + half a line lower), clamped at 0.01 from the bottom;
+  BoxPlace's 3+-line raise, DrawSlot, the from-below slide and HintBoxRect all use PlateSpan. (3) loc.cpp:
+  xxl_coop_lang.ini next to xxl_coop.ini (coop\dist, deployed by run_test.ps1 unless the Game Files copy is newer),
+  UTF-8, [French] [English] [German] [Spanish] [Italian], key = text, \n, {hero} {button} {stick} {start} {key}
+  {seconds} {player} {n} {dir}; missing -> [English] -> the key; re-read when its time changes (500 ms check).
+  Language = yellow pages +0x94 -> +0x24 (short; 0 FR, 1 EN, 2 DE, 3 ES, 4 IT = the packs 00-04GLOC);
+  XXL_LANG / LocForceLanguage override. All hint texts, combo names (the game's own: "Combo Massue", "Keule
+  Kombo", "Combo Remolino", "Combo Vortice"...), the pause item, Controls rows (Switch hero, Invert Camera X/Y,
+  Deadzone), player 2's row values (Left Stick / D-pad / Right Stick + direction, None, Start / Back) and the
+  "[P] Controls" title. The game's strings were read from the GLOC packs as UTF-16 (menu words: Stick Gauche /
+  Kreuz / Cruz / Croce, Caméra / Kamera / Cámara / Visuale). (4) Crash on a language change: the language row
+  (it takes each language at once: English -> German -> Spanish -> Italian -> French, not in index order;
+  Apply asks to overwrite the options save, then a "save done" CONTINUE) reloads the game's fonts (FUN_004090c0,
+  thiscall(yellow pages +0x28, language, 0), ret 8 -> 0040bc10 GLOC); g_slots[].obj (and the glyph copies) kept
+  the freed font at text +0x20 +0x660 and crashed in the font draw 0x5FF070 (from 0x42F430 / CText2d vf23) on
+  resuming (2 of 5 runs; esi in g_slots, found with a /MAP link). DrawSlot skips a copy whose font is not the
+  game's and the tick lays it out again; glyphs alike; the pause item takes Options' font, loc manager and text.
+  Calling FUN_004090c0 from a frame mid-level crashed the same way. Autotest hintlang (XXL_GAMELANG=0..4): the
+  language via the pause menu (S_LANGRIGHT until LocLanguage matches, Apply, YES, CONTINUE, Resume), then the
+  hints in both boxes and player 2's pause / Controls 1, 3, 4 / CO-OP Options -- all five clean; French / German
+  Fusion pair shortened (the two boxes met in split screen). The runs leave the save's language English.
