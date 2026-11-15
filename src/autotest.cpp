@@ -5887,8 +5887,9 @@ const Step kSlideCross3[] = {
 
 // slidefar (level 2): Asterix walks past LV2-2's cross detector with Obelix
 // left where the sector put him: held back, Asterix put back before the line,
-// player 2's box says "[Asterix] is waiting for you"; with Obelix ~26 units
-// back (in the 30-unit range) the slide starts.
+// player 2's box says "[Asterix] is waiting for you"; Obelix ~26 units back
+// (behind the spy's line, out of the 15-unit range): held back too; ~12 back:
+// the slide starts.
 const Step kSlideFar[] = {
 	MARK(0, "slidefar"), LOADSECTOR(200, 2),
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),
@@ -5897,15 +5898,19 @@ const Step kSlideFar[] = {
 	SHOT(7200, "sf_refused"), SHOT(8500, "sf_after"),
 	PLACEAT(9000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(9000, HERO_OBELIX, -902.5f, 528.5f, -930.0f),
 	GLIDEAT(10500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
-	SHOT(14000, "sf_slide"),
-	END(16000),
+	SHOT(13500, "sf_refused26"),
+	PLACEAT(14000, HERO_ASTERIX, -905.96f, 528.2f, -938.49f), PLACEAT(14000, HERO_OBELIX, -903.5f, 528.5f, -916.0f),
+	GLIDEAT(15500, HERO_ASTERIX, -905.96f, 524.0f, -896.0f, 2500),
+	SHOT(19000, "sf_slide"),
+	END(21000),
 };
 
 // slidespy22 (level 2): the user's softlock (xxl_coop.lv2-2_belly-slide_stuck.log).
 // Asterix has the spy's talk (zone 03C0, z -920), then stands by the slide's
-// start; Obelix is put behind the spy's zone, in the slide's 30-unit range.
+// start; Obelix is put behind the spy's zone (in the slide's old 30-unit range).
 // Asterix walks into the cross detector: the slide carries Obelix through the
-// spy's zone -- no talk, the slide runs on.
+// spy's zone -- no talk, the slide runs on. Since the 15-unit range (round 286)
+// the slide waits for Obelix there instead.
 const Step kSlideSpy22[] = {
 	MARK(0, "slidespy22"), LOADSECTOR(200, 2), { 0, S_WATCHCLUE, 0, 0, 0, 0, 0, "watch spy" },
 	VPAD(300, 1, PAD_START, 0, 0, "p2 start"), VPAD(500, 1, 0, 0, 0, "p2 release"),

@@ -2873,8 +2873,8 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 			}
 		}
 		// Co-op: a Roman agent's talk (CKHkClueMan 0x5198) set off in the belly
-		// slide's first seconds. The slide waits for the other hero within 30 units,
-		// so it can start behind a spy's line: LV2-2's agent (zone 03C0, z -920, on
+		// slide's first seconds. The slide waited for the other hero within 30 units
+		// (15 since round 286), so it could start behind a spy's line: LV2-2's agent (zone 03C0, z -920, on
 		// since the keg's group 0B6) crossed by the sliding Obelix asked the trio to
 		// walk the leader to it (0x5120 + "Asterix leads") -- the slide dropped, both
 		// heroes stuck in its mode. Held back as with a hero down; a talk at the
@@ -2900,7 +2900,7 @@ void __fastcall FlagEventHook(void* self, void* edx, unsigned eventId) {
 		// player's box says it waits.
 		if (CoopP2Joined() && !CoopSuspended() && IndivFallenHero() < 0 && GroupStartsSlide(eventId)) {
 			int zh = ZoneEventHero(eventId & 0xFFFF);
-			if ((zh == HERO_ASTERIX || zh == HERO_OBELIX) && !CoopHeroHeld((zh == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX)) && !CoopRideMateNear(zh, 30.0f, 15.0f)) {
+			if ((zh == HERO_ASTERIX || zh == HERO_OBELIX) && !CoopHeroHeld((zh == HERO_ASTERIX ? HERO_OBELIX : HERO_ASTERIX)) && !CoopRideMateNear(zh, 15.0f, 15.0f)) {
 				Trio tz = GetTrio();
 				Hero hz = tz ? tz.GetHero(zh) : Hero();
 				int ni = hz && g_tickingDet ? NodeIndex(g_tickingDet, hz) : -1;
