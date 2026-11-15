@@ -5289,3 +5289,16 @@ both halves).
   the launcher keeps 12 / 6. Autotests swhint21 (first at 12 s, keg 0348 Asterix -> Obelix: once more; zone 01E0
   Obelix -> Asterix: none; keg again, Obelix -> Obelix: none), slidefar (Obelix at the sector start: held back;
   Obelix 26 units back: the slide starts).
+- Round 285 (Nov 15, commit 372688e; user log xxl_coop.lv2-2_belly-slide_stuck.log): softlock from round 284's
+  30-unit slide range. LV2-2's spy line is plane-cross 56 (event 03C0, z -920.7), off until the keg by
+  -908.4 527.3 -944.5 burns (group 0B6 = 182, detection service message 0x1638 = enable plane-cross 0x38; the
+  slide's own 0028 is plane-cross 30, enabled by group 0D5's 0x161E -- 0x1600 + n enables test n). With Obelix
+  back behind the line (walked back across it, which re-arms the cross), the slide carried him over it in its
+  first 0.6 s: 0x5198 -> trio 0x5120 (walk the leader to the spy) + 4800 "Asterix leads" + 4803 -> shared mode
+  belly slide -> none, both heroes left in mode 3. Vanilla never starts the slide behind that line (the AI
+  Obelix is beside Asterix). Fix: FlagEventHook holds back a zone whose group sends CKHkClueMan 0x5198 while the
+  shared mode is the belly slide and it began < 4 s ago (shared.cpp SharedModeAgeMs); slide-end agents (LV4-10,
+  LV5-9) talk long after the start. Autotests slidespy22 (sector 2, group 0B6 flagged by S_FLAGEV 0x05B0, Asterix
+  talks, Obelix walks back over the line, Asterix into the slide: before -- 03C0 at +0.6 s, slide dropped; after
+  -- held back at 593 ms, still sliding 12 s on), spyzones (XXL_SURVEYSECTOR=n: groups sending 0x5198 + zone
+  dump). The run's first try without LOADSECTOR(2) had the heroes in a void: teleports alone don't stream a sector.
