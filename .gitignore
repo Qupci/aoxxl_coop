@@ -7,3 +7,4 @@ decomp/
 # test run artefacts
 testruns/
 userlogs/
+__pycache__/

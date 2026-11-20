@@ -1,164 +1,131 @@
 # Co-op mod for Asterix & Obelix XXL (2004, PC)
 
-Adds LEGO-TT-style drop-in co-op to the original PC release: player 2 presses a button on a second
-controller and takes over whichever hero player 1 is not currently driving.
+Adds LEGO-TT-style drop-in co-op to the original PC release: player 2 (P2) presses a button on a second controller and takes over whichever hero player 1 (P1) is not currently playing as.
 
-The game has no source code, so this is a runtime patch. It is built as **`xxl_coop.asi`**, loaded
-by the Ultimate ASI Loader that already ships in the game folder as `dinput8.dll`. That keeps it out
-of the way of the QoL patch (`d3d9.dll`) and the XXL Inspector, both of which want to be the
-`d3d9.dll` proxy.
+What's unique about this co-op mod:
+- Individual Hero mode
+	- Each hero has separate health and combo bar
+	- Death one of the heroes will start a "revive" sequence, where companion holds "Grab" button near fallen to revive. Revive will restore half of the original health.
+- Co-op difficulty
+	- Romans spawns twice as much, and a required fight also has twice as much romans to defeat.
+	- When players are together, co-op difficulty in increased, and when apart - difficulty is restored.
+- Single-player Second Chance
+	- It's Individual Hero mode but for single-player.
+	- Has unique Twister Fusion gameplay, where each hero has to get active Twister Combo in order to activate Twister Fusion.
+- Hero switch button for single-player, switch heroes on demand.
+- A hint system
+- Mod's options can be changed in-game pause menu, including P2 controls.
+- Skip cutscenes
+- Language support: English, French, German, Italian, Spanish.
+- More gameplay changes, such as:
+	- Twister Combo nerf, Twister no longer rapidly decreases a squad's roman counter (Twister Fusion is unchanged).
+	- Magic Potion + Combo interactions. Power Hammer or Club combo shockwaves 1 hit defeats enemies like a catapult's projectile. Mole combo can take x3 as much romans.
+	- [[#Upcoming features]] will be included here as well when completed.
 
----
+## How to install
 
-## Status — read this first
+Prerequisites:
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases)
+- [DSOAL](https://github.com/kcat/dsoal/releases)
+- [XXL1 QoL patch by AdrienTD](https://www.speedrun.com/id-ID/aoxxl/resources/gvmu0)
 
-| | state |
-|---|---|
-| Player 2 drives the other hero (move, jump, attack, grab, dash, swim) | **working**, verified with two real pads |
-| Join / leave: Start on the controller the game is not using; Start again or hold Back | **working**; player 1's pad is detected automatically |
-| Players keep their heroes through blue circles / scripted switches | implemented |
-| Scripted sections (rides, belly slide, lifters started by P1) | co-op pauses, game handles them, resumes after |
-| Cutscenes (letterbox bars) | co-op pauses (P2's hero to the AI, one screen), resumes after — automated test |
-| Split-screen (stacked or side by side), shared HUD, P2's own camera (right stick) | **working**, verified with two real pads |
-| P2's hero in the world: Romans attack him, dropped helmets come to him | **working**, verified with two real pads |
-| P2: springs, iron crates, grabbing/spinning Romans, helmets placed in the air | fixed, verified by automated tests; awaiting a real two-pad session |
-| Crates / placed helmets around P2 when P1's camera looks away | fixed (both cameras' frustums), awaiting a real two-pad session |
-| Swing (push/pull) for P2's Obelix | untested |
-| Keyboard as a controller (P1 pad + P2 keyboard, P1 keyboard + P2 pad, both on one keyboard) | **new**, automated test (`kbd`) |
-| Sound around P2 (footsteps, crates) audible: range checks and 3D mix use the nearer camera | **new**, automated check only |
-| Trigger zones bound to one hero fire for either player (Romans near the lifter for P2 alone) | **new**, automated test (`lifter2`) |
-| R3 + A: warp to your partner (both players) | user-verified (P2); automated test (`warp`) |
-| Roman squads wake up and chase the non-leading player too | automated test (`pursuito`, `pursuitlead2`) |
-| Non-leading player 1 (after the belly slide): launchers, helmets, grabbing, sound, crates | fixed (the non-leader's tick acts as leader, whichever player); awaiting a session |
-| Blue circle stepped on by P2 alone; P1 camera in the cable car | changed, awaiting a real session |
-| Crash at axxl.exe+0x9C228 (lifters) | fixed; crashes and stalls are now logged with their location |
+To install the co-op mod:
+1. Download release package
+2. Extract the archive where game executable is (`Asterix.exe`)
+3. Make sure that prerequisite dll's exist in the same game executable location.
 
-How it works is in `docs/RESEARCH.md` §0. Automated tests: `tools/run_test.ps1 <scenario>`
-(scenarios in `src/autotest.cpp`). Decompiled game code for reference: run
-`ghidra_scripts/rebuild_decomp.ps1 -Import` once, then grep `decomp/`.
+## Local co-op over internet
 
----
+Current solution is to use **Steam Link** for Steam's Remote Play feature for added Non-steam games in your Steam library.
 
-## Building
+Person over the internet:
+1. Install Steam Link, which can be downloaded on Windows [here](https://media.steampowered.com/steamlink/windows/latest/SteamLink.zip) ([from this source](https://steamcommunity.com/app/353380/discussions/8/5943120984229696131/)).
+2. Sent a 4 digit PIN to the host person.
 
-Needs the **32-bit** VS 2022 Build Tools toolchain (the game is an x86 binary).
+Host person with the game:
+1. Add game executable as non-steam game to your Steam library, it can be `axxl.exe` or `Asterix.exe`
+2. Go to `Settings > Remote Play (tab) > Computers & Devices (section) > Pair Steam Link (button)`
+3. Use 4 digit PIN that was sent from the internet person.
 
+Now the Internet person can connect to host PC via Steam Link remotely, where you/them can launch the game from the Steam library. When done playing, it is recommended to Unpair the connected Steam Link on the same Remote Play tab in the Steam settings, so that person wouldn't be able to connect to your PC by mistake later.
+
+## Known bugs
+
+If you encountered a bug, then please share it with saved `xxl_coop.log` (that gets written while game is running).
+
+It is recommended to play with `cheats = on`, so you can save some softlock situations, where the most notable actions you can do are:
+- Teleport other hero right beside your hero `R3 + A`. Usually done in co-op mode.
+- Unlock any "wait here" locks on the controlled hero by `R3 + B`. Also usually done in co-op mode.
+
+- Switching to Asterix in LV2-6 will make Obelix as sidekick go to the Asterix's "wait here" place, and can't be switched back (unless you go into co-op and do manual unlock).
+	- **Solution**: if heroes are connected in pathfinding, then hero switching is allowed when sidekick is currently locked in place, where the previous hero you were leading will take the place on "wait here" marker.
+	- **How to continue playing**: Enter co-op; Press `R3+B` on Obelix's controller
+- Obelix boarding the LV5 boat and completing it will let Asterix be behind
+	- **How to continue playing**: Enter co-op; Press `R3+A` on Obelix's controller to bring Asterix
+- Unknown crash `xxl_coop.unknown_crash.log`, details:
 ```
-coop\build.bat
+	  [13166.672] coop: Obelix takes the lead from Asterix (the hero switch button) -- leader now Obelix
+[13166.688] CRASH (first chance): exception C0000005 at axxl.exe+0x166015
+[13166.688] CRASH   reading address B20C1245
+[13166.688] CRASH   eax=B20C1241 ebx=048FBCCC ecx=04DEB97C edx=FFFFFFFF esi=04DFC0B4 edi=00000000 ebp=048FBCCC esp=0019F954
+[13166.688] CRASH   stack: 41DB27 420467 42056F 41E48E 41DA65 41DA30 41CF0D 41E8D1 413EED 61D098 40A58C 409AF3
+[13166.688] CRASH   co-op: p2=- suspended=0
+[13166.688] state[CRASH  ]: Asterix f18=63 mode=normal ai life=01 sit=FF body=16 ai=00 order=0 f1A=00 busy=0 pos=(567.18 -447.52 -191.99)
+[13166.688] state[CRASH  ]: Obelix  f18=60 mode=normal PLAYER life=00 sit=00 body=0E ai=FF order=0 f1A=00 busy=0 pos=(567.60 -447.89 -193.71) LEADER
+[13166.688] state[CRASH  ]: Idefix  f18=03 mode=normal ai life=FF sit=FF body=03 ai=00 order=0 f1A=00 busy=0 pos=(568.53 -447.52 -192.51)
+[13166.688] CRASH (unhandled): exception C0000005 at axxl.exe+0x166015
+[13166.688] CRASH   reading address B20C1245
+[13166.688] CRASH   eax=B20C1241 ebx=048FBCCC ecx=04DEB97C edx=FFFFFFFF esi=04DFC0B4 edi=00000000 ebp=048FBCCC esp=0019F954
+[13166.688] CRASH   stack: 41DB27 420467 42056F 41E48E 41DA65 41DA30 41CF0D 41E8D1 413EED 61D098 40A58C 409AF3
 ```
+- After manually switching to Obelix in LV1-1 and entering the village, you can't switch manually back to Asterix anymore. Loading a different level doesn't fix this problem, only full game restart.
+- Leader mismatch in co-op and single-player `sp_hero_switch_lock = on`
+	- Were found in co-op playthrough (without toggling it). Yet to be documented with exact scenarios to reproduce. 
+	- SP LV5-4 Trio Catapult activation with Asterix doesn't change the `LVL LEAD` to Asterix on landing.
+- Twister Combo hint always shows after buying in LV4
+- Pressing DPad Up in the in-game save menu will play the block sound that doesn't allow a hero switch
+- Sometimes the sparkles on pressing the button sequence in the combo hint can be behind a prompt box (noticed in LV3-1).
+- Vitalstatistix model in LV6-4 is floating due the cutscene skip
+- Flask texture gets corrupted at some point
+- Romans can still spawn in view. Test it in LV2-3 cave
+- Skipping the spy in LV2-1, and leaving Asterix on the cable car, will make an awkward talk with the spy (no softlock though).
+- With modified charge speed romans can reset their charge (noticed on the destroyed bridge sector in LV4)
+- Modified Roman combat lock requirement has a sudden jump in amount in the LV6 1500 fight (encountered with 3x at once/3x requirement)
 
-produces `coop\build\xxl_coop.asi`.
+## Small design fixes/additions
 
-## Installing
+- Add colored glowing on heroes after leader switching, so it can be visually easy to understand (without relying on a sound or camera change). Basically the same way as in XXL 2.
+- Add Roman's "stunned" state time multiplier as an option in co-op difficulty.
+- Asterix's torch HUD should be shown on the screen of the player that controls Asterix. Flask too (on the right side of P1 vertical split-screen (left screen), and on the left side in P2 screen (right screen)).
+- "{hero} needs help!" should be shown on the alive player's side, where after getting close enough to revive, it will switch to "Hold B to revive" prompt, but that prompt with timer will be on the other side of the screen for reference
+- When switching heroes on Twister, the romans should stop spawning, like it is when the one who activated the twister makes the romans spawn stop 
+- Player shouldn't be able to revive a companion when twister is active
+- Probably need to slightly increase revive catapult range, so there won't be an edge where it still can fire
+- Hide "Use" prompt on the machine gun for Obelix, if romans nearby are preventing to use it.
+- Sidekick view shouldn't be shown in the shop
 
-Copy into the game folder next to `axxl.exe`:
+## Upcoming features
 
-* `xxl_coop.asi`
-* `xxl_coop.ini`
-* `xxl_coop_lang.ini` (`coop\dist\`): every text the mod shows, per game language (French, English,
-  German, Spanish, Italian). Edit it to change a hint's words; the game reads it again when it is saved.
-  `run_test.ps1` copies it over unless the copy in `Game Files\` is newer.
-
-They are already installed in `Game Files\`. The mod writes `xxl_coop.log` there.
-
-With DSOAL as the sound wrapper, also copy `xxl_timerfix.asi` (`coop\timerfix\build.bat`). It is
-separate from the mod. Without it the game runs at ~45 fps instead of 62: the frame limiter's `Sleep`
-needs a 1 ms timer, which IndirectSound's XAudio2 requests but DSOAL doesn't.
-
-`xxl_widescreen2d.asi` (`coop\widescreen2d\build.bat`), also separate, draws 2D text (dialogues,
-hints, menus, the font's button icons) at its true shape: the game widens it by aspect / (4/3), a third
-too wide at 16:9. It also draws the HUD's 3D models (health shields, helmet, combo columns) without
-the stretch, in their places; a row of them (the shields) closes up towards its outer end. The HUD's
-see-through plates are drawn narrower about their anchored edge, and what sits on them comes in with them.
-It also swaps the text font's two pages for 4x sharper ones (Arial Bold, and redrawn action icons): copy the
-folder `coop\widescreen2d\fonts` PNGs into `Game Files\xxl_widescreen2d\` (two per language pack; without them
-the font stays as it is).
-
-## Controls
-
-| | |
-|---|---|
-| Start on a second pad (or Enter on the keyboard) | join as Obelix (ini `p2_hero`) |
-| Hold Back for 1.5 s (Backspace) | leave co-op |
-| Hold R3 (P2 also Back / Backspace) + A | your hero jumps to your partner's side |
-| Hold R3 + B | take your hero back when the game keeps it waiting, or reset a hero that cannot move |
-| Hold R3 + Y / R3 + X (`cheats = on`) | fill the magic potion / make your hero the leader |
-
-Player 2's keyboard keys are in the `[keyboard]` section of `xxl_coop.ini` (default: WASD move,
-arrows camera, Space jump, J/K/L attack/grab/dash, U/O shoulder buttons). While player 2 plays on
-the keyboard their keys are kept from the game, so one keyboard can serve both players when the
-keys don't overlap (the ini has a numpad layout for that).
-
-Player 1 keeps using whatever the game is already configured to use (keyboard or pad) — the mod does
-not touch player 1's input path, so the QoL patch's right-stick and mouse options keep working.
-
-Co-op refuses to arm when it would break the game: before the Obelix reunion in level 1 (the class
-genuinely has zero instances until then, which the mod checks), while either hero is flagged busy
-(`hero+0x390 & 4` — belly ride, boat, shop, cutscene), and across level transitions, which drop
-player 2 automatically.
-
----
-
-## How it works
-
-`docs/RESEARCH.md` is the real documentation. The short version:
-
-* Heroes are `CKHkAsterix` / `CKHkObelix` hooks, managed by a `CKGrpTrio` group that stores which
-  one is the **leader** (player-driven) and which is the **companion** (AI-driven).
-* Each hero is ticked once per frame by its *Life* object. The mod hooks
-  `CKHkAsterixLife::tick` and `CKHkObelixLife::tick` by swapping one vtable entry each — reversible,
-  and it cannot collide with a byte patch another mod put inside the same function.
-* Both hero update functions read a **single shared command block** at `gameManager+0x40`, and a
-  hero only consumes it when its own `+0x1A` byte is zero. That is what makes two-player control
-  tractable: clear `+0x1A` on both heroes, then swap the block's contents between the two Life ticks
-  so each hero sees its own player's input. The wrappers to do that are already installed
-  (`CoopBeforeHeroTick` / `CoopAfterHeroTick`); they just have nothing useful to write yet.
-* The companion's behaviour is an AI order byte at `hero+0x564`, and the engine kindly left the
-  developers' French debug names in the binary, so the whole order table is known — `0` is
-  *Suivre Leader*, which is Obelix trailing Asterix and starting fights on his own.
-
-### Finishing per-player input
-
-The blocker is that only four fields of the command block are identified (movement vector, heading,
-control nibble, AI-override byte). The buttons are somewhere in the rest of it.
-
-To decode them: set `diagnostics = on`, play, and diff the hex dumps in the log across frames where
-you press exactly one button. The dump already covers `0x00`–`0xBF` of the block. Note that the
-engine uses sentinels for "no change" — `0xA` nibbles in `+0x1C`, `-1` in `+0x5C` and `+0x8C` — so
-a synthesised command must fill those in for every field it is not driving.
-
-### Finishing split-screen
-
-`CalcProjCamera` at `0x414B70` is the per-frame camera projection setup and is a known-safe hook
-point (both the QoL patch and the Inspector already replace it), so per-viewport aspect ratio has a
-home. What is still missing is the "render the 3D scene once" call to run twice.
-
-The RenderWare 3 camera entry points are identified (`docs/RESEARCH.md` §7), including
-`RwCameraSetViewOffset` at `0x58FD40`, which the engine already uses — sub-rasters plus a view
-offset is the standard RenderWare way to do split-screen, so the pieces are there.
-
-**Careful:** the QoL patch overwrites `0x414B70` wholesale. Anything the co-op mod does there has to
-chain rather than clobber, or widescreen FOV breaks.
-
----
-
-## Tooling
-
-`ghidra_scripts/` holds the headless Ghidra helper used for all of the analysis:
-
-```powershell
-.\ghidra_scripts\gh.ps1 "decomp 0x414B70 | vtbl 0x625C90 14 | strings CKHkObelix"
-```
-
-Commands: `decomp`, `xrefs`, `callees`, `scanimm`, `strings`, `strtab`, `vtbl`, `sym`, `imports`.
-Chain them with `|`. It expects the analysed project the first run created under the scratchpad
-directory; re-import `axxl.exe` with `analyzeHeadless` if it has been cleaned up.
-
-## Notes on the game folder
-
-* `force_level` in `xxl_coop.ini` boots straight into a level. Prefer it over the QoL patch's
-  undocumented `initial_level` key — **`initial_level` crashes this build of the game** (verified:
-  it access-violates on startup with the co-op mod removed as well).
-* The mod refuses to patch anything if `axxl.exe` is not loaded at `0x400000` or if the two Life
-  vtable slots do not hold the values this build expects, so a different game version will make it
-  log and stand down rather than corrupt memory.
+- Bonus rewards like in XXL2.
+	- Shows a specific sequence of button presses to perform
+	- The vanilla x3 and x10 are now locked behind this system
+	- Some rewards require a full combo bar (shield, flask), and can include purchased combos in required button sequence of a reward
+	- Rewards are based on the current heroes situation
+		- is it a big fight, or a small fight based on amount (doesn't depend on the presence of combat lock) -> only big fights have flask/shield rewards.
+		- low hp -> higher chance to get 5x/10x hams; otherwise you'll get more of 3x/5x hams and multipliers
+	- Sequence reward that requires a companion interaction are disabled during revive sequence
+- New combos (for fun):
+	- A new combo with active magic potion for Asterix:
+		- After activating it, on X (action) press Asterix will very quickly glide (like a teleport but with after images) to a random Roman (with a prolonged green trail depicting his path) with a punch in midair, that will stun Roman, where a second X press will send that Roman off (defeat), and at third X press will repeat a cycle by going to the next available Roman. There is a slight delay between possible X presses. When Roman is in a stun state, you can press B (grab) that Roman and do "whip" blast with them on the ground creating a small shockwave that can defeat nearby Romans, where pressing X next will repeat the cycle. Asterix's quick glide will do 1 hit to Romans in his path. 
+		- Combo button sequence is `A > Y > X`
+		- Can be purchased starting from Normandy for slightly cheaper price than Mole Combo.
+	- A new combo for Obelix:
+		- After activating it, Obelix gets from a ground a huge boulder, where the are a few options:
+			- Pressing X will make Obelix go into spinning action, where rapidly pressing X makes the spin faster (lasts up to 8 seconds), where each hit with the bolder on Romans acts as regular X action hit, where with enough hits an enemy can be defeated like with regular hits (only on fast spinning speed). Has a unique "break shield" trait, where shield hits aren't counted in order to hit Romans. On timeout, Obelix just lets go of the boulder, which will depending on spin speed: defeat/disarm everything on its flying path in random direction + a small shockwave on its end.
+			- Pressing Y will make Obelix launch the boulder straight, which will disarm those enemies that are getting hit by it
+			- Pressing B does a blind throw upwards that will act as a catapult's projectile which will defeat enemies on impact of the shockwave
+		- Has the same button sequence as Mole Combo, and the same environment limits (i.e. solid ground required). 
+		- With active magic potion, instead of 1 hit, the enemies are defeated instantly (and also never disarmed). The spinning animation is faster too, along with the boulder's "let go" range.
+		- Can be purchased starting from Gaul for the slightly higher price as Mole Combo.
+- "Power up on demand" feature
+	- Asterix gets 1 full magic potion and 1 drop of potion that can be activated on demand. Flask container is breakable, when Asterix gets 3 hits, then the flask container breaks and only a drop of flask can be always used. A drop is still available after using full magic potion too. A drop of magic potion is not quite the "full magic potion", but it is used in order to increase the strength temporarily (the same duration as the full magic potion), where Romans will take twice as much hits (or have twice as less hp). Intended to be used when companion is down, but can be used anytime. Slot refills are at the save points (from the druid's cauldron obviously). Obelix doesn't has "full magic potion" slot, instead he has 1 "Fury" slot that have the same functionality as a drop of magic potion. Refill happens on Obelix getting full health (3 full default health shields), and there is a 2 minute wait between uses. Asterix's Magic Potion drops and Obelix's "Fury" aren't shared between heroes, each hero can use it individually with this feature.
